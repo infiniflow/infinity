@@ -337,7 +337,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     NotImplementError("Not implemented");
 
-    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, GetBufferMgr());
 
     if (res.entry_ == nullptr) {
         return res;
@@ -347,7 +347,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
     txn_indexes_.insert(index_def_entry);
-    index_names_.insert(index_def->index_name_);
+    index_names_.insert(*index_def->index_name_);
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;
 }

@@ -376,7 +376,7 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     }
 
     Vector<String> column_names(*create_index_info->column_names_);
-    String index_name = std::move(create_index_info->index_name_);
+    auto index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     IndexMethod method_type = IndexMethod::kInvalid;
     if (create_index_info->method_type_ == "IVFFlat") {
         method_type = IndexMethod::kIVFFlat;

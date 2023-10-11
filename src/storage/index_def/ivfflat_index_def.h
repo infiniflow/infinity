@@ -9,9 +9,13 @@ namespace infinity {
 class IVFFlatIndexDef : public IndexDef {
 public:
     static SharedPtr<IndexDef>
-    Make(String index_name, IndexMethod method_type, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    Make(SharedPtr<String> index_name, IndexMethod method_type, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
 
-    IVFFlatIndexDef(String index_name, IndexMethod method_type, Vector<String> column_names, size_t centroids_count, MetricType metric_type)
+    IVFFlatIndexDef(SharedPtr<String> index_name,
+                    IndexMethod method_type,
+                    Vector<String> column_names,
+                    size_t centroids_count,
+                    MetricType metric_type)
         : IndexDef(std::move(index_name), method_type, std::move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
     ~IVFFlatIndexDef() = default;

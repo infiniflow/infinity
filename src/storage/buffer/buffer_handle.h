@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "common/types/alias/concurrency.h"
 #include "common/types/data_type.h"
 #include "storage/io/file_system.h"
-#include "common/types/alias/concurrency.h"
 
 namespace infinity {
 
@@ -32,27 +32,25 @@ using BufferWriteFN = void (*)(const String &path, DataType data_type);
 
 class ObjectHandle;
 
-class CommonObjectHandle;
-
-class IndexObjectHandle;
-
 // BufferHandle is never destructed
 class BufferHandle {
-    friend ObjectHandle;
-    friend CommonObjectHandle;
-    friend IndexObjectHandle;
+    friend class ObjectHandle;
 
     friend class BufferMgrTest;
 
 public:
     explicit BufferHandle(void *buffer_mgr);
 
-    ~BufferHandle() = default;
+private:
+    void DeleteData();
+
+public:
+    ~BufferHandle() { DeleteData(); }
 
     inline void SetID(u64 id) { id_ = id; }
 
 private:
-    ptr_t LoadData();
+    void *LoadData();
 
 public:
     void UnloadData();
@@ -86,11 +84,11 @@ public:
 
 private:
     UniquePtr<FileHandler> file_handler_{nullptr};
+    void *data_{nullptr};
 
 public:
     RWMutex rw_locker_{};
 
-    UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
     void *buffer_mgr_{};
     u64 reference_count_{0};

@@ -150,7 +150,8 @@ BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir,
                 break;
         }
         case BufferType::kInvalid:
-        case BufferType::kIndex: {
+        case BufferType::kIndex: // Cannot load index file with offset
+        {
             LOG_ERROR("Buffer type is invalid")
             break;
         }

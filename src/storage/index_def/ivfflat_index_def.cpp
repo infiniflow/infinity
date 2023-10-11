@@ -5,8 +5,10 @@
 
 namespace infinity {
 
-SharedPtr<IndexDef>
-IVFFlatIndexDef::Make(String index_name, IndexMethod method_type, Vector<String> column_names, const Vector<InitParameter *> &index_para_list) {
+SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name,
+                                          IndexMethod method_type,
+                                          Vector<String> column_names,
+                                          const Vector<InitParameter *> &index_para_list) {
     size_t centroids_count = 0;
     MetricType metric_type = MetricType::kInvalid;
     for (auto para : index_para_list) {

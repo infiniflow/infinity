@@ -28,9 +28,9 @@ class ColumnBuffer {
 public:
     explicit ColumnBuffer(BufferHandle *buffer_handle, BufferManager *buffer_mgr, bool is_outline);
 
-    const ptr_t GetAll();
+    ptr_t GetAll();
 
-    Pair<const ptr_t, SizeT> GetVarcharAt(SizeT row_idx);
+    Pair<const_ptr_t, SizeT> GetVarcharAt(SizeT row_idx);
 
     Pair<const ptr_t, SizeT> GetVarcharAtPrefix(SizeT row_idx);
 

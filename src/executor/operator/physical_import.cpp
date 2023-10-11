@@ -121,7 +121,7 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
                                                                               segment_id,
                                                                               query_context->GetTxn()->GetBufferMgr());
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    CommonObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
+    ObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
 
     while (true) {
@@ -160,7 +160,7 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
                                                               query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
-            object_handle = CommonObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
+            object_handle = ObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
         }
     }
     return vector_n;

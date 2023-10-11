@@ -4,8 +4,10 @@
 
 #include "parser/statement/extra/create_table_info.h"
 #include "storage/common/block_index.h"
+#include "storage/index_def/index_def.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
+#include "storage/meta/index_def_meta.h"
 #include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn_store.h"
 
@@ -36,7 +38,8 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                               ConflictType conflict_type,
                                               u64 txn_id,
                                               TxnTimeStamp begin_ts,
-                                              TxnManager *txn_mgr) {
+                                              TxnManager *txn_mgr,
+                                              BufferManager *buffer_mgr) {
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
     if (table_entry->indexes_.find(index_def->index_name_) != table_entry->indexes_.end()) {
@@ -45,17 +48,17 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
     table_entry->rw_locker_.unlock_shared();
 
     if (index_def_meta == nullptr) {
-        LOG_TRACE("Create new index: {}", index_def->index_name_);
-        auto new_index_def_meta = MakeUnique<IndexDefMeta>(MakeShared<String>(index_def->index_name_), table_entry);
+        LOG_TRACE("Create new index: {}", *index_def->index_name_);
+        auto new_index_def_meta = MakeUnique<IndexDefMeta>(index_def->index_name_, table_entry);
         index_def_meta = new_index_def_meta.get();
 
         table_entry->rw_locker_.lock();
         table_entry->indexes_[index_def->index_name_] = std::move(new_index_def_meta);
         table_entry->rw_locker_.unlock();
 
-        LOG_TRACE("Add new index entry for {} in new index meta of table_entry {} ", index_def->index_name_, *table_entry->table_entry_dir_);
+        LOG_TRACE("Add new index entry for {} in new index meta of table_entry {} ", *index_def->index_name_, *table_entry->table_entry_dir_);
     } else {
-        LOG_TRACE("Add new index entry for {} in existed index meta of table_entry {}", index_def->index_name_, *table_entry->table_entry_dir_);
+        LOG_TRACE("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_);
     }
     IndexDef *index_def_ptr = index_def.get();
     EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, std::move(index_def), txn_id, begin_ts, txn_mgr);
@@ -81,7 +84,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
 
             for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
                 // TODO shenyushi
-                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), *index_def_ptr, column_id, embedding_info->Dimension());
+                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), *index_def_ptr, column_id, embedding_info->Dimension(), buffer_mgr);
             }
             break;
         }
@@ -98,17 +101,17 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
 
 EntryResult
 TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    return {.entry_ = nullptr, .err_ = nullptr};
+    NotImplementError("Not implemented.");
     // TODO
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    return {.entry_ = nullptr, .err_ = nullptr};
+    NotImplementError("Not implemented.");
     // TODO
 }
 
 EntryResult TableCollectionEntry::RemoveIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
-    return {.entry_ = nullptr, .err_ = nullptr};
+    NotImplementError("Not implemented.");
     // TODO
 }
 
@@ -332,7 +335,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json &table_entry_json, TableC
     if (table_entry_json.contains("indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
             UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            table_entry->indexes_.emplace(*index_def_meta->index_name_, std::move(index_def_meta));
+            table_entry->indexes_.emplace(index_def_meta->index_name_, std::move(index_def_meta));
         }
     }
 

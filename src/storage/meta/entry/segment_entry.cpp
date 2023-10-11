@@ -122,11 +122,15 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
     }
 }
 
-void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id) {
+void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr) {
     NotImplementError("Not implemented")
 }
 
-void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension) {
+void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
+                                        const IndexDef &index_def,
+                                        u64 column_id,
+                                        int dimension,
+                                        BufferManager *buffer_mgr) {
     switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
             auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
@@ -152,7 +156,7 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, const Index
             auto index = MakeUnique<faiss::IndexIVFFlat>(quantizer.get(), dimension, ivfflat_index_def.centroids_count_);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
-                CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
+                ObjectHandle object_handle(block_column_entry->buffer_handle_);
                 auto block_data_ptr = (float *)object_handle.GetData();
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
@@ -161,11 +165,8 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, const Index
                     StorageException("Train index failed: {}", e.what());
                 }
             }
-
-            auto index_filename = DetermineIndexFilename(*segment_entry->segment_dir_, ivfflat_index_def.index_name_, segment_entry->segment_id_);
-            // TODO shenyushi: change meta data
-            // segment_entry->index_name_map_.emplace(column_id, index_filename);
-            faiss::write_index(index.get(), index_filename.get()->data());
+            auto index_entry = IndexEntry::MakeNewIndexEntry(segment_entry->segment_dir_, index_def.index_name_, buffer_mgr);
+            segment_entry->index_entry_map_.emplace(index_def.index_name_, std::move(index_entry));
             return;
         }
         default: {
@@ -341,8 +342,4 @@ SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u
     return segment_dir;
 }
 
-SharedPtr<String> SegmentEntry::DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id) {
-    // TODO shenyushi 3
-    return MakeShared<String>(parent_dir + '/' + index_name + '_' + std::to_string(seg_id));
-}
 } // namespace infinity

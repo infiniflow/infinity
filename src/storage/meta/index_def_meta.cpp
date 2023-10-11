@@ -36,7 +36,7 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
                 index_def_meta->entry_list_.emplace_back(std::move(index_def_entry));
                 return {.entry_ = res, .err_ = nullptr};
             } else {
-                LOG_TRACE("Duplicated index: {}.", index_def->index_name_);
+                LOG_TRACE("Duplicated index: {}.", *index_def->index_name_);
                 return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
             }
         } else {
@@ -58,7 +58,7 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
                         index_def_meta->entry_list_.emplace_back(std::move(index_def_entry));
                         return {.entry_ = res, .err_ = nullptr};
                     } else {
-                        LOG_TRACE("Duplicated index: {}.", index_def->index_name_);
+                        LOG_TRACE("Duplicated index: {}.", *index_def->index_name_);
                         return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
                     }
                 } else {

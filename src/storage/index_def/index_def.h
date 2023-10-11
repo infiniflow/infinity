@@ -31,7 +31,7 @@ MetricType StringToMetricType(const String &str);
 
 class IndexDef {
 protected:
-    explicit IndexDef(String index_name, IndexMethod method_type, Vector<String> column_names)
+    explicit IndexDef(SharedPtr<String> index_name, IndexMethod method_type, Vector<String> column_names)
         : index_name_(std::move(index_name)), method_type_(method_type), column_names_(std::move(column_names)){};
 
 public:
@@ -59,7 +59,7 @@ protected:
 
 public:
     // TODO shenyushi, use shared_ptr here
-    const String index_name_{};
+    const SharedPtr<String> index_name_{};
     const IndexMethod method_type_{IndexMethod::kInvalid};
     const Vector<String> column_names_{};
 };

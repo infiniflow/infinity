@@ -74,7 +74,7 @@ bool IndexDef::operator!=(const IndexDef &other) const { return !(*this == other
 
 int32_t IndexDef::GetSizeInBytes() const {
     int32_t size = 0;
-    size += sizeof(int32_t) + index_name_.length();
+    size += sizeof(int32_t) + index_name_->length();
     size += sizeof(int32_t) + sizeof(method_type_);
     size += sizeof(int32_t);
     for (const String &column_name : column_names_) {
@@ -106,7 +106,7 @@ String IndexDef::ToString() const {
 
 nlohmann::json IndexDef::Serialize() const {
     nlohmann::json res;
-    res["index_name"] = index_name_;
+    res["index_name"] = *index_name_;
     res["method_type"] = IndexMethodToString(method_type_);
     res["column_names"] = column_names_;
     return res;
@@ -128,7 +128,7 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const nlohmann::json &index_def_json) 
 }
 
 void IndexDef::InitBaseWithJson(const nlohmann::json &index_def_json) {
-    const_cast<String &>(index_name_) = index_def_json["index_name"];
+    const_cast<SharedPtr<String> &>(index_name_) = MakeShared<String>(index_def_json["index_name"]);
     const_cast<IndexMethod &>(method_type_) = index_def_json["method_type"];
     const_cast<Vector<String> &>(column_names_) = index_def_json["column_names"];
 }

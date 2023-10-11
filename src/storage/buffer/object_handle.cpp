@@ -5,13 +5,13 @@ namespace infinity {
 
 ObjectHandle::ObjectHandle(BufferHandle *buffer_handle) : buffer_handle_(buffer_handle) {}
 
-// ObjectHandle::ObjectHandle(const ObjectHandle &other) : buffer_handle_(other.buffer_handle_), ptr_((other.ptr_)) {
+// TemplateHandle::TemplateHandle(const TemplateHandle &other) : buffer_handle_(other.buffer_handle_), ptr_((other.ptr_)) {
 //     buffer_handle_->AddRefCount();
 // }
 
 ObjectHandle::ObjectHandle(ObjectHandle &&other) noexcept : buffer_handle_(other.buffer_handle_) { other.buffer_handle_ = nullptr; }
 
-// ObjectHandle& ObjectHandle::operator=(const ObjectHandle &other) {
+// TemplateHandle& TemplateHandle::operator=(const TemplateHandle &other) {
 //     if (buffer_handle_) {
 //         buffer_handle_->UnloadData();
 //     }
@@ -38,7 +38,9 @@ ObjectHandle::~ObjectHandle() {}
 
 SharedPtr<String> ObjectHandle::GetDir() const { return buffer_handle_->current_dir_; }
 
-ptr_t ObjectHandle::GetData() {
+faiss::Index *ObjectHandle::GetIndex() { return static_cast<faiss::Index *>(GetRaw()); }
+
+void *ObjectHandle::GetRaw() {
     if (ptr_ == nullptr) {
         ptr_ = buffer_handle_->LoadData();
     }

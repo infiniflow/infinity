@@ -43,7 +43,8 @@ public:
                                    ConflictType conflict_type,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts,
-                                   TxnManager *txn_mgr);
+                                   TxnManager *txn_mgr,
+                                   BufferManager *buffer_mgr);
 
     static EntryResult DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
@@ -116,7 +117,7 @@ public:
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
 
-    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
+    HashMap<SharedPtr<String>, UniquePtr<IndexDefMeta>> indexes_{};
 };
 
 } // namespace infinity

@@ -6,6 +6,10 @@
 
 namespace infinity {
 
+namespace faiss {
+class Index;
+}
+
 class BufferHandle;
 
 class ObjectHandle {
@@ -30,10 +34,16 @@ public:
 public:
     [[nodiscard]] SharedPtr<String> GetDir() const;
 
-    [[nodiscard]] ptr_t GetData();
+    [[nodiscard]] inline ptr_t GetData() { return reinterpret_cast<ptr_t>(GetRaw()); }
+
+    [[nodiscard]] inline faiss::Index *GetIndex();
 
 private:
-    ptr_t ptr_{};
+    [[nodiscard]] void *GetRaw();
+
+    void *ptr_{};
 };
+
+// using FaissIndexHandle = TemplateHandle<faiss::Index>;
 
 } // namespace infinity

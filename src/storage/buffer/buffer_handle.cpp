@@ -3,11 +3,13 @@
 //
 
 #include "storage/buffer/buffer_handle.h"
+#include "common/utility/defer_op.h"
+#include "common/utility/infinity_assert.h"
+#include "faiss/Index.h"
+#include "faiss/impl/FaissException.h"
+#include "faiss/index_io.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/buffer_task.h"
-
-#include "common/utility/defer_op.h"
-#include "faiss/impl/FaissException.h"
 #include "storage/io/local_file_system.h"
 
 namespace infinity {
@@ -18,14 +20,36 @@ BufferHandle::BufferHandle(void *buf_mgr) : buffer_mgr_(buf_mgr) {
     writer_processor_ = buffer_mgr->writer_.get();
 }
 
-ptr_t BufferHandle::LoadData() {
+void BufferHandle::DeleteData() {
+    if (data_ == nullptr) {
+        return;
+    }
+    switch (buffer_type_) {
+        case BufferType::kTempFile:
+        case BufferType::kFile:
+        case BufferType::kExtraBlock: {
+            auto real_data = static_cast<char *>(data_);
+            delete[] real_data;
+            break;
+        }
+        case BufferType::kIndex: {
+            auto real_data = static_cast<faiss::Index *>(data_);
+            delete real_data;
+            break;
+        }
+        case BufferType::kInvalid:
+            break;
+    }
+}
+
+void *BufferHandle::LoadData() {
     BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
         switch (status_) {
             case BufferStatus::kLoaded: {
                 ++reference_count_;
-                return data_.get();
+                return data_;
             }
             case BufferStatus::kUnloaded: {
                 if (reference_count_ != 0 || data_ == nullptr) {
@@ -34,7 +58,7 @@ ptr_t BufferHandle::LoadData() {
                 }
                 reference_count_ = 1;
                 status_ = BufferStatus::kLoaded;
-                return data_.get();
+                return data_;
             }
             case BufferStatus::kSpilled: {
                 if (reference_count_ != 0 || data_ != nullptr) {
@@ -52,12 +76,13 @@ ptr_t BufferHandle::LoadData() {
 
                     LOG_TRACE("Read data from spilled file from: {}", file_path);
                     // Rename the temp file on disk into _temp_filename
-                    data_ = MakeUnique<char[]>(buffer_size_);
+                    auto real_data = new char[buffer_size_];
+                    data_ = reinterpret_cast<void *>(real_data);
                     reference_count_ = 1;
 
                     buffer_mgr->current_memory_size_ += buffer_size_;
                     status_ = BufferStatus::kLoaded;
-                    return data_.get();
+                    return data_;
                 } else {
                     LOG_ERROR("Only temp file can be in spilled status");
                     return nullptr;
@@ -70,7 +95,7 @@ ptr_t BufferHandle::LoadData() {
                     return nullptr;
                 }
 
-                ptr_t res{nullptr};
+                void *res{nullptr};
                 switch (buffer_type_) {
                     case BufferType::kTempFile: {
                         // Allocate memory with buffer size
@@ -88,9 +113,10 @@ ptr_t BufferHandle::LoadData() {
                         }
 
                         LOG_TRACE("Allocate buffer with name: {} and size {}", file_path, buffer_size_);
-                        data_ = MakeUnique<char[]>(buffer_size_);
+                        auto real_data = new char[buffer_size_];
+                        data_ = reinterpret_cast<void *>(real_data);
                         reference_count_ = 1;
-                        res = data_.get();
+                        res = data_;
                         break;
                     }
                     case BufferType::kFile: {
@@ -141,8 +167,9 @@ ptr_t BufferHandle::LoadData() {
                             }
 
                             // file body
-                            data_ = MakeUnique<char[]>(buffer_size_);
-                            nbytes = fs.Read(*file_handler_, data_.get(), buffer_size_);
+                            auto real_data = new char[buffer_size_];
+                            data_ = reinterpret_cast<void *>(real_data);
+                            nbytes = fs.Read(*file_handler_, data_, buffer_size_);
                             if (nbytes != buffer_size_) {
                                 StorageError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
                             }
@@ -160,7 +187,7 @@ ptr_t BufferHandle::LoadData() {
                         }
 
                         reference_count_ = 1;
-                        res = data_.get();
+                        res = data_;
                         break;
                     }
                     case BufferType::kIndex: {
@@ -197,9 +224,10 @@ ptr_t BufferHandle::LoadData() {
                         }
 
                         LOG_TRACE("Read extra block: {}", file_path);
-                        data_ = MakeUnique<char[]>(buffer_size_);
+                        auto real_data = new char[buffer_size_];
+                        data_ = reinterpret_cast<void *>(real_data);
                         reference_count_ = 1;
-                        res = data_.get();
+                        res = data_;
                         break;
                     }
                     case BufferType::kInvalid: {
@@ -260,7 +288,7 @@ void BufferHandle::FreeData() {
         } else {
             status_ = BufferStatus::kFreed;
         }
-        data_.reset();
+        DeleteData();
         data_ = nullptr;
         buffer_mgr->current_memory_size_ -= buffer_size_;
     }
@@ -292,7 +320,8 @@ UniquePtr<String> BufferHandle::SetSealing() {
 
                 LOG_TRACE("Read data from spilled file from: {}", file_path);
                 // Rename the temp file on disk into _temp_filename
-                data_ = MakeUnique<char[]>(buffer_size_);
+                auto real_data = new char[buffer_size_];
+                data_ = reinterpret_cast<void *>(real_data);
                 reference_count_ = 1;
 
                 SharedPtr<BufferReadTask> read_task = MakeShared<BufferReadTask>(this);
@@ -398,8 +427,9 @@ void BufferHandle::ReadFile() {
     }
 
     // file body
-    data_ = MakeUnique<char[]>(buffer_length);
-    nbytes = fs.Read(*file_handler_, data_.get(), buffer_length);
+    auto real_data = new char[buffer_size_];
+    data_ = reinterpret_cast<void *>(real_data);
+    nbytes = fs.Read(*file_handler_, data_, buffer_length);
     if (nbytes != buffer_length) {
         StorageError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_length, nbytes));
     }
@@ -426,11 +456,6 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
         StorageError("No data will be written.")
     }
 
-    // File structure:
-    // - header: magic number
-    // - header: buffer size
-    // - data buffer
-    // - footer: checksum
     LocalFileSystem fs;
 
     String to_write_path;
@@ -451,6 +476,20 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
         LOG_ERROR(err_msg);
         StorageError(err_msg);
     }
+
+    if (buffer_type_ == BufferType::kIndex) {
+        try {
+            faiss::write_index(reinterpret_cast<faiss::Index *>(data_), to_write_file.c_str());
+        } catch (faiss::FaissException &xcp) {
+            StorageError(xcp.msg)
+        }
+        return;
+    }
+    // File structure:
+    // - header: magic number
+    // - header: buffer size
+    // - data buffer
+    // - footer: checksum
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(to_write_file, flags, FileLockType::kWriteLock);
 
@@ -473,7 +512,7 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
         StorageError(fmt::format("Write buffer length field which length is {}.", nbytes));
     }
 
-    nbytes = fs.Write(*file_handler_, data_.get(), buffer_length);
+    nbytes = fs.Write(*file_handler_, data_, buffer_length);
     if (nbytes != buffer_length) {
         StorageError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_length, nbytes));
     }
