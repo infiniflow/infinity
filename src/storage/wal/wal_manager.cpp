@@ -3,7 +3,6 @@
 //
 
 #include "wal_manager.h"
-#include "common/types/alias/primitives.h"
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
@@ -161,7 +160,7 @@ void WalManager::Flush() {
             // Check if the wal file is too large.
             try {
                 auto file_size = fs::file_size(wal_path_);
-                if (file_size > kWALFileSizeThreshold) {
+                if (file_size > DEFAULT_WAL_FILE_SIZE) {
                     this->SwapWALFile(max_commit_ts);
                 }
 
