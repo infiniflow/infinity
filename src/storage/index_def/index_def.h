@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
 #include "json.hpp"
 
@@ -51,12 +52,15 @@ public:
 
     virtual nlohmann::json Serialize() const;
 
-    static void Deserialize(const nlohmann::json &serialized, IndexDef &index_def);
+    static SharedPtr<IndexDef> Deserialize(const nlohmann::json &index_def_json);
+
+protected:
+    void InitBaseWithJson(const nlohmann::json &index_def_json);
 
 public:
+    // TODO shenyushi, use shared_ptr here
     const String index_name_{};
     const IndexMethod method_type_{IndexMethod::kInvalid};
     const Vector<String> column_names_{};
 };
-
 } // namespace infinity

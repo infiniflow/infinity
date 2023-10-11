@@ -21,6 +21,7 @@ class BufferManager;
 class NewCatalog;
 class IndexEntry;
 class TableCollectionEntry;
+class IndexDefEntry;
 class DBEntry;
 class MetaTableState;
 class ScanState;
@@ -155,7 +156,7 @@ private:
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableCollectionEntry *> txn_tables_{};
-    Set<IndexEntry *> txn_indexes_{};
+    Set<IndexDefEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};

@@ -5,6 +5,7 @@
 #include "txn.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
+#include "storage/meta/entry/index_def_entry.h"
 #include "storage/meta/entry/index_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/meta_state.h"
@@ -344,8 +345,8 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     if (res.entry_->entry_type_ != EntryType::kIndex) {
         return {nullptr, MakeUnique<String>("Invalid index type")};
     }
-    auto index_entry = static_cast<IndexEntry *>(res.entry_);
-    txn_indexes_.insert(index_entry);
+    auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
+    txn_indexes_.insert(index_def_entry);
     index_names_.insert(index_def->index_name_);
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;

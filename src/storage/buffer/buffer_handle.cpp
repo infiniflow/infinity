@@ -5,7 +5,9 @@
 #include "storage/buffer/buffer_handle.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/buffer_task.h"
+
 #include "common/utility/defer_op.h"
+#include "faiss/impl/FaissException.h"
 #include "storage/io/local_file_system.h"
 
 namespace infinity {
@@ -70,7 +72,6 @@ ptr_t BufferHandle::LoadData() {
 
                 ptr_t res{nullptr};
                 switch (buffer_type_) {
-
                     case BufferType::kTempFile: {
                         // Allocate memory with buffer size
                         UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
@@ -161,6 +162,21 @@ ptr_t BufferHandle::LoadData() {
                         reference_count_ = 1;
                         res = data_.get();
                         break;
+                    }
+                    case BufferType::kIndex: {
+                        String file_path;
+                        if (current_dir_ == nullptr or current_dir_->empty()) {
+                            file_path = *base_dir_ + '/' + *file_name_;
+                        } else {
+                            file_path = *current_dir_ + '/' + *file_name_;
+                        }
+                        try {
+                            faiss::Index *index = faiss::read_index(file_path.c_str());
+                            res = reinterpret_cast<ptr_t>(index);
+                        } catch (faiss::FaissException xcp) {
+                            LOG_ERROR(xcp.msg);
+                            return nullptr;
+                        }
                     }
                     case BufferType::kExtraBlock: {
                         LOG_TRACE("Read extra block file header to buffer");

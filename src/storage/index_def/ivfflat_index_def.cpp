@@ -63,7 +63,7 @@ SharedPtr<IVFFlatIndexDef> IVFFlatIndexDef::Deserialize(const nlohmann::json &se
     // Hack to initialize with no parameter while default constructor is deleted
     auto ptr = new char[sizeof(IVFFlatIndexDef)];
     auto index_ptr = reinterpret_cast<IVFFlatIndexDef *>(ptr);
-    IndexDef::Deserialize(serialized, static_cast<IndexDef &>(*index_ptr));
+    index_ptr->InitBaseWithJson(serialized);
     // Hack to initialize const value after constructor
     const_cast<size_t &>(index_ptr->centroids_count_) = serialized["centroids_count_"];
     const_cast<MetricType &>(index_ptr->metric_type_) = serialized["metric_type_"];

@@ -25,6 +25,7 @@ class IndexMeta;
 class SegmentEntry;
 class IndexDef;
 class AppendState;
+class IndexDefMeta;
 
 struct TableCollectionEntry : public BaseEntry {
 public:
@@ -115,7 +116,7 @@ public:
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
 
-    HashMap<String, UniquePtr<IndexMeta>> indexes_{};
+    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
 };
 
 } // namespace infinity

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "storage/buffer/object_handle.h"
 #include "common/types/alias/containers.h"
+#include "storage/buffer/object_handle.h"
 #include <limits>
 
 namespace infinity {
@@ -14,13 +14,13 @@ struct OutlineBuffer {
 
     SizeT current_file_idx_{std::numeric_limits<SizeT>::max()};
 
-    CommonObjectHandle outline_ele_{};
+    ObjectHandle outline_ele_{};
 
     OutlineBuffer(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
 };
 
 class ColumnBuffer {
-    CommonObjectHandle inline_col_{};
+    ObjectHandle inline_col_{};
 
     // is null, if the column is inline
     UniquePtr<OutlineBuffer> outline_buffer_{};

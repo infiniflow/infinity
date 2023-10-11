@@ -327,8 +327,6 @@ nlohmann::json TableCollectionMeta::Serialize(const TableCollectionMeta *table_m
  * @return UniquePtr<TableCollectionMeta>
  */
 UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
-    nlohmann::json json_res;
-
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE("load table {}", *table_name);

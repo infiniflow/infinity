@@ -3,14 +3,13 @@
 //
 
 #include "storage/meta/entry/block_column_entry.h"
-#include "storage/meta/entry/segment_column_entry.h"
+#include "common/column_vector/column_vector.h"
+#include "common/types/varchar_layout.h"
+#include "storage/buffer/buffer_manager.h"
 #include "storage/meta/entry/block_entry.h"
+#include "storage/meta/entry/segment_column_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
-#include "storage/buffer/buffer_manager.h"
-#include "common/types/varchar_layout.h"
-#include "common/column_vector/column_vector.h"
-#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 
@@ -63,7 +62,7 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
 }
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
-    CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
+    ObjectHandle object_handle(block_column_entry->buffer_handle_);
     ptr_t dst_p = object_handle.GetData() + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
     DataType *column_type = block_column_entry->column_type_.get();
@@ -101,7 +100,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                         outline_info->written_buffers_.emplace_back(buffer_handle, 0);
                     }
                     auto &[current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
-                    CommonObjectHandle out_object_handle(current_buffer_handle);
+                    ObjectHandle out_object_handle(current_buffer_handle);
                     ptr_t outline_dst_ptr = out_object_handle.GetData() + current_buffer_offset;
                     u16 outline_data_size = varchar_type->length;
                     ptr_t outline_src_ptr = varchar_type->ptr;

@@ -15,6 +15,7 @@ class AsyncBatchProcessor;
 enum class BufferType {
     kTempFile,
     kFile,
+    kIndex,
     kExtraBlock,
     kInvalid,
 };

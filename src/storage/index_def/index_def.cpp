@@ -1,6 +1,8 @@
 #include "index_def.h"
 
+#include "common/utility/infinity_assert.h"
 #include "common/utility/serializable.h"
+#include "storage/index_def/ivfflat_index_def.h"
 
 #include <cstdint>
 #include <sstream>
@@ -110,11 +112,25 @@ nlohmann::json IndexDef::Serialize() const {
     return res;
 }
 
-void IndexDef::Deserialize(const nlohmann::json &serialized, IndexDef &index_def) {
-    // Hack to initialize const value after constructor
-    const_cast<String &>(index_def.index_name_) = serialized["index_name"];
-    const_cast<IndexMethod &>(index_def.method_type_) = serialized["method_type"];
-    const_cast<Vector<String> &>(index_def.column_names_) = serialized["column_names"];
+SharedPtr<IndexDef> IndexDef::Deserialize(const nlohmann::json &index_def_json) {
+    IndexMethod method_type = index_def_json["method_type"];
+    switch (method_type) {
+        case IndexMethod::kIVFFlat: {
+            auto ptr = IVFFlatIndexDef::Deserialize(index_def_json);
+            return std::static_pointer_cast<IndexDef>(ptr);
+        }
+        case IndexMethod::kInvalid: {
+            StorageError("Error index method while deserializing");
+        }
+        default:
+            NotImplementError("Not implemented");
+    }
+}
+
+void IndexDef::InitBaseWithJson(const nlohmann::json &index_def_json) {
+    const_cast<String &>(index_name_) = index_def_json["index_name"];
+    const_cast<IndexMethod &>(method_type_) = index_def_json["method_type"];
+    const_cast<Vector<String> &>(column_names_) = index_def_json["column_names"];
 }
 
 } // namespace infinity

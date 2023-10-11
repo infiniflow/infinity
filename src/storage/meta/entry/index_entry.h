@@ -1,32 +1,29 @@
 #pragma once
 
-#include "common/types/alias/concurrency.h"
-#include "common/types/alias/primitives.h"
 #include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
 #include "storage/buffer/buffer_handle.h"
-#include "storage/buffer/object_handle.h"
 #include "storage/index_def/index_def.h"
-#include "storage/meta/entry/base_entry.h"
-
 namespace infinity {
 
-class IndexMeta;
+class BufferManager;
 
-struct IndexEntry : public BaseEntry {
+class IndexEntry {
 public:
-    explicit IndexEntry(SharedPtr<IndexDef> index_def, IndexMeta *index_meta, u64 txn_id, TxnTimeStamp begin_ts);
-
-public:
-    static IndexObjectHandle GetIndexObjectHandle(IndexEntry *index_entry);
+    explicit IndexEntry(SharedPtr<String> segment_entry_dir, SharedPtr<IndexDef> index_def)
+        : segment_entry_dir_(std::move(segment_entry_dir)), index_def_(std::move(index_def)) {}
 
 public:
-    RWMutex rw_locker_{};
+    [[nodiscard]] static const void GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
 
-    IndexMeta *index_meta_{};
+private:
+    static inline String IndexFileName(const String &index_name) { return index_name + ".idx"; }
 
+    static inline String IndexDirName(const String &segment_entry_dir) { return segment_entry_dir + "/index"; }
+
+private:
+    SharedPtr<String> segment_entry_dir_{};
     SharedPtr<IndexDef> index_def_{};
-
-    SharedPtr<String> file_name_{};
-    BufferHandle *index_buffer_handle_{};
+    BufferHandle *buffer_handle_{};
 };
 } // namespace infinity

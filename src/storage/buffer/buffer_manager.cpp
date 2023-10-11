@@ -44,6 +44,21 @@ BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir, 
     }
 
     switch (buffer_type) {
+        case BufferType::kIndex: {
+            LOG_TRACE("Read index file, Generate Buffer Handle");
+            std::unique_lock<RWMutex> w_locker(rw_locker_);
+            auto [iter, insert_ok] = buffer_map_.emplace(*full_name, this);
+            StorageAssert(insert_ok, "Insert buffer handle failed");
+            auto &[_full_name, buffer_handle] = *iter;
+            buffer_handle.id_ = next_buffer_id_++;
+            buffer_handle.base_dir_ = base_dir_;
+            buffer_handle.temp_dir_ = temp_dir_;
+            buffer_handle.current_dir_ = file_dir;
+            buffer_handle.file_name_ = filename;
+            buffer_handle.buffer_type_ = buffer_type;
+
+            return &buffer_handle;
+        }
         case BufferType::kTempFile: {
             LOG_ERROR("Temp file meta data should be stored in buffer manager")
             NotImplementError("Not implemented here") break;
@@ -134,7 +149,8 @@ BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir,
                 //            return &(iter.first->second);
                 break;
         }
-        case BufferType::kInvalid: {
+        case BufferType::kInvalid:
+        case BufferType::kIndex: {
             LOG_ERROR("Buffer type is invalid")
             break;
         }
