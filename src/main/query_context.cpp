@@ -105,6 +105,7 @@ QueryResult QueryContext::Query(const String &query) {
         try {
             this->CreateTxn();
             this->BeginTxn();
+            LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}", session_ptr_->txn_->TxnID(), session_ptr_->txn_->BeginTS(), statement->ToString()));
 
             // Build unoptimized logical plan for each SQL statement.
             SharedPtr<BindContext> bind_context;

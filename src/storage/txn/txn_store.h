@@ -40,6 +40,7 @@ public:
     Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
     HashMap<u64, SharedPtr<IndexEntry>> uncommitted_indexes_{};
     UniquePtr<AppendState> append_state_{};
+    DeleteState delete_state_{};
 
     SizeT current_block_id_{0};
 

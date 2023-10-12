@@ -26,7 +26,7 @@ public:
 
     static SharedPtr<String> ToString(DBMeta *db_meta);
 
-    static nlohmann::json Serialize(const DBMeta *db_meta);
+    static nlohmann::json Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
 

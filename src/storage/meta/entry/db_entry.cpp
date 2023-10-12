@@ -161,18 +161,25 @@ SharedPtr<String> DBEntry::ToString(DBEntry *db_entry) {
     return res;
 }
 
-nlohmann::json DBEntry::Serialize(const DBEntry *db_entry) {
+nlohmann::json DBEntry::Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
-
-    json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
-    json_res["db_name"] = *db_entry->db_name_;
-    json_res["txn_id"] = db_entry->txn_id_.load();
-    json_res["begin_ts"] = db_entry->begin_ts_;
-    json_res["commit_ts"] = db_entry->commit_ts_.load();
-    json_res["deleted"] = db_entry->deleted_;
-    json_res["entry_type"] = db_entry->entry_type_;
-    for (const auto &table_meta_pair : db_entry->tables_) {
-        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta_pair.second.get()));
+    Vector<TableCollectionMeta *> table_metas;
+    {
+        std::shared_lock<std::shared_mutex> lck(db_entry->rw_locker_);
+        json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
+        json_res["db_name"] = *db_entry->db_name_;
+        json_res["txn_id"] = db_entry->txn_id_.load();
+        json_res["begin_ts"] = db_entry->begin_ts_;
+        json_res["commit_ts"] = db_entry->commit_ts_.load();
+        json_res["deleted"] = db_entry->deleted_;
+        json_res["entry_type"] = db_entry->entry_type_;
+        table_metas.reserve(db_entry->tables_.size());
+        for (auto &table_meta_pair : db_entry->tables_) {
+            table_metas.push_back(table_meta_pair.second.get());
+        }
+    }
+    for (TableCollectionMeta *table_meta : table_metas) {
+        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }

@@ -7,6 +7,8 @@
 #include "common/column_vector/column_vector.h"
 #include "storage/meta/table_collection_meta.h"
 #include "txn.h"
+#include <algorithm>
+#include <ranges>
 
 namespace infinity {
 
@@ -67,7 +69,19 @@ UniquePtr<String> TxnTableStore::CreateIndexFile(u64 segment_id, SharedPtr<Index
     return nullptr;
 }
 
-UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) { NotImplementError("TxnTableStore::Delete") }
+UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
+    auto &rows = delete_state_.rows_;
+    for (auto row_id : row_ids) {
+        auto it = rows.find(row_id.segment_id_);
+        if (it != rows.end()) {
+            it->second.push_back(row_id);
+        } else {
+            Vector<RowID> tmp_rows = {row_id};
+            rows.emplace(row_id.segment_id_, tmp_rows);
+        }
+    }
+    return nullptr;
+}
 
 void TxnTableStore::Scan(SharedPtr<DataBlock> &output_block) {}
 
@@ -92,15 +106,17 @@ void TxnTableStore::PrepareCommit() {
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
     for (const auto &uncommitted : uncommitted_segments_) {
-        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_);
+        // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
+        TableCollectionEntry::ImportSegment(table_entry_, txn_, uncommitted);
     }
+
+    TableCollectionEntry::Delete(table_entry_, txn_, delete_state_, txn_ptr->GetBufferMgr());
 
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
 /**
- * @attention deprecated
- * @brief Call for really commit the data to disk.
+ * @brief Call for really commit the data to memory catalog.
  */
 void TxnTableStore::Commit() {
     Txn *txn_ptr = (Txn *)txn_;

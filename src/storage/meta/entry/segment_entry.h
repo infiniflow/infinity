@@ -17,18 +17,12 @@ class IndexEntry;
 class AppendState;
 class TxnTableStore;
 
-enum DataSegmentStatus : i8 {
-    kSegmentOpen,
-    kSegmentClosed,
-    kSegmentFlushing,
-};
-
 struct SegmentVersion {
 public:
     explicit SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
         for (SizeT i = 0; i < capacity; ++i) {
-            created_[i] = MAX_TXN_ID;
-            deleted_[i] = MAX_TXN_ID;
+            created_[i] = 0;
+            deleted_[i] = 0;
             txn_ptr_[i] = (u64)(nullptr);
         }
     }
@@ -37,7 +31,7 @@ public:
     Vector<aptr> txn_ptr_{};
 
 public:
-    static nlohmann::json Serialize(const SegmentVersion *segment_version);
+    static nlohmann::json Serialize(SegmentVersion *segment_version);
 
     static UniquePtr<SegmentVersion> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 };
@@ -51,43 +45,30 @@ public:
     const TableCollectionEntry *table_entry_{};
 
     SharedPtr<String> segment_dir_{};
-
-    SizeT row_capacity_{};
-
-    SizeT current_row_{};
-
     i32 segment_id_{};
 
-    std::atomic<DataSegmentStatus> status_{DataSegmentStatus::kSegmentOpen};
-
+    SizeT row_count_{};
+    SizeT row_capacity_{};
     u64 column_count_{};
-    //    Vector<SharedPtr<SegmentColumnEntry>> columns_;
 
-    //    UniquePtr<SegmentVersion> segment_version_{};
+    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
+    TxnTimeStamp checkpoint_ts_{0};
 
-    au64 min_row_ts_{};
-    au64 max_row_ts_{}; // Indicate when the segment is removed.
-
-    u64 start_ts_{0};
-    u64 end_ts_{MAX_TIMESTAMP};
-
-    Vector<UniquePtr<BlockEntry>> block_entries_{};
+    Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     SharedPtr<String> index_dir_{};
 
     HashMap<SharedPtr<String>, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
-    [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
-
-public:
     static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry,
-                                                       u64 txn_id,
                                                        u64 segment_id,
-                                                       BufferManager *buffer_mgr,
-                                                       SizeT segment_row = DEFAULT_SEGMENT_ROW);
+                                                       BufferManager *buffer_mgr);
 
-    static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const Vector<RowID> &rows, BufferManager *buffer_mgr);
 
     static void CreateIndexScalar(SegmentEntry *segment_entry,
                                   Txn *txn_ptr,
@@ -109,24 +90,17 @@ public:
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
 
-    static bool PrepareFlush(SegmentEntry *segment_entry);
-
-    static bool Flush(SegmentEntry *segment_entry);
-
-    //    inline static SegmentColumnEntry*
-    //    GetColumnDataByID(SegmentEntry* segment_entry, u64 column_id) {
-    //        return segment_entry->columns_[column_id].get();
-    //    }
-
     static u64 GetBlockIDByRowID(SizeT row_id);
 
     static i16 GetMaxBlockID(const SegmentEntry *segment_entry);
 
     static BlockEntry *GetBlockEntryByID(const SegmentEntry *segment_entry, u64 block_id);
 
-    static nlohmann::json Serialize(const SegmentEntry *segment_entry);
+    static nlohmann::json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
+
+    static int Room(SegmentEntry *segment_entry);
 
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);

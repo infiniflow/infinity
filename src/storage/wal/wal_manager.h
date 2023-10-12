@@ -34,10 +34,9 @@ public:
     WalManager(Storage *storage,
                const std::string &wal_path,
                u64 wal_size_threshold,
-               u64 full_checkpoint_time_interval,
-               u64 full_checkpoint_txn_interval,
-               u64 delta_checkpoint_time_interval,
-               u64 delta_checkpoint_txn_interval);
+               u64 full_checkpoint_interval_sec,
+               u64 delta_checkpoint_interval_sec,
+               u64 delta_checkpoint_interval_wal_bytes);
 
     ~WalManager();
 
@@ -64,35 +63,46 @@ public:
     int64_t ReplayWalFile();
 
     void RecycleWalFile();
+private:
+    void SetWalState(TxnTimeStamp max_commit_ts, int64_t wal_size);
+    void GetWalState(TxnTimeStamp& max_commit_ts, int64_t& wal_size);
 
 public:
     u64 wal_size_threshold_{};
-    u64 full_checkpoint_time_interval_{};
-    u64 full_checkpoint_txn_interval_{};
-    u64 delta_checkpoint_time_interval_{};
-    u64 delta_checkpoint_txn_interval_{};
+    u64 full_checkpoint_interval_sec_{};
+    u64 delta_checkpoint_interval_sec_{};
+    u64 delta_checkpoint_interval_wal_bytes_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
     String wal_path_;
+    Storage *storage_;
+
     // WalManager state
     std::atomic<bool> running_;
     std::thread flush_thread_;
     std::thread checkpoint_thread_;
 
-    std::mutex mutex_; // protect que_ and ofs_
-    std::queue<std::shared_ptr<WalEntry>> que_, que2_, que3_;
+    // TxnManager and Fush thread access following members
+    std::mutex mutex_;
+    std::deque<std::shared_ptr<WalEntry>> que_;
+
+    // Only Flush thread access following members
+    std::deque<std::shared_ptr<WalEntry>> que2_;
     std::ofstream ofs_;
 
-    SeqGenerator lsn_gen_;
-    std::atomic<TxnTimeStamp> commit_ts_pend_;
-    TxnTimeStamp commit_ts_done_{};
+    // Flush and Checkpoint threads access following members
+    std::mutex mutex2_;
+    TxnTimeStamp max_commit_ts_;
+    int64_t wal_size_;
 
-    int64_t checkpoint_ts_{};
-
-    Storage *storage_;
-
+    // Only Checkpoint thread access following members
+    TxnTimeStamp ckp_commit_ts_{};
+    int64_t full_ckp_wal_size_;
+    int64_t full_ckp_when_;
+    int64_t delta_ckp_wal_size_;
+    int64_t delta_ckp_when_;
     Vector<String> wal_list_;
 };
 

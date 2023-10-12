@@ -22,24 +22,19 @@ void Storage::Init() {
     wal_mgr_ = MakeUnique<WalManager>(this,
                                       std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
                                       config_ptr_->wal_size_threshold(),
-                                      config_ptr_->full_checkpoint_time_interval(),
-                                      config_ptr_->full_checkpoint_txn_interval(),
-                                      config_ptr_->delta_checkpoint_time_interval(),
-                                      config_ptr_->delta_checkpoint_txn_interval());
+                                      config_ptr_->full_checkpoint_interval_sec(),
+                                      config_ptr_->delta_checkpoint_interval_sec(),
+                                      config_ptr_->delta_checkpoint_interval_wal_bytes());
     auto start_time_stamp = wal_mgr_->ReplayWalFile();
-    wal_mgr_->Start();
 
     // Construct txn manager
     // TODO:xuanwei if replay wal file, should not create new catalog. must load from wal file. if no wal file, should create new catalog.
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if (catalog_file_entry == nullptr) {
         // No catalog file at all
-        new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
+        new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
         txn_mgr_ =
             MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
-        txn_mgr_->Start();
-
-        Storage::InitCatalog(new_catalog_.get(), txn_mgr_.get());
     } else {
         // load catalog file.
         new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
@@ -48,9 +43,10 @@ void Storage::Init() {
                                           std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
                                           0,
                                           start_time_stamp + 1);
-
-        txn_mgr_->Start();
     }
+    txn_mgr_->Start();
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
 
     BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();
@@ -78,7 +74,7 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
     Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(dir);
     SharedPtr<DirEntry> latest;
     int64_t latest_version_number = -1;
-    const std::regex catalog_file_regex("META_[0-9]+\\.json");
+    const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
     for (const auto &dir_entry_ptr : dir_array) {
         LOG_TRACE("Candidate file name: {}", dir_entry_ptr->path().c_str());
         if (dir_entry_ptr->is_regular_file()) {

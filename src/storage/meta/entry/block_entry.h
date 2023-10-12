@@ -23,28 +23,22 @@ class SegmentEntry;
 
 class DataBlock;
 
-enum BlockEntryStatus : i8 {
-    kBlockOpen,
-    kBlockClosed,
-    kBlockFlushing,
-};
-
 struct BlockVersion {
     BlockVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
         for (SizeT i = 0; i < capacity; ++i) {
-            created_[i] = MAX_TXN_ID;
-            deleted_[i] = MAX_TXN_ID;
-            txn_ptr_[i] = (u64)(nullptr);
+            created_[i] = 0;
+            deleted_[i] = 0;
+            txn_ptr_[i] = nullptr;
         }
     }
-    Vector<au64> created_{};
-    Vector<au64> deleted_{};
-    Vector<aptr> txn_ptr_{};
+    Vector<TxnTimeStamp> created_{};
+    Vector<TxnTimeStamp> deleted_{};
+    Vector<Txn*> txn_ptr_{};
 };
 
 struct BlockEntry : public BaseEntry {
 public:
-    explicit BlockEntry(const SegmentEntry *segment_entry, i16 block_id, u64 column_count, SizeT start_row, BufferManager *buffer_mgr);
+    explicit BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
 
     RWMutex rw_locker_{};
 
@@ -52,52 +46,45 @@ public:
 
     SharedPtr<String> base_dir_{};
 
-    i16 start_row_{0};
-
-    i16 row_count_{};
-
-    i16 row_capacity_{};
-
     i16 block_id_{};
-
-    std::atomic<BlockEntryStatus> status_{BlockEntryStatus::kBlockOpen};
+    i16 row_count_{};
+    i16 row_capacity_{};
 
     Vector<UniquePtr<BlockColumnEntry>> columns_;
 
     UniquePtr<BlockVersion> block_version_{};
 
-    au64 min_row_ts_{MAX_TIMESTAMP};
-    au64 max_row_ts_{MAX_TIMESTAMP};
+    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this BlockEntry
+    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
+    TxnTimeStamp checkpoint_ts_{0};
 
-    u64 start_ts_{0};
-    u64 end_ts_{MAX_TIMESTAMP};
+    Txn* txn_ptr_{nullptr};
 
-    ptr_t txn_ptr_{nullptr};
+    // checkpoint state
+    i16 checkpoint_row_count_{0};
+    std::string checkpoint_dir_{};
 
 public:
-    [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - row_count_; }
+    static int AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows);
 
-public:
-    static i16 AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows);
+    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset);
 
-    static void CommitAppend(BlockEntry *block_entry, u64 txn_id_);
+    static void CommitAppend(BlockEntry *block_entry, Txn *txn_ptr);
 
-    static void CommitDelete(BlockEntry *block_entry, Txn *txn_ptr, u64 start_row_in_segment, u64 row_count);
+    static void CommitDelete(BlockEntry *block_entry, Txn *txn_ptr);
 
-    static bool PrepareFlush(BlockEntry *block_entry);
-
-    static bool Flush(BlockEntry *block_entry);
+    static void Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts);
 
     inline static BlockColumnEntry *GetColumnDataByID(BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
 
-    static nlohmann::json Serialize(const BlockEntry *segment_entry);
+    static nlohmann::json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
-    static bool IsFull(BlockEntry *block_entry);
+    static int Room(BlockEntry *block_entry);
 
 private:
-    static SharedPtr<String> DetermineFilename(const String &parent_dir, u64 seg_id);
+    static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);
 };
 
 } // namespace infinity

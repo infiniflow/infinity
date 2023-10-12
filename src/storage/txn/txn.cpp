@@ -3,6 +3,11 @@
 //
 
 #include "txn.h"
+//
+// Created by jinhai on 23-6-4.
+//
+
+#include "txn.h"
 #include "parser/definition/table_def.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
@@ -65,8 +70,20 @@ UniquePtr<String> Txn::Append(const String &db_name, const String &table_name, c
 }
 
 UniquePtr<String> Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
+    TableCollectionEntry *table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if (err_msg != nullptr) {
+        return err_msg;
+    }
+
+    TxnTableStore *table_store{nullptr};
+    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+    }
+    table_store = txn_tables_store_[table_name].get();
+
     wal_entry_->cmds.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
-    return nullptr;
+    return table_store->Delete(row_ids);
 }
 
 void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_name, const String &table_name, const Vector<ColumnID> &columns) {
@@ -492,21 +509,17 @@ void Txn::CommitTxn() {
         return;
     }
 
-    // If the txn is checkpoint
-    if (is_checkpoint_) {
-        // 1. Flush memory table
-        CheckpointFlushMemTable();
-        // if changed flush the table
-        // if not changed get the name
-        // 2. Flush the catalog
-        CheckpointFlushCatalog();
+    if (wal_entry_->cmds.empty()) {
+        // Don't need to write empty WalEntry (read-only transactions).
+        txn_mgr_->Invalidate(commit_ts);
+        txn_context_.SetTxnCommitted();
+        return;
     }
-
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
     wal_entry_->commit_ts = commit_ts;
-
     txn_mgr_->PutWalEntry(wal_entry_);
+
     // Wait until CommitTxnBottom is done.
     std::unique_lock lk(m);
     cv.wait(lk, [this] { return done_bottom_; });
@@ -524,41 +537,27 @@ void Txn::CommitTxnBottom() {
     txn_context_.SetTxnCommitted();
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
-    bool is_read_only_txn = true;
     // Commit databases to memory catalog
     for (auto *db_entry : txn_dbs_) {
         db_entry->Commit(commit_ts);
-        is_read_only_txn = false;
     }
 
     // Commit tables to memory catalog
     for (auto *table_entry : txn_tables_) {
         table_entry->Commit(commit_ts);
-        is_read_only_txn = false;
     }
 
     //  Commit indexes in catalog
     for (auto *index_def_entry : txn_indexes_) {
         index_def_entry->Commit(commit_ts);
-        is_read_only_txn = false;
     }
 
     // Commit the prepared data
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
         table_local_store->Commit();
-        is_read_only_txn = false;
     }
 
-    // TODO: Flush the whole catalog.
-    if (!is_read_only_txn) {
-        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
-        String file_name = "META_" + std::to_string(txn_id_) + ".json";
-        LOG_TRACE("Going to store META as file {}/{}", dir_name, file_name);
-        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
-    }
-
-    // Reset the LSN of WAL
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
@@ -569,7 +568,6 @@ void Txn::CommitTxnBottom() {
 }
 
 void Txn::CancelCommitTxnBottom() {
-    txn_context_.SetTxnRollbacking(txn_context_.GetCommitTS());
     txn_context_.SetTxnRollbacked();
     std::unique_lock lk(m);
     done_bottom_ = true;
@@ -602,56 +600,22 @@ void Txn::RollbackTxn() {
         table_local_store->Rollback();
     }
 
-    { txn_context_.SetTxnRollbacked(); }
-
+    txn_context_.SetTxnRollbacked();
     LOG_TRACE("Txn: {} is dropped.", txn_id_);
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds.push_back(cmd); }
 
-void Txn::Checkpoint(const TxnTimeStamp max_commit_ts) {
-    is_checkpoint_ = true;
-    max_commit_ts_ = max_commit_ts;
-
-    String catalog_path = "META_" + std::to_string(txn_id_) + ".json";
-    AddWalCmd(MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path));
-}
-
-/**
- * @brief Flush the memory table to disk
- * traverse all the table entries and flush the segments
- */
-void Txn::CheckpointFlushMemTable() {
-    auto db_entries = NewCatalog::Databases(catalog_, txn_id_, max_commit_ts_);
-    for (auto &it : db_entries) {
-
-        auto table_entries = DBEntry::TableCollections(it, txn_id_, max_commit_ts_);
-        for (auto &table_entry : table_entries) {
-
-            auto segment = table_entry->segments_.begin();
-            while (segment != table_entry->segments_.end()) {
-                if (segment->second->status_ == DataSegmentStatus::kSegmentClosed) {
-                    ++segment;
-                    continue;
-                }
-
-                auto changed = SegmentEntry::PrepareFlush(segment->second.get());
-                if (changed) {
-                    SegmentEntry::Flush(segment->second.get());
-                }
-                ++segment;
-            }
-        }
-    }
-}
-
-/**
- * @brief Flush the catalog to disk
- */
-void Txn::CheckpointFlushCatalog() {
-    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
-    String file_name = "META_" + std::to_string(txn_id_) + ".json";
+void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String file_name = "META_" + std::to_string(max_commit_ts);
+    if (is_full_checkpoint)
+        file_name += ".full.json";
+    else
+        file_name += ".delta.json";
+    String catalog_path = dir_name + "/" + file_name;
     LOG_TRACE("Checkpoint: Going to store META as file {}/{}", dir_name, file_name);
-    NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
+    NewCatalog::SaveAsFile(catalog_, max_commit_ts, dir_name, file_name, is_full_checkpoint);
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path));
 }
 } // namespace infinity

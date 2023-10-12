@@ -43,7 +43,7 @@ struct ImportState {
 };
 
 struct DeleteState {
-    HashMap<u64, Vector<u64>> rows_;
+    HashMap<u64, Vector<RowID>> rows_;
 };
 
 struct GetState {};

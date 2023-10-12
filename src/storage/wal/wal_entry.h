@@ -190,7 +190,7 @@ struct WalCmdCheckpoint : public WalCmd {
 };
 
 struct WalEntryHeader {
-    int32_t size; // size of payload, excluding the header, round to multi
+    int32_t size; // size of payload, including the header, round to multi
     // of 4. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
     uint32_t checksum; // crc32 of the entry, including the header and the
