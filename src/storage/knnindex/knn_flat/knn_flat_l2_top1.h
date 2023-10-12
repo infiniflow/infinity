@@ -17,11 +17,10 @@ class KnnFlatL2Top1 final : public KnnDistance<DistType> {
 
 public:
     explicit KnnFlatL2Top1(const DistType *queries, i64 query_count, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type), queries_(queries), query_count_(query_count),
-          dimension_(dimension) {
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type, query_count, 1, dimension), queries_(queries) {
 
-        id_array_ = MakeUnique<Vector<RowID>>(query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * query_count_);
+        id_array_ = MakeUnique<Vector<RowID>>(this->query_count_, RowID());
+        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->query_count_);
 
         single_best_result_handler_ = MakeUnique<SingleBestResultHandler>(query_count, distance_array_.get(), id_array_->data());
         single_result_handler_ = MakeUnique<SingleResultHandler>(*single_best_result_handler_);
@@ -38,14 +37,14 @@ public:
     [[nodiscard]] inline RowID *GetIDs() const final { return single_best_result_handler_->ids_tab; }
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
-        if (idx >= query_count_) {
+        if (idx >= this->query_count_) {
             ExecutorError("Query index exceeds the limit")
         }
         return single_best_result_handler_->dis_tab + idx * 1;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
-        if (idx >= query_count_) {
+        if (idx >= this->query_count_) {
             ExecutorError("Query index exceeds the limit")
         }
         return single_best_result_handler_->ids_tab + idx * 1;
@@ -58,8 +57,6 @@ private:
     UniquePtr<SingleBestResultHandler> single_best_result_handler_{};
     UniquePtr<SingleResultHandler> single_result_handler_{};
     const DistType *queries_{};
-    i64 query_count_{};
-    i64 dimension_{};
     bool begin_{false};
 };
 

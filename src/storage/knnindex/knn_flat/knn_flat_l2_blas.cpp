@@ -26,7 +26,7 @@ namespace infinity {
 
 template <typename DistType>
 void KnnFlatL2Blas<DistType>::Begin() {
-    if (begin_ || query_count_ == 0) {
+    if (begin_ || this->query_count_ == 0) {
         return;
     }
 
@@ -36,14 +36,14 @@ void KnnFlatL2Blas<DistType>::Begin() {
     // const size_t bs_x = 16, bs_y = 16;
 
     ip_block_ = MakeUnique<DistType[]>(bs_x * bs_y);
-    x_norms_ = MakeUnique<DistType[]>(query_count_);
+    x_norms_ = MakeUnique<DistType[]>(this->query_count_);
 
-    fvec_norms_L2sqr(x_norms_.get(), queries_, dimension_, query_count_);
+    fvec_norms_L2sqr(x_norms_.get(), queries_, this->dimension_, this->query_count_);
 
-    for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
+    for (size_t i0 = 0; i0 < this->query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
-        if (i1 > query_count_)
-            i1 = query_count_;
+        if (i1 > this->query_count_)
+            i1 = this->query_count_;
 
         heap_result_handler_->begin_multiple(i0, i1);
     }
@@ -56,21 +56,23 @@ void KnnFlatL2Blas<DistType>::Search(const DistType *base, i16 base_count, i32 s
         ExecutorError("KnnFlatL2Blas isn't begin")
     }
 
+    this->total_base_count_ += base_count;
+
     if (base_count == 0) {
         return;
     }
 
     y_norms_ = MakeUnique<DistType[]>(base_count);
-    fvec_norms_L2sqr(y_norms_.get(), base, dimension_, base_count);
+    fvec_norms_L2sqr(y_norms_.get(), base, this->dimension_, base_count);
 
     // block sizes
     const size_t bs_x = faiss::distance_compute_blas_query_bs;
     const size_t bs_y = faiss::distance_compute_blas_database_bs;
 
-    for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
+    for (size_t i0 = 0; i0 < this->query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
-        if (i1 > query_count_)
-            i1 = query_count_;
+        if (i1 > this->query_count_)
+            i1 = this->query_count_;
 
         for (i16 j0 = 0; j0 < base_count; j0 += bs_y) {
             i16 j1 = j0 + bs_y;
@@ -79,16 +81,16 @@ void KnnFlatL2Blas<DistType>::Search(const DistType *base, i16 base_count, i32 s
             /* compute the actual dot products */
             {
                 float one = 1, zero = 0;
-                FINTEGER nyi = j1 - j0, nxi = i1 - i0, di = dimension_;
+                FINTEGER nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
                 sgemm_("Transpose",
                        "Not transpose",
                        &nyi,
                        &nxi,
                        &di,
                        &one,
-                       base + j0 * dimension_,
+                       base + j0 * this->dimension_,
                        &di,
-                       queries_ + i0 * dimension_,
+                       queries_ + i0 * this->dimension_,
                        &di,
                        &zero,
                        ip_block_.get(),
@@ -125,10 +127,10 @@ void KnnFlatL2Blas<DistType>::End() {
     const size_t bs_y = faiss::distance_compute_blas_database_bs;
     // const size_t bs_x = 16, bs_y = 16;
 
-    for (size_t i0 = 0; i0 < query_count_; i0 += bs_x) {
+    for (size_t i0 = 0; i0 < this->query_count_; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
-        if (i1 > query_count_)
-            i1 = query_count_;
+        if (i1 > this->query_count_)
+            i1 = this->query_count_;
 
         heap_result_handler_->end_multiple(i0, i1);
     }

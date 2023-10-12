@@ -7,7 +7,6 @@
 #include "common/utility/str.h"
 #include "main/logger.h"
 #include "storage/invertedindex/key_encoder.h"
-#include "txn.h"
 #include "storage/wal/wal_entry.h"
 #include "txn.h"
 #include <map>
@@ -23,23 +22,14 @@ class BufferManager;
 
 class TxnManager {
 public:
-    explicit
-    TxnManager(NewCatalog* catalog,
-               BufferManager* buffer_mgr,
-               PutWalEntryFn put_wal_entry_fn,
-               u64 start_txn_id = 0,
-               TxnTimeStamp start_ts = 0)
-            : catalog_(catalog),
-              buffer_mgr_(buffer_mgr),
-              put_wal_entry_(put_wal_entry_fn),
-              txn_id_(start_txn_id),
-              txn_ts_(start_ts),
-              is_running_(true) {}
+    explicit TxnManager(NewCatalog *catalog,
+                        BufferManager *buffer_mgr,
+                        PutWalEntryFn put_wal_entry_fn,
+                        u64 start_txn_id = 0,
+                        TxnTimeStamp start_ts = 0)
+        : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(true) {}
 
-    ~TxnManager() {
-        Stop();
-    }
-
+    ~TxnManager() { Stop(); }
 
     Txn *CreateTxn();
 
@@ -61,14 +51,11 @@ public:
 
     void PutWalEntry(std::shared_ptr<WalEntry> entry);
 
-    void
-    Start();
+    void Start();
 
-    void
-    Stop();
+    void Stop();
 
-    bool
-    Stopped();
+    bool Stopped();
 
 private:
     u64 GetNewTxnID();
@@ -79,12 +66,13 @@ private:
     u64 txn_id_{};
     BufferManager *buffer_mgr_{};
     HashMap<u64, UniquePtr<Txn>> txn_map_{};
+    // PutWalEntry function
     PutWalEntryFn put_wal_entry_{};
 
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
     TxnTimeStamp txn_ts_{};
-    std::map<TxnTimeStamp, std::shared_ptr<WalEntry>> priority_que_;   //TODO: use C++23 std::flat_map?
+    std::map<TxnTimeStamp, std::shared_ptr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     std::atomic<bool> is_running_{false};
 };

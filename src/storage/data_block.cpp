@@ -100,6 +100,14 @@ void DataBlock::AppendValue(SizeT column_index, const Value &value) {
     finalized = false;
 }
 
+void DataBlock::AppendValueByPtr(SizeT column_index, const ptr_t value_ptr) {
+    StorageAssert(column_index < column_count_,
+                  "Attempt to access invalid column index: " + std::to_string(column_index) + " in column count: " + std::to_string(column_count_));
+
+    column_vectors[column_index]->AppendByPtr(value_ptr);
+    finalized = false;
+}
+
 void DataBlock::Finalize() {
     bool first_flat_column_vector = false;
     SizeT row_count = 0;
@@ -147,9 +155,13 @@ void DataBlock::UnionWith(const SharedPtr<DataBlock> &other) {
 }
 
 void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) {
+    AppendWith(other.get());
+}
+
+void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
         StorageError(
-            fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+                fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
         StorageError(fmt::format("Attempt append block with row count {} into block with row count {}, "

@@ -34,7 +34,7 @@ void Infinity::UnInit() {
     }
     initialized_ = false;
 
-    storage_->Uninit();
+    storage_->UnInit();
     storage_.reset();
 
     resource_manager_.reset();

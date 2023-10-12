@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "common/constants/constants.h"
 #include "common/types/alias/primitives.h"
 #include "storage/txn/txn_manager.h"
 #include "wal_entry.h"
@@ -32,7 +31,13 @@ private:
 
 class WalManager {
 public:
-    WalManager(Storage *storage, const std::string &wal_path);
+    WalManager(Storage *storage,
+               const std::string &wal_path,
+               u64 wal_size_threshold,
+               u64 full_checkpoint_time_interval,
+               u64 full_checkpoint_txn_interval,
+               u64 delta_checkpoint_time_interval,
+               u64 delta_checkpoint_txn_interval);
 
     ~WalManager();
 
@@ -54,9 +59,18 @@ public:
     // Checkpoint for transactions which's lsn no larger than lsn_pend_chk_.
     void Checkpoint();
 
-    void SwapWALFile(int64_t max_commit_ts);
+    void SwapWalFile(TxnTimeStamp max_commit_ts);
 
-    int64_t ReplayWALFile();
+    int64_t ReplayWalFile();
+
+    void RecycleWalFile();
+
+public:
+    u64 wal_size_threshold_{};
+    u64 full_checkpoint_time_interval_{};
+    u64 full_checkpoint_txn_interval_{};
+    u64 delta_checkpoint_time_interval_{};
+    u64 delta_checkpoint_txn_interval_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
@@ -80,8 +94,6 @@ private:
     Storage *storage_;
 
     Vector<String> wal_list_;
-
-    bool wait_for_checkpoint_{false};
 };
 
 } // namespace infinity

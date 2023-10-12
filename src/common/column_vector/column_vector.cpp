@@ -455,13 +455,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
 }
 
 void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx) {
-    StorageAssert(initialized, "Column vector isn't initialized.")
-        StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.")
-            StorageAssert(data_type_ == other.data_type_, "Data type is mismatched.") if (vector_type_ == ColumnVectorType::kConstant) {
+    StorageAssert(initialized, "Column vector isn't initialized.");
+    StorageAssert(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
+    StorageAssert(data_type_ == other.data_type_, "Data type is mismatched.");
+    if (vector_type_ == ColumnVectorType::kConstant) {
         StorageAssert(dst_idx == 0, "Attempting to access non-zero position of constant vector");
         tail_index_ = 1;
-    }
-    else {
+    } else {
         StorageAssert(dst_idx < tail_index_, "Attempting to access invalid position of target column vector");
     }
     if (other.vector_type_ == ColumnVectorType::kConstant) {
@@ -1209,55 +1209,55 @@ void ColumnVector::Finalize(SizeT index) {
     tail_index_ = index;
 }
 
-void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
-    StorageAssert(initialized, "Column vector isn't initialized.")
-        StorageAssert(index <= tail_index_,
-                      "Attempt to store value into unavailable row of column vector: " + std::to_string(index) +
-                          ", current column tail index: " + std::to_string(tail_index_) + ", capacity: " + std::to_string(capacity_))
+void ColumnVector::SetByRawPtr(SizeT index, const ptr_t raw_ptr) {
+    StorageAssert(initialized, "Column vector isn't initialized.");
+    StorageAssert(index <= tail_index_,
+                  "Attempt to store value into unavailable row of column vector: " + std::to_string(index) +
+                      ", current column tail index: " + std::to_string(tail_index_) + ", capacity: " + std::to_string(capacity_));
 
-        // We assume the value_ptr point to the same type data.
+    // We assume the value_ptr point to the same type data.
 
-        switch (data_type_->type()) {
+    switch (data_type_->type()) {
 
         case kBoolean: {
-            ((BooleanT *)data_ptr_)[index] = *(BooleanT *)(value_ptr);
+            ((BooleanT *)data_ptr_)[index] = *(BooleanT *)(raw_ptr);
             break;
         }
         case kTinyInt: {
-            ((TinyIntT *)data_ptr_)[index] = *(TinyIntT *)(value_ptr);
+            ((TinyIntT *)data_ptr_)[index] = *(TinyIntT *)(raw_ptr);
             break;
         }
         case kSmallInt: {
-            ((SmallIntT *)data_ptr_)[index] = *(SmallIntT *)(value_ptr);
+            ((SmallIntT *)data_ptr_)[index] = *(SmallIntT *)(raw_ptr);
             break;
         }
         case kInteger: {
-            ((IntegerT *)data_ptr_)[index] = *(IntegerT *)(value_ptr);
+            ((IntegerT *)data_ptr_)[index] = *(IntegerT *)(raw_ptr);
             break;
         }
         case kBigInt: {
-            ((BigIntT *)data_ptr_)[index] = *(BigIntT *)(value_ptr);
+            ((BigIntT *)data_ptr_)[index] = *(BigIntT *)(raw_ptr);
             break;
         }
         case kHugeInt: {
-            ((HugeIntT *)data_ptr_)[index] = *(HugeIntT *)(value_ptr);
+            ((HugeIntT *)data_ptr_)[index] = *(HugeIntT *)(raw_ptr);
             break;
         }
         case kFloat: {
-            ((FloatT *)data_ptr_)[index] = *(FloatT *)(value_ptr);
+            ((FloatT *)data_ptr_)[index] = *(FloatT *)(raw_ptr);
             break;
         }
         case kDouble: {
-            ((DoubleT *)data_ptr_)[index] = *(DoubleT *)(value_ptr);
+            ((DoubleT *)data_ptr_)[index] = *(DoubleT *)(raw_ptr);
             break;
         }
         case kDecimal: {
-            ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(value_ptr);
+            ((DecimalT *)data_ptr_)[index] = *(DecimalT *)(raw_ptr);
             break;
         }
         case kVarchar: {
             // Copy string
-            auto *varchar_ptr = (VarcharT *)(value_ptr);
+            auto *varchar_ptr = (VarcharT *)(raw_ptr);
             u16 varchar_len = varchar_ptr->length;
             if (varchar_len <= VarcharType::INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
@@ -1272,50 +1272,50 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kDate: {
-            ((DateT *)data_ptr_)[index] = *(DateT *)(value_ptr);
+            ((DateT *)data_ptr_)[index] = *(DateT *)(raw_ptr);
             break;
         }
         case kTime: {
-            ((TimeT *)data_ptr_)[index] = *(TimeT *)(value_ptr);
+            ((TimeT *)data_ptr_)[index] = *(TimeT *)(raw_ptr);
             break;
         }
         case kDateTime: {
-            ((DateTimeT *)data_ptr_)[index] = *(DateTimeT *)(value_ptr);
+            ((DateTimeT *)data_ptr_)[index] = *(DateTimeT *)(raw_ptr);
             break;
         }
         case kTimestamp: {
-            ((TimestampT *)data_ptr_)[index] = *(TimestampT *)(value_ptr);
+            ((TimestampT *)data_ptr_)[index] = *(TimestampT *)(raw_ptr);
             break;
         }
         case kInterval: {
-            ((IntervalT *)data_ptr_)[index] = *(IntervalT *)(value_ptr);
+            ((IntervalT *)data_ptr_)[index] = *(IntervalT *)(raw_ptr);
             break;
         }
         case kArray: {
-            ((ArrayT *)data_ptr_)[index] = *(ArrayT *)(value_ptr);
+            ((ArrayT *)data_ptr_)[index] = *(ArrayT *)(raw_ptr);
             break;
         }
         case kTuple: {
             TypeError("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
-            ((PointT *)data_ptr_)[index] = *(PointT *)(value_ptr);
+            ((PointT *)data_ptr_)[index] = *(PointT *)(raw_ptr);
             break;
         }
         case kLine: {
-            ((LineT *)data_ptr_)[index] = *(LineT *)(value_ptr);
+            ((LineT *)data_ptr_)[index] = *(LineT *)(raw_ptr);
             break;
         }
         case kLineSeg: {
-            ((LineSegT *)data_ptr_)[index] = *(LineSegT *)(value_ptr);
+            ((LineSegT *)data_ptr_)[index] = *(LineSegT *)(raw_ptr);
             break;
         }
         case kBox: {
-            ((BoxT *)data_ptr_)[index] = *(BoxT *)(value_ptr);
+            ((BoxT *)data_ptr_)[index] = *(BoxT *)(raw_ptr);
             break;
         }
         case kPath: {
-            auto *point_ptr = (PathT *)(value_ptr);
+            auto *point_ptr = (PathT *)(raw_ptr);
             u32 point_count = point_ptr->point_count;
 
             SizeT point_area_size = point_count * sizeof(PointT);
@@ -1331,7 +1331,7 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kPolygon: {
-            auto *polygon_ptr = (PolygonT *)(value_ptr);
+            auto *polygon_ptr = (PolygonT *)(raw_ptr);
             u64 point_count = polygon_ptr->point_count;
 
             SizeT point_area_size = point_count * sizeof(PointT);
@@ -1347,11 +1347,11 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kCircle: {
-            ((CircleT *)data_ptr_)[index] = *(CircleT *)(value_ptr);
+            ((CircleT *)data_ptr_)[index] = *(CircleT *)(raw_ptr);
             break;
         }
         case kBitmap: {
-            auto *bitmap_ptr = (BitmapT *)(value_ptr);
+            auto *bitmap_ptr = (BitmapT *)(raw_ptr);
             u64 bit_count = bitmap_ptr->count;
             u64 unit_count = BitmapT::UnitCount(bit_count);
 
@@ -1364,11 +1364,11 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kUuid: {
-            ((UuidT *)data_ptr_)[index] = *(UuidT *)(value_ptr);
+            ((UuidT *)data_ptr_)[index] = *(UuidT *)(raw_ptr);
             break;
         }
         case kBlob: {
-            auto *blob_ptr = (BlobT *)(value_ptr);
+            auto *blob_ptr = (BlobT *)(raw_ptr);
             u64 blob_size = blob_ptr->size;
             ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
             memcpy(ptr, (void *)(blob_ptr->ptr), blob_size);
@@ -1378,17 +1378,17 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
             break;
         }
         case kEmbedding: {
-            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
+            //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
-            memcpy(ptr, embedding_ptr->ptr, data_type_->Size());
+            memcpy(ptr, raw_ptr, data_type_->Size());
             break;
         }
         case kRowID: {
-            ((RowT *)data_ptr_)[index] = *(RowT *)(value_ptr);
+            ((RowT *)data_ptr_)[index] = *(RowT *)(raw_ptr);
             break;
         }
         case kMixed: {
-            ((MixedT *)data_ptr_)[index] = *(MixedT *)(value_ptr);
+            ((MixedT *)data_ptr_)[index] = *(MixedT *)(raw_ptr);
             break;
         }
         default: {
@@ -1398,8 +1398,19 @@ void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
     }
 }
 
+void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
+    // We assume the value_ptr point to the same type data.
+    if (data_type()->type() == LogicalType::kEmbedding) {
+        auto *embedding_ptr = (EmbeddingT *)(value_ptr);
+        SetByRawPtr(index, embedding_ptr->ptr);
+    } else {
+        SetByRawPtr(index, value_ptr);
+    }
+}
+
 void ColumnVector::AppendValue(const Value &value) {
-    StorageAssert(initialized, "Column vector isn't initialized.") if (vector_type_ == ColumnVectorType::kConstant) {
+    StorageAssert(initialized, "Column vector isn't initialized.");
+    if (vector_type_ == ColumnVectorType::kConstant) {
         StorageAssert(tail_index_ < 1, fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
 
@@ -1409,12 +1420,28 @@ void ColumnVector::AppendValue(const Value &value) {
     SetValue(tail_index_++, value);
 }
 
-void ColumnVector::AppendByPtr(const ptr_t value_ptr) {
-    StorageAssert(initialized, "Column vector isn't initialized.") if (vector_type_ == ColumnVectorType::kConstant) {
+void ColumnVector::AppendByRawPtr(const ptr_t raw_ptr) {
+    StorageAssert(initialized, "Column vector isn't initialized.");
+    if (vector_type_ == ColumnVectorType::kConstant) {
         StorageAssert(tail_index_ < 1, fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
     StorageAssert(tail_index_ < capacity_, fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
-    SetByPtr(tail_index_++, value_ptr);
+    SetByRawPtr(tail_index_++, raw_ptr);
+}
+
+void ColumnVector::AppendByPtr(const ptr_t value_ptr) {
+
+    if (data_type_->type() == LogicalType::kEmbedding) {
+        AppendByRawPtr(value_ptr);
+    } else {
+        StorageAssert(initialized, "Column vector isn't initialized.");
+        if (vector_type_ == ColumnVectorType::kConstant) {
+            StorageAssert(tail_index_ < 1, fmt::format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+        }
+        StorageAssert(tail_index_ < capacity_, fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+
+        SetByPtr(tail_index_++, value_ptr);
+    }
 }
 
 void ColumnVector::AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
@@ -1695,10 +1722,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         case kEmbedding: {
-            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
+            //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
+            auto *base_src_ptr = other.data_ptr_;
             ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
             for (SizeT idx = 0; idx < count; ++idx) {
-                ptr_t src_ptr = base_src_ptr->ptr + idx * data_type_->Size();
+                ptr_t src_ptr = base_src_ptr + idx * data_type_->Size();
                 ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
                 memcpy(dst_ptr, src_ptr, data_type_->Size());
             }

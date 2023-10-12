@@ -70,20 +70,20 @@ using MixedT = MixedType;
 
 class DataType {
 public:
-    explicit DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr = nullptr)
-        : type_(logical_type), type_info_(std::move(type_info_ptr)) {}
+    explicit DataType(LogicalType logical_type, SharedPtr<TypeInfo> type_info_ptr = nullptr);
 
     ~DataType() = default;
 
-    DataType(const DataType &other) : type_(other.type_), type_info_(other.type_info_) {}
+    DataType(const DataType &other) : type_(other.type_), plain_type_(other.plain_type_), type_info_(other.type_info_) {}
 
-    DataType(DataType &&other) noexcept : type_(other.type_), type_info_(std::move(other.type_info_)) {}
+    DataType(DataType &&other) noexcept : type_(other.type_), plain_type_(other.plain_type_), type_info_(std::move(other.type_info_)) {}
 
     DataType &operator=(const DataType &other) {
         if (this == &other)
             return *this;
         type_ = other.type_;
         type_info_ = other.type_info_;
+        plain_type_ = other.plain_type_;
         return *this;
     }
 
@@ -92,6 +92,7 @@ public:
             return *this;
         type_ = other.type_;
         type_info_ = other.type_info_;
+        plain_type_ = other.plain_type_;
         other.type_info_ = nullptr;
         return *this;
     }
@@ -107,11 +108,6 @@ public:
     [[nodiscard]] inline LogicalType type() const { return type_; }
 
     [[nodiscard]] inline const SharedPtr<TypeInfo> &type_info() const { return type_info_; }
-
-    inline void Reset() {
-        type_ = LogicalType::kInvalid;
-        type_info_.reset();
-    }
 
     inline bool IsNumeric() const {
         switch (type_) {
@@ -131,22 +127,30 @@ public:
         }
     }
 
+    inline void Reset() {
+        type_ = LogicalType::kInvalid;
+        type_info_.reset();
+        plain_type_ = false;
+    }
+
     nlohmann::json Serialize();
 
     static SharedPtr<DataType> Deserialize(const nlohmann::json &data_type_json);
 
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
-    int32_t GetSizeInBytes() const;
+    [[nodiscard]] int32_t GetSizeInBytes() const;
 
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
     static SharedPtr<DataType> ReadAdv(char *&ptr, int32_t maxbytes);
 
+    [[nodiscard]] inline bool Plain() const { return plain_type_; }
+
 private:
     LogicalType type_{LogicalType::kInvalid};
+    bool plain_type_{false};
     SharedPtr<TypeInfo> type_info_{nullptr};
-
     // Static method
 public:
     static i64 CastRule(const DataType &from, const DataType &to);

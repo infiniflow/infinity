@@ -13,7 +13,8 @@ namespace infinity {
 
 class PhysicalInsert : public PhysicalOperator {
 public:
-    explicit PhysicalInsert(u64 id, TableCollectionEntry *table_collection_entry, u64 table_index, Vector<SharedPtr<BaseExpression>> value_list)
+    explicit
+    PhysicalInsert(u64 id, TableCollectionEntry *table_collection_entry, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
         : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id), table_collection_entry_(table_collection_entry),
           table_index_(table_index), value_list_(std::move(value_list)) {}
 
@@ -27,7 +28,7 @@ public:
 
     inline const TableCollectionEntry *table_collection_entry() const { return table_collection_entry_; }
 
-    inline const Vector<SharedPtr<BaseExpression>> &value_list() const { return value_list_; }
+    inline const Vector<Vector<SharedPtr<BaseExpression>>> &value_list() const { return value_list_; }
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -35,7 +36,7 @@ public:
 
 private:
     TableCollectionEntry *table_collection_entry_{};
-    Vector<SharedPtr<BaseExpression>> value_list_{};
+    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
     u64 table_index_{};
 
     SharedPtr<Vector<String>> output_names_{};

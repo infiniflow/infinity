@@ -848,7 +848,7 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
         }
         case KnnDistanceType::kInnerProduct:
         case KnnDistanceType::kCosine: {
-            PlannerAssert(order_type == OrderType::kDesc, "L2 need descending order");
+            PlannerAssert(order_type == OrderType::kDesc, "IP need descending order");
             break;
         }
         default: {

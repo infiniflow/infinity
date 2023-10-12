@@ -68,7 +68,7 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state) {
     auto *knn_scan_function_data_ptr = input_state->knn_scan_function_data_.get();
-    const BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
+    BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if (knn_column_ids.size() != 1) {
@@ -84,8 +84,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
     BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
     i16 row_count = current_block_entry->row_count_;
 
-    ColumnBuffer column_buffer =
-        BlockColumnEntry::GetColumnData(current_block_entry->columns_[knn_column_id].get(), query_context->storage()->buffer_manager());
+    Vector<ColumnBuffer> columns_buffer;
+    columns_buffer.reserve(current_block_entry->columns_.size());
+    SizeT column_count = current_block_entry->columns_.size();
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        columns_buffer.emplace_back(
+            BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager()));
+    }
+
     switch (knn_scan_function_data_ptr->knn_distance_type_) {
 
         case KnnDistanceType::kInvalid: {
@@ -127,25 +133,48 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                     }
 #endif
 
-                    knn_flat_l2->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
+                    knn_flat_l2->Search((f32 *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
 
                     if (block_ids_idx == block_ids->size() - 1) {
                         // Last block, Get the result according to the topk row.
                         knn_flat_l2->End();
 
-                        for (i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
+                        for (i64 query_idx = 0; query_idx < knn_flat_l2->QueryCount(); ++query_idx) {
 
                             f32 *top_distance = knn_flat_l2->GetDistanceByIdx(query_idx);
                             RowID *row_id = knn_flat_l2->GetIDByIdx(query_idx);
 
-                            for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
-                                SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
+                            i64 result_count = std::min(knn_flat_l2->TotalBaseCount(), knn_flat_l2->TopK());
+
+                            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
+                                SizeT id = query_idx * knn_flat_l2->QueryCount() + top_idx;
                                 LOG_TRACE("Row offset: {}: {}: {}, distance {}",
                                           row_id[id].segment_id_,
                                           row_id[id].block_id_,
                                           row_id[id].block_offset_,
                                           top_distance[id]);
+
+                                BlockEntry *block_entry = block_index->segment_block_index_[row_id[id].segment_id_][row_id[id].block_id_];
+
+                                SizeT column_id = 0;
+                                for (; column_id < column_count; ++column_id) {
+                                    ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
+                                                                                                 query_context->storage()->buffer_manager());
+
+
+                                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
+                                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
+                                }
+
+                                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
+                                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
                             }
+
+                            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                                LOG_TRACE("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id));
+                            }
+                            // Get row from input data block
+                            //                            output_state->data_block_->AppendValue()
                         }
                     }
                     break;
@@ -297,24 +326,46 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                         }
                     }
 
-                    knn_flat_ip->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
+                    knn_flat_ip->Search((f32 *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
 
                     if (block_ids_idx == block_ids->size() - 1) {
                         // Last segment, Get the result according to the topk row.
                         knn_flat_ip->End();
 
-                        for (i64 query_idx = 0; query_idx < knn_scan_function_data_ptr->query_embedding_count_; ++query_idx) {
+                        for (i64 query_idx = 0; query_idx < knn_flat_ip->QueryCount(); ++query_idx) {
 
                             f32 *top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
                             RowID *row_id = knn_flat_ip->GetIDByIdx(query_idx);
 
-                            for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
-                                SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
+                            i64 result_count = std::min(knn_flat_ip->TotalBaseCount(), knn_flat_ip->TopK());
+
+                            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
+                                SizeT id = query_idx * knn_flat_ip->TotalBaseCount() + top_idx;
                                 LOG_TRACE("Row offset: {}: {}: {}, distance {}",
                                           row_id[id].segment_id_,
                                           row_id[id].block_id_,
                                           row_id[id].block_offset_,
                                           top_distance[id]);
+
+                                BlockEntry *block_entry = block_index->segment_block_index_[row_id[id].segment_id_][row_id[id].block_id_];
+
+                                SizeT column_id = 0;
+                                for (; column_id < column_count; ++column_id) {
+                                    ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
+                                                                                                 query_context->storage()->buffer_manager());
+
+
+                                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
+                                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
+                                }
+
+                                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
+                                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
+
+                            }
+
+                            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                                LOG_TRACE("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id));
                             }
                         }
                     }

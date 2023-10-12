@@ -206,20 +206,27 @@ bool SegmentEntry::PrepareFlush(SegmentEntry *segment_entry) {
     return segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kSegmentFlushing, std::memory_order_seq_cst);
 }
 
-UniquePtr<String> SegmentEntry::Flush(SegmentEntry *segment_entry) {
+bool SegmentEntry::Flush(SegmentEntry *segment_entry) {
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
     for (const auto &block_entry : segment_entry->block_entries_) {
-        BlockEntry::Flush(block_entry.get());
+
+        bool flushed = BlockEntry::Flush(block_entry.get());
+        if (!flushed) {
+            LOG_WARN("Block is expected as flushing status");
+            // TODO(xuanwei): delta checkpoint
+            continue;
+        }
         LOG_TRACE("Segment: {}, Block: {} is flushed", segment_entry->segment_id_, block_entry->block_id_);
     }
 
-    DataSegmentStatus expected = DataSegmentStatus::kSegmentFlushing;
+    auto expected = DataSegmentStatus::kSegmentFlushing;
     if (!segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kSegmentClosed, std::memory_order_seq_cst)) {
-        return MakeUnique<String>("Data segment is expected as flushing status");
+        LOG_WARN("Data segment is expected as flushing status");
+        return false;
     }
     LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
 
-    return nullptr;
+    return true;
 }
 
 u64 SegmentEntry::GetBlockIDByRowID(SizeT row_id) {

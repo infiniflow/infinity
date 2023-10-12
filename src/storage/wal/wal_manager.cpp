@@ -3,7 +3,6 @@
 //
 
 #include "wal_manager.h"
-#include "common/types/alias/primitives.h"
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
@@ -17,7 +16,16 @@ namespace infinity {
 using namespace std;
 namespace fs = std::filesystem;
 
-WalManager::WalManager(Storage *storage, const std::string &wal_path) : storage_(storage), wal_path_(wal_path), running_(false) {}
+WalManager::WalManager(Storage *storage,
+                       const string &wal_path,
+                       u64 wal_size_threshold,
+                       u64 full_checkpoint_time_interval,
+                       u64 full_checkpoint_txn_interval,
+                       u64 delta_checkpoint_time_interval,
+                       u64 delta_checkpoint_txn_interval)
+    : storage_(storage), wal_path_(wal_path), wal_size_threshold_(wal_size_threshold), full_checkpoint_time_interval_(full_checkpoint_time_interval),
+      full_checkpoint_txn_interval_(full_checkpoint_txn_interval), delta_checkpoint_time_interval_(delta_checkpoint_time_interval),
+      delta_checkpoint_txn_interval_(delta_checkpoint_txn_interval), running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -53,9 +61,10 @@ void WalManager::Start() {
 void WalManager::Stop() {
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
-    if (!changed)
-        // Already stopped.
+    if (!changed) {
+        LOG_INFO("WalManager::Stop already stopped");
         return;
+    }
 
     LOG_INFO("WalManager::Stop begin to stop txn manager");
     // Notify txn manager to stop.
@@ -74,14 +83,12 @@ void WalManager::Stop() {
     }
 
     // Wait for checkpoint thread to stop.
-    LOG_INFO("WalManager::Stop begin to stop checkpoint thread");
+    LOG_INFO("WalManager::Stop checkpoint thread join");
     checkpoint_thread_.join();
-    LOG_INFO("WalManager::Stop done to stop checkpoint thread");
 
     // Wait for flush thread to stop
-    LOG_INFO("WalManager::Stop begin to stop flush thread");
+    LOG_INFO("WalManager::Stop flush thread join");
     flush_thread_.join();
-    LOG_INFO("WalManager::Stop done to stop flush thread");
 
     ofs_.close();
 }
@@ -115,8 +122,6 @@ void WalManager::Flush() {
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
-        LOG_INFO("WalManager::Flush q1 swap {} entries to q2", que2_.size());
-
         while (!que2_.empty()) {
             std::shared_ptr<WalEntry> entry = que2_.front();
             max_commit_ts = entry->commit_ts;
@@ -152,7 +157,7 @@ void WalManager::Flush() {
             TxnManager *txn_mgr = storage_->txn_manager();
             while (!que3_.empty()) {
                 std::shared_ptr<WalEntry> entry = que3_.front();
-                // Commit sequently so they get visible in the same order
+                // Commit sequentially so they get visible in the same order
                 // with wal.
                 Txn *txn = txn_mgr->GetTxn(entry->txn_id);
                 if (txn != nullptr) {
@@ -164,8 +169,8 @@ void WalManager::Flush() {
             // Check if the wal file is too large.
             try {
                 auto file_size = fs::file_size(wal_path_);
-                if (file_size > kWALFileSizeThreshold) {
-                    this->SwapWALFile(max_commit_ts);
+                if (file_size > wal_size_threshold_) {
+                    this->SwapWalFile(max_commit_ts);
                 }
 
             } catch (std::exception &e) {
@@ -184,16 +189,14 @@ void WalManager::Checkpoint() {
     // Fuzzy checkpoint for every 10 transactions or 20s.
     while (running_.load()) {
         TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
-        if (commit_ts_pend - commit_ts_done_ < 2 ||
-            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < 20000000000)) {
+        if (commit_ts_pend - commit_ts_done_ < full_checkpoint_txn_interval_ ||
+            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < full_checkpoint_time_interval_)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
 
         // Checkponit is heavy and infrequent operation.
         LOG_INFO("WalManager::Checkpoint enter for transactions' lsn <= {}", commit_ts_pend);
-        // std::this_thread::sleep_for(std::chrono::seconds(10));
-        wait_for_checkpoint_ = true;
 
         TxnManager *txn_mgr = nullptr;
         Txn *txn = nullptr;
@@ -216,27 +219,7 @@ void WalManager::Checkpoint() {
         LOG_INFO("WalManager::Checkpoint quit", commit_ts_done_);
         checkpoint_ts_ = std::chrono::steady_clock::now().time_since_epoch().count();
 
-        // Gc old wal files.
-        LOG_INFO("WalManager::Checkpoint begin to gc wal files")
-        if (fs::exists(wal_path_)) {
-            for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
-                // Only delete the wal.log.* files. the wal.log file is current wal file.
-                // Check if the wal.log.* files are too old.
-                // if * is little than the max_commit_ts, we will delete it.
-                if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
-                    auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                    LOG_INFO("WalManager::Checkpoint suffix: {}", suffix.c_str());
-                    LOG_INFO("WalManager::Checkpoint lsn_done_chk_: {}", commit_ts_done_);
-                    if (std::stoll(suffix) < commit_ts_done_) {
-                        fs::remove(entry.path());
-                        LOG_INFO("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
-                    }
-                }
-            }
-        }
-        LOG_INFO("WalManager::Checkpoint end to gc wal files")
-
-        wait_for_checkpoint_ = false;
+        RecycleWalFile();
     }
 }
 
@@ -249,7 +232,7 @@ void WalManager::Checkpoint() {
  * @param max_commit_ts The max commit timestamp of the transactions in the
  * current wal file.
  */
-void WalManager::SwapWALFile(const int64_t max_commit_ts) {
+void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     if (ofs_.is_open()) {
         ofs_.close();
     }
@@ -274,7 +257,7 @@ void WalManager::SwapWALFile(const int64_t max_commit_ts) {
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
-int64_t WalManager::ReplayWALFile() {
+int64_t WalManager::ReplayWalFile() {
     // if the wal directory does not exist, just return 0.
     if (!fs::exists(wal_path_)) {
         return 0;
@@ -354,6 +337,29 @@ int64_t WalManager::ReplayWALFile() {
 
     // So we can get the entry's content.
     // Deserialize the entry.
+}
+
+/**
+ * @brief Gc the old wal files.
+ * Only delete the wal.log.* files. the wal.log file is current wal file.
+ * Check if the wal.log.* files are too old.
+ * if * is little than the max_commit_ts, we will delete it.
+ */
+void WalManager::RecycleWalFile() {
+    // Gc old wal files.
+    LOG_INFO("WalManager::Checkpoint begin to gc wal files")
+    if (fs::exists(wal_path_)) {
+        for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
+            if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
+                auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
+                if (std::stoll(suffix) < commit_ts_done_) {
+                    fs::remove(entry.path());
+                    LOG_TRACE("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
+                }
+            }
+        }
+    }
+    LOG_INFO("WalManager::Checkpoint end to gc wal files");
 }
 
 } // namespace infinity

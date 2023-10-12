@@ -25,13 +25,26 @@ enum class KnnDistanceAlgoType {
 
 class KnnDistanceBase {
 public:
-    explicit KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type) : algo_type_(type), elem_type_(elem_type) {}
+    explicit KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type, i64 query_count, i64 dimension, i64 topk)
+        : algo_type_(type), elem_type_(elem_type), query_count_(query_count), dimension_(dimension), top_k_(topk) {}
 
     [[nodiscard]] inline KnnDistanceAlgoType algo_type() const { return algo_type_; };
 
     [[nodiscard]] inline EmbeddingDataType elem_type() const { return elem_type_; };
 
+    inline i64 QueryCount() const { return query_count_; }
+
+    inline i64 TopK() const { return top_k_; }
+
+    inline i64 TotalBaseCount() const { return total_base_count_; }
+
 protected:
+
+    i64 query_count_{};
+    i64 dimension_{};
+    i64 top_k_{};
+    i64 total_base_count_{};
+
     KnnDistanceAlgoType algo_type_{KnnDistanceAlgoType::kInvalid};
     EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
 };
@@ -39,7 +52,8 @@ protected:
 template <typename DistType>
 class KnnDistance : public KnnDistanceBase {
 public:
-    explicit KnnDistance(KnnDistanceAlgoType type, EmbeddingDataType elem_type) : KnnDistanceBase(type, elem_type) {}
+    explicit KnnDistance(KnnDistanceAlgoType type, EmbeddingDataType elem_type, i64 query_count, i64 dimension, i64 topk)
+        : KnnDistanceBase(type, elem_type, query_count, dimension, topk) {}
 
     virtual void Begin() = 0;
 

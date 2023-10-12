@@ -127,6 +127,7 @@ struct SQL_LTYPE {
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
+    std::vector<std::vector<infinity::ParsedExpr*>*>*    expr_array_list_t;
 
     std::vector<infinity::WhenThen*>*     case_check_array_t;
 
@@ -198,6 +199,19 @@ struct SQL_LTYPE {
         delete ($$);
     }
 } <expr_array_t>
+
+%destructor {
+    fprintf(stderr, "destroy expression array list\n");
+    if (($$) != nullptr) {
+        for (auto arr_ptr : *($$)) {
+            for (auto ptr : *arr_ptr) {
+                delete ptr;
+            }
+            delete (arr_ptr);
+        }
+        delete ($$);
+    }
+} <expr_array_list_t>
 
 %destructor {
     fprintf(stderr, "destroy order by expr list\n");
@@ -369,6 +383,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            constant_expr interval_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <expr_array_t>            expr_array group_by_clause
+%type <expr_array_list_t>       expr_array_list
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
 %type <case_check_array_t>      case_check_array;
@@ -799,7 +814,7 @@ delete_statement : DELETE FROM table_name where_clause {
 /*
  * INSERT STATEMENT
  */
-insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' expr_array ')' {
+insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_array_list {
     $$ = new infinity::InsertStatement();
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
@@ -809,7 +824,7 @@ insert_statement: INSERT INTO table_name optional_identifier_array VALUES '(' ex
     free($3->table_name_ptr_);
     delete $3;
     $$->columns_ = $4;
-    $$->values_ = $7;
+    $$->values_ = $6;
 }
 | INSERT INTO table_name optional_identifier_array select_without_paren {
     $$ = new infinity::InsertStatement();
@@ -1428,6 +1443,26 @@ expr_array : expr_alias {
 }
 | expr_array ',' expr_alias {
     $1->emplace_back($3);
+    $$ = $1;
+};
+
+expr_array_list : '(' expr_array ')' {
+    $$ = new std::vector<std::vector<infinity::ParsedExpr*>*>();
+    $$->push_back($2);
+}
+| expr_array_list ',' '(' expr_array ')' {
+    if(!$1->empty() && $1->back()->size() != $4->size()) {
+        yyerror(&yyloc, scanner, result, "The expr_array in list shall have the same size.");
+        for (auto arr_ptr : *$1) {
+            for (auto ptr : *arr_ptr) {
+                delete ptr;
+            }
+            delete (arr_ptr);
+        }
+        delete $1;
+        YYERROR;
+    }
+    $1->push_back($4);
     $$ = $1;
 };
 

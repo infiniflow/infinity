@@ -36,9 +36,6 @@ ObjectHandle &ObjectHandle::operator=(ObjectHandle &&other) {
 }
 
 ObjectHandle::~ObjectHandle() {
-    if (buffer_handle_) {
-        buffer_handle_->UnloadData();
-    }
 }
 
 SharedPtr<String> ObjectHandle::GetDir() const {
@@ -48,6 +45,12 @@ SharedPtr<String> ObjectHandle::GetDir() const {
 //---------------------------------------------------------------------------------------------
 
 CommonObjectHandle::CommonObjectHandle(BufferHandle *buffer_handle) : ObjectHandle(buffer_handle) {}
+
+CommonObjectHandle::~CommonObjectHandle() {
+    if(ptr_ != nullptr && buffer_handle_ != nullptr) {
+        buffer_handle_->UnloadData();
+    }
+}
 
 CommonObjectHandle::CommonObjectHandle(CommonObjectHandle &&other) : ObjectHandle(std::move(other)), ptr_(other.ptr_) { other.ptr_ = nullptr; }
 

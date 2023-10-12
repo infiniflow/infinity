@@ -12,6 +12,7 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
     if (input_state->Complete()) {
         LOG_TRACE("PhysicalMergeKnn::Execute complete")
     }
+    output_state->data_block_->AppendWith(input_state->input_data_block_);
     output_state->SetComplete();
 }
 

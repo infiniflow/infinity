@@ -86,7 +86,7 @@ public:
 
     static bool PrepareFlush(BlockEntry *block_entry);
 
-    static UniquePtr<String> Flush(BlockEntry *block_entry);
+    static bool Flush(BlockEntry *block_entry);
 
     inline static BlockColumnEntry *GetColumnDataByID(BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
 

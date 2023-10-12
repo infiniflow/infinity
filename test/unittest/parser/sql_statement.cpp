@@ -22,6 +22,9 @@ class StatementParsingTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity/data/db");
+        system("rm -rf /tmp/infinity/data/catalog/*");
+        system("rm -rf /tmp/infinity/_tmp");
     }
 };
 
@@ -103,11 +106,40 @@ TEST_F(StatementParsingTest, good_test1) {
             auto *insert_statement = (InsertStatement *)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "default");
+            EXPECT_EQ(insert_statement->values_->size(), 1);
 
-            ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_)[0];
+            ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
             EXPECT_STREQ(insert0_expr->str_value_, "abc");
-            ConstantExpr *insert1_expr = (ConstantExpr *)(*insert_statement->values_)[1];
+            ConstantExpr *insert1_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[1];
             EXPECT_EQ(insert1_expr->integer_value_, 333);
+        }
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "INSERT INTO t1 VALUES ('abc', 333), ('def', 444);";
+        parser->Parse(input_sql, result);
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        for (auto &statement : *result->statements_ptr_) {
+            EXPECT_EQ(statement->type_, StatementType::kInsert);
+            auto *insert_statement = (InsertStatement *)(statement);
+            EXPECT_EQ(insert_statement->table_name_, "t1");
+            EXPECT_EQ(insert_statement->schema_name_, "default");
+            EXPECT_EQ(insert_statement->values_->size(), 2);
+
+            ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
+            EXPECT_STREQ(insert0_expr->str_value_, "abc");
+            ConstantExpr *insert1_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[1];
+            EXPECT_EQ(insert1_expr->integer_value_, 333);
+
+            ConstantExpr *insert2_expr = (ConstantExpr *)(*insert_statement->values_->at(1))[0];
+            EXPECT_STREQ(insert2_expr->str_value_, "def");
+            ConstantExpr *insert3_expr = (ConstantExpr *)(*insert_statement->values_->at(1))[1];
+            EXPECT_EQ(insert3_expr->integer_value_, 444);
         }
 
         result->Reset();

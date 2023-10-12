@@ -15,7 +15,7 @@ namespace infinity {
 
 class KnnScanFunctionData : public TableFunctionData {
 public:
-    KnnScanFunctionData(const BlockIndex *block_index,
+    KnnScanFunctionData(BlockIndex *block_index,
                         const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
                         const Vector<SizeT> &non_knn_column_ids,
                         Vector<SizeT> knn_column_ids,
@@ -29,7 +29,7 @@ public:
           knn_column_ids_(std::move(knn_column_ids)), topk_(topk), dimension_(dimension), query_embedding_count_(query_embedding_count),
           query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
-    const BlockIndex *block_index_{};
+    BlockIndex *block_index_{};
     const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_{};
     const Vector<SizeT> &non_knn_column_ids_{};
     Vector<SizeT> knn_column_ids_{};
