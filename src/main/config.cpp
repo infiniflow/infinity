@@ -4,6 +4,7 @@
 
 #include "config.h"
 #include "bin/compilation_config.h"
+#include "common/default_values.h"
 #include "common/types/alias/containers.h"
 #include "spdlog/common.h"
 #include "toml.hpp"
@@ -53,6 +54,11 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
     SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
 
+    // Default wal config
+    u64 wal_flush_time_interval = 20000000000; // ms
+    u64 wal_flush_txn_interval = 3;            // txn
+    u64 wal_file_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
+
     if (config_path == nullptr) {
         std::cout << "No config file is given, use default configs." << std::endl;
 
@@ -101,6 +107,13 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             option_.buffer_pool_size = default_buffer_pool_size; // 4Gib
             option_.temp_dir = MakeShared<String>(*default_temp_dir);
+        }
+
+        // Wal
+        {
+            option_.wal_flush_time_interval_ = wal_flush_time_interval;
+            option_.wal_flush_txn_interval_ = wal_flush_txn_interval;
+            option_.wal_file_size_threshold_ = wal_file_size_threshold;
         }
 
     } else {
@@ -228,6 +241,18 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             }
             option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));
         }
+
+        // Wal
+        {
+            auto wal_config = config["wal"];
+            option_.wal_flush_time_interval_ = wal_config["wal_flush_time_interval"].value_or(wal_flush_time_interval);
+            option_.wal_flush_txn_interval_ = wal_config["wal_flush_txn_interval"].value_or(wal_flush_txn_interval);
+            auto wal_file_size_threshold_str = wal_config["wal_file_size_threshold"].value_or("10KB");
+            result = ParseByteSize(wal_file_size_threshold_str, option_.wal_file_size_threshold_);
+            if (result != nullptr) {
+                return result;
+            }
+        }
     }
 
     return result;
@@ -268,6 +293,11 @@ void Config::PrintAll() const {
         // Buffer
         infinity::infinity_logger->info(" - buffer_pool_size: " + std::to_string(option_.buffer_pool_size));
         infinity::infinity_logger->info(" - temp_dir: " + *option_.temp_dir);
+
+        // Wal
+        infinity::infinity_logger->info(" - wal_flush_time_interval: " + std::to_string(option_.wal_flush_time_interval_));
+        infinity::infinity_logger->info(" - wal_flush_txn_interval: " + std::to_string(option_.wal_flush_txn_interval_));
+        infinity::infinity_logger->info(" - wal_file_size_threshold: " + std::to_string(option_.wal_file_size_threshold_));
     }
 }
 

@@ -37,7 +37,7 @@ constexpr SizeT GB = 1024 * MB;
 constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
 constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
-constexpr SizeT DEFAULT_WAL_FILE_SIZE = 10 * 1024;
+constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024;
 constexpr String WAL_FILE_TEMP_FILE = "wal.log";
 constexpr String WAL_FILE_PREFIX = "wal.log.";
 

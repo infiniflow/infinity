@@ -24,3 +24,8 @@ default_row_size        = 8192
 [buffer]
 buffer_pool_size        = "4GB"
 temp_dir                = "/tmp/infinity/temp"
+
+[wal]
+wal_flush_time_interval      = 20000000000
+wal_flush_txn_interval       = 20
+wal_flush_size_threshold     = "10KB"

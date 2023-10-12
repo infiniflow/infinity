@@ -16,7 +16,13 @@ namespace infinity {
 using namespace std;
 namespace fs = std::filesystem;
 
-WalManager::WalManager(Storage *storage, const std::string &wal_path) : storage_(storage), wal_path_(wal_path), running_(false) {}
+WalManager::WalManager(Storage *storage,
+                       const std::string &wal_path,
+                       u64 wal_file_size_threshold,
+                       u64 wal_flush_time_interval,
+                       u64 wal_flush_txn_interval)
+    : storage_(storage), wal_path_(wal_path), wal_file_size_threshold_(wal_file_size_threshold), wal_flush_time_interval_(wal_flush_time_interval),
+      wal_flush_txn_interval_(wal_flush_txn_interval), running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -160,8 +166,8 @@ void WalManager::Flush() {
             // Check if the wal file is too large.
             try {
                 auto file_size = fs::file_size(wal_path_);
-                if (file_size > DEFAULT_WAL_FILE_SIZE) {
-                    this->SwapWALFile(max_commit_ts);
+                if (file_size > wal_file_size_threshold_) {
+                    this->SwapWalFile(max_commit_ts);
                 }
 
             } catch (std::exception &e) {
@@ -180,8 +186,8 @@ void WalManager::Checkpoint() {
     // Fuzzy checkpoint for every 10 transactions or 20s.
     while (running_.load()) {
         TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
-        if (commit_ts_pend - commit_ts_done_ < 2 ||
-            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < 20000000000)) {
+        if (commit_ts_pend - commit_ts_done_ < wal_flush_txn_interval_ ||
+            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < wal_flush_time_interval_)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -210,23 +216,7 @@ void WalManager::Checkpoint() {
         LOG_INFO("WalManager::Checkpoint quit", commit_ts_done_);
         checkpoint_ts_ = std::chrono::steady_clock::now().time_since_epoch().count();
 
-        // Gc old wal files.
-        LOG_INFO("WalManager::Checkpoint begin to gc wal files")
-        if (fs::exists(wal_path_)) {
-            for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
-                // Only delete the wal.log.* files. the wal.log file is current wal file.
-                // Check if the wal.log.* files are too old.
-                // if * is little than the max_commit_ts, we will delete it.
-                if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
-                    auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                    if (std::stoll(suffix) < commit_ts_done_) {
-                        fs::remove(entry.path());
-                        LOG_TRACE("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
-                    }
-                }
-            }
-        }
-        LOG_INFO("WalManager::Checkpoint end to gc wal files");
+        RecycleWalFile();
     }
 }
 
@@ -239,7 +229,7 @@ void WalManager::Checkpoint() {
  * @param max_commit_ts The max commit timestamp of the transactions in the
  * current wal file.
  */
-void WalManager::SwapWALFile(const int64_t max_commit_ts) {
+void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     if (ofs_.is_open()) {
         ofs_.close();
     }
@@ -264,7 +254,7 @@ void WalManager::SwapWALFile(const int64_t max_commit_ts) {
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
-int64_t WalManager::ReplayWALFile() {
+int64_t WalManager::ReplayWalFile() {
     // if the wal directory does not exist, just return 0.
     if (!fs::exists(wal_path_)) {
         return 0;
@@ -344,6 +334,29 @@ int64_t WalManager::ReplayWALFile() {
 
     // So we can get the entry's content.
     // Deserialize the entry.
+}
+
+/**
+ * @brief Gc the old wal files.
+ * Only delete the wal.log.* files. the wal.log file is current wal file.
+ * Check if the wal.log.* files are too old.
+ * if * is little than the max_commit_ts, we will delete it.
+ */
+void WalManager::RecycleWalFile() {
+    // Gc old wal files.
+    LOG_INFO("WalManager::Checkpoint begin to gc wal files")
+    if (fs::exists(wal_path_)) {
+        for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
+            if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
+                auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
+                if (std::stoll(suffix) < commit_ts_done_) {
+                    fs::remove(entry.path());
+                    LOG_TRACE("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str());
+                }
+            }
+        }
+    }
+    LOG_INFO("WalManager::Checkpoint end to gc wal files");
 }
 
 } // namespace infinity

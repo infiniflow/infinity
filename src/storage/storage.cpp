@@ -21,8 +21,12 @@ void Storage::Init() {
     String catalog_dir = *config_ptr_->data_dir() + "/catalog";
 
     // Construct wal manager
-    wal_mgr_ = MakeShared<WalManager>(this, std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE);
-    auto start_time_stamp = wal_mgr_->ReplayWALFile();
+    wal_mgr_ = MakeShared<WalManager>(this,
+                                      std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
+                                      config_ptr_->wal_file_size_threshold(),
+                                      config_ptr_->wal_flush_time_interval(),
+                                      config_ptr_->wal_flush_txn_interval());
+    auto start_time_stamp = wal_mgr_->ReplayWalFile();
     wal_mgr_->Start();
 
     // Construct txn manager

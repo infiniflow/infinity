@@ -50,6 +50,11 @@ struct Options {
     // Buffer
     u64 buffer_pool_size{};
     SharedPtr<String> temp_dir{};
+
+    // Wal
+    u64 wal_flush_time_interval_{};
+    u64 wal_flush_txn_interval_{};
+    u64 wal_file_size_threshold_{};
 };
 
 struct Config {
@@ -106,6 +111,13 @@ public:
     [[nodiscard]] inline u64 buffer_pool_size() const { return option_.buffer_pool_size; }
 
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return option_.temp_dir; }
+
+    // Wal
+    [[nodiscard]] inline u64 wal_flush_time_interval() const { return option_.wal_flush_time_interval_; }
+
+    [[nodiscard]] inline u64 wal_flush_txn_interval() const { return option_.wal_flush_txn_interval_; }
+
+    [[nodiscard]] inline u64 wal_file_size_threshold() const { return option_.wal_file_size_threshold_; }
 
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);

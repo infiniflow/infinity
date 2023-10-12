@@ -31,7 +31,7 @@ private:
 
 class WalManager {
 public:
-    WalManager(Storage *storage, const std::string &wal_path);
+    WalManager(Storage *storage, const std::string &wal_path, u64 wal_file_size_threshold, u64 wal_flush_time_interval, u64 wal_flush_txn_interval);
 
     ~WalManager();
 
@@ -53,9 +53,16 @@ public:
     // Checkpoint for transactions which's lsn no larger than lsn_pend_chk_.
     void Checkpoint();
 
-    void SwapWALFile(int64_t max_commit_ts);
+    void SwapWalFile(TxnTimeStamp max_commit_ts);
 
-    int64_t ReplayWALFile();
+    int64_t ReplayWalFile();
+
+    void RecycleWalFile();
+
+public:
+    u64 wal_file_size_threshold_{};
+    u64 wal_flush_time_interval_{};
+    u64 wal_flush_txn_interval_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
