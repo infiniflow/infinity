@@ -52,9 +52,11 @@ struct Options {
     SharedPtr<String> temp_dir{};
 
     // Wal
-    u64 wal_flush_time_interval_{};
-    u64 wal_flush_txn_interval_{};
-    u64 wal_file_size_threshold_{};
+    u64 wal_size_threshold_{};
+    u64 full_checkpoint_time_interval_{};
+    u64 full_checkpoint_txn_interval_{};
+    u64 delta_checkpoint_time_interval_{};
+    u64 delta_checkpoint_txn_interval_{};
 };
 
 struct Config {
@@ -113,11 +115,15 @@ public:
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return option_.temp_dir; }
 
     // Wal
-    [[nodiscard]] inline u64 wal_flush_time_interval() const { return option_.wal_flush_time_interval_; }
+    [[nodiscard]] inline u64 full_checkpoint_time_interval() const { return option_.full_checkpoint_time_interval_; }
 
-    [[nodiscard]] inline u64 wal_flush_txn_interval() const { return option_.wal_flush_txn_interval_; }
+    [[nodiscard]] inline u64 full_checkpoint_txn_interval() const { return option_.full_checkpoint_txn_interval_; }
 
-    [[nodiscard]] inline u64 wal_file_size_threshold() const { return option_.wal_file_size_threshold_; }
+    [[nodiscard]] inline u64 delta_checkpoint_time_interval() const { return option_.delta_checkpoint_time_interval_; }
+
+    [[nodiscard]] inline u64 delta_checkpoint_txn_interval() const { return option_.delta_checkpoint_txn_interval_; }
+
+    [[nodiscard]] inline u64 wal_size_threshold() const { return option_.wal_size_threshold_; }
 
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);

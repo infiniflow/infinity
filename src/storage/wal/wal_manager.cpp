@@ -17,12 +17,15 @@ using namespace std;
 namespace fs = std::filesystem;
 
 WalManager::WalManager(Storage *storage,
-                       const std::string &wal_path,
-                       u64 wal_file_size_threshold,
-                       u64 wal_flush_time_interval,
-                       u64 wal_flush_txn_interval)
-    : storage_(storage), wal_path_(wal_path), wal_file_size_threshold_(wal_file_size_threshold), wal_flush_time_interval_(wal_flush_time_interval),
-      wal_flush_txn_interval_(wal_flush_txn_interval), running_(false) {}
+                       const string &wal_path,
+                       u64 wal_size_threshold,
+                       u64 full_checkpoint_time_interval,
+                       u64 full_checkpoint_txn_interval,
+                       u64 delta_checkpoint_time_interval,
+                       u64 delta_checkpoint_txn_interval)
+    : storage_(storage), wal_path_(wal_path), wal_size_threshold_(wal_size_threshold), full_checkpoint_time_interval_(full_checkpoint_time_interval),
+      full_checkpoint_txn_interval_(full_checkpoint_txn_interval), delta_checkpoint_time_interval_(delta_checkpoint_time_interval),
+      delta_checkpoint_txn_interval_(delta_checkpoint_txn_interval), running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -166,7 +169,7 @@ void WalManager::Flush() {
             // Check if the wal file is too large.
             try {
                 auto file_size = fs::file_size(wal_path_);
-                if (file_size > wal_file_size_threshold_) {
+                if (file_size > wal_size_threshold_) {
                     this->SwapWalFile(max_commit_ts);
                 }
 
@@ -186,8 +189,8 @@ void WalManager::Checkpoint() {
     // Fuzzy checkpoint for every 10 transactions or 20s.
     while (running_.load()) {
         TxnTimeStamp commit_ts_pend = commit_ts_pend_.load();
-        if (commit_ts_pend - commit_ts_done_ < wal_flush_txn_interval_ ||
-            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < wal_flush_time_interval_)) {
+        if (commit_ts_pend - commit_ts_done_ < full_checkpoint_txn_interval_ ||
+            (checkpoint_ts_ > 0 && std::chrono::steady_clock::now().time_since_epoch().count() - checkpoint_ts_ < full_checkpoint_time_interval_)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }

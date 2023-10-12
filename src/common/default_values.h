@@ -38,6 +38,10 @@ constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
 constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
 constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024;
+constexpr SizeT FULL_CHECKPOINT_TIME_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
+constexpr SizeT FULL_CHECKPOINT_TXN_INTERVAL = 100 * 1000;           // txn count
+constexpr SizeT DELTA_CHECKPOINT_TIME_INTERVAL = 20000;              // 20 seconds
+constexpr SizeT DELTA_CHECKPOINT_TXN_INTERVAL = 3;                   // txn count
 constexpr String WAL_FILE_TEMP_FILE = "wal.log";
 constexpr String WAL_FILE_PREFIX = "wal.log.";
 

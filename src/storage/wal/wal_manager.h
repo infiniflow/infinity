@@ -31,7 +31,13 @@ private:
 
 class WalManager {
 public:
-    WalManager(Storage *storage, const std::string &wal_path, u64 wal_file_size_threshold, u64 wal_flush_time_interval, u64 wal_flush_txn_interval);
+    WalManager(Storage *storage,
+               const std::string &wal_path,
+               u64 wal_size_threshold,
+               u64 full_checkpoint_time_interval,
+               u64 full_checkpoint_txn_interval,
+               u64 delta_checkpoint_time_interval,
+               u64 delta_checkpoint_txn_interval);
 
     ~WalManager();
 
@@ -60,9 +66,11 @@ public:
     void RecycleWalFile();
 
 public:
-    u64 wal_file_size_threshold_{};
-    u64 wal_flush_time_interval_{};
-    u64 wal_flush_txn_interval_{};
+    u64 wal_size_threshold_{};
+    u64 full_checkpoint_time_interval_{};
+    u64 full_checkpoint_txn_interval_{};
+    u64 delta_checkpoint_time_interval_{};
+    u64 delta_checkpoint_txn_interval_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
