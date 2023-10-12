@@ -105,7 +105,7 @@ public:
 
     static bool PrepareFlush(SegmentEntry *segment_entry);
 
-    static UniquePtr<String> Flush(SegmentEntry *segment_entry);
+    static bool Flush(SegmentEntry *segment_entry);
 
     //    inline static SegmentColumnEntry*
     //    GetColumnDataByID(SegmentEntry* segment_entry, u64 column_id) {

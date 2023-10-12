@@ -94,7 +94,7 @@ bool BlockEntry::PrepareFlush(BlockEntry *block_entry) {
     return block_entry->status_.compare_exchange_strong(expected, BlockEntryStatus::kBlockFlushing, std::memory_order_seq_cst);
 }
 
-UniquePtr<String> BlockEntry::Flush(BlockEntry *block_entry) {
+bool BlockEntry::Flush(BlockEntry *block_entry) {
     LOG_TRACE("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
     for (SizeT column_id = 0; const auto &column_data : block_entry->columns_) {
         column_data->Flush(column_data.get(), block_entry->row_count_);
@@ -104,11 +104,12 @@ UniquePtr<String> BlockEntry::Flush(BlockEntry *block_entry) {
 
     BlockEntryStatus expected = BlockEntryStatus::kBlockFlushing;
     if (!block_entry->status_.compare_exchange_strong(expected, BlockEntryStatus::kBlockClosed, std::memory_order_seq_cst)) {
-        return MakeUnique<String>("Data block is expected as flushing status");
+        LOG_WARN("Data block is expected as flushing status");
+        return false;
     }
     LOG_TRACE("Segment: {}, Block: {} is being flushed", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
 
-    return nullptr;
+    return true;
 }
 
 nlohmann::json BlockEntry::Serialize(const BlockEntry *block_entry) {
@@ -121,6 +122,7 @@ nlohmann::json BlockEntry::Serialize(const BlockEntry *block_entry) {
     json_res["row_count"] = block_entry->row_count_;
     json_res["row_capacity"] = block_entry->row_capacity_;
     json_res["block_id"] = block_entry->block_id_;
+    json_res["block_dir"] = *block_entry->base_dir_;
     for (const auto &block_column_entry : block_entry->columns_) {
         json_res["columns"].emplace_back(BlockColumnEntry::Serialize(block_column_entry.get()));
     }

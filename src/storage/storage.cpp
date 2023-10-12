@@ -3,7 +3,6 @@
 //
 
 #include "storage/storage.h"
-#include "common/constants/constants.h"
 #include "function/builtin_functions.h"
 #include "schema_definition.h"
 #include "storage/io/local_file_system.h"
@@ -20,16 +19,26 @@ void Storage::Init() {
 
     // Check the data dir to get latest catalog file.
     String catalog_dir = *config_ptr_->data_dir() + "/catalog";
-    wal_mgr_ = MakeShared<WalManager>(this, *config_ptr_->wal_dir() + kWALFileTemp);
-    auto start_time_stamp = wal_mgr_->ReplayWALFile();
+
+    // Construct wal manager
+    wal_mgr_ = MakeShared<WalManager>(this,
+                                      std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
+                                      config_ptr_->wal_size_threshold(),
+                                      config_ptr_->full_checkpoint_time_interval(),
+                                      config_ptr_->full_checkpoint_txn_interval(),
+                                      config_ptr_->delta_checkpoint_time_interval(),
+                                      config_ptr_->delta_checkpoint_txn_interval());
+    auto start_time_stamp = wal_mgr_->ReplayWalFile();
     wal_mgr_->Start();
+
+    // Construct txn manager
+    // TODO:xuanwei if replay wal file, should not create new catalog. must load from wal file. if no wal file, should create new catalog.
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if (catalog_file_entry == nullptr) {
         // No catalog file at all
         new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir));
-        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
-                                          buffer_mgr_.get(),
-                                          std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
+        txn_mgr_ =
+            MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
         txn_mgr_->Start();
 
         Storage::InitCatalog(new_catalog_.get(), txn_mgr_.get());
@@ -49,14 +58,12 @@ void Storage::Init() {
     builtin_functions.Init();
 }
 
-void
-Storage::Uninit() {
+void Storage::UnInit() {
     txn_mgr_->Stop();
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
     wal_mgr_.reset();
-
 
     new_catalog_.reset();
     buffer_mgr_.reset();

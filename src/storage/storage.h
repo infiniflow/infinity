@@ -30,7 +30,7 @@ public:
 
     void Init();
 
-    void Uninit();
+    void UnInit();
 
 private:
     static SharedPtr<DirEntry> GetLatestCatalog(const String &dir);
