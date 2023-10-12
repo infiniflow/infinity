@@ -42,8 +42,8 @@ constexpr SizeT FULL_CHECKPOINT_TIME_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 constexpr SizeT FULL_CHECKPOINT_TXN_INTERVAL = 100 * 1000;           // txn count
 constexpr SizeT DELTA_CHECKPOINT_TIME_INTERVAL = 20000;              // 20 seconds
 constexpr SizeT DELTA_CHECKPOINT_TXN_INTERVAL = 3;                   // txn count
-constexpr String WAL_FILE_TEMP_FILE = "wal.log";
-constexpr String WAL_FILE_PREFIX = "wal.log.";
+const String WAL_FILE_TEMP_FILE = "wal.log";
+const String WAL_FILE_PREFIX = "wal.log.";
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
 } // namespace infinity
