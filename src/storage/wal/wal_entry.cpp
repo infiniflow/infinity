@@ -7,6 +7,11 @@
 
 #include <cstdint>
 #include <cstring>
+#include <format>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <type_traits>
 
 namespace infinity {
 
@@ -245,12 +250,20 @@ int32_t WalEntry::GetSizeInBytes() const {
     return size;
 }
 
+/**
+ * An entry is serialized as follows:
+ * - WalEntryHeader
+ *   - size
+ *   - checksum
+ *   - txn_id
+ *   - commit_ts
+ * - number of WalCmd
+ *   - (repeated) WalCmd
+ * - 4 bytes pad
+ * @param ptr
+ */
+
 void WalEntry::WriteAdv(char *&ptr) const {
-    // An entry is serialized as follows:
-    // - WalEntryHeader
-    // - number of WalCmd
-    // - (repeated) WalCmd
-    // - 4 bytes pad
     char *const saved_ptr = ptr;
     memcpy(ptr, this, sizeof(WalEntryHeader));
     ptr += sizeof(WalEntryHeader);
@@ -269,9 +282,9 @@ void WalEntry::WriteAdv(char *&ptr) const {
     return;
 }
 
-SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
-    StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
+SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t max_bytes) {
+    char *const ptr_end = ptr + max_bytes;
+    StorageAssert(max_bytes > 0, "ptr goes out of range when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     WalEntryHeader *header = (WalEntryHeader *)ptr;
     entry->size = header->size;
@@ -290,15 +303,51 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
     ptr += sizeof(WalEntryHeader);
     int32_t cnt = ReadBufAdv<int32_t>(ptr);
     for (size_t i = 0; i < cnt; i++) {
-        maxbytes = ptr_end - ptr;
-        StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
-        SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, maxbytes);
+        max_bytes = ptr_end - ptr;
+        StorageAssert(max_bytes > 0, "ptr goes out of range when reading WalEntry");
+        SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds.push_back(cmd);
     }
     ptr += sizeof(int32_t);
-    maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes >= 0, "ptr goes out of range when reading WalEntry");
+    max_bytes = ptr_end - ptr;
+    StorageAssert(max_bytes >= 0, "ptr goes out of range when reading WalEntry");
     return entry;
 }
 
+bool WalEntryIterator::ReadNextWalFile() {
+    for (const auto &wal_file : wal_list_) {
+        std::ifstream ifs(wal_file.c_str(), std::ios::binary | std::ios::ate);
+        if (!ifs.is_open()) {
+            throw StorageException("Can not open the " + wal_list_[wal_index_]);
+        }
+
+        std::streamsize size = ifs.tellg();
+        if (size > 0) {
+            // read the entire file into the buffer
+            std::vector<char> buf(size);
+            ifs.seekg(0, std::ios::beg);
+            ifs.read(buf.data(), size);
+            ifs.close();
+
+            // parse the buffer
+            char *ptr = buf.data();
+            while (ptr < buf.data() + size) {
+                int32_t entry_size;
+                std::memcpy(&entry_size, ptr + size - sizeof(int32_t), sizeof(entry_size));
+                ptr += size - entry_size;
+
+                auto entry = WalEntry::ReadAdv(ptr, entry_size);
+                current_entry_.push_back(entry);
+                if (ptr <= buf.data()) {
+                    break;
+                }
+            }
+        }
+        ifs.close();
+        ++wal_index_;
+        return true;
+    }
+
+    return false;
+}
 } // namespace infinity

@@ -259,9 +259,43 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
         throw StorageException("Failed to open wal file: " + wal_path_);
     }
 }
+
+/*****************************************************************************
+ * REPLAY WAL FILE
+ *****************************************************************************/
 /**
  * @brief Replay the wal file.
+ *  wal format: wal.log.<max_commit_ts>
+ *  the wal.log file is the current wal file.
+ *  the most recent wal.log file is the current wal file.
  *
+ *  time min -------------------------------------------------------------------------------------------------------------------------------> time max
+ *  ================ =========================  =================================================================================================
+ *  |   wal.log.1  | |       wal.log.3       |  |                                wal.log                                                        |
+ *  ---------------- -------------------------  --------------------------------------------------------------------------------------------------
+ *  |[entry｜entry]| |  [entry｜entry｜entry] ｜ | [entry｜entry｜entry| <checkpoint{ max_commit_ts ; catalog_path }>｜entry?(bad checksum)｜entry]|
+ *  ================ =========================  ==================================================================================================
+ *                                                  ⬆️     ｜                                          ⬆️-------- ⬅️ ---------------------- ⬅️ phase 1:
+ find the checkpoint entry
+ *                                                  ｜      ｜                      ⬇️
+ *                                                  ｜------｜------- ⬅️ -----------｜     phase 2: find the first entry which commit_ts low equal (<=)
+ the max_commit_ts
+ *                                                          ｜
+ *                                                          ➡️ ------ |       ...  (jump checkpoint entry) ...       | continue => end
+ *
+ *                                                                    phase 3: replay the entries by the order of the wal.log
+ *                                                                    - case 1: the entry is a checkpoint entry, jump it.
+ *                                                                    - case 2: the entry is a normal entry, replay it.
+ *                                                                    - case 3: the entry is a bad entry, stop replaying and end.
+
+
+
+ *  phase 1(⬅️): - find the checkpoint entry in the wal.log file. ( Attention: From back to front find the first checkpoint entry)
+ *           - get the max commit timestamp of the checkpoint entry.
+ *           - get the catalog path of the checkpoint entry.
+ *
+ *  phase 2(⬅️): - find the first entry which commit_ts low equal (<=) the max_commit_ts
+ *  phase 3(➡️): - replay the entries by the order of the wal.log
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
@@ -327,12 +361,24 @@ int64_t WalManager::ReplayWalFile() {
 
         auto entry = WalEntry::ReadAdv(ptr, entry_size);
 
+        // How to traverse the wal file from back to front?
+        // We will use the entry's tail to traverse the wal file.
+        // The entry's tail is 4B, which is the size of the entry.
+        // So we can get the entry's size.
+        // The entry's content is entry_size bytes.
+        // So we can get the entry's content.
+        // Deserialize the entry.
+
+        for (const auto &cmd : entry->cmds) {
+            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+        }
         max_commit_ts = entry->commit_ts;
 
         auto commands = entry->cmds;
 
         break;
     }
+
     return max_commit_ts;
 
     // 2.2.2 Read the wal file.

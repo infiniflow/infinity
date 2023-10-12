@@ -5,7 +5,10 @@
 #include "common/types/alias/strings.h"
 #include "common/types/complex/row_id.h"
 #include <cstdint>
+#include <filesystem>
+#include <iostream>
 #include <roaring/roaring.hh>
+#include <utility>
 
 namespace infinity {
 
@@ -39,60 +42,84 @@ enum class WalCommandType : uint8_t {
     CHECKPOINT = 99,
 };
 
+// WalCommandType -> String
+static String WalCommandTypeToString(WalCommandType type) {
+    switch (type) {
+        case WalCommandType::INVALID:
+            return "INVALID";
+        case WalCommandType::CREATE_DATABASE:
+            return "CREATE_DATABASE";
+        case WalCommandType::DROP_DATABASE:
+            return "DROP_DATABASE";
+        case WalCommandType::CREATE_TABLE:
+            return "CREATE_TABLE";
+        case WalCommandType::DROP_TABLE:
+            return "DROP_TABLE";
+        case WalCommandType::ALTER_INFO:
+            return "ALTER_INFO";
+        case WalCommandType::IMPORT:
+            return "IMPORT";
+        case WalCommandType::APPEND:
+            return "APPEND";
+        case WalCommandType::DELETE:
+            return "DELETE";
+        case WalCommandType::CHECKPOINT:
+            return "CHECKPOINT";
+        default:
+            return "INVALID";
+    }
+}
+
 struct WalCmd {
     virtual ~WalCmd() = default;
 
     virtual WalCommandType GetType() = 0;
 
     virtual bool operator==(const WalCmd &other) const { return typeid(*this) == typeid(other); }
-    bool operator!=(const WalCmd &other) { return !(*this == other); }
+    bool operator!=(const WalCmd &other) const { return !(*this == other); }
     // Estimated serialized size in bytes
-    virtual int32_t GetSizeInBytes() const = 0;
+    [[nodiscard]] virtual int32_t GetSizeInBytes() const = 0;
     // Write to a char buffer
     virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
-    static SharedPtr<WalCmd> ReadAdv(char *&ptr, int32_t maxbytes);
+    static SharedPtr<WalCmd> ReadAdv(char *&ptr, int32_t max_bytes);
 };
 
 struct WalCmdCreateDatabase : public WalCmd {
-    WalCmdCreateDatabase(const String &db_name_) : db_name(db_name_) {}
-    virtual WalCommandType GetType() { return WalCommandType::CREATE_DATABASE; }
-    virtual bool operator==(const WalCmd &other) const {
+    explicit WalCmdCreateDatabase(const String &db_name_) : db_name(db_name_) {}
+
+    WalCommandType GetType() override { return WalCommandType::CREATE_DATABASE; }
+    bool operator==(const WalCmd &other) const override {
         auto other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name;
     }
-
-    int32_t GetSizeInBytes() const;
-
-    void WriteAdv(char *&buf) const;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
 };
 
 struct WalCmdDropDatabase : public WalCmd {
-    WalCmdDropDatabase(const String &db_name_) : db_name(db_name_) {}
-    virtual WalCommandType GetType() { return WalCommandType::DROP_DATABASE; }
-    virtual bool operator==(const WalCmd &other) const {
+    explicit WalCmdDropDatabase(const String &db_name_) : db_name(db_name_) {}
+
+    WalCommandType GetType() override { return WalCommandType::DROP_DATABASE; }
+    bool operator==(const WalCmd &other) const override {
         auto other_cmd = dynamic_cast<const WalCmdDropDatabase *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name;
     }
-
-    virtual int32_t GetSizeInBytes() const;
-
-    virtual void WriteAdv(char *&buf) const;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
 };
 
 struct WalCmdCreateTable : public WalCmd {
     WalCmdCreateTable(const String &db_name_, const SharedPtr<TableDef> &table_def_) : db_name(db_name_), table_def(table_def_) {}
-    virtual WalCommandType GetType() { return WalCommandType::CREATE_TABLE; }
 
-    virtual bool operator==(const WalCmd &other) const;
-
-    virtual int32_t GetSizeInBytes() const;
-
-    virtual void WriteAdv(char *&buf) const;
+    WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
+    bool operator==(const WalCmd &other) const override;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
     SharedPtr<TableDef> table_def;
@@ -117,15 +144,14 @@ struct WalCmdCreateIndex : public WalCmd {
 
 struct WalCmdDropTable : public WalCmd {
     WalCmdDropTable(const String &db_name_, const String &table_name_) : db_name(db_name_), table_name(table_name_) {}
-    virtual WalCommandType GetType() { return WalCommandType::DROP_TABLE; }
-    virtual bool operator==(const WalCmd &other) const {
+
+    WalCommandType GetType() override { return WalCommandType::DROP_TABLE; }
+    bool operator==(const WalCmd &other) const override {
         auto other_cmd = dynamic_cast<const WalCmdDropTable *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name && table_name == other_cmd->table_name;
     }
-
-    int32_t GetSizeInBytes() const;
-
-    void WriteAdv(char *&buf) const;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
     String table_name;
@@ -134,10 +160,12 @@ struct WalCmdDropTable : public WalCmd {
 struct WalCmdImport : public WalCmd {
     WalCmdImport(const String &db_name_, const String &table_name_, const String &segment_dir_)
         : db_name(db_name_), table_name(table_name_), segment_dir(segment_dir_) {}
-    virtual WalCommandType GetType() { return WalCommandType::IMPORT; }
-    virtual bool operator==(const WalCmd &other) const;
-    virtual int32_t GetSizeInBytes() const;
-    virtual void WriteAdv(char *&buf) const;
+
+    WalCommandType GetType() override { return WalCommandType::IMPORT; }
+    bool operator==(const WalCmd &other) const override;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
+
     String db_name;
     String table_name;
     String segment_dir;
@@ -146,13 +174,11 @@ struct WalCmdImport : public WalCmd {
 struct WalCmdAppend : public WalCmd {
     WalCmdAppend(const String &db_name_, const String &table_name_, const SharedPtr<DataBlock> &block_)
         : db_name(db_name_), table_name(table_name_), block(block_) {}
-    virtual WalCommandType GetType() { return WalCommandType::APPEND; }
 
-    virtual bool operator==(const WalCmd &other) const;
-
-    virtual int32_t GetSizeInBytes() const;
-
-    virtual void WriteAdv(char *&buf) const;
+    WalCommandType GetType() override { return WalCommandType::APPEND; }
+    bool operator==(const WalCmd &other) const override;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
     String table_name;
@@ -162,13 +188,11 @@ struct WalCmdAppend : public WalCmd {
 struct WalCmdDelete : public WalCmd {
     WalCmdDelete(const String &db_name_, const String &table_name_, const Vector<RowID> &row_ids_)
         : db_name(db_name_), table_name(table_name_), row_ids(row_ids_) {}
-    virtual WalCommandType GetType() { return WalCommandType::DELETE; }
 
-    virtual bool operator==(const WalCmd &other) const;
-
-    virtual int32_t GetSizeInBytes() const;
-
-    virtual void WriteAdv(char *&buf) const;
+    WalCommandType GetType() override { return WalCommandType::DELETE; }
+    bool operator==(const WalCmd &other) const override;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     String db_name;
     String table_name;
@@ -177,13 +201,11 @@ struct WalCmdDelete : public WalCmd {
 
 struct WalCmdCheckpoint : public WalCmd {
     WalCmdCheckpoint(int64_t max_commit_ts_, String catalog_path) : max_commit_ts_(max_commit_ts_), catalog_path_(catalog_path) {}
-    virtual WalCommandType GetType() { return WalCommandType::CHECKPOINT; }
 
-    virtual bool operator==(const WalCmd &other) const;
-
-    virtual int32_t GetSizeInBytes() const;
-
-    virtual void WriteAdv(char *&buf) const;
+    WalCommandType GetType() override { return WalCommandType::CHECKPOINT; }
+    bool operator==(const WalCmd &other) const override;
+    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    void WriteAdv(char *&buf) const override;
 
     int64_t max_commit_ts_;
     String catalog_path_;
@@ -206,16 +228,51 @@ struct WalEntry : WalEntryHeader {
 
     // Estimated serialized size in bytes, ensured be no less than Write
     // requires, allowed be larger.
-    int32_t GetSizeInBytes() const;
+    [[nodiscard]] int32_t GetSizeInBytes() const;
 
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry> ReadAdv(char *&ptr, int32_t maxbytes);
+    static SharedPtr<WalEntry> ReadAdv(char *&ptr, int32_t max_bytes);
 
     Vector<SharedPtr<WalCmd>> cmds;
 
     // the next Iterator of the entry in the wal file
+};
+
+class WalEntryIterator {
+public:
+    explicit WalEntryIterator(const std::vector<std::string> &wal_list) : wal_list_(wal_list), wal_index_(0), entry_index_(0), current_entry_() {}
+
+    bool Next() {
+        // TODO:need check
+        while (wal_index_ < wal_list_.size()) {
+            if (entry_index_ < current_entry_.size()) {
+                ++entry_index_;
+                return true;
+            } else {
+                if (ReadNextWalFile()) {
+                    entry_index_ = 0;
+                    if (!current_entry_.empty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] SharedPtr<WalEntry> GetEntry() const { return current_entry_.at(entry_index_); }
+
+private:
+    bool ReadNextWalFile();
+
+    bool ReadNext();
+
+    std::vector<std::string> wal_list_;
+    size_t wal_index_;
+    size_t entry_index_;
+    std::vector<SharedPtr<WalEntry>> current_entry_;
 };
 
 } // namespace infinity
