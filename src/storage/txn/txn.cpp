@@ -4,12 +4,13 @@
 
 #include "txn.h"
 #include "storage/buffer/buffer_manager.h"
+#include "storage/definition/table_def.h"
 #include "storage/meta/catalog.h"
 #include "storage/meta/entry/index_def_entry.h"
 #include "storage/meta/entry/index_entry.h"
 #include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/index_def_meta.h"
 #include "storage/meta/meta_state.h"
-#include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
 

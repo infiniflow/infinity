@@ -7,20 +7,12 @@
 #include "common/utility/random.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVFFlat.h"
-#include "storage/index_def/ivfflat_index_def.h"
+#include "storage/definition/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
 #include "storage/meta/entry/data_access_state.h"
 #include "storage/meta/entry/index_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "storage/txn/txn.h"
-// #include "common/default_values.h"
-// #include "common/types/alias/smart_ptr.h"
-// #include "common/types/alias/strings.h"
-// #include "common/utility/exception.h"
-// #include "common/utility/infinity_assert.h"
-// #include "storage/buffer/object_handle.h"
-// #include "storage/index_def/index_def.h"
-// #include <ctime>
 
 namespace infinity {
 

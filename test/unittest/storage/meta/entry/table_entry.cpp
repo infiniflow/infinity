@@ -3,11 +3,11 @@
 //
 
 #include "base_test.h"
-#include "storage/meta/meta_state.h"
-#include "storage/data_block.h"
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
-#include "storage/table_def.h"
+#include "storage/data_block.h"
+#include "storage/definition/table_def.h"
+#include "storage/meta/meta_state.h"
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

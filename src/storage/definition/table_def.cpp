@@ -3,7 +3,6 @@
 //
 
 #include "table_def.h"
-
 #include "common/utility/serializable.h"
 
 namespace infinity {

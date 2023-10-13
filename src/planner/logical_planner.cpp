@@ -29,7 +29,7 @@
 #include "planner/node/logical_show.h"
 #include "query_binder.h"
 #include "src/parser/statement.h"
-#include "storage/index_def/ivfflat_index_def.h"
+#include "storage/definition/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
 
 namespace infinity {

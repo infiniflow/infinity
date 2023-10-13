@@ -3,7 +3,7 @@
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
 #include "storage/data_block.h"
-#include "storage/table_def.h"
+#include "storage/definition/table_def.h"
 
 #include <cstdint>
 #include <cstring>

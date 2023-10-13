@@ -1,7 +1,7 @@
 #include "ivfflat_index_def.h"
 
 #include "common/utility/serializable.h"
-#include "storage/index_def/index_def.h"
+#include "storage/definition/index_def/index_def.h"
 
 namespace infinity {
 

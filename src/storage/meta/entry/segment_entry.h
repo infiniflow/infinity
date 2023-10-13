@@ -10,15 +10,10 @@
 namespace infinity {
 
 class BufferManager;
-
 class Txn;
-
 class TableCollectionEntry;
-
 class IndexDef;
-
 class IndexEntry;
-
 class AppendState;
 
 enum DataSegmentStatus : i8 {
