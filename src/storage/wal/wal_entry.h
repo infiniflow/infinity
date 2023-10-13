@@ -212,13 +212,13 @@ struct WalCmdCheckpoint : public WalCmd {
 };
 
 struct WalEntryHeader {
-    int32_t size; // size of payload, including the header, round to multi
+    i32 size; // size of payload, including the header, round to multi
     // of 4. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
-    uint32_t checksum; // crc32 of the entry, including the header and the
+    u32 checksum; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
-    int64_t txn_id;    // txn id of the entry
-    int64_t commit_ts; // commit timestamp of the txn
+    i64 txn_id;    // txn id of the entry
+    i64 commit_ts; // commit timestamp of the txn
 };
 
 struct WalEntry : WalEntryHeader {
@@ -237,31 +237,16 @@ struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds;
 
-    // the next Iterator of the entry in the wal file
+    [[nodiscard]] Pair<i64, String> GetCheckpointInfo() const;
+
+    bool ISCheckPoint() const;
 };
 
 class WalEntryIterator {
 public:
-    explicit WalEntryIterator(String wal) : wal_(std::move(wal)), entry_index_(0), entries_() {
-        std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
-        if (!ifs.is_open()) {
-            StorageError("Wal open failed");
-        }
-        wal_size_ = ifs.tellg();
-        Vector<char> buf(wal_size_);
-        ifs.seekg(0, std::ios::beg);
-        ifs.read(buf.data(), wal_size_);
-        ifs.close();
-        ptr_ = buf.data() + wal_size_;
-        while (ptr_ > buf.data()) {
-            i32 entry_size;
-            memcpy(&entry_size, ptr_ - sizeof(i32), sizeof(entry_size));
-            ptr_ = ptr_ - entry_size;
-            auto entry = WalEntry::ReadAdv(ptr_, entry_size);
-            ptr_ = ptr_ - entry_size;
-            entries_.push_back(entry);
-        }
-    }
+    explicit WalEntryIterator(String wal) : wal_(std::move(wal)), entry_index_(0), entries_() {}
+
+    void Init();
 
     bool Next();
 

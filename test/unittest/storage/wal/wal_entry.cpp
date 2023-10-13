@@ -23,10 +23,7 @@ class WalEntryTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/data/catalog/*");
-        system("rm -rf /tmp/infinity/wal/*");
-        system("rm -rf /tmp/infinity/_tmp");
+        system("rm -rf /tmp/infinity");
     }
 };
 
@@ -70,7 +67,6 @@ void MockWalFile() {
         auto entry = MakeShared<WalEntry>();
         entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
         entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
-        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
         entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
         auto data_block = DataBlock::Make();
@@ -105,12 +101,33 @@ void MockWalFile() {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(2), std::string("catalog")));
-        int32_t expect_size = entry->GetSizeInBytes();
+        entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(i64(1), std::string("catalog")));
+        entry->commit_ts = 3;
+        i32 expect_size = entry->GetSizeInBytes();
         std::vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
-        int32_t actual_size = ptr - buf.data();
+        i32 actual_size = ptr - buf.data();
+        EXPECT_EQ(actual_size, expect_size);
+
+        fs::create_directories("/tmp/infinity/wal");
+        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        if (!ofs.is_open()) {
+            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+        }
+        ofs.write(buf.data(), ptr - buf.data());
+        ofs.flush();
+        ofs.close();
+    }
+    {
+        auto entry = MakeShared<WalEntry>();
+        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+        entry->commit_ts = 4;
+        i32 expect_size = entry->GetSizeInBytes();
+        std::vector<char> buf(expect_size);
+        char *ptr = buf.data();
+        entry->WriteAdv(ptr);
+        i32 actual_size = ptr - buf.data();
         EXPECT_EQ(actual_size, expect_size);
 
         fs::create_directories("/tmp/infinity/wal");
@@ -149,7 +166,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(i64(123), std::string("catalog")));
 
-    int32_t exp_size = entry->GetSizeInBytes();
+    i32 exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
@@ -166,49 +183,56 @@ TEST_F(WalEntryTest, ReadWrite) {
 TEST_F(WalEntryTest, WalEntryIterator) {
     MockWalFile();
 
-    i64 max_commit_ts = 0;
-    String catalog_path;
-    Vector<SharedPtr<WalEntry>> replay_entries;
-    WalEntryIterator iterator1("/tmp/infinity/wal/wal.log");
+    String wal_file_path = "/tmp/infinity/wal/wal.log";
+
+    WalEntryIterator iterator1(wal_file_path);
+    iterator1.Init();
     while (iterator1.Next()) {
-        LOG_INFO("WAL ENTRY:");
         auto wal_entry = iterator1.GetEntry();
+        LOG_INFO("WAL ENTRY COMMIT TS: {}", wal_entry->commit_ts);
         for (const auto &cmd : wal_entry->cmds) {
-            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
         }
     }
 
-    WalEntryIterator iterator("/tmp/infinity/wal/wal.log");
+    Vector<SharedPtr<WalEntry>> replay_entries;
+    int64_t max_commit_ts = 0;
+    String catalog_path;
+    WalEntryIterator iterator(wal_file_path);
+    iterator.Init();
+
+    // phase 1: find the max commit ts and catalog path
     while (iterator.Next()) {
         auto wal_entry = iterator.GetEntry();
-        replay_entries.push_back(wal_entry);
-        LOG_INFO("WAL ENTRY");
-        for (const auto &cmd : wal_entry->cmds) {
-            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
-            if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-                auto checkpoint_cmd = std::dynamic_pointer_cast<WalCmdCheckpoint>(cmd);
-                max_commit_ts = checkpoint_cmd->max_commit_ts_;
-                catalog_path = checkpoint_cmd->catalog_path_;
-            }
-        }
 
-        if (max_commit_ts <= 0) {
-            continue;
-        }
-
-        if (wal_entry->commit_ts <= max_commit_ts) {
-            // TODO: replay wal entry by this entry + 1
+        if (!wal_entry->ISCheckPoint()) {
+            replay_entries.push_back(wal_entry);
+        } else {
+            std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+            LOG_INFO("Checkpoint Max Commit Ts: {}", max_commit_ts);
+            LOG_INFO("Catalog Path: {}", catalog_path);
             break;
         }
     }
 
-    EXPECT_EQ(max_commit_ts, 2);
-
-    LOG_INFO("WAL REPLAY ENTRIES")
-    for (const auto &entry : replay_entries) {
-        LOG_INFO("WAL ENTRY");
-        for (const auto &cmd : entry->cmds) {
-            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+    // phase 2: by the max commit ts, find the entries to replay
+    while (iterator.Next()) {
+        auto wal_entry = iterator.GetEntry();
+        if (wal_entry->commit_ts > max_commit_ts) {
+            replay_entries.push_back(wal_entry);
         }
     }
+
+    // phase 3: replay the entries
+    LOG_INFO("Start to replay the entries")
+    for (const auto &entry : replay_entries) {
+        LOG_INFO("WAL ENTRY COMMIT TS: {}", entry->commit_ts);
+        for (const auto &cmd : entry->cmds) {
+            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+        }
+    }
+
+    EXPECT_EQ(max_commit_ts, 1);
+    EXPECT_EQ(catalog_path, "catalog");
+    EXPECT_EQ(replay_entries.size(), 2);
 }
