@@ -316,10 +316,8 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t max_bytes) {
 }
 
 bool WalEntryIterator::Next() {
-    while (entry_index_ < entries_.size()) {
-        if (entry_index_ < entries_.size()) {
-            return true;
-        }
+    if (entry_index_ < entries_.size()) {
+        return true;
     }
     return false;
 }

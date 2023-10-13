@@ -245,7 +245,7 @@ public:
     explicit WalEntryIterator(String wal) : wal_(std::move(wal)), entry_index_(0), entries_() {
         std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
         if (!ifs.is_open()) {
-            StorageError("ifstream open failed");
+            StorageError("Wal open failed");
         }
         wal_size_ = ifs.tellg();
         Vector<char> buf(wal_size_);
@@ -268,11 +268,11 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> GetEntry();
 
 private:
-    String wal_;
-    std::streamsize wal_size_;
+    String wal_{};
+    std::streamsize wal_size_{};
     char *ptr_{};
-    SizeT entry_index_;
-    Vector<SharedPtr<WalEntry>> entries_;
+    SizeT entry_index_{};
+    Vector<SharedPtr<WalEntry>> entries_{};
 };
 
 } // namespace infinity
