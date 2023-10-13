@@ -7,6 +7,10 @@
 #include "common/utility/infinity_assert.h"
 #include "storage/io/local_file_system.h"
 
+#if defined(__APPLE__)
+#include <unistd.h>
+#endif
+
 namespace infinity {
 
 Database::Database(String dir_name, FileSystemType file_system_type) : dir_name_(std::move(dir_name)) {

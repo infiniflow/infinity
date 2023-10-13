@@ -2,8 +2,8 @@
 // Created by xwg on 23-9-6.
 //
 #include "base_test.h"
-#include "main/infinity.h"
 #include "test_helper/sql_runner.h"
+#include "main/infinity.h"
 #include "storage/table.h"
 #include "storage/table_def.h"
 

@@ -3,8 +3,9 @@
 //
 
 #include "base_test.h"
-#include "main/infinity.h"
 #include "parser/sql_parser.h"
+
+#include "main/infinity.h"
 
 
 class SQLParserTest : public BaseTest {
