@@ -10,6 +10,7 @@
 #include "faiss/index_io.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/buffer_task.h"
+#include "storage/buffer/faiss_index_ptr.h"
 #include "storage/io/local_file_system.h"
 
 namespace infinity {
@@ -34,8 +35,10 @@ void BufferHandle::DeleteData() {
         }
         case BufferType::kTempFaissIndex:
         case BufferType::kFaissIndex: {
-            auto real_data = static_cast<faiss::Index *>(data_);
-            delete real_data;
+            auto ptr = static_cast<FaissIndexPtr *>(data_);
+            delete ptr->index_;
+            delete ptr->quantizer_;
+            delete ptr;
             break;
         }
         case BufferType::kInvalid:
@@ -456,7 +459,8 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
 
     if (buffer_type_ == BufferType::kFaissIndex || buffer_type_ == BufferType::kTempFaissIndex) {
         try {
-            faiss::write_index(static_cast<faiss::Index *>(data_), to_write_file.c_str());
+            auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
+            faiss::write_index(static_cast<faiss::Index *>(faiss_index_ptr->index_), to_write_file.c_str());
             prepare_success = true; // Not to close file_handler_
         } catch (faiss::FaissException &xcp) {
             StorageError(xcp.msg)

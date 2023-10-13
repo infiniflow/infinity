@@ -5,7 +5,7 @@
 #pragma once
 
 #include "executor/physical_operator.h"
-#include "storage/definition/table_def.h"
+#include "storage/meta/definition/table_def.h"
 
 namespace infinity {
 

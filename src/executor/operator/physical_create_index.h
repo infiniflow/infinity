@@ -2,7 +2,7 @@
 
 #include "executor/physical_operator.h"
 #include "parser/statement/extra/extra_ddl_info.h"
-#include "storage/definition/index_def/index_def.h"
+#include "storage/meta/definition/index_def/index_def.h"
 
 namespace infinity {
 class PhysicalCreateIndex : public PhysicalOperator {

@@ -4,7 +4,7 @@
 #include "common/types/alias/containers.h"
 #include "common/types/alias/primitives.h"
 #include "common/types/alias/smart_ptr.h"
-#include "storage/definition/index_def/index_def.h"
+#include "storage/meta/definition/index_def/index_def.h"
 #include "storage/meta/entry/base_entry.h"
 
 namespace infinity {

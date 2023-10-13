@@ -4,8 +4,8 @@
 
 #include "logical_planner.h"
 #include "main/query_context.h"
-#include "storage/txn/txn.h"
 #include "storage/meta/entry/table_collection_entry.h"
+#include "storage/txn/txn.h"
 
 #include "expression/cast_expression.h"
 #include "function/cast/cast_function.h"
@@ -29,8 +29,8 @@
 #include "planner/node/logical_show.h"
 #include "query_binder.h"
 #include "src/parser/statement.h"
-#include "storage/definition/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
+#include "storage/meta/definition/index_def/ivfflat_index_def.h"
 
 namespace infinity {
 

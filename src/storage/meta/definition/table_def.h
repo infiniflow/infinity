@@ -6,8 +6,8 @@
 
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
-#include "storage/definition/column_def.h"
-#include "storage/definition/index_def/index_def.h"
+#include "storage/meta/definition/column_def.h"
+#include "storage/meta/definition/index_def/index_def.h"
 
 namespace infinity {
 

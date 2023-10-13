@@ -7,12 +7,14 @@
 #include "common/utility/random.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVFFlat.h"
-#include "storage/definition/index_def/ivfflat_index_def.h"
+#include "storage/buffer/faiss_index_ptr.h"
 #include "storage/io/local_file_system.h"
+#include "storage/meta/definition/index_def/ivfflat_index_def.h"
 #include "storage/meta/entry/data_access_state.h"
 #include "storage/meta/entry/index_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "storage/txn/txn.h"
+#include "storage/txn/txn_store.h"
 
 namespace infinity {
 
@@ -162,9 +164,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                     StorageException("Train index failed: {}", e.what());
                 }
             }
-            // delete quantizer;
 
-            auto index_entry = IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, buffer_mgr, index);
+            auto index_entry = IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, buffer_mgr, new FaissIndexPtr(index, quantizer));
 
             txn_store->CreateIndexFile(segment_entry->segment_id_, std::move(index_entry));
             return index_entry;

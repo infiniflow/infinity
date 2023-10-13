@@ -2,7 +2,7 @@
 
 #include "common/utility/infinity_assert.h"
 #include "common/utility/serializable.h"
-#include "storage/definition/index_def/index_def.h"
+#include "storage/meta/definition/index_def/index_def.h"
 
 namespace infinity {
 

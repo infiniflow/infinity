@@ -6,7 +6,7 @@
 
 namespace infinity {
 SharedPtr<IndexEntry>
-IndexEntry::NewIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager, faiss::Index *index) {
+IndexEntry::NewIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager, FaissIndexPtr *index) {
     // FIXME shenyushi: estimate index size.
     auto buffer_handle = buffer_manager->AllocateBufferHandle(segment_entry->segment_dir_, index_name, 0, BufferType::kTempFaissIndex);
     // FIXME shenyushi: Should use make_shared instead. One heap allocate

@@ -14,7 +14,7 @@
 #include "extra_ddl_info.h"
 #include "parser/statement/select_statement.h"
 #include "parser/statement/statement_common.h"
-#include "storage/definition/column_def.h"
+#include "storage/meta/definition/column_def.h"
 
 namespace infinity {
 

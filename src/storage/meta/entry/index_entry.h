@@ -19,7 +19,7 @@ private:
 
 public:
     static SharedPtr<IndexEntry>
-    NewIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager, faiss::Index *index);
+    NewIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager, FaissIndexPtr *index);
 
 private:
     static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager);

@@ -34,7 +34,11 @@ ObjectHandle &ObjectHandle::operator=(ObjectHandle &&other) noexcept {
     return *this;
 }
 
-ObjectHandle::~ObjectHandle() {}
+ObjectHandle::~ObjectHandle() {
+    if (buffer_handle_) {
+        buffer_handle_->UnloadData();
+    }
+}
 
 SharedPtr<String> ObjectHandle::GetDir() const { return buffer_handle_->current_dir_; }
 
