@@ -3,9 +3,8 @@
 //
 
 #include "storage/meta/entry/table_collection_entry.h"
-#include "parser/statement/extra/create_table_info.h"
 #include "storage/common/block_index.h"
-#include "storage/index_def/index_def.h"
+#include "storage/definition/index_def/index_def.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/index_def_meta.h"
 #include "storage/meta/table_collection_meta.h"
@@ -63,39 +62,6 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
     IndexDef *index_def_ptr = index_def.get();
     EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, std::move(index_def), txn_id, begin_ts, txn_mgr);
 
-    // Write index file
-    switch (index_def_ptr->method_type_) {
-        case IndexMethod::kIVFFlat: {
-            // check whether the column def is valid
-            if (index_def_ptr->column_names_.size() != 1) {
-                StorageException("IVFFlat index should created on one column");
-            }
-            const String &column_name = index_def_ptr->column_names_[0];
-            u64 column_id = table_entry->GetColumnIdByName(column_name);
-            ColumnDef &column_def = *table_entry->columns_[column_id];
-            if (column_def.type()->type() != LogicalType::kEmbedding) {
-                StorageException("IVFFlat index should created on Embedding type column");
-            }
-            auto type_info = column_def.type()->type_info().get();
-            auto embedding_info = (EmbeddingInfo *)type_info;
-            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-                StorageException("IVFFlat index should created on float embedding type column");
-            }
-
-            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-                // TODO shenyushi
-                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), *index_def_ptr, column_id, embedding_info->Dimension(), buffer_mgr);
-            }
-            break;
-        }
-        case IndexMethod::kInvalid: {
-            StorageException("Invalid index method type.");
-        }
-        default: {
-            NotImplementException("Not implemented.");
-        }
-    }
-
     return res;
 }
 
@@ -111,8 +77,16 @@ EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, co
 }
 
 void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr) {
-    NotImplementError("Not implemented.");
-    // TODO
+    table_entry->rw_locker_.lock_shared();
+
+    IndexDefMeta *index_def_meta{nullptr};
+    if (table_entry->indexes_.find(index_name) != table_entry->indexes_.end()) {
+        index_def_meta = table_entry->indexes_[index_name].get();
+    }
+    table_entry->rw_locker_.unlock_shared();
+
+    LOG_TRACE("Remove index entry: {}", *index_name);
+    IndexDefMeta::DeleteNewEntry(index_def_meta, txn_id, txn_mgr);
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
@@ -160,6 +134,40 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
     }
 }
 
+void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, BufferManager *buffer_mgr) {
+    auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
+    switch (index_def.method_type_) {
+        case IndexMethod::kIVFFlat: {
+            // check whether the column def is valid
+            if (index_def.column_names_.size() != 1) {
+                StorageException("IVFFlat index should created on one column");
+            }
+            const String &column_name = index_def.column_names_[0];
+            u64 column_id = table_entry->GetColumnIdByName(column_name);
+            ColumnDef &column_def = *table_entry->columns_[column_id];
+            if (column_def.type()->type() != LogicalType::kEmbedding) {
+                StorageException("IVFFlat index should created on Embedding type column");
+            }
+            auto type_info = column_def.type()->type_info().get();
+            auto embedding_info = (EmbeddingInfo *)type_info;
+            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+                StorageException("IVFFlat index should created on float embedding type column");
+            }
+
+            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), index_def, column_id, embedding_info->Dimension(), buffer_mgr, txn_store_ptr);
+            }
+            break;
+        }
+        case IndexMethod::kInvalid: {
+            StorageException("Invalid index method type.");
+        }
+        default: {
+            NotImplementException("Not implemented.");
+        }
+    }
+}
+
 UniquePtr<String>
 TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
     NotImplementError("TableCollectionEntry::Delete");
@@ -183,6 +191,14 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
         LOG_TRACE("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_);
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_id_, range.row_count_);
+    }
+}
+
+void TableCollectionEntry::CommitCreateIndexFile(TableCollectionEntry *table_entry,
+                                                 Txn *txn_ptr,
+                                                 const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
+    for (const auto &[segment_id, index_entry] : uncommitted_indexes) {
+        SegmentEntry::CommitCreateIndexFile(table_entry->segments_[segment_id].get(), txn_ptr, index_entry);
     }
 }
 

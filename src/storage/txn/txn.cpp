@@ -537,6 +537,7 @@ void Txn::CommitTxnBottom() {
         is_read_only_txn = false;
     }
 
+    bool is_read_only_txn = true;
     //  Commit indexes in catalog
     for (auto *index_def_entry : txn_indexes_) {
         index_def_entry->Commit(commit_ts);

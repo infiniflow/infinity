@@ -113,14 +113,19 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
     }
 }
 
-void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr){
-    NotImplementError("Not implemented")}
+void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry,
+                                     Txn *txn_ptr,
+                                     const IndexDef &index_def,
+                                     u64 column_id,
+                                     BufferManager *buffer_mgr,
+                                     TxnTableStore *txn_store){NotImplementError("Not implemented")}
 
 SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
                                                          const IndexDef &index_def,
                                                          u64 column_id,
                                                          int dimension,
-                                                         BufferManager *buffer_mgr) {
+                                                         BufferManager *buffer_mgr,
+                                                         TxnTableStore *txn_store) {
     Vector<SharedPtr<IndexEntry>> index_entries;
     switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
@@ -161,7 +166,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
 
             auto index_entry = IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, buffer_mgr, index);
 
-            // segment_entry->index_entry_map_.emplace(index_def.index_name_, index_entry); // TODO shenyushi: may not emplace here
+            txn_store->CreateIndexFile(segment_entry->segment_id_, std::move(index_entry));
             return index_entry;
         }
         case IndexMethod::kInvalid: {

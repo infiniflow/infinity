@@ -13,6 +13,8 @@ class TxnManager;
 
 class TableCollectionEntry;
 
+class BufferManager;
+
 class IndexDefMeta {
 public:
     explicit IndexDefMeta(SharedPtr<String> index_name, TableCollectionEntry *table_collection_entry)

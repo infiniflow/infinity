@@ -130,9 +130,8 @@ UniquePtr<IndexDefMeta> IndexDefMeta::Deserialize(const nlohmann::json &index_de
     auto res = MakeUnique<IndexDefMeta>(std::move(index_name), table_collection_entry);
     if (index_def_meta_json.contains("entries")) {
         for (const auto &entry_json : index_def_meta_json["entries"]) {
-            // TODO shenyushi
-            // auto entry = IndexEntry::Deserialize(entry_json, res.get());
-            // res->entry_list_.emplace_back(std::move(entry));
+            auto entry = IndexDefEntry::Deserialize(entry_json, res.get());
+            res->entry_list_.emplace_back(std::move(entry));
         }
     }
     return res;

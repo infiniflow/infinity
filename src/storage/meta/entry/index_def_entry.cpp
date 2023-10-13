@@ -24,7 +24,6 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const nlohmann::json &index_
     u64 txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     // IndexDef::Deserialize(index_def_entry_json["index_def"], IndexDef &index_def)
-    // TODO shenyushi: deserialize from index_def
     auto index_def_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts);
     return index_def_entry;
 }

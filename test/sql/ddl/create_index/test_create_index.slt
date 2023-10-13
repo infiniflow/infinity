@@ -11,7 +11,7 @@ CREATE TABLE test_create_index (co1 embedding(float,128));
 
 # import data from fvecs file
 query I
-COPY test_create_index FROM '/home/shenyushi/Documents/GitHub/infiniflow/infinity/test/data/fvecs/test.fvecs' WITH ( DELIMITER ',' );
+COPY test_create_index FROM '/tmp/infinity/sqllogictest/test.fvecs' WITH ( DELIMITER ',' );
 ----
 
 query I

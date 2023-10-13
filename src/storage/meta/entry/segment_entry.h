@@ -15,6 +15,7 @@ class TableCollectionEntry;
 class IndexDef;
 class IndexEntry;
 class AppendState;
+class TxnTableStore;
 
 enum DataSegmentStatus : i8 {
     kSegmentOpen,
@@ -88,10 +89,19 @@ public:
 
     static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr);
+    static void CreateIndexScalar(SegmentEntry *segment_entry,
+                                  Txn *txn_ptr,
+                                  const IndexDef &index_def,
+                                  u64 column_id,
+                                  BufferManager *buffer_mgr,
+                                  TxnTableStore *txn_store);
 
-    static SharedPtr<IndexEntry>
-    CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension, BufferManager *buffer_mgr);
+    static SharedPtr<IndexEntry> CreateIndexEmbedding(SegmentEntry *segment_entry,
+                                                      const IndexDef &index_def,
+                                                      u64 column_id,
+                                                      int dimension,
+                                                      BufferManager *buffer_mgr,
+                                                      TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 

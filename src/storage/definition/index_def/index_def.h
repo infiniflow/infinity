@@ -4,7 +4,6 @@
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
 #include "json.hpp"
-#include "storage/knnindex/knn_distance.h"
 
 namespace infinity {
 
@@ -59,7 +58,6 @@ public:
     static SharedPtr<IndexDef> Deserialize(const nlohmann::json &index_def_json);
 
 public:
-    // TODO shenyushi, use shared_ptr here
     const SharedPtr<String> index_name_{};
     const IndexMethod method_type_{IndexMethod::kInvalid};
     const Vector<String> column_names_{};

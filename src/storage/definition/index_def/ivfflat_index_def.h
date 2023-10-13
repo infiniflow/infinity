@@ -25,7 +25,6 @@ public:
     virtual bool operator!=(const IndexDef &other) const override;
 
 public:
-    // Note shenyushi: whether the virtual function of derive class needs to has "virtual" keyword? And what is "final" keyword?
     virtual int32_t GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;

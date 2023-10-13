@@ -12,7 +12,7 @@
 namespace infinity {
 
 class TxnManager;
-
+class TxnTableStore;
 class DBEntry;
 class TableCollectionMeta;
 class BufferManager;

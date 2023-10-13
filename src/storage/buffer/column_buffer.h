@@ -32,7 +32,7 @@ public:
 
     Pair<const_ptr_t, SizeT> GetVarcharAt(SizeT row_idx);
 
-    Pair<const ptr_t, SizeT> GetVarcharAtPrefix(SizeT row_idx);
+    Pair<const_ptr_t, SizeT> GetVarcharAtPrefix(SizeT row_idx);
 
     ptr_t GetValueAt(SizeT row_idx, const DataType &data_type);
 };

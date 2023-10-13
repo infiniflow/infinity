@@ -23,7 +23,7 @@ public:
 
     UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
 
-    UniquePtr<String> CreateIndexFile(u64 segment_id, const SharedPtr<IndexEntry> &index);
+    UniquePtr<String> CreateIndexFile(u64 segment_id, SharedPtr<IndexEntry> index);
 
     UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
