@@ -6,6 +6,7 @@
 #include "common/types/complex/row_id.h"
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <roaring/roaring.hh>
 #include <utility>
@@ -242,37 +243,38 @@ struct WalEntry : WalEntryHeader {
 
 class WalEntryIterator {
 public:
-    explicit WalEntryIterator(const std::vector<std::string> &wal_list) : wal_list_(wal_list), wal_index_(0), entry_index_(0), current_entry_() {}
-
-    bool Next() {
-        // TODO:need check
-        while (wal_index_ < wal_list_.size()) {
-            if (entry_index_ < current_entry_.size()) {
-                ++entry_index_;
-                return true;
-            } else {
-                if (ReadNextWalFile()) {
-                    entry_index_ = 0;
-                    if (!current_entry_.empty()) {
-                        return true;
-                    }
-                }
-            }
+    explicit WalEntryIterator(String wal) : wal_(std::move(wal)), entry_index_(0), entries_() {
+        std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
+        if (!ifs.is_open()) {
+            std::cerr << "Failed to open wal file: " << wal_ << std::endl;
+            return;
         }
-        return false;
+        wal_size_ = ifs.tellg();
+        Vector<char> buf(wal_size_);
+        ifs.seekg(0, std::ios::beg);
+        ifs.read(buf.data(), wal_size_);
+        ifs.close();
+        ptr_ = buf.data() + wal_size_;
+        while (ptr_ > buf.data()) {
+            i32 entry_size;
+            memcpy(&entry_size, ptr_ - sizeof(i32), sizeof(entry_size));
+            ptr_ = ptr_ - entry_size;
+            auto entry = WalEntry::ReadAdv(ptr_, entry_size);
+            ptr_ = ptr_ - entry_size;
+            entries_.push_back(entry);
+        }
     }
 
-    [[nodiscard]] SharedPtr<WalEntry> GetEntry() const { return current_entry_.at(entry_index_); }
+    bool Next();
+
+    [[nodiscard]] SharedPtr<WalEntry> GetEntry();
 
 private:
-    bool ReadNextWalFile();
-
-    bool ReadNext();
-
-    std::vector<std::string> wal_list_;
-    size_t wal_index_;
-    size_t entry_index_;
-    std::vector<SharedPtr<WalEntry>> current_entry_;
+    String wal_;
+    std::streamsize wal_size_;
+    char *ptr_{};
+    SizeT entry_index_;
+    Vector<SharedPtr<WalEntry>> entries_;
 };
 
 } // namespace infinity

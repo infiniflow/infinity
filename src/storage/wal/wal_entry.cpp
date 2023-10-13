@@ -314,40 +314,15 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t max_bytes) {
     return entry;
 }
 
-bool WalEntryIterator::ReadNextWalFile() {
-    for (const auto &wal_file : wal_list_) {
-        std::ifstream ifs(wal_file.c_str(), std::ios::binary | std::ios::ate);
-        if (!ifs.is_open()) {
-            throw StorageException("Can not open the " + wal_list_[wal_index_]);
+bool WalEntryIterator::Next() {
+    while (entry_index_ < entries_.size()) {
+        if (entry_index_ < entries_.size()) {
+            return true;
         }
-
-        std::streamsize size = ifs.tellg();
-        if (size > 0) {
-            // read the entire file into the buffer
-            std::vector<char> buf(size);
-            ifs.seekg(0, std::ios::beg);
-            ifs.read(buf.data(), size);
-            ifs.close();
-
-            // parse the buffer
-            char *ptr = buf.data();
-            while (ptr < buf.data() + size) {
-                int32_t entry_size;
-                std::memcpy(&entry_size, ptr + size - sizeof(int32_t), sizeof(entry_size));
-                ptr += size - entry_size;
-
-                auto entry = WalEntry::ReadAdv(ptr, entry_size);
-                current_entry_.push_back(entry);
-                if (ptr <= buf.data()) {
-                    break;
-                }
-            }
-        }
-        ifs.close();
-        ++wal_index_;
-        return true;
     }
-
     return false;
 }
+
+SharedPtr<WalEntry> WalEntryIterator::GetEntry() { return entries_[entry_index_++]; }
+
 } // namespace infinity

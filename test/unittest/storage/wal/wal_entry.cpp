@@ -64,6 +64,66 @@ SharedPtr<TableDef> MockTableDesc2() {
     return MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
 }
 
+void MockWalFile() {
+
+    for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
+        auto entry = MakeShared<WalEntry>();
+        entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
+        entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
+        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+        entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+
+        auto data_block = DataBlock::Make();
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
+        column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        data_block->Init(column_types);
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
+            data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
+        }
+        data_block->Finalize();
+        entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
+        entry->commit_ts = commit_ts;
+
+        i32 expect_size = entry->GetSizeInBytes();
+        std::vector<char> buf(expect_size);
+        char *ptr = buf.data();
+        entry->WriteAdv(ptr);
+        i32 actual_size = ptr - buf.data();
+        EXPECT_EQ(actual_size, expect_size);
+
+        fs::create_directories("/tmp/infinity/wal");
+        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        if (!ofs.is_open()) {
+            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+        }
+        ofs.write(buf.data(), ptr - buf.data());
+        ofs.flush();
+        ofs.close();
+    }
+    {
+        auto entry = MakeShared<WalEntry>();
+        entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(2), std::string("catalog")));
+        int32_t expect_size = entry->GetSizeInBytes();
+        std::vector<char> buf(expect_size);
+        char *ptr = buf.data();
+        entry->WriteAdv(ptr);
+        int32_t actual_size = ptr - buf.data();
+        EXPECT_EQ(actual_size, expect_size);
+
+        fs::create_directories("/tmp/infinity/wal");
+        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        if (!ofs.is_open()) {
+            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+        }
+        ofs.write(buf.data(), ptr - buf.data());
+        ofs.flush();
+        ofs.close();
+    }
+}
+
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
@@ -87,7 +147,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
     Vector<RowID> row_ids = {RowID(1, 2, 3)};
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
-    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), std::string("catalog")));
+    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(i64(123), std::string("catalog")));
 
     int32_t exp_size = entry->GetSizeInBytes();
     std::vector<char> buf(exp_size, char(0));
@@ -104,52 +164,49 @@ TEST_F(WalEntryTest, ReadWrite) {
 }
 
 TEST_F(WalEntryTest, WalEntryIterator) {
-    SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
-    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
-    entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
-    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+    MockWalFile();
 
-    SharedPtr<DataBlock> data_block = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types;
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
-    column_types.emplace_back(MakeShared<DataType>(LogicalType::kTinyInt));
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
-    data_block->Init(column_types);
-    for (SizeT i = 0; i < row_count; ++i) {
-        data_block->AppendValue(0, Value::MakeBool(i % 2 == 0));
-        data_block->AppendValue(1, Value::MakeTinyInt(static_cast<i8>(i)));
-    }
-    data_block->Finalize();
-
-    entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
-    Vector<RowID> row_ids = {RowID(1, 2, 3)};
-    entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
-    entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), std::string("catalog")));
-
-    int32_t expect_size = entry->GetSizeInBytes();
-    std::vector<char> buf(expect_size);
-    char *ptr = buf.data();
-    entry->WriteAdv(ptr);
-    int32_t actual_size = ptr - buf.data();
-    EXPECT_EQ(actual_size, expect_size);
-
-    fs::create_directories("/tmp/infinity/wal");
-    auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
-    if (!ofs.is_open()) {
-        throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+    i64 max_commit_ts = 0;
+    String catalog_path;
+    Vector<SharedPtr<WalEntry>> replay_entries;
+    WalEntryIterator iterator1("/tmp/infinity/wal/wal.log");
+    while (iterator1.Next()) {
+        LOG_INFO("WAL ENTRY:");
+        auto wal_entry = iterator1.GetEntry();
+        for (const auto &cmd : wal_entry->cmds) {
+            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+        }
     }
 
-    ofs.write(buf.data(), ptr - buf.data());
-    ofs.flush();
-
-    Vector<String> wal_list;
-    wal_list.push_back("/tmp/infinity/wal/wal.log");
-
-    WalEntryIterator iterator(wal_list);
+    WalEntryIterator iterator("/tmp/infinity/wal/wal.log");
     while (iterator.Next()) {
         auto wal_entry = iterator.GetEntry();
+        replay_entries.push_back(wal_entry);
+        LOG_INFO("WAL ENTRY");
+        for (const auto &cmd : wal_entry->cmds) {
+            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+                auto checkpoint_cmd = std::dynamic_pointer_cast<WalCmdCheckpoint>(cmd);
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                catalog_path = checkpoint_cmd->catalog_path_;
+            }
+        }
+
+        if (max_commit_ts <= 0) {
+            continue;
+        }
+
+        if (wal_entry->commit_ts <= max_commit_ts) {
+            // TODO: replay wal entry by this entry + 1
+            break;
+        }
+    }
+
+    EXPECT_EQ(max_commit_ts, 2);
+
+    LOG_INFO("WAL REPLAY ENTRIES")
+    for (const auto &entry : replay_entries) {
+        LOG_INFO("WAL ENTRY");
         for (const auto &cmd : entry->cmds) {
             LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
         }
