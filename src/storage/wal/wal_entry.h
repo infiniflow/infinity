@@ -3,13 +3,12 @@
 #include "common/types/alias/containers.h"
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
+#include "common/utility/infinity_assert.h"
 #include "common/types/complex/row_id.h"
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <roaring/roaring.hh>
-#include <utility>
 
 namespace infinity {
 
@@ -67,7 +66,7 @@ static String WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::CHECKPOINT:
             return "CHECKPOINT";
         default:
-            return "INVALID";
+            StorageError("Not supported wal command type");
     }
 }
 
@@ -246,8 +245,7 @@ public:
     explicit WalEntryIterator(String wal) : wal_(std::move(wal)), entry_index_(0), entries_() {
         std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
         if (!ifs.is_open()) {
-            std::cerr << "Failed to open wal file: " << wal_ << std::endl;
-            return;
+            StorageError("ifstream open failed");
         }
         wal_size_ = ifs.tellg();
         Vector<char> buf(wal_size_);

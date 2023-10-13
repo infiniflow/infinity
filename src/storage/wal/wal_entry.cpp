@@ -4,6 +4,7 @@
 #include "common/utility/serializable.h"
 #include "parser/definition/table_def.h"
 #include "storage/data_block.h"
+#include "storage/table_def.h"
 
 #include <cstdint>
 #include <cstring>
