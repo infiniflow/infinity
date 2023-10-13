@@ -32,7 +32,8 @@ void BufferHandle::DeleteData() {
             delete[] real_data;
             break;
         }
-        case BufferType::kIndex: {
+        case BufferType::kTempFaissIndex:
+        case BufferType::kFaissIndex: {
             auto real_data = static_cast<faiss::Index *>(data_);
             delete real_data;
             break;
@@ -65,27 +66,24 @@ void *BufferHandle::LoadData() {
                     LOG_ERROR("Error happened when buffer with spilled status.")
                     return nullptr;
                 }
-                if (buffer_type_ == BufferType::kTempFile) {
-                    // Restore the data from disk
-                    String file_path;
-                    if (current_dir_ == nullptr or current_dir_->empty()) {
-                        file_path = *base_dir_ + '/' + *file_name_;
-                    } else {
-                        file_path = *current_dir_ + '/' + *file_name_;
+                switch (buffer_type_) {
+                    case BufferType::kTempFile: {
+                        // Restore the data from disk
+
+                        LOG_TRACE("Read data from spilled file from: {}", file_path());
+                        // Rename the temp file on disk into _temp_filename
+                        auto real_data = new char[buffer_size_];
+                        data_ = reinterpret_cast<void *>(real_data);
+                        reference_count_ = 1;
+
+                        buffer_mgr->current_memory_size_ += buffer_size_;
+                        status_ = BufferStatus::kLoaded;
+                        return data_;
                     }
-
-                    LOG_TRACE("Read data from spilled file from: {}", file_path);
-                    // Rename the temp file on disk into _temp_filename
-                    auto real_data = new char[buffer_size_];
-                    data_ = reinterpret_cast<void *>(real_data);
-                    reference_count_ = 1;
-
-                    buffer_mgr->current_memory_size_ += buffer_size_;
-                    status_ = BufferStatus::kLoaded;
-                    return data_;
-                } else {
-                    LOG_ERROR("Only temp file can be in spilled status");
-                    return nullptr;
+                    default: {
+                        LOG_ERROR("Only temp file can be in spilled status");
+                        return nullptr;
+                    }
                 }
             }
 
@@ -105,32 +103,33 @@ void *BufferHandle::LoadData() {
                             return nullptr;
                         }
 
-                        String file_path;
-                        if (current_dir_ == nullptr or current_dir_->empty()) {
-                            file_path = *base_dir_ + '/' + *file_name_;
-                        } else {
-                            file_path = *current_dir_ + '/' + *file_name_;
-                        }
-
-                        LOG_TRACE("Allocate buffer with name: {} and size {}", file_path, buffer_size_);
+                        LOG_TRACE("Allocate buffer with name: {} and size {}", file_path(), buffer_size_);
                         auto real_data = new char[buffer_size_];
                         data_ = reinterpret_cast<void *>(real_data);
                         reference_count_ = 1;
                         res = data_;
                         break;
                     }
+                    case BufferType::kTempFaissIndex: {
+                        UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
+                        if (err_msg != nullptr) {
+                            LOG_ERROR(*err_msg);
+                            return nullptr;
+                        }
+                        LOG_TRACE("Allocate buffer with name: {} and  estimated size {}", file_path(), buffer_size_);
+                        // should be initialzed by caller. (ex: faiss)
+
+                        reference_count_ = 1;
+                        res = nullptr;
+                        break;
+                    }
                     case BufferType::kFile: {
                         {
                             LocalFileSystem fs;
 
-                            String file_path;
-                            if (current_dir_ == nullptr or current_dir_->empty()) {
-                                file_path = *base_dir_ + '/' + *file_name_;
-                            } else {
-                                file_path = *current_dir_ + '/' + *file_name_;
-                            }
+                            String file_p = file_path();
 
-                            file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+                            file_handler_ = fs.OpenFile(file_p, FileFlags::READ_FLAG, FileLockType::kReadLock);
                             DeferFn defer_fn([&]() {
                                 file_handler_->Close();
                                 file_handler_ = nullptr;
@@ -158,7 +157,7 @@ void *BufferHandle::LoadData() {
                                 StorageError(fmt::format("Incorrect buffer length field size: {}", sizeof(buffer_size_)));
                             }
 
-                            LOG_TRACE("Read file: {} which size: {}", file_path, buffer_size_);
+                            LOG_TRACE("Read file: {} which size: {}", file_p, buffer_size_);
                             // Need buffer size space
                             UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
                             if (err_msg != nullptr) {
@@ -190,15 +189,9 @@ void *BufferHandle::LoadData() {
                         res = data_;
                         break;
                     }
-                    case BufferType::kIndex: {
-                        String file_path;
-                        if (current_dir_ == nullptr or current_dir_->empty()) {
-                            file_path = *base_dir_ + '/' + *file_name_;
-                        } else {
-                            file_path = *current_dir_ + '/' + *file_name_;
-                        }
+                    case BufferType::kFaissIndex: {
                         try {
-                            faiss::Index *index = faiss::read_index(file_path.c_str());
+                            faiss::Index *index = faiss::read_index(file_path().c_str());
                             res = reinterpret_cast<ptr_t>(index);
                         } catch (faiss::FaissException xcp) {
                             LOG_ERROR(xcp.msg);
@@ -216,14 +209,7 @@ void *BufferHandle::LoadData() {
                             return nullptr;
                         }
 
-                        String file_path;
-                        if (current_dir_ == nullptr or current_dir_->empty()) {
-                            file_path = *base_dir_ + '/' + *file_name_;
-                        } else {
-                            file_path = *current_dir_ + '/' + *file_name_;
-                        }
-
-                        LOG_TRACE("Read extra block: {}", file_path);
+                        LOG_TRACE("Read extra block: {}", file_path());
                         auto real_data = new char[buffer_size_];
                         data_ = reinterpret_cast<void *>(real_data);
                         reference_count_ = 1;
@@ -275,15 +261,8 @@ void BufferHandle::FreeData() {
         }
 
         BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
-        if (buffer_type_ == BufferType::kTempFile) {
-            String file_path;
-            if (current_dir_ == nullptr or current_dir_->empty()) {
-                file_path = *base_dir_ + '/' + *file_name_;
-            } else {
-                file_path = *current_dir_ + '/' + *file_name_;
-            }
-
-            LOG_TRACE("Spill current buffer into {}", file_path);
+        if (buffer_type_ == BufferType::kTempFile || buffer_type_ == BufferType::kTempFaissIndex) {
+            LOG_TRACE("Spill current buffer into {}", file_path());
             status_ = BufferStatus::kSpilled;
         } else {
             status_ = BufferStatus::kFreed;
@@ -297,7 +276,7 @@ void BufferHandle::FreeData() {
 UniquePtr<String> BufferHandle::SetSealing() {
     BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     std::unique_lock<RWMutex> w_locker(rw_locker_);
-    if (buffer_type_ != BufferType::kTempFile) {
+    if (buffer_type_ != BufferType::kTempFile && buffer_type_ != BufferType::kTempFaissIndex) {
         UniquePtr<String> err_msg = MakeUnique<String>("Attempt to set non-temp file buffer to sealed status");
         LOG_ERROR(*err_msg);
         return err_msg;
@@ -311,14 +290,8 @@ UniquePtr<String> BufferHandle::SetSealing() {
             }
             if (buffer_type_ == BufferType::kTempFile) {
                 // Restore the data from disk
-                String file_path;
-                if (current_dir_ == nullptr or current_dir_->empty()) {
-                    file_path = *base_dir_ + '/' + *file_name_;
-                } else {
-                    file_path = *current_dir_ + '/' + *file_name_;
-                }
 
-                LOG_TRACE("Read data from spilled file from: {}", file_path);
+                LOG_TRACE("Read data from spilled file from: {}", file_path());
                 // Rename the temp file on disk into _temp_filename
                 auto real_data = new char[buffer_size_];
                 data_ = reinterpret_cast<void *>(real_data);
@@ -390,14 +363,7 @@ void BufferHandle::ReadFile() {
     // - footer: checksum
     LocalFileSystem fs;
 
-    String file_path;
-    if (current_dir_ == nullptr or current_dir_->empty()) {
-        file_path = *base_dir_ + '/' + *file_name_;
-    } else {
-        file_path = *current_dir_ + '/' + *file_name_;
-    }
-
-    file_handler_ = fs.OpenFile(file_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    file_handler_ = fs.OpenFile(file_path(), FileFlags::READ_FLAG, FileLockType::kReadLock);
     DeferFn defer_fn([&]() {
         file_handler_->Close();
         file_handler_ = nullptr;
@@ -458,7 +424,7 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
 
     LocalFileSystem fs;
 
-    String to_write_path;
+    String to_write_path = file_path();
     if (current_dir_ == nullptr or current_dir_->empty()) {
         to_write_path = *base_dir_;
 
@@ -477,19 +443,6 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
         StorageError(err_msg);
     }
 
-    if (buffer_type_ == BufferType::kIndex) {
-        try {
-            faiss::write_index(reinterpret_cast<faiss::Index *>(data_), to_write_file.c_str());
-        } catch (faiss::FaissException &xcp) {
-            StorageError(xcp.msg)
-        }
-        return;
-    }
-    // File structure:
-    // - header: magic number
-    // - header: buffer size
-    // - data buffer
-    // - footer: checksum
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(to_write_file, flags, FileLockType::kWriteLock);
 
@@ -500,6 +453,21 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
             file_handler_ = nullptr;
         }
     });
+
+    if (buffer_type_ == BufferType::kFaissIndex || buffer_type_ == BufferType::kTempFaissIndex) {
+        try {
+            faiss::write_index(static_cast<faiss::Index *>(data_), to_write_file.c_str());
+            prepare_success = true; // Not to close file_handler_
+        } catch (faiss::FaissException &xcp) {
+            StorageError(xcp.msg)
+        }
+        return;
+    }
+    // File structure:
+    // - header: magic number
+    // - header: buffer size
+    // - data buffer
+    // - footer: checksum
 
     u64 magic_number = 0x00dd3344;
     i64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));

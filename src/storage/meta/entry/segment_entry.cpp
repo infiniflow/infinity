@@ -3,25 +3,24 @@
 //
 
 #include "storage/meta/entry/segment_entry.h"
-#include "storage/meta/entry/table_collection_entry.h"
-//
-//#include "common/default_values.h"
-//#include "common/types/alias/smart_ptr.h"
-//#include "common/types/alias/strings.h"
 #include "common/utility/defer_op.h"
-//#include "common/utility/exception.h"
-//#include "common/utility/infinity_assert.h"
 #include "common/utility/random.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVFFlat.h"
-#include "faiss/index_io.h"
-//#include "storage/buffer/object_handle.h"
-//#include "storage/index_def/index_def.h"
 #include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
-#include "storage/txn/txn.h"
 #include "storage/meta/entry/data_access_state.h"
-//#include <ctime>
+#include "storage/meta/entry/index_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/txn/txn.h"
+// #include "common/default_values.h"
+// #include "common/types/alias/smart_ptr.h"
+// #include "common/types/alias/strings.h"
+// #include "common/utility/exception.h"
+// #include "common/utility/infinity_assert.h"
+// #include "storage/buffer/object_handle.h"
+// #include "storage/index_def/index_def.h"
+// #include <ctime>
 
 namespace infinity {
 
@@ -122,42 +121,43 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
     }
 }
 
-void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr) {
-    NotImplementError("Not implemented")
-}
+void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr){
+    NotImplementError("Not implemented")}
 
-void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
-                                        const IndexDef &index_def,
-                                        u64 column_id,
-                                        int dimension,
-                                        BufferManager *buffer_mgr) {
+SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
+                                                         const IndexDef &index_def,
+                                                         u64 column_id,
+                                                         int dimension,
+                                                         BufferManager *buffer_mgr) {
+    Vector<SharedPtr<IndexEntry>> index_entries;
     switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
             auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
-            faiss::IndexFlat *quantizer_ptr = nullptr;
+            faiss::IndexFlat *quantizer = nullptr;
+            faiss::MetricType metric = faiss::MetricType::METRIC_L2;
             switch (ivfflat_index_def.metric_type_) {
                 case MetricType::kMerticL2: {
-                    quantizer_ptr = new faiss::IndexFlatL2(dimension);
+                    quantizer = new faiss::IndexFlatL2(dimension);
+                    metric = faiss::MetricType::METRIC_L2;
                     break;
                 }
                 case MetricType::kMerticInnerProduct: {
-                    quantizer_ptr = new faiss::IndexFlatIP(dimension);
+                    quantizer = new faiss::IndexFlatIP(dimension);
+                    metric = faiss::MetricType::METRIC_INNER_PRODUCT;
                     break;
                 }
                 case MetricType::kInvalid: {
-                    StorageException("Metric type is not supported");
+                    StorageError("Metric type is invalid");
                 }
                 default: {
-                    NotImplementException("Not implemented");
+                    NotImplementError("Not implemented");
                 }
             }
-            // faiss::IndexFlatL2 quantizer(dimension);
-            auto quantizer = std::unique_ptr<faiss::IndexFlat>(quantizer_ptr);
-            auto index = MakeUnique<faiss::IndexIVFFlat>(quantizer.get(), dimension, ivfflat_index_def.centroids_count_);
+            auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 ObjectHandle object_handle(block_column_entry->buffer_handle_);
-                auto block_data_ptr = (float *)object_handle.GetData();
+                auto block_data_ptr = reinterpret_cast<float *>(object_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);
@@ -165,12 +165,18 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
                     StorageException("Train index failed: {}", e.what());
                 }
             }
-            auto index_entry = IndexEntry::MakeNewIndexEntry(segment_entry->segment_dir_, index_def.index_name_, buffer_mgr);
-            segment_entry->index_entry_map_.emplace(index_def.index_name_, std::move(index_entry));
-            return;
+            // delete quantizer;
+
+            auto index_entry = IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, buffer_mgr, index);
+
+            // segment_entry->index_entry_map_.emplace(index_def.index_name_, index_entry); // TODO shenyushi: may not emplace here
+            return index_entry;
+        }
+        case IndexMethod::kInvalid: {
+            StorageError("Index method type is invalid");
         }
         default: {
-            NotImplementException("Index method type is not supported");
+            NotImplementError("Not implemented");
         }
     }
 }
@@ -195,6 +201,11 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
     }
 
     BlockEntry::CommitAppend(segment_entry->block_entries_[block_id].get(), committing_txn_id);
+}
+
+void SegmentEntry::CommitCreateIndexFile(SegmentEntry *segment_entry, Txn *txn_ptr, SharedPtr<IndexEntry> index_entry) {
+    IndexEntry::Flush(index_entry.get());
+    segment_entry->index_entry_map_.emplace(index_entry->index_name(), std::move(index_entry));
 }
 
 void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count) {
@@ -223,12 +234,16 @@ bool SegmentEntry::Flush(SegmentEntry *segment_entry) {
         LOG_TRACE("Segment: {}, Block: {} is flushed", segment_entry->segment_id_, block_entry->block_id_);
     }
 
+    for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
+        IndexEntry::Flush(index_entry.get());
+    }
+
     auto expected = DataSegmentStatus::kSegmentFlushing;
     if (!segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kSegmentClosed, std::memory_order_seq_cst)) {
         LOG_WARN("Data segment is expected as flushing status");
         return false;
     }
-    LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
+    LOG_TRACE("DataSegment: {} is closed", segment_entry->segment_id_);
 
     return true;
 }
@@ -282,6 +297,9 @@ nlohmann::json SegmentEntry::Serialize(const SegmentEntry *segment_entry) {
     for (const auto &block_entry : segment_entry->block_entries_) {
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry.get()));
     }
+    for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
+        json_res["index_entries"].emplace_back(IndexEntry::Serialize(index_entry.get()));
+    }
     return json_res;
 }
 
@@ -326,6 +344,12 @@ SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableCollect
             //        for(SizeT column_id = 0; column_id < column_count; ++ column_id) {
             //            auto& block_column_entry = block_entry->columns_[column_id];
             //        }
+        }
+    }
+    if (segment_entry_json.contains("index_entries")) {
+        for (const auto &index_json : segment_entry_json["index_entries"]) {
+            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
+            segment_entry->index_entry_map_.emplace(index_entry->index_name(), std::move(index_entry));
         }
     }
 

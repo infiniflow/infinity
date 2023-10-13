@@ -79,7 +79,7 @@ public:
 
     SharedPtr<String> index_dir_{};
 
-    HashMap<SharedPtr<String>, UniquePtr<IndexEntry>> index_entry_map_{};
+    HashMap<SharedPtr<String>, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
     [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
@@ -95,9 +95,12 @@ public:
 
     static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, BufferManager *buffer_mgr);
 
-    static void CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension, BufferManager *buffer_mgr);
+    static SharedPtr<IndexEntry>
+    CreateIndexEmbedding(SegmentEntry *segment_entry, const IndexDef &index_def, u64 column_id, int dimension, BufferManager *buffer_mgr);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
+
+    static void CommitCreateIndexFile(SegmentEntry *segment_entry, Txn *txn_ptr, SharedPtr<IndexEntry> index_entry);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
 

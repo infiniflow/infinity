@@ -12,6 +12,7 @@ class Txn;
 class TableCollectionEntry;
 class SegmentEntry;
 class DataBlock;
+class IndexEntry;
 
 class TxnTableStore {
 public:
@@ -21,6 +22,8 @@ public:
     UniquePtr<String> Append(const SharedPtr<DataBlock> &input_block);
 
     UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
+
+    UniquePtr<String> CreateIndexFile(u64 segment_id, const SharedPtr<IndexEntry> &index);
 
     UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
@@ -35,6 +38,7 @@ public:
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
     Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
+    HashMap<u64, SharedPtr<IndexEntry>> uncommitted_indexes_{};
     UniquePtr<AppendState> append_state_{};
 
     SizeT current_block_id_{0};

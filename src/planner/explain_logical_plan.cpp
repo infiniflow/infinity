@@ -100,6 +100,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
             Explain((LogicalCreateTable *)statement, result, intent_size);
             break;
         }
+        case LogicalNodeType::kCreateIndex: {
+            NotImplementError("not implemented");
+            break;
+        }
         case LogicalNodeType::kCreateCollection: {
             Explain((LogicalCreateCollection *)statement, result, intent_size);
             break;
@@ -238,6 +242,46 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
     }
 
     // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, int intent_size) {
+    {
+        String create_header_str;
+        if (intent_size != 0) {
+            create_header_str = String(intent_size - 2, ' ') + "-> CREATE INDEX ";
+        } else {
+            create_header_str = "CREATE INDEX ";
+        }
+
+        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(create_header_str));
+    }
+
+    {
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name_;
+        result->emplace_back(MakeShared<String>(schema_name_str));
+    }
+
+    {
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name_;
+        result->emplace_back(MakeShared<String>(table_name_str));
+    }
+
+    // Index definition
+    {
+        String index_def_str = String(intent_size, ' ') + " - index definition: " + create_node->index_definition_->ToString();
+        result->emplace_back(MakeShared<String>(index_def_str));
+    }
+
+    {
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type_);
+        result->emplace_back(MakeShared<String>(conflict_type_str));
+    }
+
     {
         String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
         result->emplace_back(MakeShared<String>(output_columns_str));

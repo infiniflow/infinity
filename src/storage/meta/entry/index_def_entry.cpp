@@ -4,7 +4,7 @@
 
 namespace infinity {
 IndexDefEntry::IndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kIndex), index_def_meta_(index_def_meta), index_def_(index_def) {
+    : BaseEntry(EntryType::kIndexDef), index_def_meta_(index_def_meta), index_def_(index_def) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 }

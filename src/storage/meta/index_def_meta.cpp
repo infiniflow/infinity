@@ -86,7 +86,21 @@ EntryResult IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, u64 txn_id,
     NotImplementError("Not implemented");
 }
 
-void IndexDefMeta::DeleteNewEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnManager *txn_mgr) { NotImplementError("Not implemented"); }
+void IndexDefMeta::DeleteNewEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnManager *txn_mgr) {
+    std::unique_lock<RWMutex> rw_locker(index_def_meta->rw_locker_);
+    if (index_def_meta->entry_list_.empty()) {
+        LOG_TRACE("Attempt to delete not existed index entry.");
+        return;
+    }
+
+    // `std::remove_if` if move all elements that satisfy the predicate to the first part of the container and return the iterator to the end of first
+    // part
+    auto removed_iter = std::remove_if(index_def_meta->entry_list_.begin(), index_def_meta->entry_list_.end(), [&](UniquePtr<BaseEntry> &entry) {
+        return entry->txn_id_ == txn_id;
+    });
+    // erase the all "moved" elements of the second part
+    index_def_meta->entry_list_.erase(removed_iter, index_def_meta->entry_list_.end());
+}
 
 EntryResult IndexDefMeta::GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts) { NotImplementError("Not implemented"); }
 
@@ -96,7 +110,7 @@ nlohmann::json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
     nlohmann::json json;
 
     for (const auto &entry : index_def_meta->entry_list_) {
-        if (entry->entry_type_ == EntryType::kIndex) {
+        if (entry->entry_type_ == EntryType::kIndexDef) {
             json["entries"].push_back(IndexDefEntry::Serialize(static_cast<IndexDefEntry *>(entry.get())));
         } else if (entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE("Skip dummy entry during serialize index {} meta", *index_def_meta->index_name_);

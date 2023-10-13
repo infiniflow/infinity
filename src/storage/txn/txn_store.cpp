@@ -4,8 +4,8 @@
 
 #include "txn_store.h"
 
-#include "storage/meta/table_collection_meta.h"
 #include "common/column_vector/column_vector.h"
+#include "storage/meta/table_collection_meta.h"
 #include "txn.h"
 
 namespace infinity {
@@ -62,6 +62,11 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
+UniquePtr<String> TxnTableStore::CreateIndexFile(u64 segment_id, const SharedPtr<IndexEntry> &index) {
+    uncommitted_indexes_.emplace(segment_id, index);
+    return nullptr;
+}
+
 UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) { NotImplementError("TxnTableStore::Delete") }
 
 void TxnTableStore::Scan(SharedPtr<DataBlock> &output_block) {}
@@ -87,7 +92,7 @@ void TxnTableStore::PrepareCommit() {
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
     for (const auto &uncommitted : uncommitted_segments_) {
-        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_, txn_ptr->GetBufferMgr());
+        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_);
     }
 
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
@@ -99,7 +104,8 @@ void TxnTableStore::PrepareCommit() {
  */
 void TxnTableStore::Commit() {
     Txn *txn_ptr = (Txn *)txn_;
-    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
+    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
+    TableCollectionEntry::CommitCreateIndexFile(table_entry_, txn_, uncommitted_indexes_);
 }
 
 } // namespace infinity

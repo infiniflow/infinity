@@ -9,7 +9,7 @@
 ## prerequisite
 
 1. Install [rust](https://www.rust-lang.org/tools/install).
-2. Install [sqllogictest cli tool](git@github.com:risinglightdb/sqllogictest-rs.git). Run `cargo install sqllogicaltest-bin` so that `sqllogictest` can be used.
+2. Run `cargo install sqllogictest-bin` to install cli tool.
 3. run `where sqllogictest` to get your path of sqllogictest cli tool. Remember it.
 
 ## start the test

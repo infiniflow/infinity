@@ -38,13 +38,13 @@ public:
         : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id), schema_name_(schema_name), table_name_(table_name),
           index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types) {}
 
-private:
-    SharedPtr<String> schema_name_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<IndexDef> index_def_ptr_{};
-    ConflictType conflict_type_{};
+public:
+    const SharedPtr<String> schema_name_{};
+    const SharedPtr<String> table_name_{};
+    const SharedPtr<IndexDef> index_def_ptr_{};
+    const ConflictType conflict_type_{};
 
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    const SharedPtr<Vector<String>> output_names_{};
+    const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 } // namespace infinity

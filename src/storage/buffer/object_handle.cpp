@@ -40,6 +40,11 @@ SharedPtr<String> ObjectHandle::GetDir() const { return buffer_handle_->current_
 
 faiss::Index *ObjectHandle::GetIndex() { return static_cast<faiss::Index *>(GetRaw()); }
 
+void ObjectHandle::WriteFaissIndex(faiss::Index *index) {
+    buffer_handle_->data_ = static_cast<void *>(index);
+    ptr_ = static_cast<void *>(index);
+}
+
 void *ObjectHandle::GetRaw() {
     if (ptr_ == nullptr) {
         ptr_ = buffer_handle_->LoadData();

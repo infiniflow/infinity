@@ -1,0 +1,19 @@
+# name: test/sql/ddl/create_index/test_create_index.sql
+# description: Test create index
+# group: [ddl, create_index]
+
+statement ok
+DROP TABLE IF EXISTS test_create_index;
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement ok
+CREATE TABLE test_create_index (co1 embedding(float,128));
+
+# import data from fvecs file
+query I
+COPY test_create_index FROM '/home/shenyushi/Documents/GitHub/infiniflow/infinity/test/data/fvecs/test.fvecs' WITH ( DELIMITER ',' );
+----
+
+query I
+CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+----

@@ -2,11 +2,11 @@
 // Created by jinhai on 23-8-18.
 //
 
+#include "storage/meta/entry/table_collection_entry.h"
 #include "parser/statement/extra/create_table_info.h"
 #include "storage/common/block_index.h"
 #include "storage/index_def/index_def.h"
 #include "storage/meta/entry/segment_entry.h"
-#include "storage/meta/entry/table_collection_entry.h"
 #include "storage/meta/index_def_meta.h"
 #include "storage/meta/table_collection_meta.h"
 #include "storage/txn/txn_store.h"
@@ -110,7 +110,7 @@ EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, co
     // TODO
 }
 
-EntryResult TableCollectionEntry::RemoveIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
+void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr) {
     NotImplementError("Not implemented.");
     // TODO
 }
@@ -177,10 +177,7 @@ TableCollectionEntry::Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, cons
     return nullptr;
 }
 
-void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry,
-                                        Txn *txn_ptr,
-                                        const AppendState *append_state_ptr,
-                                        BufferManager *buffer_mgr) {
+void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
 
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_);
@@ -210,8 +207,7 @@ TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn
 UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry *table_entry,
                                                             Txn *txn_ptr,
                                                             SharedPtr<SegmentEntry> segment,
-                                                            AppendState &append_state,
-                                                            BufferManager *buffer_mgr) {
+                                                            AppendState &append_state) {
     for (const auto &block_entry : segment->block_entries_) {
         append_state.append_ranges_.emplace_back(segment->segment_id_, block_entry->block_id_, 0, block_entry->row_count_);
     }

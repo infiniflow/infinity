@@ -4,16 +4,17 @@
 
 #pragma once
 
+#include "common/types/alias/containers.h"
 #include "common/types/alias/primitives.h"
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
-#include "common/types/alias/containers.h"
 
 namespace infinity {
 
 class LogicalNode;
 class LogicalCreateSchema;
 class LogicalCreateTable;
+class LogicalCreateIndex;
 class LogicalCreateCollection;
 class LogicalCreateView;
 class LogicalDropSchema;
@@ -43,6 +44,8 @@ public:
     static void Explain(const LogicalCreateSchema *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalCreateIndex *create_index, SharedPtr<Vector<SharedPtr<String>>> &result, int intent_size);
 
     static void Explain(const LogicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

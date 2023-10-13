@@ -14,8 +14,9 @@ class AsyncBatchProcessor;
 
 enum class BufferType {
     kTempFile,
+    kTempFaissIndex,
     kFile,
-    kIndex,
+    kFaissIndex,
     kExtraBlock,
     kInvalid,
 };
@@ -43,6 +44,16 @@ public:
 
 private:
     void DeleteData();
+
+    String file_path() {
+        String file_path;
+        if (current_dir_ == nullptr or current_dir_->empty()) {
+            file_path = *base_dir_ + '/' + *file_name_;
+        } else {
+            file_path = *current_dir_ + '/' + *file_name_;
+        }
+        return file_path;
+    }
 
 public:
     ~BufferHandle() { DeleteData(); }
@@ -101,9 +112,6 @@ public:
     SharedPtr<String> file_name_{};   // ex. 0.col
     offset_t offset_{};
     u64 id_{};
-
-    // file descriptor
-    int fd_{};
 
     // function to read and write the file.
     BufferReadFN read_func_{};

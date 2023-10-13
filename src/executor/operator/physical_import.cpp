@@ -3,17 +3,8 @@
 //
 
 #include "physical_import.h"
-
-#include "storage/meta/entry/db_entry.h"
-#include "storage/txn/txn.h"
-#include "storage/wal/wal_entry.h"
-#include "storage/table.h"
-#include "storage/table_def.h"
-
-#include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/info/varchar_info.h"
-
 #include "common/types/logical_type.h"
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
@@ -21,9 +12,14 @@
 #include "main/query_context.h"
 #include "storage/buffer/buffer_handle.h"
 #include "storage/io/local_file_system.h"
+#include "storage/meta/entry/db_entry.h"
 #include "storage/meta/entry/segment_column_entry.h"
 #include "storage/meta/entry/segment_entry.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
+#include "storage/wal/wal_entry.h"
 #include <cstring>
 
 extern "C" {

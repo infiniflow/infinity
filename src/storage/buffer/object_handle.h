@@ -4,11 +4,11 @@
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
 
-namespace infinity {
-
 namespace faiss {
 class Index;
 }
+
+namespace infinity {
 
 class BufferHandle;
 
@@ -34,16 +34,16 @@ public:
 public:
     [[nodiscard]] SharedPtr<String> GetDir() const;
 
-    [[nodiscard]] inline ptr_t GetData() { return reinterpret_cast<ptr_t>(GetRaw()); }
+    [[nodiscard]] inline ptr_t GetData() { return static_cast<ptr_t>(GetRaw()); }
 
     [[nodiscard]] inline faiss::Index *GetIndex();
+
+    void WriteFaissIndex(faiss::Index *index);
 
 private:
     [[nodiscard]] void *GetRaw();
 
     void *ptr_{};
 };
-
-// using FaissIndexHandle = TemplateHandle<faiss::Index>;
 
 } // namespace infinity
