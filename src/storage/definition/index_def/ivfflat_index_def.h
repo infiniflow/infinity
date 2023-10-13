@@ -34,8 +34,6 @@ public:
 
     virtual nlohmann::json Serialize() const override;
 
-    static SharedPtr<IVFFlatIndexDef> Deserialize(const nlohmann::json &serialized);
-
 public:
     const size_t centroids_count_{};
 

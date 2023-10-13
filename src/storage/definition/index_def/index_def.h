@@ -4,6 +4,7 @@
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
 #include "json.hpp"
+#include "storage/knnindex/knn_distance.h"
 
 namespace infinity {
 
@@ -48,14 +49,14 @@ public:
     // Write to a char buffer
     virtual void WriteAdv(char *&ptr) const;
 
+    // Read char from buffer
+    static SharedPtr<IndexDef> ReadAdv(char *&ptr, int32_t maxbytes);
+
     virtual String ToString() const;
 
     virtual nlohmann::json Serialize() const;
 
     static SharedPtr<IndexDef> Deserialize(const nlohmann::json &index_def_json);
-
-protected:
-    void InitBaseWithJson(const nlohmann::json &index_def_json);
 
 public:
     // TODO shenyushi, use shared_ptr here

@@ -1,5 +1,6 @@
 #include "ivfflat_index_def.h"
 
+#include "common/utility/infinity_assert.h"
 #include "common/utility/serializable.h"
 #include "storage/definition/index_def/index_def.h"
 
@@ -38,12 +39,13 @@ bool IVFFlatIndexDef::operator!=(const IndexDef &other) const { return !(*this =
 
 int32_t IVFFlatIndexDef::GetSizeInBytes() const {
     size_t size = IndexDef::GetSizeInBytes();
-    size += sizeof(int32_t) + sizeof(centroids_count_);
-    size += sizeof(int32_t) + sizeof(metric_type_);
+    size += sizeof(centroids_count_);
+    size += sizeof(metric_type_);
     return size;
 }
 
 void IVFFlatIndexDef::WriteAdv(char *&ptr) const {
+    IndexDef::WriteAdv(ptr);
     WriteBufAdv(ptr, centroids_count_);
     WriteBufAdv(ptr, metric_type_);
 }
@@ -59,17 +61,6 @@ nlohmann::json IVFFlatIndexDef::Serialize() const {
     res["centroids_count"] = centroids_count_;
     res["metric_type"] = MetricTypeToString(metric_type_);
     return res;
-}
-
-SharedPtr<IVFFlatIndexDef> IVFFlatIndexDef::Deserialize(const nlohmann::json &serialized) {
-    // Hack to initialize with no parameter while default constructor is deleted
-    auto ptr = new char[sizeof(IVFFlatIndexDef)];
-    auto index_ptr = reinterpret_cast<IVFFlatIndexDef *>(ptr);
-    index_ptr->InitBaseWithJson(serialized);
-    // Hack to initialize const value after constructor
-    const_cast<size_t &>(index_ptr->centroids_count_) = serialized["centroids_count_"];
-    const_cast<MetricType &>(index_ptr->metric_type_) = serialized["metric_type_"];
-    return std::shared_ptr<IVFFlatIndexDef>(index_ptr);
 }
 
 } // namespace infinity

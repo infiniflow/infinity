@@ -69,6 +69,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
             cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
             break;
         }
+        case WalCommandType::CREATE_INDEX: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
+            break;
+        }
         default:
             StorageError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
