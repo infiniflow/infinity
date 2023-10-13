@@ -2,16 +2,10 @@
 // Created by jinhai on 23-6-2.
 //
 
-#include "simdjson.h"
 #include "base_test.h"
 #include "bin/compilation_config.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include "storage/common/async_batch_processor.h"
-#include "storage/common/async_dummy_task.h"
-#include <gtest/gtest.h>
+#include "simdjson.h"
 
 class SimdJsonTest : public BaseTest {
     void SetUp() override {

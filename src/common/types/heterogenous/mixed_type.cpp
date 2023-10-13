@@ -4,7 +4,6 @@
 
 #include "mixed_type.h"
 #include "common/utility/infinity_assert.h"
-#include "main/logger.h"
 #include "main/stats/global_resource_usage.h"
 #include "mixed_array_value.h"
 #include "mixed_tuple_value.h"

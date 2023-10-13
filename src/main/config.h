@@ -9,8 +9,6 @@
 #include "common/types/alias/strings.h"
 #include "spdlog/spdlog.h"
 
-#include <cstdint>
-
 namespace infinity {
 
 enum class LogLevel { kTrace, kInfo, kWarning, kError, kFatal };

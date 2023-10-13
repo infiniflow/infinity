@@ -2,7 +2,7 @@
 // Created by jinhai on 23-6-4.
 //
 
-#include "catalog.h"
+#include "storage/meta/catalog.h"
 #include "function/function_set.h"
 #include "function/table_function.h"
 #include "main/logger.h"

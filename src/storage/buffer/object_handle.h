@@ -1,16 +1,20 @@
 #pragma once
 
 #include "faiss/Index.h"
-#include "storage/buffer/buffer_handle.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
 
 namespace infinity {
+
+class BufferHandle;
 
 class ObjectHandle {
 protected:
     BufferHandle *buffer_handle_{};
 
 public:
-    ObjectHandle() {}
+    ObjectHandle() = default;
 
     explicit ObjectHandle(BufferHandle *buffer_handle);
 
@@ -18,9 +22,9 @@ public:
 
     ObjectHandle &operator=(const ObjectHandle &other) = delete;
 
-    ObjectHandle(ObjectHandle &&other);
+    ObjectHandle(ObjectHandle &&other) noexcept;
 
-    ObjectHandle &operator=(ObjectHandle &&other);
+    ObjectHandle &operator=(ObjectHandle &&other) noexcept;
 
     ~ObjectHandle();
 

@@ -2,13 +2,19 @@
 // Created by JinHai on 2022/8/9.
 //
 
-#include "logical_filter.h"
-
+#include "planner/node/logical_filter.h"
+#include "planner/column_binding.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalFilter::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+
+SharedPtr<Vector<String>> LogicalFilter::GetOutputNames() const { return left_node_->GetOutputNames(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalFilter::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+
+String LogicalFilter::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

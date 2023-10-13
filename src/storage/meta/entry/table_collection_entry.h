@@ -4,23 +4,19 @@
 
 #pragma once
 
-#include "common/types/alias/smart_ptr.h"
-#include "parser/statement/extra/create_table_info.h"
-#include "segment_entry.h"
-#include "storage/common/block_index.h"
-#include "storage/index_def/index_def.h"
-#include "storage/meta/entry/data_access_state.h"
-#include "table_collecton_type.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/entry/table_collecton_type.h"
 
 namespace infinity {
 
 class DBEntry;
-
 class TableCollectionMeta;
-
 class BufferManager;
-
 class Txn;
+class BlockIndex;
+class ColumnDef;
+class DeleteState;
+class ScanState;
 
 struct TableCollectionEntry : public BaseEntry {
 public:

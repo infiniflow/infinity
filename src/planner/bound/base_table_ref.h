@@ -7,11 +7,10 @@
 #include "planner/node/logical_table_scan.h"
 #include "table_ref.h"
 
-#include <utility>
-
 namespace infinity {
 
 class TableFunction;
+class BlockIndex;
 
 class BaseTableRef : public TableRef {
 public:

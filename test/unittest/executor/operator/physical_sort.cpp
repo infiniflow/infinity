@@ -7,7 +7,6 @@
 #include "common/types/value.h"
 #include "main/infinity.h"
 #include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include <gtest/gtest.h>
 
 #include "executor/operator/physical_sort.h"

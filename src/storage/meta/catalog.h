@@ -6,20 +6,19 @@
 
 #include <shared_mutex>
 
-#include "db_meta.h"
-#include "storage/common/async_batch_processor.h"
+#include "storage/meta/entry/base_entry.h"
+#include "storage/meta/db_meta.h"
 #include "storage/io/file_system_type.h"
-#include "storage/meta/entry/db_entry.h"
+#include "json.hpp"
 
 namespace infinity {
 
 class Txn;
-
 class TxnManager;
-
 class FunctionSet;
-
 class TableFunction;
+class DBEntry;
+class BufferManager;
 
 struct NewCatalog {
 public:

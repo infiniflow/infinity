@@ -3,18 +3,17 @@
 //
 
 #include "txn.h"
-
-#include "common/types/alias/strings.h"
-#include "common/utility/infinity_assert.h"
-#include "main/logger.h"
+#include "storage/meta/meta_state.h"
 #include "storage/meta/catalog.h"
-#include "storage/meta/entry/table_collection_entry.h"
 #include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
-#include "storage/wal/wal_entry.h"
+#include "storage/buffer/buffer_manager.h"
 
 namespace infinity {
+
+Txn::Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id)
+    : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()) {}
 
 UniquePtr<String> Txn::GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry) {
     if (db_name_.empty()) {

@@ -3,7 +3,9 @@
 //
 
 #include "group_binder.h"
-#include "common/utility/infinity_assert.h"
+#include "main/query_context.h"
+#include "storage/storage.h"
+#include "planner/binder/bind_alias_proxy.h"
 #include "function/function_set.h"
 
 namespace infinity {

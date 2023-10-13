@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <array>
-
 #include "common/singleton.h"
 #include "common/types/logical_type.h"
+
+#include <array>
 
 namespace infinity {
 

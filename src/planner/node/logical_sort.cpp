@@ -3,11 +3,19 @@
 //
 
 #include "logical_sort.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalSort::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalSort::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+
+SharedPtr<Vector<String>> LogicalSort::GetOutputNames() const { return left_node_->GetOutputNames(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalSort::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+
+String LogicalSort::ToString(i64 &space) const {
 
     std::stringstream ss;
     String arrow_str;

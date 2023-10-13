@@ -3,9 +3,8 @@
 //
 
 #include "abs.h"
-#include "function/scalar_function.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
-#include "function_template.h"
 
 namespace infinity {
 

@@ -3,12 +3,19 @@
 //
 
 #include "logical_export.h"
-
+#include "planner/column_binding.h"
+#include "common/types/data_type.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalExport::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalExport::GetColumnBindings() const { return {}; }
+
+SharedPtr<Vector<String>> LogicalExport::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalExport::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+
+String LogicalExport::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

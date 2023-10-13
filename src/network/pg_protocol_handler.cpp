@@ -6,8 +6,6 @@
 #include "common/types/alias/containers.h"
 #include "pg_message.h"
 
-#include <utility>
-
 namespace infinity {
 
 PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}

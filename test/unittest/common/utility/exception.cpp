@@ -2,12 +2,8 @@
 // Created by JinHai on 2022/9/4.
 //
 
-#include "common/utility/exception.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class ExceptionTest : public BaseTest {
     void SetUp() override {

@@ -5,10 +5,9 @@
 #pragma once
 
 #include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
 
 #include <stdexcept>
-#include <string>
-#include <vector>
 
 namespace infinity {
 
@@ -23,21 +22,21 @@ protected:
 
 private:
     template <typename T, typename... Args>
-    static String BuildMessageInternal(std::vector<String> &values, T param, Args... params);
+    static String BuildMessageInternal(Vector<String> &values, T param, Args... params);
 
-    static String BuildMessageInternal(std::vector<String> &values);
+    static String BuildMessageInternal(Vector<String> &values);
 
     String message_;
 };
 
 template <typename... Args>
 String Exception::BuildMessage(Args... params) {
-    std::vector<String> values;
+    Vector<String> values;
     return BuildMessageInternal(values, params...);
 }
 
 template <typename T, typename... Args>
-String Exception::BuildMessageInternal(std::vector<String> &values, T param, Args... params) {
+String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... params) {
     values.push_back(std::move(param));
     return BuildMessageInternal(values, params...);
 }

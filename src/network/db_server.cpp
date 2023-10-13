@@ -3,10 +3,9 @@
 //
 
 #include "db_server.h"
-#include "common/utility/infinity_assert.h"
 #include "main/infinity.h"
+#include "network/connection.h"
 #include <boost/bind/bind.hpp>
-#include <thread>
 
 namespace infinity {
 

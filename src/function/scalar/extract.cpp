@@ -2,8 +2,8 @@
 // Created by jinhai on 23-3-19.
 //
 
-#include "extract.h"
-#include "function/scalar_function.h"
+#include "function/scalar/extract.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
 
 namespace infinity {

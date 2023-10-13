@@ -4,15 +4,20 @@
 
 #pragma once
 
-#include "function/table/knn_scan_data.h"
-#include "function/table/table_scan_data.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"
 #include "storage/common/global_block_id.h"
-#include "storage/meta/entry/segment_entry.h"
-#include "storage/table.h"
 
 namespace infinity {
+
+class DataBlock;
+class TableScanFunctionData;
+class KnnScanFunctionData;
+class TableDef;
+class ColumnDef;
+class DataType;
 
 struct OutputState {
     inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
@@ -85,7 +90,7 @@ struct UnionAllOutputState : public OutputState {
 struct TableScanInputState : public InputState {
     inline explicit TableScanInputState() : InputState(PhysicalOperatorType::kTableScan) {}
 
-    UniquePtr<TableScanFunctionData> table_scan_function_data_{};
+    SharedPtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
 struct TableScanOutputState : public OutputState {
@@ -96,7 +101,7 @@ struct TableScanOutputState : public OutputState {
 struct KnnScanInputState : public InputState {
     inline explicit KnnScanInputState() : InputState(PhysicalOperatorType::kKnnScan) {}
 
-    UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
+    SharedPtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
 struct KnnScanOutputState : public OutputState {

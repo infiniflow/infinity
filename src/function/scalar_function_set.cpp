@@ -2,7 +2,8 @@
 // Created by JinHai on 2022/12/14.
 //
 
-#include "scalar_function_set.h"
+#include "function/scalar_function_set.h"
+#include "expression/base_expression.h"
 #include <sstream>
 
 namespace infinity {

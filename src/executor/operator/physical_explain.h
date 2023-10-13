@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "executor/physical_operator.h"
 #include "parser/statement/explain_statement.h"
 

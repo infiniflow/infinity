@@ -3,6 +3,7 @@
 //
 
 #include "sql_runner.h"
+#include "planner/bind_context.h"
 
 namespace infinity {
 

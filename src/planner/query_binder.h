@@ -4,18 +4,28 @@
 
 #pragma once
 
-#include <utility>
-
-#include "bound_select_statement.h"
-#include "parser/table_reference/cross_product_reference.h"
-#include "parser/table_reference/join_reference.h"
-#include "parser/table_reference/subquery_reference.h"
-#include "parser/table_reference/table_reference.h"
-#include "planner/bind_context.h"
-#include "planner/binder/bind_alias_proxy.h"
-#include "storage/view.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/primitives.h"
+#include "parser/statement/select_statement.h"
+#include "parser/parsed_expr/knn_expr.h"
 
 namespace infinity {
+
+class QueryContext;
+class BindContext;
+class BoundSelectStatement;
+class SelectStatement;
+class TableRef;
+class TableReference;
+class BaseTableReference;
+class SubqueryReference;
+class CrossProductReference;
+class JoinReference;
+class ParsedExpr;
+class Binding;
+class BindAliasProxy;
 
 class QueryBinder : public std::enable_shared_from_this<QueryBinder> {
 public:

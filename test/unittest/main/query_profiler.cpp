@@ -2,12 +2,9 @@
 // Created by JinHai on 2022/9/7.
 //
 
-#include "main/profiler/query_profiler.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "main/profiler/query_profiler.h"
 
 class QueryProfilerTest : public BaseTest {
     void SetUp() override {

@@ -3,9 +3,6 @@
 //
 
 #include "knn_expression.h"
-#include <sstream>
-
-#include <utility>
 
 namespace infinity {
 

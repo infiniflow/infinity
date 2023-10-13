@@ -4,6 +4,10 @@
 
 #include "physical_limit.h"
 #include "expression/value_expression.h"
+#include "storage/table.h"
+#include "storage/data_block.h"
+#include "parser/statement/extra/create_table_info.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 

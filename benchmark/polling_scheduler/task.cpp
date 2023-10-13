@@ -6,7 +6,7 @@
 #include "task.h"
 #include "common/utility/threadutil.h"
 #include <iostream>
-#include <immintrin.h>
+#include <emmintrin.h>
 
 namespace infinity {
 

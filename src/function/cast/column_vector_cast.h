@@ -4,12 +4,9 @@
 
 #pragma once
 
-#include <utility>
-
 #include "common/column_vector/operator/unary_operator.h"
-
-#include "common/types/data_type.h"
 #include "common/types/null_value.h"
+#include "common/column_vector/bitmask.h"
 
 namespace infinity {
 

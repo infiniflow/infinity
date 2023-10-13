@@ -3,7 +3,6 @@
 //
 
 #include "bind_alias_proxy.h"
-#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

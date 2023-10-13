@@ -2,10 +2,10 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include "scalar_function.h"
+#include "function/scalar_function.h"
+#include "expression/base_expression.h"
 #include "common/utility/infinity_assert.h"
 #include <sstream>
-#include <utility>
 
 namespace infinity {
 

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "planner/logical_node_visitor.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
 

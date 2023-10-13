@@ -8,6 +8,8 @@
 
 namespace infinity {
 
+class BaseExpression;
+
 class LogicalProject : public LogicalNode {
 public:
     LogicalProject(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
@@ -19,7 +21,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "logical_project_" + std::to_string(table_index_); }
 

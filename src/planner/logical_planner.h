@@ -4,27 +4,51 @@
 
 #pragma once
 
-#include <utility>
+// #include <utility>
+//
+// #include "bound_statement.h"
 
-#include "bound_statement.h"
+// #include "parser/base_statement.h"
+// #include "parser/statement/alter_statement.h"
+// #include "parser/statement/copy_statement.h"
+// #include "parser/statement/create_statement.h"
+// #include "parser/statement/delete_statement.h"
+// #include "parser/statement/drop_statement.h"
+// #include "parser/statement/execute_statement.h"
+// #include "parser/statement/explain_statement.h"
+// #include "parser/statement/flush_statement.h"
+// #include "parser/statement/insert_statement.h"
+// #include "parser/statement/prepare_statement.h"
+// #include "parser/statement/select_statement.h"
+// #include "parser/statement/show_statement.h"
+// #include "parser/statement/update_statement.h"
+// #include "planner/bind_context.h"
 
-#include "parser/base_statement.h"
-#include "parser/statement/alter_statement.h"
-#include "parser/statement/copy_statement.h"
-#include "parser/statement/create_statement.h"
-#include "parser/statement/delete_statement.h"
-#include "parser/statement/drop_statement.h"
-#include "parser/statement/execute_statement.h"
-#include "parser/statement/explain_statement.h"
-#include "parser/statement/flush_statement.h"
-#include "parser/statement/insert_statement.h"
-#include "parser/statement/prepare_statement.h"
-#include "parser/statement/select_statement.h"
-#include "parser/statement/show_statement.h"
-#include "parser/statement/update_statement.h"
-#include "planner/bind_context.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/data_type.h"
 
 namespace infinity {
+
+class BindContext;
+class QueryContext;
+class BaseStatement;
+class SelectStatement;
+class InsertStatement;
+class UpdateStatement;
+class DeleteStatement;
+class CreateStatement;
+class DropStatement;
+class CopyStatement;
+class PrepareStatement;
+class ExecuteStatement;
+class AlterStatement;
+class ShowStatement;
+class FlushStatement;
+class ExplainStatement;
+class LogicalNode;
+
 
 class LogicalPlanner {
 public:

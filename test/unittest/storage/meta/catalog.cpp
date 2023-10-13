@@ -3,17 +3,7 @@
 //
 
 #include "base_test.h"
-#include <gtest/gtest.h>
-#include <mutex>
-#include <thread>
-#include <utility>
-
 #include "main/infinity.h"
-#include "storage/buffer/buffer_manager.h"
-#include "storage/meta/catalog.h"
-#include "storage/meta/entry/base_entry.h"
-#include "storage/txn/txn.h"
-#include "storage/txn/txn_manager.h"
 
 class CatalogTest : public BaseTest {
     void

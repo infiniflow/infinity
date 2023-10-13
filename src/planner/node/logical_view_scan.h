@@ -6,9 +6,10 @@
 
 #include "planner/logical_node.h"
 
-#include "storage/view.h"
 
 namespace infinity {
+
+class View;
 
 class LogicalViewScan : public LogicalNode {
 
@@ -16,15 +17,15 @@ public:
     explicit LogicalViewScan(u64 node_id, SharedPtr<View> view_ptr)
         : LogicalNode(node_id, LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     [[nodiscard]] SharedPtr<View> view_ptr() const { return view_ptr_; }
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalViewScan"; }
 

@@ -3,22 +3,20 @@
 //
 
 #include "buffer_writer.h"
-#include "connection.h"
-
 #include <boost/asio/write.hpp>
 
 namespace infinity {
 
-size_t BufferWriter::size() const {
+SizeT BufferWriter::size() const {
     const auto current_size = std::distance(&*start_pos_, &*current_pos_);
     return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
-void BufferWriter::send_string(const std::string &value, NullTerminator null_terminator) {
+void BufferWriter::send_string(const String &value, NullTerminator null_terminator) {
     auto position_in_string = 0u;
 
     if (!full()) {
-        position_in_string = static_cast<uint32_t>(std::min(max_capacity() - size(), value.size()));
+        position_in_string = static_cast<u32>(std::min(max_capacity() - size(), value.size()));
         std::copy_n(value.begin(), position_in_string, current_pos_);
         std::advance(current_pos_, position_in_string);
     }
@@ -38,10 +36,10 @@ void BufferWriter::send_string(const std::string &value, NullTerminator null_ter
     }
 }
 
-void BufferWriter::flush(size_t bytes) {
+void BufferWriter::flush(SizeT bytes) {
     NetworkAssert(bytes <= size(), "Can't flush more bytes than available");
     const auto bytes_to_send = bytes ? bytes : size();
-    size_t bytes_sent;
+    SizeT bytes_sent;
 
     boost::system::error_code boost_error;
     if (std::distance(&*start_pos_, &*current_pos_) < 0) {
@@ -65,7 +63,7 @@ void BufferWriter::flush(size_t bytes) {
     std::advance(start_pos_, bytes_sent);
 }
 
-void BufferWriter::try_flush(size_t bytes) {
+void BufferWriter::try_flush(SizeT bytes) {
     if (bytes >= max_capacity() - size()) {
         flush(bytes);
     }

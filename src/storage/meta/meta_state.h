@@ -4,12 +4,16 @@
 
 #pragma once
 
-#include "common/column_vector/column_vector.h"
-#include "storage/data_block.h"
-#include "storage/meta/entry/block_column_entry.h"
-#include "storage/meta/entry/segment_entry.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
+
+class SegmentEntry;
+class BlockEntry;
+class BlockColumnEntry;
+class DataBlock;
+class ColumnVector;
 
 struct MetaColumnVectorState {
     ColumnVector *column_vector_{};

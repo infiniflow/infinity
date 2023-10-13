@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "buffer_handle.h"
-#include "concurrentqueue.h"
+#include "storage/buffer/buffer_handle.h"
 #include "storage/common/async_batch_processor.h"
+#include "concurrentqueue.h"
 
 namespace infinity {
 

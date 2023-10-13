@@ -7,16 +7,10 @@
 #include "main/config.h"
 #include "meta/catalog.h"
 #include "txn/txn_manager.h"
-#include <memory>
-#include <string>
+#include "storage/buffer/buffer_manager.h"
+#include "storage/wal/wal_manager.h"
 
 namespace infinity {
-
-class Infinity;
-
-class BufferManager;
-
-class WalManager;
 
 class Storage {
 public:
@@ -39,11 +33,10 @@ private:
 
 private:
     const Config *config_ptr_{};
-    //    UniquePtr<Catalog> catalog_{};
     UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
-    SharedPtr<WalManager> wal_mgr_{};
+    UniquePtr<WalManager> wal_mgr_{};
 };
 
 } // namespace infinity

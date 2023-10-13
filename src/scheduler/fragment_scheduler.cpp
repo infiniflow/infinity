@@ -5,6 +5,9 @@
 #include "fragment_scheduler.h"
 #include "common/utility/threadutil.h"
 #include "fragment_task.h"
+#include "main/config.h"
+#include "main/logger.h"
+#include "common/utility/infinity_assert.h"
 #include <random>
 
 namespace infinity {

@@ -4,20 +4,23 @@
 
 #pragma once
 
-#include "expression/aggregate_expression.h"
-#include "expression/between_expression.h"
-#include "expression/case_expression.h"
-#include "expression/cast_expression.h"
-#include "expression/column_expression.h"
-#include "expression/conjunction_expression.h"
-#include "expression/function_expression.h"
-#include "expression/in_expression.h"
-#include "expression/knn_expression.h"
-#include "expression/subquery_expression.h"
-#include "expression/value_expression.h"
-#include "logical_node.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class LogicalNode;
+class BaseExpression;
+class AggregateExpression;
+class BetweenExpression;
+class CaseExpression;
+class CastExpression;
+class ColumnExpression;
+class ConjunctionExpression;
+class FunctionExpression;
+class ValueExpression;
+class InExpression;
+class SubqueryExpression;
+class KnnExpression;
 
 class LogicalNodeVisitor {
 public:

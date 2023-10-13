@@ -1,33 +1,24 @@
 #pragma once
 
-#include "common/types/alias/strings.h"
 #include "planner/logical_node.h"
-#include "storage/index_def/index_def.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 
 namespace infinity {
+
+class IndexDef;
+
 class LogicalCreateIndex : public LogicalNode {
   public:
-    [[nodiscard]] inline Vector<ColumnBinding>
-    GetColumnBindings() const override {
-        return {};
-    };
+    [[nodiscard]] Vector<ColumnBinding>
+    GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>>
-    GetOutputNames() const override {
-        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-        result->emplace_back("OK");
-        return result;
-    }
+    [[nodiscard]] SharedPtr<Vector<String>>
+    GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>>
-    GetOutputTypes() const override {
-        SharedPtr<Vector<SharedPtr<DataType>>> result_type =
-            MakeShared<Vector<SharedPtr<DataType>>>();
-        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        return result_type;
-    }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>>
+    GetOutputTypes() const final;
 
-    String ToString(i64 &space) override; // TTT shenyushi: should be const
+    String ToString(i64 &space) const final; // TTT shenyushi: should be const
 
     inline String name() override { return "LogicalCreateIndex"; }
 

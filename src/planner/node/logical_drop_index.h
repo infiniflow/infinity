@@ -2,6 +2,7 @@
 // Created by jinhai on 23-3-6.
 //
 #include "planner/logical_node.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 
 namespace infinity {
 
@@ -11,21 +12,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kDropSchema), schema_name_(std::move(schema_name)), index_name_(std::move(index_name)),
           conflict_type_(conflict_type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final {
-        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-        result->emplace_back("OK");
-        return result;
-    }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final {
-        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        return result_type;
-    }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalDropIndex"; }
 

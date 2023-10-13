@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include "common/types/info/decimal_info.h"
-#include "common/types/info/embedding_info.h"
-#include "common/utility/infinity_assert.h"
 #include "data_type.h"
 
 namespace infinity {

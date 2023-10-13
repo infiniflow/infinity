@@ -3,11 +3,9 @@
 //
 
 #include "database.h"
-#include "common/utility/infinity_assert.h"
 #include "database_helper.h"
+#include "common/utility/infinity_assert.h"
 #include "storage/io/local_file_system.h"
-
-#include <unistd.h>
 
 namespace infinity {
 

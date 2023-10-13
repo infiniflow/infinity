@@ -3,6 +3,11 @@
 //
 
 #include "knn_scan.h"
+#include "storage/common/block_index.h"
+#include "storage/meta/entry/block_entry.h"
+#include "storage/storage.h"
+#include "storage/data_block.h"
+
 #include "storage/knnindex/knn_flat/knn_flat_ip.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir.h"
@@ -13,6 +18,8 @@
 #include "storage/knnindex/knn_flat/knn_flat_l2_reservoir.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1_blas.h"
+
+#include "main/query_context.h"
 
 namespace infinity {
 
@@ -426,6 +433,12 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     }
 #endif
     output.Finalize();
+}
+
+SharedPtr<KnnScanFunction> KnnScanFunction::Make(NewCatalog *catalog, const String &func_name) {
+    SharedPtr<TableFunction> table_func = NewCatalog::GetTableFunctionByName(catalog, func_name);
+    SharedPtr<KnnScanFunction> knn_scan_func = std::static_pointer_cast<KnnScanFunction>(table_func);
+    return knn_scan_func;
 }
 
 void RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

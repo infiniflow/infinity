@@ -3,8 +3,18 @@
 //
 
 #include "physical_table_scan.h"
+#include "storage/storage.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "storage/data_block.h"
+#include "storage/common/block_index.h"
+#include "main/query_context.h"
+
+#include "executor/operator_state.h"
 #include "function/table/table_scan.h"
 #include "planner/bound/base_table_ref.h"
+
+#include "common/column_vector/column_vector.h"
 
 namespace infinity {
 

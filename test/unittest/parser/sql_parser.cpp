@@ -3,16 +3,8 @@
 //
 
 #include "base_test.h"
-
-#include "common/types/info/varchar_info.h"
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
-#include "parser/statement/extra/create_index_info.h"
-
-#include "main/logger.h"
 #include "main/infinity.h"
-
-#include <gtest/gtest.h>
+#include "parser/sql_parser.h"
 
 
 class SQLParserTest : public BaseTest {

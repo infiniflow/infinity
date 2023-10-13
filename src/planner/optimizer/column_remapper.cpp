@@ -4,6 +4,7 @@
 
 #include "column_remapper.h"
 #include "expression/reference_expression.h"
+#include "expression/column_expression.h"
 
 namespace infinity {
 

@@ -3,16 +3,7 @@
 //
 
 #include "base_test.h"
-#include "common/types/info/decimal_info.h"
-#include "storage/data_block.h"
-#include <gtest/gtest.h>
-
-#include "common/types/info/array_info.h"
-#include "common/types/info/embedding_info.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir.h"
 
 class KnnFlatIpBlasReservoirTest : public BaseTest {

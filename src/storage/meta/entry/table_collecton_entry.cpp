@@ -2,12 +2,12 @@
 // Created by jinhai on 23-8-18.
 //
 
-#include "main/logger.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "parser/statement/extra/create_table_info.h"
 #include "storage/index_def/ivfflat_index_def.h"
 #include "storage/meta/table_collection_meta.h"
-#include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
-#include "table_collection_entry.h"
+#include "storage/common/block_index.h"
 
 namespace infinity {
 

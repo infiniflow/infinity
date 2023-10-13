@@ -2,7 +2,9 @@
 // Created by jinhai on 23-2-5.
 //
 
-#include "logical_aggregate.h"
+#include "planner/node/logical_aggregate.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
 
 namespace infinity {
 
@@ -48,7 +50,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalAggregate::GetOutputTypes() const 
     return result;
 }
 
-String LogicalAggregate::ToString(i64 &space) {
+String LogicalAggregate::ToString(i64 &space) const {
 
     std::stringstream ss;
     String arrow_str;

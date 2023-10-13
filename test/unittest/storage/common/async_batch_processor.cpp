@@ -2,16 +2,11 @@
 // Created by jinhai on 23-6-2.
 //
 
-#include "storage/common/async_batch_processor.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include "storage/common/async_dummy_task.h"
-#include "storage/common/async_terminate_task.h"
+#include "storage/common/async_batch_processor.h"
 #include "storage/common/commit_task.h"
-#include <gtest/gtest.h>
+#include "storage/common/async_dummy_task.h"
 
 class AsyncTaskProcessorTest : public BaseTest {
     void SetUp() override {

@@ -12,8 +12,11 @@
 namespace infinity {
 
 class TableScanFunction;
-
 class BaseTableRef;
+class TableCollectionEntry;
+class BlockIndex;
+class TableScanInputState;
+class TableScanOutputState;
 
 class PhysicalTableScan : public PhysicalOperator {
 public:

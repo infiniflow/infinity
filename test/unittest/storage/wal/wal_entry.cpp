@@ -1,13 +1,8 @@
 
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
 #include "storage/data_block.h"
-#include "storage/txn/txn_manager.h"
-#include <gtest/gtest.h>
-#include <vector>
+#include "storage/table_def.h"
 
 class WalEntryTest : public BaseTest {
     void SetUp() override {

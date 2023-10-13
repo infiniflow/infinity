@@ -3,6 +3,9 @@
 //
 
 #include "physical_sort.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 

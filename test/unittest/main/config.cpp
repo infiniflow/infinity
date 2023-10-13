@@ -2,14 +2,9 @@
 // Created by jinhai on 23-8-31.
 //
 
-#include "main/config.h"
 #include "base_test.h"
-#include "bin/compilation_config.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/query_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "bin/compilation_config.h"
 
 class ConfigTest : public BaseTest {
     void SetUp() override {

@@ -3,11 +3,19 @@
 //
 
 #include "query_binder.h"
-#include "common/singleton.h"
+#include "storage/txn/txn.h"
+#include "storage/storage.h"
+#include "storage/meta/entry/view_entry.h"
+
 #include "expression/column_expression.h"
 #include "expression/conjunction_expression.h"
 #include "expression/expression_transformer.h"
 #include "function/table/table_scan.h"
+#include "main/query_context.h"
+
+#include "planner/binding.h"
+#include "planner/bind_context.h"
+#include "planner/bound_select_statement.h"
 #include "planner/binder/bind_alias_proxy.h"
 #include "planner/binder/group_binder.h"
 #include "planner/binder/having_binder.h"
@@ -18,9 +26,11 @@
 #include "planner/binder/where_binder.h"
 #include "planner/bound/base_table_ref.h"
 #include "planner/bound/cross_product_table_ref.h"
-#include "planner/bound/dummy_table_ref.h"
 #include "planner/bound/join_table_ref.h"
 #include "planner/bound/subquery_table_ref.h"
+#include "parser/table_reference/table_reference.h"
+#include "parser/table_reference/subquery_reference.h"
+#include "parser/table_reference/cross_product_reference.h"
 
 namespace infinity {
 

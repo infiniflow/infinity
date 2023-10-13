@@ -3,7 +3,10 @@
 //
 
 #include "physical_knn_scan.h"
-#include "function/table/knn_scan.h"
+#include "function/table/knn_scan_data.h"
+#include "storage/storage.h"
+#include "storage/data_block.h"
+
 #include "planner/bound/base_table_ref.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas.h"
@@ -15,6 +18,10 @@
 #include "storage/knnindex/knn_flat/knn_flat_l2_reservoir.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1_blas.h"
+
+#include "executor/operator_state.h"
+#include "main/query_context.h"
+#include "storage/common/block_index.h"
 
 namespace infinity {
 

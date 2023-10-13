@@ -7,8 +7,11 @@
 #include "executor/fragment/plan_fragment.h"
 #include "fragment_task_block_queue.h"
 #include "fragment_task_poller_queue.h"
+#include "common/types/alias/concurrency.h"
 
 namespace infinity {
+
+class Config;
 
 class FragmentScheduler {
 public:

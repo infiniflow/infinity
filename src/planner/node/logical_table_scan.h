@@ -9,6 +9,7 @@
 namespace infinity {
 
 class BaseTableRef;
+class TableCollectionEntry;
 
 class LogicalTableScan : public LogicalNode {
 public:
@@ -26,7 +27,7 @@ public:
 
     [[nodiscard]] u64 TableIndex() const;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalTableScan"; }
 

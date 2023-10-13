@@ -13,13 +13,13 @@ class LogicalFlush : public LogicalNode {
 public:
     explicit LogicalFlush(u64 node_id, FlushType type) : LogicalNode(node_id, LogicalNodeType::kFlush), flush_type_(type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return MakeShared<Vector<String>>(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalFlush"; }
 

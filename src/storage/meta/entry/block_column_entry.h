@@ -5,7 +5,6 @@
 #pragma once
 
 #include "common/types/data_type.h"
-#include "storage/buffer/buffer_handle.h"
 #include "storage/buffer/column_buffer.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/meta/entry/outline_info.h"

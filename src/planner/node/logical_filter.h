@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "expression/base_expression.h"
 #include "planner/logical_node.h"
 
@@ -16,13 +14,13 @@ public:
     explicit LogicalFilter(u64 node_id, SharedPtr<BaseExpression> expression)
         : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalFilter"; }
 

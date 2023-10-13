@@ -3,7 +3,12 @@
 //
 
 #include "connection.h"
+#include "storage/table.h"
+#include "storage/data_block.h"
+
 #include "common/utility/infinity_assert.h"
+#include "common/column_vector/column_vector.h"
+
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "main/query_context.h"

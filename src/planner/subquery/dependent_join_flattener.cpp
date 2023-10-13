@@ -3,6 +3,10 @@
 //
 
 #include "dependent_join_flattener.h"
+#include "storage/storage.h"
+#include "planner/bind_context.h"
+#include "planner/binding.h"
+
 #include "correlated_expressions_detector.h"
 #include "function/scalar_function_set.h"
 #include "function/table/table_scan.h"
@@ -13,6 +17,10 @@
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_table_scan.h"
 #include "rewrite_correlated_expressions.h"
+#include "expression/column_expression.h"
+#include "expression/function_expression.h"
+
+#include "main/query_context.h"
 
 namespace infinity {
 

@@ -4,6 +4,9 @@
 
 #include "logical_knn_scan.h"
 #include "planner/bound/base_table_ref.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
+#include "storage/meta/entry/table_collection_entry.h"
 
 namespace infinity {
 
@@ -55,7 +58,7 @@ String LogicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
 u64 LogicalKnnScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-String LogicalKnnScan::ToString(i64 &space) {
+String LogicalKnnScan::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

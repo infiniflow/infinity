@@ -2,9 +2,8 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include "table_function.h"
+#include "function/table_function.h"
 #include <sstream>
-#include <utility>
 
 namespace infinity {
 

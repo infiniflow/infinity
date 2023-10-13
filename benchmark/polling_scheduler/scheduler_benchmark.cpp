@@ -5,9 +5,7 @@
 
 #include "task.h"
 #include "fragment.h"
-#include "concurrentqueue.h"
 #include "main/profiler/base_profiler.h"
-#include <iostream>
 
 using namespace infinity;
 

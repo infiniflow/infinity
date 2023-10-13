@@ -16,6 +16,8 @@ enum class SourceType {
     kRemote,
 };
 
+class SourceState;
+
 class PhysicalSource final : public PhysicalOperator {
 public:
     explicit PhysicalSource(u64 id, SourceType source_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)

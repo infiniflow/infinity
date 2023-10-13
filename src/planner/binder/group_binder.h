@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include "bind_alias_proxy.h"
 #include "planner/expression_binder.h"
 
 namespace infinity {
+
+class BindAliasProxy;
 
 class GroupBinder : public ExpressionBinder {
 public:

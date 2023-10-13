@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include "planner/bound_statement.h"
 #include "table_ref.h"
 
 namespace infinity {
+
+class BoundStatement;
 class SubqueryTableRef : public TableRef {
 public:
     explicit SubqueryTableRef(SharedPtr<BoundStatement> subquery_node, u64 table_index, String alias)

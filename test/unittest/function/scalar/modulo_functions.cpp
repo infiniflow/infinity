@@ -1,17 +1,12 @@
 //
 // Created by jinhai on 23-1-8.
 //
-#include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
-#include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
+#include "base_test.h"
+#include "main/infinity.h"
+#include "function/scalar_function_set.h"
 #include "expression/column_expression.h"
 #include "function/scalar/modulo.h"
-#include "function/scalar_function_set.h"
 
 class ModuloFunctionsTest : public BaseTest {
     void SetUp() override {

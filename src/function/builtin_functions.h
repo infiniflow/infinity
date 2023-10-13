@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include "function_set.h"
-#include "storage/meta/catalog.h"
+#include "function/function_set.h"
 
 namespace infinity {
+
+class NewCatalog;
 
 class BuiltinFunctions : public std::enable_shared_from_this<BuiltinFunctions> {
 public:

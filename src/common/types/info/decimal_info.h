@@ -4,10 +4,8 @@
 
 #pragma once
 
-#include "common/types/logical_type.h"
+#include "common/types/alias/smart_ptr.h"
 #include "common/types/type_info.h"
-
-#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

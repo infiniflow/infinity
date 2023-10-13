@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/column_vector/column_vector.h"
-#include "common/utility/infinity_assert.h"
+#include "common/column_vector/bitmask.h"
 
 namespace infinity {
 

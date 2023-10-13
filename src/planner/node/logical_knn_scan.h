@@ -4,14 +4,15 @@
 
 #pragma once
 
-#include "parser/parsed_expr/knn_expr.h"
 #include "planner/logical_node.h"
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 
+class BaseExpression;
 class KnnExpression;
-
 class BaseTableRef;
+class TableCollectionEntry;
 
 class LogicalKnnScan : public LogicalNode {
 public:
@@ -29,7 +30,7 @@ public:
 
     [[nodiscard]] u64 TableIndex() const;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalKnnScan"; }
 

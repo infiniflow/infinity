@@ -3,11 +3,19 @@
 //
 
 #include "logical_limit.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalLimit::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalLimit::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+
+SharedPtr<Vector<String>> LogicalLimit::GetOutputNames() const { return left_node_->GetOutputNames(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalLimit::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+
+String LogicalLimit::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

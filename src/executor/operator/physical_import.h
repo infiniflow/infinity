@@ -5,9 +5,16 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "parser/statement/statement_common.h"
 #include "third_party/zsv/include/zsv/common.h"
 
 namespace infinity {
+
+class TableCollectionEntry;
+class Txn;
+class SegmentEntry;
+class ImportInputState;
+class ImportOutputState;
 
 struct ParserContext {
     zsv_parser parser_{};

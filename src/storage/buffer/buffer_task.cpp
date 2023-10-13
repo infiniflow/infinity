@@ -4,6 +4,7 @@
 
 #include "buffer_task.h"
 #include "storage/common/commit_task.h"
+#include "storage/buffer/buffer_handle.h"
 
 namespace infinity {
 

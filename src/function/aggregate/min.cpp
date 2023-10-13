@@ -2,9 +2,9 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include "min.h"
-#include "function/aggregate_function.h"
+#include "function/aggregate/min.h"
 #include "function/aggregate_function_set.h"
+#include "storage/meta/catalog.h"
 
 namespace infinity {
 

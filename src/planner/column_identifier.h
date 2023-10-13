@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "main/query_context.h"
-
-#include <string>
+#include "parser/parsed_expr/column_expr.h"
 
 namespace infinity {
+
+class QueryContext;
 
 struct ColumnIdentifier {
 public:

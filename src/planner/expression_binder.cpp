@@ -1,21 +1,25 @@
 //
 // Created by JinHai on 2022/8/11.
 //
+#include "expression_binder.h"
+#include "main/query_context.h"
+#include "storage/storage.h"
 
 #include "expression/aggregate_expression.h"
-#include "expression/between_expression.h"
+#include "expression/column_expression.h"
 #include "expression/case_expression.h"
 #include "expression/cast_expression.h"
 #include "expression/function_expression.h"
 #include "expression/in_expression.h"
 #include "expression/value_expression.h"
+#include "expression/knn_expression.h"
+#include "expression/subquery_expression.h"
+
 #include "function/aggregate_function_set.h"
 #include "function/scalar_function_set.h"
 
-#include "common/utility/infinity_assert.h"
-#include "expression/knn_expression.h"
-#include "expression_binder.h"
-#include "query_binder.h"
+#include "planner/query_binder.h"
+#include "planner/column_identifier.h"
 
 namespace infinity {
 

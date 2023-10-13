@@ -4,9 +4,7 @@
 
 #include "storage/storage.h"
 #include "function/builtin_functions.h"
-#include "schema_definition.h"
 #include "storage/io/local_file_system.h"
-#include "storage/wal/wal_manager.h"
 #include <regex>
 
 namespace infinity {
@@ -21,7 +19,7 @@ void Storage::Init() {
     String catalog_dir = *config_ptr_->data_dir() + "/catalog";
 
     // Construct wal manager
-    wal_mgr_ = MakeShared<WalManager>(this,
+    wal_mgr_ = MakeUnique<WalManager>(this,
                                       std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
                                       config_ptr_->wal_size_threshold(),
                                       config_ptr_->full_checkpoint_time_interval(),

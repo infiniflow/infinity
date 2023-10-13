@@ -3,7 +3,9 @@
 //
 
 #include "db_entry.h"
+
 #include "parser/statement/extra/extra_ddl_info.h"
+#include "storage/common/block_index.h"
 
 namespace infinity {
 

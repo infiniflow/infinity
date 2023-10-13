@@ -3,6 +3,11 @@
 //
 
 #include "physical_create_schema.h"
+#include "executor/operator_state.h"
+#include "storage/txn/txn.h"
+#include "main/query_context.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 

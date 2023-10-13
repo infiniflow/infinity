@@ -1,11 +1,7 @@
-#include "column_buffer.h"
-#include "common/types/data_type.h"
-
+#include "storage/buffer/column_buffer.h"
 #include "common/types/varchar_layout.h"
-#include "common/utility/infinity_assert.h"
 #include "storage/buffer/buffer_handle.h"
 #include "storage/buffer/buffer_manager.h"
-#include "storage/buffer/object_handle.h"
 #include "storage/meta/entry/segment_column_entry.h"
 
 namespace infinity {

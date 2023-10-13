@@ -4,10 +4,6 @@
 
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class ColumnDefTest : public BaseTest {
     void SetUp() override {

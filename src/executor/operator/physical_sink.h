@@ -15,6 +15,12 @@ enum class SinkType {
     kResult,
 };
 
+class SinkState;
+class MaterializeSinkState;
+class ResultSinkState;
+class MessageSinkState;
+class QueueSinkState;
+
 class PhysicalSink final : public PhysicalOperator {
 public:
     explicit PhysicalSink(u64 id, SinkType sink_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)

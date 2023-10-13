@@ -3,6 +3,9 @@
 //
 
 #include "rewrite_correlated_expressions.h"
+#include "expression/column_expression.h"
+#include "expression/subquery_expression.h"
+#include "planner/bind_context.h"
 
 namespace infinity {
 

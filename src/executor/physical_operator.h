@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include "main/query_context.h"
-#include "operator_state.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
 #include "physical_operator_type.h"
-#include "storage/table.h"
-
-#include <memory>
-#include <utility>
 
 namespace infinity {
 
-class OperatorPipeline;
+class QueryContext;
+class Table;
+class InputState;
+class OutputState;
+class DataType;
 
 class PhysicalOperator : public std::enable_shared_from_this<PhysicalOperator> {
 
@@ -25,8 +25,6 @@ public:
     virtual ~PhysicalOperator() = default;
 
     virtual void Init() = 0;
-
-    SharedPtr<OperatorPipeline> GenerateOperatorPipeline();
 
     SharedPtr<PhysicalOperator> left() const { return left_; }
 
@@ -55,8 +53,6 @@ protected:
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<PhysicalOperator> left_{nullptr};
     SharedPtr<PhysicalOperator> right_{nullptr};
-
-    std::weak_ptr<OperatorPipeline> operator_pipeline_{};
 
     SharedPtr<Table> output_{};
 

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "planner/logical_node.h"
+#include "parser/statement/statement_common.h"
 
 namespace infinity {
 
@@ -14,13 +15,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kExport), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
           file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return MakeShared<Vector<String>>(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalExport"; }
 

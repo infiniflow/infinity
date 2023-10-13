@@ -2,13 +2,9 @@
 // Created by jinhai on 22-12-19.
 //
 
-#include "common/column_vector/bitmask_buffer.h"
 #include "base_test.h"
-#include "common/types/value.h"
+#include "common/column_vector/bitmask.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class BitmaskBufferTest : public BaseTest {
     void SetUp() override {

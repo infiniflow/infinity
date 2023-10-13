@@ -2,7 +2,12 @@
 // Created by jinhai on 23-3-16.
 //
 
-#include "physical_drop_collection.h"
+#include "executor/operator/physical_drop_collection.h"
+#include "storage/txn/txn.h"
+#include "main/query_context.h"
+#include "executor/operator_state.h"
+#include "storage/table_def.h"
+#include "storage/table.h"
 
 namespace infinity {
 

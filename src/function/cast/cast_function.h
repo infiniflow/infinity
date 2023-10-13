@@ -4,11 +4,14 @@
 
 #pragma once
 
-#include "bound_cast_func.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/data_type.h"
+#include "function/cast/bound_cast_func.h"
+//#include "function/cast/column_vector_cast.h"
+//#include "common/column_vector/column_vector.h"
+//#include "common/types/data_type.h"
 
 namespace infinity {
+
+class DataType;
 
 class CastFunction {
 public:

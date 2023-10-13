@@ -2,15 +2,9 @@
 // Created by jinhai on 23-1-24.
 //
 
-#include "common/column_vector/selection.h"
 #include "base_test.h"
 #include "common/column_vector/column_vector.h"
-#include "common/default_values.h"
-#include "common/types/value.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class SelectionTest : public BaseTest {
     void SetUp() override {

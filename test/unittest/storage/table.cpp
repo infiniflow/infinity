@@ -2,18 +2,13 @@
 // Created by jinhai on 23-1-25.
 //
 
-#include "storage/table.h"
 #include "base_test.h"
-#include "common/types/info/decimal_info.h"
-#include "storage/data_block.h"
-#include <gtest/gtest.h>
-
-#include "common/types/info/array_info.h"
-#include "common/types/info/embedding_info.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
+
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "common/column_vector/column_vector.h"
+#include "storage/data_block.h"
 
 class TableTest : public BaseTest {
     void SetUp() override {

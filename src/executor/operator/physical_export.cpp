@@ -3,6 +3,7 @@
 //
 
 #include "physical_export.h"
+#include "executor/operator_state.h"
 
 namespace infinity {
 

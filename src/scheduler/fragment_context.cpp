@@ -3,6 +3,8 @@
 //
 
 #include "fragment_context.h"
+#include "storage/table.h"
+
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_knn_scan.h"
 #include "executor/operator/physical_table_scan.h"
@@ -12,6 +14,14 @@
 #include "fragment_data_queue.h"
 #include "src/executor/fragment/plan_fragment.h"
 #include "storage/common/global_block_id.h"
+#include "storage/data_block.h"
+
+#include "main/query_context.h"
+
+#include "function/table/knn_scan_data.h"
+#include "function/table/table_scan_data.h"
+
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 
@@ -182,7 +192,7 @@ void BuildParallelTaskStateTemplate<TableScanInputState, TableScanOutputState>(V
         //            SchedulerError("Empty segment entry ids")
         //        }
 
-        table_scan_input_state->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
+        table_scan_input_state->table_scan_function_data_ = MakeShared<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
                                                                                               table_scan_source_state->global_ids_,
                                                                                               physical_table_scan->ColumnIDs());
 
@@ -240,7 +250,7 @@ void BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vecto
             ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_knn_scan->limit_expression_.get());
             i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
-            knn_scan_input_state->knn_scan_function_data_ = MakeUnique<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
+            knn_scan_input_state->knn_scan_function_data_ = MakeShared<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
                                                                                             knn_scan_source_state->global_ids_,
                                                                                             physical_knn_scan->ColumnIDs(),
                                                                                             knn_column_ids,

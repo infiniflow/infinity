@@ -4,8 +4,8 @@
 
 #include "txn_store.h"
 
-#include "common/utility/infinity_assert.h"
 #include "storage/meta/table_collection_meta.h"
+#include "common/column_vector/column_vector.h"
 #include "txn.h"
 
 namespace infinity {

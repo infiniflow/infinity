@@ -3,12 +3,19 @@
 //
 
 #include "logical_flush.h"
-
+#include "planner/column_binding.h"
+#include "common/types/data_type.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalFlush::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalFlush::GetColumnBindings() const { return {}; }
+
+SharedPtr<Vector<String>> LogicalFlush::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalFlush::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+
+String LogicalFlush::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

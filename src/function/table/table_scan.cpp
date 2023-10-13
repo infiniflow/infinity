@@ -2,7 +2,13 @@
 // Created by jinhai on 23-9-17.
 //
 
-#include "table_scan.h"
+#include "function/table/table_scan.h"
+#include "storage/storage.h"
+#include "storage/data_block.h"
+#include "common/column_vector/column_vector.h"
+#include "storage/common/block_index.h"
+
+#include "main/query_context.h"
 
 namespace infinity {
 
@@ -50,6 +56,12 @@ void TableScanFunc(QueryContext *query_context, TableFunctionData *table_functio
         }
     }
     output.Finalize();
+}
+
+SharedPtr<TableScanFunction> TableScanFunction::Make(NewCatalog *catalog, const String &func_name) {
+    SharedPtr<TableFunction> table_func = NewCatalog::GetTableFunctionByName(catalog, func_name);
+    SharedPtr<TableScanFunction> table_scan_func = std::static_pointer_cast<TableScanFunction>(table_func);
+    return table_scan_func;
 }
 
 void RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

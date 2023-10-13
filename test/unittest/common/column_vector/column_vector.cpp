@@ -2,14 +2,9 @@
 // Created by JinHai on 2022/12/4.
 //
 
-#include "common/column_vector/column_vector.h"
 #include "base_test.h"
-#include "common/types/value.h"
-#include "common/utility/serializable.h"
+#include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class ColumnVectorTest : public BaseTest {
     void SetUp() override {

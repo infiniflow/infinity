@@ -5,6 +5,7 @@
 #pragma once
 
 #include "executor/physical_operator.h"
+#include "parser/statement/statement_common.h"
 
 namespace infinity {
 

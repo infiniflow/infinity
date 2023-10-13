@@ -1,13 +1,10 @@
 //
 // Created by jinhai on 23-5-19.
 //
-#include "common/utility/id_allocator.h"
+
 #include "base_test.h"
-#include "common/types/alias/primitives.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "common/utility/id_allocator.h"
 
 class IDAllocatorTest : public BaseTest {
     void SetUp() override {

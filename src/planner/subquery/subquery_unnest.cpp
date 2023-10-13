@@ -3,9 +3,12 @@
 //
 
 #include "subquery_unnest.h"
-#include "expression/expression_transformer.h"
+#include "main/query_context.h"
+#include "storage/storage.h"
+#include "planner/bind_context.h"
+#include "expression/subquery_expression.h"
+#include "expression/column_expression.h"
 
-#include "common/utility/infinity_assert.h"
 #include "dependent_join_flattener.h"
 #include "expression/aggregate_expression.h"
 #include "expression/cast_expression.h"

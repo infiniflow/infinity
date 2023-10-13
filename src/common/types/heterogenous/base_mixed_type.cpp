@@ -3,7 +3,6 @@
 //
 
 #include "base_mixed_type.h"
-#include "main/logger.h"
 
 namespace infinity {
 

@@ -22,7 +22,7 @@ public:
     SharedPtr<TableRef> right_table_ref_;
 
     // Condition ???
-    std::vector<SharedPtr<BaseExpression>> on_conditions_;
+    Vector<SharedPtr<BaseExpression>> on_conditions_;
 
     // Join Type ???
     JoinType join_type_;

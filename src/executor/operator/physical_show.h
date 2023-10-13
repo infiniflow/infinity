@@ -4,14 +4,15 @@
 
 #pragma once
 
-#include <utility>
-
 #include "executor/physical_operator.h"
 #include "planner/node/logical_show.h"
 #include "storage/collection.h"
 #include "storage/view.h"
 
 namespace infinity {
+
+class ShowInputState;
+class ShowOutputState;
 
 class PhysicalShow : public PhysicalOperator {
 public:

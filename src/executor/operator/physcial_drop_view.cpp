@@ -2,7 +2,12 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#include "physcial_drop_view.h"
+#include "executor/operator/physcial_drop_view.h"
+#include "storage/txn/txn.h"
+#include "main/query_context.h"
+#include "parser/statement/extra/create_table_info.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 

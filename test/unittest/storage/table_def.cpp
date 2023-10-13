@@ -2,13 +2,9 @@
 // Created by jinhai on 22-12-25.
 //
 
-#include "storage/table_def.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "storage/table_def.h"
 
 class TableDefTest : public BaseTest {
     void SetUp() override {

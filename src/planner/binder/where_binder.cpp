@@ -2,7 +2,8 @@
 // Created by JinHai on 2022/8/12.
 //
 
-#include "where_binder.h"
+#include "planner/binder/bind_alias_proxy.h"
+#include "planner/binder/where_binder.h"
 
 namespace infinity {
 

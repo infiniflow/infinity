@@ -3,6 +3,7 @@
 //
 
 #include "logical_cross_product.h"
+#include "planner/column_binding.h"
 
 #include <sstream>
 
@@ -54,7 +55,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalCrossProduct::GetOutputTypes() con
     return result;
 }
 
-String LogicalCrossProduct::ToString(i64 &space) {
+String LogicalCrossProduct::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

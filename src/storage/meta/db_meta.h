@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "storage/meta/entry/db_entry.h"
 
 namespace infinity {

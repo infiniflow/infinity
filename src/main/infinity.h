@@ -6,7 +6,6 @@
 
 #include "common/singleton.h"
 
-#include "legacy_sched/scheduler.h"
 #include "resource_manager.h"
 #include "scheduler/fragment_scheduler.h"
 #include "storage/storage.h"

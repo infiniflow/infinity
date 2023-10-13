@@ -1,12 +1,8 @@
-#include <gtest/gtest.h>
 
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "storage/invertedindex/format/posting_value.h"
 #include "storage/invertedindex/format/short_buffer.h"
-#include <iostream>
 
 namespace infinity {
 

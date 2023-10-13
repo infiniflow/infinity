@@ -3,12 +3,20 @@
 //
 
 #include "logical_import.h"
-
+#include "planner/column_binding.h"
+#include "common/types/data_type.h"
+#include "storage/meta/entry/db_entry.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalImport::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalImport::GetColumnBindings() const { return {}; }
+
+SharedPtr<Vector<String>> LogicalImport::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalImport::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+
+String LogicalImport::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

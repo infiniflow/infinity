@@ -5,6 +5,8 @@
 #include "fragment_builder.h"
 #include "executor/operator/physical_explain.h"
 #include "explain_fragment.h"
+#include "common/utility/infinity_assert.h"
+#include "main/logger.h"
 
 namespace infinity {
 

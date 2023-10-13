@@ -1,9 +1,7 @@
+
+#include "base_test.h"
+#include "main/infinity.h"
 #include "common/utility/mpsc_queue.h"
-#include <algorithm>
-#include <gtest/gtest.h>
-#include <set>
-#include <string>
-#include <thread>
 
 namespace infinity {
 

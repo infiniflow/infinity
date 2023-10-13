@@ -3,14 +3,16 @@
 //
 
 #pragma once
-// #include <utility>
 
-#include "function/function_data.h"
+//#include "function/function_data.h"
 #include "function/table_function.h"
 #include "storage/meta/catalog.h"
-#include "storage/txn/txn_state.h"
+//#include "storage/txn/txn_state.h"
 
 namespace infinity {
+
+class SegmentEntry;
+class TableCollectionEntry;
 
 void RegisterSeqScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 

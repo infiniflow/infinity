@@ -6,7 +6,6 @@
 
 #include "config.h"
 #include "spdlog/logger.h"
-#include <memory>
 
 namespace infinity {
 

@@ -7,6 +7,7 @@
 #include "storage/io/local_file_system.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/txn/txn.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 

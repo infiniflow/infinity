@@ -4,11 +4,16 @@
 
 #pragma once
 
-#include "common/column_vector/column_vector.h"
-#include "common/column_vector/selection.h"
 #include "common/types/alias/db_type.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/default_values.h"
+#include "common/types/value.h"
 
 namespace infinity {
+
+class Selection;
+class ColumnVector;
+class DataType;
 
 // Intermediate data structure transferred between operator.
 struct DataBlock {

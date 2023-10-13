@@ -11,7 +11,6 @@
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "main/session.h"
-#include "main/stats/global_resource_usage.h"
 #include "parser/sql_parser.h"
 #include "planner/optimizer.h"
 #include "test_helper/sql_runner.h"

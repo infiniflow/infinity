@@ -4,6 +4,15 @@
 
 #include "expression_state.h"
 #include "common/utility/infinity_assert.h"
+#include "expression/aggregate_expression.h"
+#include "expression/base_expression.h"
+#include "expression/case_expression.h"
+#include "expression/cast_expression.h"
+#include "expression/column_expression.h"
+#include "expression/function_expression.h"
+#include "expression/in_expression.h"
+#include "expression/reference_expression.h"
+#include "expression/value_expression.h"
 
 namespace infinity {
 

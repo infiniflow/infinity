@@ -2,12 +2,10 @@
 // Created by JinHai on 2022/8/7.
 //
 
-#include "bind_context.h"
-
-#include "common/utility/infinity_assert.h"
+#include "planner/bind_context.h"
+#include "planner/binding.h"
+#include "planner/column_identifier.h"
 #include "expression/column_expression.h"
-#include "storage/table.h"
-#include <utility>
 
 namespace infinity {
 

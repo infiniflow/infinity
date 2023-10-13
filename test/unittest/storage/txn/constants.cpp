@@ -4,12 +4,6 @@
 
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include "storage/data_block.h"
-#include "storage/txn/txn_state.h"
-#include <gtest/gtest.h>
 
 class TxnContants : public BaseTest {
     void SetUp() override {

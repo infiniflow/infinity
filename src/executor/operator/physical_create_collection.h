@@ -7,8 +7,6 @@
 #include "executor/physical_operator.h"
 #include "storage/table_def.h"
 
-#include <memory>
-
 namespace infinity {
 
 class PhysicalCreateCollection final : public PhysicalOperator {

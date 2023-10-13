@@ -2,14 +2,9 @@
 // Created by jinhai on 23-3-10.
 //
 
-#include "function/cast/varchar_cast.h"
 #include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "function/cast/varchar_cast.h"
 
 class VarcharTest : public BaseTest {
     void SetUp() override {

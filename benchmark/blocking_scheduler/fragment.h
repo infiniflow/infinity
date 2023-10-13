@@ -4,12 +4,13 @@
 
 #pragma once
 
-#include "task.h"
-#include "operator.h"
 #include <iostream>
 #include <cstdio>
 #include <exception>
 #include <cassert>
+
+#include "task.h"
+#include "operator.h"
 
 namespace infinity {
 #if 0

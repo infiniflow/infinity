@@ -2,12 +2,9 @@
 // Created by JinHai on 2022/11/13.
 //
 
-#include "common/types/value.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "common/types/value.h"
 
 class ValueTest : public BaseTest {
     void SetUp() override {

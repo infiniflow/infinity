@@ -23,19 +23,6 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        infinity_console_src
-        CONFIGURE_DEPENDS
-        bin/infinity_console.cpp
-)
-
-file(GLOB_RECURSE
-        console_src
-        CONFIGURE_DEPENDS
-        bin/console.cpp
-        bin/console.h
-)
-
-file(GLOB_RECURSE
         common_src
         CONFIGURE_DEPENDS
         common/*.cpp
@@ -84,12 +71,6 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        legacy_sched_src
-        CONFIGURE_DEPENDS
-        legacy_sched/*.cpp
-)
-
-file(GLOB_RECURSE
         scheduler_src
         CONFIGURE_DEPENDS
         scheduler/*.cpp
@@ -134,7 +115,6 @@ target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_par
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
 
 set(INFINITY_CORE_SOURCE
-        ${console_src}
         ${common_src}
         ${executor_src}
         ${expression_src}
@@ -143,7 +123,6 @@ set(INFINITY_CORE_SOURCE
         ${network_src}
         ${parser_src}
         ${planner_src}
-        ${legacy_sched_src}
         ${scheduler_src}
         ${storage_src}
         ${third_party_src}
@@ -182,11 +161,6 @@ add_executable(infinity_main
 target_include_directories(infinity_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
 #set_property(TARGET infinity_main PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
 
-add_executable(infinity_console
-        ${infinity_console_src}
-)
-target_include_directories(infinity_console PUBLIC "${CMAKE_SOURCE_DIR}/third_party/linenoise")
-
 target_link_libraries(
         infinity_main
         infinity_core
@@ -199,20 +173,5 @@ target_link_libraries(
         newpfor
         zsv_parser
 
-        ${EXTERNAL_LIBS}
-)
-
-target_link_libraries(
-        infinity_console
-        infinity_core
-        infinity_parser
-        tlsf
-        linenoise
-        roaring
-        faiss
-        gfortran
-        fastpfor
-        newpfor
-        zsv_parser
         ${EXTERNAL_LIBS}
 )

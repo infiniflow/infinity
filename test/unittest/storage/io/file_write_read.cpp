@@ -4,15 +4,10 @@
 
 #include "base_test.h"
 #include "storage/io/file_reader.h"
-#include "storage/io/file_system.h"
 #include "storage/io/file_writer.h"
 #include "storage/io/local_file_system.h"
-#include <gtest/gtest.h>
 
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
 
 class FileWriteReadTest : public BaseTest {
     void SetUp() override {

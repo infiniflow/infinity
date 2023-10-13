@@ -4,10 +4,12 @@
 
 #pragma once
 
-#include "common/types/data_type.h"
 #include "planner/logical_node.h"
 
 namespace infinity {
+
+class DataType;
+class QueryContext;
 
 struct BoundStatement {
 public:

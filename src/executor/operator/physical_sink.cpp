@@ -3,6 +3,10 @@
 //
 
 #include "physical_sink.h"
+#include "executor/operator_state.h"
+#include "common/utility/infinity_assert.h"
+#include "spdlog/fmt/fmt.h"
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 

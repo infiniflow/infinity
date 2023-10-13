@@ -3,6 +3,8 @@
 //
 
 #include "limit_binder.h"
+#include "storage/storage.h"
+#include "main/query_context.h"
 #include "function/function_set.h"
 
 namespace infinity {

@@ -3,7 +3,7 @@
 //
 
 #include "common/types/complex/row_id.h"
-#include "spdlog/logger.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 

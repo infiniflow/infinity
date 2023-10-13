@@ -3,6 +3,8 @@
 //
 
 #include "correlated_expressions_detector.h"
+#include "expression/column_expression.h"
+#include "expression/subquery_expression.h"
 
 namespace infinity {
 

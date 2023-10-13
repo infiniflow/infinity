@@ -67,8 +67,6 @@
 #include "explain_physical_plan.h"
 #include "planner/bound/base_table_ref.h"
 
-#include <limits>
-
 namespace infinity {
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedPtr<LogicalNode> &logical_operator) const {

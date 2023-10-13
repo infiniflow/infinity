@@ -4,7 +4,6 @@
 
 #include "order_binder.h"
 #include "expression/column_expression.h"
-#include "function/function_set.h"
 
 namespace infinity {
 

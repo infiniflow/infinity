@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include <utility>
-
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
 
 namespace infinity {
+
+class TableCollectionEntry;
 
 class PhysicalInsert : public PhysicalOperator {
 public:

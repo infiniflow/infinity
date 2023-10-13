@@ -3,7 +3,15 @@
 //
 
 #include "physical_project.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "storage/data_block.h"
+#include "parser/statement/extra/create_table_info.h"
+
 #include "executor/expression/expression_evaluator.h"
+#include "executor/expression/expression_state.h"
+#include "executor/operator_state.h"
+#include "main/query_context.h"
 
 namespace infinity {
 

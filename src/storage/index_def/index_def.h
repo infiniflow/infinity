@@ -3,6 +3,7 @@
 #include "common/types/alias/containers.h"
 #include "common/types/alias/strings.h"
 #include "json.hpp"
+
 namespace infinity {
 
 enum class IndexMethod {

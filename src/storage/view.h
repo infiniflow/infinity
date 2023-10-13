@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "common/types/data_type.h"
 #include "parser/statement/extra/create_view_info.h"
 #include "parser/statement/select_statement.h"

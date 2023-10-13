@@ -5,9 +5,11 @@
 #pragma once
 
 #include "executor/physical_operator.h"
-#include "main/query_context.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 
 namespace infinity {
+
+class QueryContext;
 
 class PhysicalCreateSchema final : public PhysicalOperator {
 public:

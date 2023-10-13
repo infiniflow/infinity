@@ -2,13 +2,9 @@
 // Created by JinHai on 2022/12/16.
 //
 
-#include "common/types/null_value.h"
 #include "base_test.h"
-#include "common/types/data_type.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "common/types/null_value.h"
 
 class NullValueTest : public BaseTest {
     void SetUp() override {
