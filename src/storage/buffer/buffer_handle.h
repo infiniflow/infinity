@@ -5,10 +5,12 @@
 #pragma once
 
 #include "common/types/data_type.h"
-#include "storage/common/async_batch_processor.h"
 #include "storage/io/file_system.h"
+#include "common/types/alias/concurrency.h"
 
 namespace infinity {
+
+class AsyncBatchProcessor;
 
 enum class BufferType {
     kTempFile,

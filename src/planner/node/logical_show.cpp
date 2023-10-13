@@ -21,7 +21,13 @@ String ToString(ShowType type) {
     }
 }
 
-String LogicalShow::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalShow::GetColumnBindings() const { return {}; }
+
+SharedPtr<Vector<String>> LogicalShow::GetOutputNames() const { return MakeShared<Vector<String>>(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalShow::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+
+String LogicalShow::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

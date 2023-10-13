@@ -1,13 +1,8 @@
-#include <gtest/gtest.h>
 
 #include "base_test.h"
-#include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include "storage/invertedindex/format/buffered_byte_slice.h"
 #include "storage/invertedindex/format/buffered_byte_slice_reader.h"
 #include "storage/invertedindex/format/doc_list_format_option.h"
-#include <iostream>
 
 namespace infinity {
 

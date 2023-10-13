@@ -2,28 +2,30 @@
 // Created by JinHai on 2022/7/22.
 //
 
-#include "parser/sql_parser.h"
-#include "parser/parser_result.h"
-
 #include "query_context.h"
+#include "storage/table.h"
+
+#include "parser/parser_result.h"
 #include "parser/sql_parser.h"
+
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "executor/fragment_builder.h"
 #include "executor/physical_operator.h"
 #include "executor/physical_planner.h"
 #include "infinity.h"
-#include "legacy_sched/operator_pipeline.h"
 #include "main/session.h"
+#include "parser/sql_parser.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
+#include "planner/bind_context.h"
+#include "storage/data_block.h"
+
 
 #include <sstream>
 #include <utility>
 
 namespace infinity {
-
-class Pipeline;
 
 String QueryResult::ToString() const {
     std::stringstream ss;
@@ -65,6 +67,21 @@ String QueryResult::ToString() const {
     }
 
     return ss.str();
+}
+
+void QueryContext::Init(Session *session_ptr,
+                        const Config *global_config_ptr,
+                        FragmentScheduler *scheduler_ptr,
+                        Storage *storage_ptr,
+                        ResourceManager *resource_manager_ptr) {
+    session_ptr_ = session_ptr;
+    global_config_ = global_config_ptr;
+    scheduler_ = scheduler_ptr;
+    storage_ = storage_ptr;
+    resource_manager_ = resource_manager_ptr;
+    initialized_ = true;
+    cpu_number_limit_ = resource_manager_ptr->GetCpuResource();
+    memory_size_limit_ = resource_manager_ptr->GetMemoryResource();
 }
 
 QueryResult QueryContext::Query(const String &query) {
@@ -110,13 +127,6 @@ QueryResult QueryContext::Query(const String &query) {
 
             scheduler_->Schedule(this, plan_fragment.get());
             query_result.result_ = plan_fragment->GetResult();
-            //
-            //            // Create execution pipeline
-            //            SharedPtr<Pipeline> pipeline = OperatorPipeline::Create(physical_plan);
-            //
-            //            // Schedule the query pipeline
-            //            Infinity::instance().scheduler()->Schedule(this, pipeline);
-            //            query_result.result_ = pipeline->GetResult();
             query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
             this->CommitTxn();

@@ -3,17 +3,11 @@
 //
 
 #include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
-
-#include "expression/column_expression.h"
-#include "expression/value_expression.h"
-#include "function/scalar/substring.h"
 #include "function/scalar_function_set.h"
+#include "expression/column_expression.h"
+#include "function/scalar/substring.h"
+#include "expression/value_expression.h"
 
 class SubstrFunctionTest : public BaseTest {
     void SetUp() override {

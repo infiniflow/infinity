@@ -3,11 +3,10 @@
 //
 
 #include "column_vector.h"
-
-#include "common/utility/infinity_assert.h"
+#include "common/column_vector/bitmask.h"
 #include "common/utility/serializable.h"
 #include "storage/buffer/column_buffer.h"
-#include <utility>
+#include "common/types/info/embedding_info.h"
 
 namespace infinity {
 

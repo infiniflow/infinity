@@ -3,7 +3,10 @@
 //
 
 #include "interval_type.h"
-#include "main/logger.h"
+
+#include "spdlog/fmt/fmt.h"
+
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

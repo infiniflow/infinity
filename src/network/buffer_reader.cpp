@@ -3,20 +3,18 @@
 //
 
 #include "buffer_reader.h"
-
 #include <boost/asio/read.hpp>
-#include <iostream>
 
 namespace infinity {
 
-size_t BufferReader::size() const {
+SizeT BufferReader::size() const {
     const auto current_size = std::distance(&*start_pos_, &*current_pos_);
     return (current_size < 0) ? (current_size + PG_MSG_BUFFER_SIZE) : current_size;
 }
 
-std::string BufferReader::read_string() {
+String BufferReader::read_string() {
     auto end_pos = RingBufferIterator(data_);
-    std::string result;
+    String result;
 
     if (size() != 0) {
         end_pos = std::find(start_pos_, current_pos_, NULL_END);
@@ -35,8 +33,8 @@ std::string BufferReader::read_string() {
     return result;
 }
 
-std::string BufferReader::read_string(const size_t string_length, NullTerminator null_terminator) {
-    std::string result;
+String BufferReader::read_string(const SizeT string_length, NullTerminator null_terminator) {
+    String result;
     result.reserve(string_length);
 
     if (size() != 0) {
@@ -59,7 +57,7 @@ std::string BufferReader::read_string(const size_t string_length, NullTerminator
     return result;
 }
 
-void BufferReader::receive_more(size_t bytes) {
+void BufferReader::receive_more(SizeT bytes) {
     if (size() >= bytes) {
         // Current data in buffer is enough for reading.
         return;
@@ -68,7 +66,7 @@ void BufferReader::receive_more(size_t bytes) {
     // Get the available size of the buffer;
     const auto available_size = max_capacity() - size();
 
-    size_t bytes_read{0};
+    SizeT bytes_read{0};
 
     boost::system::error_code boost_error;
 

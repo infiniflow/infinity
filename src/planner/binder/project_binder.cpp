@@ -3,9 +3,10 @@
 //
 
 #include "project_binder.h"
-#include "common/utility/infinity_assert.h"
-#include "expression/column_expression.h"
+#include "main/query_context.h"
+#include "storage/storage.h"
 #include "function/function_set.h"
+#include "expression/column_expression.h"
 
 namespace infinity {
 

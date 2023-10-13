@@ -4,21 +4,17 @@
 
 #pragma once
 
-#include "common/utility/str.h"
-#include "main/logger.h"
-#include "storage/invertedindex/key_encoder.h"
 #include "storage/wal/wal_entry.h"
-#include "txn.h"
-#include <map>
-#include <mutex>
+#include "storage/txn/txn.h"
+#include "common/types/alias/concurrency.h"
 
 namespace infinity {
 
 using PutWalEntryFn = std::function<void(std::shared_ptr<WalEntry>)>;
 
 class WalEntry;
-
 class BufferManager;
+class NewCatalog;
 
 class TxnManager {
 public:

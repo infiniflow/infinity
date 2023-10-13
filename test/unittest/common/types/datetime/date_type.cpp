@@ -3,11 +3,7 @@
 //
 
 #include "base_test.h"
-#include "common/types/data_type.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class DateTypeTest : public BaseTest {
     void SetUp() override {

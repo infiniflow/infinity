@@ -3,19 +3,23 @@
 //
 
 #include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
 #include "executor/expression/expression_evaluator.h"
-#include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
-
+#include "executor/expression/expression_state.h"
+#include "expression/aggregate_expression.h"
+#include "expression/base_expression.h"
+#include "expression/case_expression.h"
+#include "expression/cast_expression.h"
 #include "expression/column_expression.h"
+#include "expression/function_expression.h"
+#include "expression/in_expression.h"
+#include "expression/reference_expression.h"
+#include "expression/value_expression.h"
+#include "main/infinity.h"
 #include "function/scalar/add.h"
 #include "function/scalar/subtract.h"
 #include "function/scalar_function_set.h"
 #include "storage/table.h"
+#include "storage/table_def.h"
 
 class ExpressionEvaluatorTest : public BaseTest {
     void SetUp() override {

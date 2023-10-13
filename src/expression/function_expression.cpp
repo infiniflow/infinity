@@ -5,8 +5,6 @@
 #include "function_expression.h"
 #include <sstream>
 
-#include <utility>
-
 namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments)

@@ -2,7 +2,13 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#include "physical_create_view.h"
+#include "executor/operator/physical_create_view.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+
+#include "storage/txn/txn.h"
+#include "main/query_context.h"
+#include "executor/operator_state.h"
 
 namespace infinity {
 

@@ -4,15 +4,16 @@
 
 #pragma once
 
+#include "src/scheduler/fragment_context.h"
 #include "executor/operator/physical_sink.h"
 #include "executor/operator/physical_source.h"
-#include "executor/physical_operator.h"
-#include "main/query_context.h"
-#include "src/scheduler/fragment_context.h"
-
-#include <memory>
 
 namespace infinity {
+
+class QueryContext;
+class PhysicalOperator;
+class PhysicalSink;
+class PhysicalSource;
 
 class PlanFragment {
 public:

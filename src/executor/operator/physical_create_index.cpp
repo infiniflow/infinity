@@ -1,5 +1,7 @@
 #include "physical_create_index.h"
 #include "executor/operator_state.h"
+#include "main/query_context.h"
+#include "storage/txn/txn.h"
 
 namespace infinity {
 void PhysicalCreateIndex::Init() {}
@@ -16,7 +18,7 @@ void PhysicalCreateIndex::Execute(QueryContext *query_context,
     auto create_index_output_state =
         static_cast<CreateIndexOutputState *>(output_state);
 
-    auto txn = query_context->GetTxn();
+    auto* txn = query_context->GetTxn();
     auto result = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_,
                                    conflict_type_);
     if (result.err_ != nullptr) {

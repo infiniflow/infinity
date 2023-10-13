@@ -4,22 +4,32 @@
 
 #pragma once
 
+#include "common/types/alias/db_type.h"
+#include "common/types/alias/smart_ptr.h"
 #include "storage/common/table_collection_detail.h"
-#include "storage/meta/entry/table_collection_entry.h"
-#include "storage/meta/meta_state.h"
-#include "storage/wal/wal_entry.h"
+#include "storage/meta/entry/base_entry.h"
+#include "parser/statement/extra/extra_ddl_info.h"
+
 #include "txn_context.h"
-#include "txn_store.h"
 #include <condition_variable>
 #include <mutex>
 
 namespace infinity {
 
 class TxnManager;
-
 class BufferManager;
-
 class NewCatalog;
+class TableCollectionEntry;
+class DBEntry;
+class MetaTableState;
+class ScanState;
+class GetState;
+class WalEntry;
+class WalCmd;
+class TableDef;
+class IndexDef;
+class DataBlock;
+class TxnTableStore;
 
 struct GetParam {
     const String &db_name_{};
@@ -35,8 +45,7 @@ struct ScanParam {
 
 class Txn {
 public:
-    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id)
-        : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(std::make_shared<WalEntry>()) {}
+    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
 
     void BeginTxn();
 
@@ -135,7 +144,7 @@ private:
 private:
     NewCatalog *catalog_{};
     u64 txn_id_{};
-    TxnContext txn_context_;
+    TxnContext txn_context_{};
 
     // Related database
     Set<String> db_names_{};
@@ -148,7 +157,7 @@ private:
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};
     // Key: table name Value: TxnTableStore
-    HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
+    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 
     // Handled database
     String db_name_;

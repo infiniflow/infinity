@@ -1,6 +1,9 @@
 //
 // Created by jinhai on 23-3-5.
 //
+
+#pragma once
+
 #include "extra_ddl_info.h"
 #include "parser/statement/statement_common.h"
 

@@ -2,8 +2,6 @@
 #include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 
-#include <stdint.h>
-
 namespace infinity {
 
 MemoryChunk MemoryPool::DUMMY_CHUNK;

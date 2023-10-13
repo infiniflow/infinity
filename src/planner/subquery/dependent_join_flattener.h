@@ -5,6 +5,7 @@
 #pragma once
 
 #include "expression/subquery_expression.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
 

@@ -3,7 +3,7 @@
 //
 
 #include "executor/fragment/plan_fragment.h"
-#include "src/scheduler/fragment_context.h"
+#include "main/query_context.h"
 
 namespace infinity {
 

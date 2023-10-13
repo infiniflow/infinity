@@ -3,6 +3,8 @@
 //
 
 #include "logical_join.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
 #include <sstream>
 
 namespace infinity {
@@ -62,7 +64,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalJoin::GetOutputTypes() const {
     return result;
 }
 
-String LogicalJoin::ToString(i64 &space) {
+String LogicalJoin::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

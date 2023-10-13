@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include "bound_cast_func.h"
-#include "column_vector_cast.h"
-#include "common/types/data_type.h"
-
-#include "common/utility/infinity_assert.h"
+#include "function/cast/bound_cast_func.h"
+#include "function/cast/column_vector_cast.h"
 
 namespace infinity {
 

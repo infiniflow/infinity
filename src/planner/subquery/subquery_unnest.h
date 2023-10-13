@@ -4,11 +4,18 @@
 
 #pragma once
 
-#include "expression/base_expression.h"
-#include "expression/subquery_expression.h"
-#include "planner/logical_node.h"
+#include "planner/column_binding.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
+
+class QueryContext;
+class BindContext;
+class LogicalNode;
+class BaseExpression;
+class SubqueryExpression;
+class ColumnExpression;
 
 class SubqueryUnnest {
 public:

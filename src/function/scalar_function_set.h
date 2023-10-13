@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "function_set.h"
-#include "scalar_function.h"
+#include "function/function_set.h"
+#include "function/scalar_function.h"
 
 namespace infinity {
 
@@ -20,7 +20,7 @@ public:
     ScalarFunction GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments);
 
 private:
-    static int64_t MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments);
+    static i64 MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments);
 
     Vector<ScalarFunction> functions_;
 };

@@ -2,7 +2,7 @@
 // Created by jinhai on 23-10-5.
 //
 
-#include "block_index.h"
+#include "storage/common/block_index.h"
 #include "storage/meta/entry/segment_entry.h"
 
 namespace infinity {

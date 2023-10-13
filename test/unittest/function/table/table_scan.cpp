@@ -9,15 +9,11 @@
 #include "common/types/logical_type.h"
 #include "function/table/seq_scan.h"
 #include "function/table/table_scan.h"
-#include "legacy_sched/pipeline.h"
 #include "main/config.h"
 #include "main/infinity.h"
 #include "main/session.h"
-#include "main/stats/global_resource_usage.h"
-#include "storage/data_block.h"
+#include "main/query_context.h"
 #include "storage/meta/catalog.h"
-#include "storage/meta/entry/segment_column_entry.h"
-#include "storage/meta/entry/segment_entry.h"
 #include "storage/storage.h"
 #include <math.h>
 

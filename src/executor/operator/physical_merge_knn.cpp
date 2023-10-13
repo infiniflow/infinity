@@ -3,6 +3,8 @@
 //
 
 #include "physical_merge_knn.h"
+#include "executor/operator_state.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 

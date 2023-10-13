@@ -5,10 +5,10 @@
 #pragma once
 
 #include "logical_node.h"
-#include <string>
 
 namespace infinity {
 
+class QueryContext;
 class OptimizerRule {
 public:
     virtual void ApplyToPlan(QueryContext *query_context_ptr, const SharedPtr<LogicalNode> &logical_plan) = 0;

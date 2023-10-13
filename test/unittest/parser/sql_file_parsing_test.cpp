@@ -3,15 +3,9 @@
 //
 
 #include "base_test.h"
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
-
-#include "bin/compilation_config.h"
 #include "main/infinity.h"
-
-#include <filesystem>
-#include <fstream>
-#include <gtest/gtest.h>
+#include "bin/compilation_config.h"
+#include "parser/sql_parser.h"
 
 class SQLFileParsingTest : public BaseTest {
     void SetUp() override {

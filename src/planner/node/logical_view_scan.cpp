@@ -3,12 +3,19 @@
 //
 
 #include "logical_view_scan.h"
-
+#include "planner/column_binding.h"
+#include "storage/view.h"
 #include <sstream>
 
 namespace infinity {
 
-String LogicalViewScan::ToString(i64 &space) {
+Vector<ColumnBinding> LogicalViewScan::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+
+SharedPtr<Vector<String>> LogicalViewScan::GetOutputNames() const { return left_node_->GetOutputNames(); }
+
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalViewScan::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+
+String LogicalViewScan::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

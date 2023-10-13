@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include "table.h"
-#include "view.h"
-
-#include <memory>
-#include <unordered_map>
+#include "storage/table.h"
+#include "storage/view.h"
 
 namespace infinity {
 

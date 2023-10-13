@@ -3,6 +3,7 @@
 //
 
 #include "hash_table.h"
+#include "common/column_vector/bitmask.h"
 
 namespace infinity {
 

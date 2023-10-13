@@ -4,31 +4,37 @@
 
 #pragma once
 
-#include "logical_node.h"
-#include "planner/node/logical_aggregate.h"
-#include "planner/node/logical_create_collection.h"
-#include "planner/node/logical_create_schema.h"
-#include "planner/node/logical_create_table.h"
-#include "planner/node/logical_create_view.h"
-#include "planner/node/logical_cross_product.h"
-#include "planner/node/logical_drop_collection.h"
-#include "planner/node/logical_drop_schema.h"
-#include "planner/node/logical_drop_table.h"
-#include "planner/node/logical_drop_view.h"
-#include "planner/node/logical_export.h"
-#include "planner/node/logical_filter.h"
-#include "planner/node/logical_flush.h"
-#include "planner/node/logical_import.h"
-#include "planner/node/logical_insert.h"
-#include "planner/node/logical_join.h"
-#include "planner/node/logical_knn_scan.h"
-#include "planner/node/logical_limit.h"
-#include "planner/node/logical_project.h"
-#include "planner/node/logical_show.h"
-#include "planner/node/logical_sort.h"
-#include "planner/node/logical_table_scan.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
+
+class LogicalNode;
+class LogicalCreateSchema;
+class LogicalCreateTable;
+class LogicalCreateCollection;
+class LogicalCreateView;
+class LogicalDropSchema;
+class LogicalDropTable;
+class LogicalDropCollection;
+class LogicalDropView;
+class LogicalInsert;
+class LogicalProject;
+class LogicalFilter;
+class LogicalTableScan;
+class LogicalKnnScan;
+class LogicalAggregate;
+class LogicalSort;
+class LogicalLimit;
+class LogicalCrossProduct;
+class LogicalJoin;
+class LogicalShow;
+class LogicalImport;
+class LogicalExport;
+class LogicalFlush;
+class BaseExpression;
 
 class ExplainLogicalPlan {
 public:

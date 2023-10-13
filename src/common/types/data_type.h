@@ -8,11 +8,9 @@
 #include "common/types/complex/embedding_type.h"
 #include "common/types/complex/row_id.h"
 #include "common/utility/infinity_assert.h"
+#include "common/types/logical_type.h"
+#include "common/types/type_info.h"
 #include "json.hpp"
-#include "logical_type.h"
-#include "type_info.h"
-
-#include <string>
 
 namespace infinity {
 

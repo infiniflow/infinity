@@ -31,7 +31,7 @@ void ParseArguments(int argc, char **argv, infinity::StartupParameter &parameter
     }
 }
 
-int main(int argc, char **argv) {
+auto main(int argc, char **argv) -> int {
     std::cout << " __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
                  "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
                  "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"

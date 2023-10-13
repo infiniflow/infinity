@@ -5,9 +5,15 @@
 #pragma once
 
 #include "executor/operator_state.h"
-#include "storage/meta/entry/segment_entry.h"
+
+#include <atomic>
+
+//#include "storage/meta/entry/segment_entry.h"
 
 namespace infinity {
+
+class SourceState;
+class SinkState;
 
 // Task type:
 // DDL task

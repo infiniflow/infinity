@@ -3,13 +3,12 @@
 //
 
 #include "logical_planner.h"
-#include "common/types/alias/smart_ptr.h"
-#include "common/types/alias/strings.h"
-#include "common/utility/exception.h"
-#include "common/utility/infinity_assert.h"
+#include "main/query_context.h"
+#include "storage/txn/txn.h"
+#include "storage/meta/entry/table_collection_entry.h"
+
 #include "expression/cast_expression.h"
 #include "function/cast/cast_function.h"
-#include "parser/statement/extra/create_index_info.h"
 #include "planner/binder/insert_binder.h"
 #include "planner/explain_logical_plan.h"
 #include "planner/node/logical_create_collection.h"
@@ -32,7 +31,6 @@
 #include "src/parser/statement.h"
 #include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
-#include <memory>
 
 namespace infinity {
 

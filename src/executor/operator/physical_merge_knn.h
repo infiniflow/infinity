@@ -6,6 +6,7 @@
 
 #include "executor/physical_operator.h"
 #include "expression/base_expression.h"
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 

@@ -5,8 +5,6 @@
 #pragma once
 
 #include "common/types/alias/strings.h"
-#include <functional>
-#include <string>
 
 namespace infinity {
 

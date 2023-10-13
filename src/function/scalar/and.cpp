@@ -2,9 +2,8 @@
 // Created by JinHai on 2022/9/28.
 //
 
-#include "function/scalar_function.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
-#include "less.h"
 
 namespace infinity {
 

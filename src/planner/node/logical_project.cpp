@@ -3,6 +3,8 @@
 //
 
 #include "logical_project.h"
+#include "planner/column_binding.h"
+#include "expression/base_expression.h"
 #include <sstream>
 
 namespace infinity {
@@ -38,7 +40,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalProject::GetOutputTypes() const {
     return result;
 }
 
-String LogicalProject::ToString(i64 &space) {
+String LogicalProject::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

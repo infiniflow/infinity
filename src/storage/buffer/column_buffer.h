@@ -1,10 +1,13 @@
 #pragma once
 
-#include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/object_handle.h"
+#include "common/types/alias/containers.h"
 #include <limits>
 
 namespace infinity {
+
+class BufferManager;
+class DataType;
 
 struct OutlineBuffer {
     BufferManager *buffer_mgr_{};

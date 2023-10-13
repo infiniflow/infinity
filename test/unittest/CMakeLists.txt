@@ -4,12 +4,6 @@ include_directories(BEFORE SYSTEM ./)
 include_directories(AFTER SYSTEM /usr/local/include)
 
 file(GLOB_RECURSE
-        bin_src
-        CONFIGURE_DEPENDS
-        bin/*.cpp
-)
-
-file(GLOB_RECURSE
         common_test_src
         CONFIGURE_DEPENDS
         common/*.cpp
@@ -65,7 +59,6 @@ file(GLOB_RECURSE
 
 add_executable(test_main
         main.cpp
-        ${bin_src}
         ${common_test_src}
         ${executor_test_src}
         ${function_test_src}

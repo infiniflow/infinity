@@ -4,11 +4,7 @@
 
 #pragma once
 
-// #include "query_context.h"
-#include "prepared_plan.h"
 #include "storage/txn/txn.h"
-
-#include <unordered_map>
 
 namespace infinity {
 
@@ -32,9 +28,6 @@ public:
     Txn *txn_{};
 
 private:
-    // prepared plan for PREPARE and EXECUTE statement
-    HashMap<String, SharedPtr<PreparedPlan>> prepared_plans_;
-
     // Current schema
     String current_database_;
 

@@ -6,7 +6,6 @@
 
 #include "base_entry.h"
 
-#include "common/column_vector/column_vector.h"
 #include "storage/buffer/column_buffer.h"
 #include "storage/meta/entry/outline_info.h"
 
@@ -15,6 +14,8 @@ namespace infinity {
 class BufferManager;
 
 class SegmentEntry;
+
+class ColumnVector;
 
 struct SegmentColumnEntry : public BaseEntry {
 public:

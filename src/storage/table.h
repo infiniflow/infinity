@@ -4,15 +4,15 @@
 
 #pragma once
 
-#include <utility>
-
-#include "base_table.h"
-#include "data_block.h"
-#include "table_def.h"
+#include "common/types/complex/row_id.h"
+#include "storage/base_table.h"
 
 namespace infinity {
 
-class Block;
+class DataBlock;
+class TableDef;
+class ColumnDef;
+class DataType;
 
 enum class TableType {
     kInvalid,
@@ -27,33 +27,23 @@ enum class TableType {
 
 class Table : public BaseTable {
 public:
-    static inline SharedPtr<Table> Make(SharedPtr<TableDef> table_def_ptr, TableType type) {
-        return MakeShared<Table>(std::move(table_def_ptr), type);
-    }
+    static SharedPtr<Table> Make(SharedPtr<TableDef> table_def_ptr, TableType type);
 
-    static inline SharedPtr<Table> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
-        SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
-        return Make(result_table_def_ptr, TableType::kResult);
-    }
+    static SharedPtr<Table> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs);
 
-    static inline SharedPtr<Table> MakeEmptyResultTable() {
-        SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
-        return Make(result_table_def_ptr, TableType::kResult);
-    }
+    static SharedPtr<Table> MakeEmptyResultTable();
 
 public:
-    explicit Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-        : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-          definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
+    explicit Table(SharedPtr<TableDef> table_def_ptr, TableType type);
 
 public:
-    [[nodiscard]] SizeT ColumnCount() const { return definition_ptr_->column_count(); }
+    [[nodiscard]] SizeT ColumnCount() const;
 
-    [[nodiscard]] SharedPtr<String> TableName() const { return definition_ptr_->table_name(); }
+    [[nodiscard]] SharedPtr<String> TableName() const;
 
-    [[nodiscard]] inline const SharedPtr<String> &SchemaName() const { return definition_ptr_->schema_name(); }
+    [[nodiscard]] const SharedPtr<String> &SchemaName() const;
 
-    SizeT GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
+    SizeT GetColumnIdByName(const String &column_name);
 
     [[nodiscard]] SizeT row_count() const { return row_count_; }
 
@@ -66,14 +56,11 @@ public:
                       "Attempt to access invalid index: " + std::to_string(idx) + "/" + std::to_string(DataBlockCount())) return data_blocks_[idx];
     }
 
-    [[nodiscard]] String &GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
+    [[nodiscard]] String &GetColumnNameById(SizeT idx) const;
 
-    [[nodiscard]] SharedPtr<DataType> GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
+    [[nodiscard]] SharedPtr<DataType> GetColumnTypeById(SizeT idx) const;
 
-    inline void Append(const SharedPtr<DataBlock> &data_block) {
-        data_blocks_.emplace_back(data_block);
-        UpdateRowCount(data_block->row_count());
-    }
+    void Append(const SharedPtr<DataBlock> &data_block);
 
     inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
 
@@ -90,10 +77,10 @@ public:
     void UnionWith(const SharedPtr<Table> &other);
 
 public:
-    SharedPtr<TableDef> definition_ptr_;
+    SharedPtr<TableDef> definition_ptr_{};
     SizeT row_count_{0};
     TableType type_{TableType::kInvalid};
-    Vector<SharedPtr<DataBlock>> data_blocks_;
+    Vector<SharedPtr<DataBlock>> data_blocks_{};
     SharedPtr<String> result_msg_{};
 };
 

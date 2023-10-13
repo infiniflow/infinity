@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "function_set.h"
-#include "table_function.h"
+#include "function/function_set.h"
+#include "function/table_function.h"
 
 namespace infinity {
 

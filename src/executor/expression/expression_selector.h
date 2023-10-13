@@ -4,11 +4,16 @@
 
 #pragma once
 
-#include "executor/expression/expression_state.h"
-#include "expression/base_expression.h"
-#include "storage/data_block.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class BaseExpression;
+class ExpressionState;
+class DataBlock;
+class Selection;
+class Bitmask;
 
 class ExpressionSelector {
 public:

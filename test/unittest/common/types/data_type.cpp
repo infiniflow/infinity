@@ -2,12 +2,8 @@
 // Created by JinHai on 2022/10/30.
 //
 
-#include "common/types/data_type.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class DataTypeTest : public BaseTest {
     void SetUp() override {

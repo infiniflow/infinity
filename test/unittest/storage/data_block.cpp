@@ -2,17 +2,11 @@
 // Created by JinHai on 2022/11/12.
 //
 
-#include "storage/data_block.h"
 #include "base_test.h"
-#include "common/types/info/decimal_info.h"
-#include <gtest/gtest.h>
-
+#include "storage/data_block.h"
 #include "common/types/info/array_info.h"
-#include "common/types/info/embedding_info.h"
 #include "main/infinity.h"
-#include "main/logger.h"
 #include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
 
 class DataBlockTest : public BaseTest {
     void SetUp() override {

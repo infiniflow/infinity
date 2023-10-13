@@ -4,25 +4,25 @@
 
 #pragma once
 
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/smart_ptr.h"
 #include "common/utility/infinity_assert.h"
-#include "common/utility/str.h"
-#include "pg_message.h"
-#include "ring_buffer_iterator.h"
+#include "network/pg_message.h"
+#include "network/ring_buffer_iterator.h"
 
-#include <iostream>
-#include <utility>
-
+#include <array>
 #include <boost/asio/ip/tcp.hpp>
 
 namespace infinity {
 
 class BufferReader {
 public:
-    explicit BufferReader(std::shared_ptr<boost::asio::ip::tcp::socket> socket) : socket_(std::move(socket)){};
+    explicit BufferReader(SharedPtr<boost::asio::ip::tcp::socket> socket) : socket_(std::move(socket)){};
 
-    [[nodiscard]] size_t size() const;
+    [[nodiscard]] SizeT size() const;
 
-    [[nodiscard]] static inline size_t max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
+    [[nodiscard]] static inline SizeT max_capacity() { return PG_MSG_BUFFER_SIZE - 1; }
 
     [[nodiscard]] inline bool full() const { return size() == max_capacity(); }
 
@@ -48,18 +48,18 @@ public:
         NetworkAssert(false, "Try to read invalid type of data from the buffer.");
     }
 
-    std::string read_string(const size_t string_length, NullTerminator null_terminator = NullTerminator::kYes);
+    String read_string(const SizeT string_length, NullTerminator null_terminator = NullTerminator::kYes);
 
-    std::string read_string();
+    String read_string();
 
 private:
-    void receive_more(size_t more_bytes = 1);
+    void receive_more(SizeT more_bytes = 1);
 
     std::array<char, PG_MSG_BUFFER_SIZE> data_{};
     RingBufferIterator start_pos_{data_};
     RingBufferIterator current_pos_{data_};
 
-    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
+    SharedPtr<boost::asio::ip::tcp::socket> socket_;
 };
 
 } // namespace infinity

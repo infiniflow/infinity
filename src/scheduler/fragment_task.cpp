@@ -4,6 +4,9 @@
 
 #include "fragment_task.h"
 #include "fragment_context.h"
+#include "executor/operator/physical_source.h"
+#include "executor/operator/physical_sink.h"
+#include "main/logger.h"
 
 namespace infinity {
 

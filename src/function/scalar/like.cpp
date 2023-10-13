@@ -2,11 +2,9 @@
 // Created by jinhai on 23-3-18.
 //
 
-#include "like.h"
-#include "function/scalar_function.h"
+#include "function/scalar/like.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
-#include "less_equals.h"
-#include <cmath>
 
 namespace infinity {
 

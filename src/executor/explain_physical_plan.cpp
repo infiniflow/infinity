@@ -3,6 +3,7 @@
 //
 
 #include "explain_physical_plan.h"
+
 #include "executor/operator/physcial_drop_view.h"
 #include "executor/operator/physical_aggregate.h"
 #include "executor/operator/physical_alter.h"
@@ -51,6 +52,9 @@
 #include "planner/explain_logical_plan.h"
 
 #include "expression/knn_expression.h"
+
+#include "storage/meta/entry/db_entry.h"
+#include "storage/meta/table_collection_meta.h"
 
 namespace infinity {
 

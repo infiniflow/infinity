@@ -4,18 +4,16 @@
 
 #pragma once
 
-#include "column_binding.h"
-#include "column_identifier.h"
-#include "expression/base_expression.h"
-#include "logical_node_type.h"
-#include "planner/bind_context.h"
-
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
+#include "common/types/alias/strings.h"
+#include "planner/logical_node_type.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
+
+class DataType;
 
 class LogicalNode {
 public:
@@ -45,7 +43,7 @@ public:
 
     void set_node_id(u64 node_id) { node_id_ = node_id; }
 
-    virtual String ToString(i64 &space) = 0;
+    virtual String ToString(i64 &space) const = 0;
 
     virtual String name() = 0;
 

@@ -7,7 +7,6 @@
 #include "common/types/alias/primitives.h"
 #include "common/types/alias/strings.h"
 #include "json.hpp"
-#include <iostream>
 
 namespace infinity {
 

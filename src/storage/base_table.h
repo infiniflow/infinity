@@ -6,7 +6,6 @@
 
 #include "common/types/alias/smart_ptr.h"
 #include "storage/meta/entry/table_collecton_type.h"
-#include <utility>
 
 namespace infinity {
 

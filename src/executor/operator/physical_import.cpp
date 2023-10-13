@@ -3,6 +3,13 @@
 //
 
 #include "physical_import.h"
+
+#include "storage/meta/entry/db_entry.h"
+#include "storage/txn/txn.h"
+#include "storage/wal/wal_entry.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+
 #include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/info/varchar_info.h"

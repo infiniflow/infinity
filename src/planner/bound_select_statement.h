@@ -4,14 +4,16 @@
 
 #pragma once
 
-#include <utility>
-
 #include "bound_statement.h"
 #include "planner/bound/table_ref.h"
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 
 class LogicalKnnScan;
+class BindContext;
+class QueryContext;
+class BaseExpression;
 
 struct BoundSelectStatement final : public BoundStatement {
 public:

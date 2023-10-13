@@ -4,10 +4,8 @@
 
 #pragma once
 
-#include <utility>
-
 #include "planner/logical_node.h"
-
+#include "planner/column_binding.h"
 #include "storage/table.h"
 
 namespace infinity {
@@ -28,13 +26,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
           table_index_(table_index) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return MakeShared<Vector<String>>(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalShow"; }
 

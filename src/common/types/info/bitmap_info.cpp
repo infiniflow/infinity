@@ -7,9 +7,9 @@
 namespace infinity {
 
 SharedPtr<BitmapInfo> BitmapInfo::Make(i64 limit) {
-    TypeAssert(limit % 8 == 0, "Bitmap size should be the times of eight.")
-        TypeAssert(limit >= 1 && limit <= MAX_BITMAP_SIZE,
-                   "Bitmap type length can't be less than 1 or larger than " + std::to_string(MAX_BITMAP_SIZE)) return MakeShared<BitmapInfo>(limit);
+    TypeAssert(limit % 8 == 0, "Bitmap size should be the times of eight.");
+    TypeAssert(limit >= 1 && limit <= MAX_BITMAP_SIZE,
+               "Bitmap type length can't be less than 1 or larger than " + std::to_string(MAX_BITMAP_SIZE)) return MakeShared<BitmapInfo>(limit);
 }
 
 SharedPtr<BitmapInfo> BitmapInfo::Make() { return MakeShared<BitmapInfo>(MAX_BITMAP_SIZE); }

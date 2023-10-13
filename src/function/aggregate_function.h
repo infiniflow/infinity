@@ -5,13 +5,11 @@
 #pragma once
 
 #include "common/column_vector/column_vector.h"
-#include "common/types/data_type.h"
-#include "expression/base_expression.h"
-#include "function.h"
-#include <utility>
-#include <vector>
+#include "function/function.h"
 
 namespace infinity {
+
+class BaseExpression;
 
 using AggregateInitializeFuncType = std::function<void(ptr_t)>;
 using AggregateUpdateFuncType = std::function<void(ptr_t, const SharedPtr<ColumnVector> &)>;

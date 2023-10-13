@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include "common/utility/infinity_assert.h"
-#include "pg_message.h"
-
 #include <array>
 #include <boost/iterator/iterator_facade.hpp>
 

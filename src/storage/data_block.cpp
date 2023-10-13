@@ -3,6 +3,7 @@
 //
 
 #include "data_block.h"
+#include "common/column_vector/column_vector.h"
 #include "common/utility/serializable.h"
 
 namespace infinity {

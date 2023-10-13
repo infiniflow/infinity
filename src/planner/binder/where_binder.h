@@ -4,11 +4,13 @@
 
 #pragma once
 
-#include "bind_alias_proxy.h"
 #include "function/function.h"
 #include "planner/expression_binder.h"
 
 namespace infinity {
+
+class BaseExpression;
+class BindAliasProxy;
 
 class WhereBinder final : public ExpressionBinder {
 public:

@@ -3,13 +3,8 @@
 //
 
 #include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
-#include "function/cast/float_cast.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "function/cast/float_cast.h"
 
 class DoubleCastTest : public BaseTest {
     void SetUp() override {

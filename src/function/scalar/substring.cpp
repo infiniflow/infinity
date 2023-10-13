@@ -2,11 +2,9 @@
 // Created by jinhai on 23-3-20.
 //
 
-#include "substring.h"
-
-#include "function/scalar_function.h"
+#include "function/scalar/substring.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
-#include <cmath>
 
 namespace infinity {
 

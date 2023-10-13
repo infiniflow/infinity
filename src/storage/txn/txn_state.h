@@ -5,8 +5,6 @@
 #pragma once
 
 #include "common/types/alias/primitives.h"
-#include "common/utility/infinity_assert.h"
-#include <limits>
 
 namespace infinity {
 

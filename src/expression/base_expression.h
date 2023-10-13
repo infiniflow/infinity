@@ -9,10 +9,6 @@
 #include "common/types/data_type.h"
 #include "common/types/expression_type.h"
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 namespace infinity {
 
 enum class ExprSourceType {

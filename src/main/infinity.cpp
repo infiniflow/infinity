@@ -3,7 +3,6 @@
 //
 
 #include "infinity.h"
-#include "legacy_sched/naive_scheduler.h"
 
 namespace infinity {
 

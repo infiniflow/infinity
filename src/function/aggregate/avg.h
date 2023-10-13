@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include "function/aggregate_function.h"
-#include "storage/meta/catalog.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class NewCatalog;
 
 void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 

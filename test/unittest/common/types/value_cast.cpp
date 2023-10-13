@@ -3,11 +3,8 @@
 //
 
 #include "base_test.h"
-#include "common/types/value.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "common/types/value.h"
 
 class ValueCastTest : public BaseTest {
     void SetUp() override {

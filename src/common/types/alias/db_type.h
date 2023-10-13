@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "src/common/types/complex/row_id.h"
+#include "common/types/complex/row_id.h"
 
 namespace infinity {
 

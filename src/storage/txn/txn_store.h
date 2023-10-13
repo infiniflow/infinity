@@ -4,15 +4,14 @@
 
 #pragma once
 
-#include <utility>
-
 #include "src/storage/meta/entry/data_access_state.h"
-#include "storage/data_block.h"
-#include "storage/meta/entry/table_collection_entry.h"
 
 namespace infinity {
 
 class Txn;
+class TableCollectionEntry;
+class SegmentEntry;
+class DataBlock;
 
 class TxnTableStore {
 public:

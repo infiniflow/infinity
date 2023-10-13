@@ -3,6 +3,11 @@
 //
 
 #include "physical_drop_schema.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+
+#include "executor/operator_state.h"
+#include "storage/txn/txn.h"
 
 namespace infinity {
 

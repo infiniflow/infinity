@@ -4,9 +4,6 @@
 
 #include "column_expression.h"
 
-#include <sstream>
-#include <utility>
-
 namespace infinity {
 
 ColumnExpression::ColumnExpression(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth)

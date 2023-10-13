@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "function/function_set.h"
-#include "function/scalar_function.h"
-#include "storage/meta/catalog.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class NewCatalog;
 
 void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 

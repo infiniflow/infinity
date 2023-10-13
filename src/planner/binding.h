@@ -4,12 +4,16 @@
 
 #pragma once
 
-#include "storage/meta/entry/table_collection_entry.h"
-#include "storage/meta/entry/view_entry.h"
-
-#include <unordered_map>
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/primitives.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
+
+class TableCollectionEntry;
+class BlockIndex;
+class DataType;
 
 enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 

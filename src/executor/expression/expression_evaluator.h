@@ -4,11 +4,24 @@
 
 #pragma once
 
-#include "expression/base_expression.h"
-#include "expression/reference_expression.h"
-#include "expression_state.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class BaseExpression;
+class AggregateExpression;
+class CaseExpression;
+class CastExpression;
+class ColumnExpression;
+class ReferenceExpression;
+class FunctionExpression;
+class ValueExpression;
+class InExpression;
+
+class DataBlock;
+class ColumnVector;
+
+class ExpressionState;
 
 class ExpressionEvaluator {
 public:

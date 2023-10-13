@@ -5,7 +5,6 @@
 #pragma once
 
 #include "storage/knnindex/knn_distance.h"
-
 #include "storage/knnindex/knn_flat/alias.h"
 
 namespace infinity {

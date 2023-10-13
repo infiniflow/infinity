@@ -3,16 +3,11 @@
 //
 
 #include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
-
+#include "storage/data_block.h"
 #include "expression/column_expression.h"
-#include "function/aggregate/first.h"
 #include "function/aggregate_function_set.h"
+#include "function/aggregate/first.h"
 
 class FirstFunctionTest : public BaseTest {
     void SetUp() override {

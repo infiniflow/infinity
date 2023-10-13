@@ -2,7 +2,12 @@
 // Created by jinhai on 23-3-13.
 //
 
-#include "physical_explain.h"
+#include "executor/operator/physical_explain.h"
+#include "executor/operator_state.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+#include "common/column_vector/column_vector.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 

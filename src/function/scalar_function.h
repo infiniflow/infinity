@@ -8,15 +8,13 @@
 #include "common/column_vector/operator/ternary_operator.h"
 #include "common/column_vector/operator/unary_operator.h"
 #include "common/types/null_value.h"
-#include "common/utility/infinity_assert.h"
-#include "executor/operator_state.h"
-#include "expression/base_expression.h"
-#include "function.h"
+#include "common/column_vector/bitmask.h"
+#include "function/function.h"
 #include "storage/data_block.h"
 
-#include <vector>
-
 namespace infinity {
+
+class BaseExpression;
 
 struct ScalarFunctionData {
     explicit ScalarFunctionData(ColumnVector *column_vector_ptr) : column_vector_ptr_(column_vector_ptr) {}

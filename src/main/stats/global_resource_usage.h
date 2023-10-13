@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include "common/singleton.h"
 #include "common/types/alias/primitives.h"
-
 #include <atomic>
 
 namespace infinity {

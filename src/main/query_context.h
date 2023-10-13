@@ -4,21 +4,26 @@
 
 #pragma once
 
-#include "main/profiler/query_profiler.h"
+// #include "main/profiler/query_profiler.h"
 #include "planner/logical_node_type.h"
-#include "storage/table.h"
-#include "transaction_context.h"
-// #include "scheduler/fragment_scheduler.h"
-#include "resource_manager.h"
-#include "storage/storage.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/primitives.h"
+// #include "storage/table.h"
+// #include "transaction_context.h"
 
-#include <string>
+// #include <string>
 
 namespace infinity {
 
 class Session;
-
+class Storage;
+class ResourceManager;
 class FragmentScheduler;
+class QueryProfiler;
+class Table;
+class Txn;
+class Config;
 
 struct QueryResult {
     SharedPtr<Table> result_;
@@ -33,20 +38,11 @@ public:
 
     inline ~QueryContext() { UnInit(); }
 
-    inline void Init(Session *session_ptr,
-                     const Config *global_config_ptr,
-                     FragmentScheduler *scheduler_ptr,
-                     Storage *storage_ptr,
-                     ResourceManager *resource_manager_ptr) {
-        session_ptr_ = session_ptr;
-        global_config_ = global_config_ptr;
-        scheduler_ = scheduler_ptr;
-        storage_ = storage_ptr;
-        resource_manager_ = resource_manager_ptr;
-        initialized_ = true;
-        cpu_number_limit_ = resource_manager_ptr->GetCpuResource();
-        memory_size_limit_ = resource_manager_ptr->GetMemoryResource();
-    }
+    void Init(Session *session_ptr,
+              const Config *global_config_ptr,
+              FragmentScheduler *scheduler_ptr,
+              Storage *storage_ptr,
+              ResourceManager *resource_manager_ptr);
 
     inline void UnInit() {
         initialized_ = false;
@@ -95,7 +91,7 @@ public:
     [[nodiscard]] inline ResourceManager *resource_manager() { return resource_manager_; }
 
 private:
-    UniquePtr<QueryProfiler> query_metrics_;
+    SharedPtr<QueryProfiler> query_metrics_;
 
     const Config *global_config_{};
     FragmentScheduler *scheduler_{};

@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "function/function.h"
 #include "planner/expression_binder.h"
 
 namespace infinity {

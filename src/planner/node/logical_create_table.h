@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <utility>
-
 #include "planner/logical_node.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 
@@ -22,21 +21,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kCreateTable), schema_name_(std::move(schema_name)), table_definition_(std::move(table_def_ptr)),
           table_index_(table_index), conflict_type_(conflict_type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final {
-        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-        result->emplace_back("OK");
-        return result;
-    }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final {
-        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        return result_type;
-    }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalCreateTable"; }
 

@@ -4,9 +4,11 @@
 
 #pragma once
 
-#include "common/column_vector/column_vector.h"
+#include "common/types/alias/smart_ptr.h"
 
 namespace infinity {
+
+class ColumnVector;
 
 struct CastParameters {
     bool strict{false};

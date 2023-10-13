@@ -2,12 +2,8 @@
 // Created by JinHai on 2022/7/25.
 //
 
-#include "common/utility/str.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
 
 class StrTest : public BaseTest {
     void SetUp() override {

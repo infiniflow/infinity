@@ -2,11 +2,12 @@
 // Created by JinHai on 2022/12/14.
 //
 
-#include "cast_function.h"
-#include "bool_cast.h"
-#include "float_cast.h"
-#include "integer_cast.h"
-#include "varchar_cast.h"
+
+#include "function/cast/cast_function.h"
+#include "function/cast/bool_cast.h"
+#include "function/cast/float_cast.h"
+#include "function/cast/integer_cast.h"
+#include "function/cast/varchar_cast.h"
 
 namespace infinity {
 

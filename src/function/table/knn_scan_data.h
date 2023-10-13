@@ -4,14 +4,14 @@
 
 #pragma once
 
-#include "function/function_data.h"
 #include "function/table_function.h"
 #include "parser/parsed_expr/knn_expr.h"
 #include "storage/common/global_block_id.h"
 #include "storage/knnindex/knn_distance.h"
-#include "storage/txn/txn_state.h"
 
 namespace infinity {
+
+class BlockIndex;
 
 class KnnScanFunctionData : public TableFunctionData {
 public:

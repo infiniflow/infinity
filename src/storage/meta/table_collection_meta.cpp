@@ -3,10 +3,6 @@
 //
 
 #include "table_collection_meta.h"
-#include "common/utility/defer_op.h"
-#include "main/logger.h"
-#include "parser/statement/extra/extra_ddl_info.h"
-#include "storage/meta/entry/table_collection_entry.h"
 #include "storage/txn/txn_manager.h"
 
 namespace infinity {

@@ -3,9 +3,10 @@
 //
 
 #include "logical_table_scan.h"
+#include "planner/column_binding.h"
 #include "planner/bound/base_table_ref.h"
+#include "storage/meta/entry/table_collection_entry.h"
 #include <sstream>
-#include <utility>
 
 namespace infinity {
 
@@ -42,7 +43,7 @@ String LogicalTableScan::TableAlias() const { return base_table_ref_->alias_; }
 
 u64 LogicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-String LogicalTableScan::ToString(i64 &space) {
+String LogicalTableScan::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {

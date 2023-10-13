@@ -4,16 +4,17 @@
 
 #pragma once
 
-#include "bitmask.h"
 #include "common/default_values.h"
-#include "common/types/data_type.h"
 #include "common/types/value.h"
-#include "main/stats/global_resource_usage.h"
-#include "selection.h"
-#include "storage/buffer/column_buffer.h"
+#include "common/column_vector/selection.h"
 #include "vector_buffer/vector_buffer.h"
 
 namespace infinity {
+
+class Bitmask;
+class DataType;
+class ColumnBuffer;
+class VectorBuffer;
 
 enum class ColumnVectorType : i8 {
     kInvalid,

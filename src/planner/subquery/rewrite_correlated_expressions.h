@@ -5,8 +5,11 @@
 #pragma once
 
 #include "planner/logical_node_visitor.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
+
+class BindContext;
 
 class RewriteCorrelatedExpressions final : public LogicalNodeVisitor {
 public:

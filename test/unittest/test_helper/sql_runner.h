@@ -9,7 +9,6 @@
 #include "common/column_vector/column_vector.h"
 #include "common/types/value.h"
 #include "executor/physical_planner.h"
-#include "legacy_sched/operator_pipeline.h"
 #include "main/infinity.h"
 #include "main/logger.h"
 #include "main/session.h"
@@ -18,7 +17,6 @@
 #include "planner/optimizer.h"
 
 #include "executor/fragment_builder.h"
-#include "main/profiler/show_logical_plan.h"
 
 namespace infinity {
 

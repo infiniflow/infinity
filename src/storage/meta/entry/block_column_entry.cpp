@@ -2,11 +2,15 @@
 // Created by jinhai on 23-10-2.
 //
 
-#include "block_column_entry.h"
-#include "common/types/varchar_layout.h"
+#include "storage/meta/entry/block_column_entry.h"
+#include "storage/meta/entry/segment_column_entry.h"
 #include "storage/meta/entry/block_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
+#include "storage/buffer/buffer_manager.h"
+#include "common/types/varchar_layout.h"
+#include "common/column_vector/column_vector.h"
+#include "parser/statement/extra/create_table_info.h"
 
 namespace infinity {
 

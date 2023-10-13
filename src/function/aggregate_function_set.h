@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "aggregate_function.h"
-#include "function_set.h"
+#include "function/aggregate_function.h"
+#include "function/function_set.h"
 
 namespace infinity {
 

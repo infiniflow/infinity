@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include "function/function_data.h"
 #include "function/table_function.h"
 #include "storage/common/global_block_id.h"
-#include "storage/txn/txn_state.h"
 
 namespace infinity {
+
+class BlockIndex;
 
 class TableScanFunctionData : public TableFunctionData {
 public:

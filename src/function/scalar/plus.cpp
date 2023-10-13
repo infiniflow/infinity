@@ -2,8 +2,8 @@
 // Created by jinhai on 23-1-10.
 //
 
-#include "plus.h"
-#include "function/scalar_function.h"
+#include "function/scalar/plus.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
 
 namespace infinity {

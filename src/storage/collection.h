@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "base_table.h"
 
 namespace infinity {

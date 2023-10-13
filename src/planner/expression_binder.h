@@ -5,15 +5,16 @@
 #pragma once
 
 #include "bind_context.h"
-
-#include "expression/base_expression.h"
-#include "expression/subquery_expression.h"
 #include "function/function.h"
 #include "parser/expression.h"
 
 #include <memory>
 
 namespace infinity {
+
+class BaseExpression;
+class SubqueryExpression;
+class QueryContext;
 
 struct ExprBindResult {
     SharedPtr<BaseExpression> bound_expression_ptr_{};

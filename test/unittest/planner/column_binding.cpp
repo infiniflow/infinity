@@ -2,13 +2,9 @@
 // Created by jinhai on 23-2-17.
 //
 
-#include "planner/column_binding.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include <gtest/gtest.h>
+#include "planner/column_binding.h"
 
 class ColumnBindingTest : public BaseTest {
     void SetUp() override {

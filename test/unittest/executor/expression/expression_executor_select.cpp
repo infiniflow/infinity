@@ -8,7 +8,6 @@
 #include "executor/expression/expression_evaluator.h"
 #include "main/infinity.h"
 #include "main/logger.h"
-#include "main/stats/global_resource_usage.h"
 #include <gtest/gtest.h>
 
 #include "expression/column_expression.h"

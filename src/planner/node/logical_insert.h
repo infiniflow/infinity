@@ -12,6 +12,8 @@
 
 namespace infinity {
 
+class TableCollectionEntry;
+
 class LogicalInsert : public LogicalNode {
 public:
     explicit
@@ -19,13 +21,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kInsert), table_collection_entry_(table_collection_ptr), table_index_(table_index),
           value_list_(std::move(value_list)){};
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return MakeShared<Vector<String>>(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return MakeShared<Vector<SharedPtr<DataType>>>(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalInsert"; }
 

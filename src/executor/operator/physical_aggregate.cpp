@@ -2,9 +2,12 @@
 // Created by JinHai on 2022/7/28.
 //
 
-#include "physical_aggregate.h"
+#include "executor/operator/physical_aggregate.h"
+#include "storage/table.h"
+#include "storage/data_block.h"
+
 #include "common/utility/utility.h"
-#include "executor/expression/expression_evaluator.h"
+#include "expression/base_expression.h"
 
 namespace infinity {
 

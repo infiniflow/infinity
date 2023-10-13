@@ -8,19 +8,21 @@
 
 namespace infinity {
 
+class BaseExpression;
+
 class LogicalLimit : public LogicalNode {
 public:
     explicit LogicalLimit(u64 node_id, SharedPtr<BaseExpression> limit_expression, SharedPtr<BaseExpression> offset_expression)
         : LogicalNode(node_id, LogicalNodeType::kLimit), limit_expression_(std::move(limit_expression)),
           offset_expression_(std::move(offset_expression)) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalLimit"; }
 

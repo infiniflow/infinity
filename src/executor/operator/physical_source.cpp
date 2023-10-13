@@ -3,6 +3,8 @@
 //
 
 #include "physical_source.h"
+#include "executor/operator_state.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

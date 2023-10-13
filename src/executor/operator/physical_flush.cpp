@@ -3,6 +3,11 @@
 //
 
 #include "physical_flush.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+
+#include "executor/operator_state.h"
+#include "main/query_context.h"
 
 namespace infinity {
 

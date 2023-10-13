@@ -3,6 +3,7 @@
 //
 
 #include "aggregate_function_set.h"
+#include "expression/base_expression.h"
 
 namespace infinity {
 

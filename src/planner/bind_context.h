@@ -4,20 +4,21 @@
 
 #pragma once
 
-#include "binding.h"
-#include "column_identifier.h"
-#include "expression/base_expression.h"
-#include "expression/column_expression.h"
-
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
+#include "parser/statement/select_statement.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
 
 class Table;
-
+class Binding;
 class ExpressionBinder;
+class SelectStatement;
+class BaseExpression;
+class TableCollectionEntry;
+class BlockIndex;
+class ColumnExpression;
+class DataType;
+class ColumnIdentifier;
 
 struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement *select_stmt, HashSet<String> masked_name_set)

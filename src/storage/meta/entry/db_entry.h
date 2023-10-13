@@ -4,14 +4,10 @@
 
 #pragma once
 
-#include <utility>
-
-#include "base_entry.h"
-
-#include "parser/statement/extra/extra_ddl_info.h"
+#include "storage/meta/entry/base_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
 #include "storage/common/table_collection_detail.h"
 #include "storage/meta/table_collection_meta.h"
-#include "table_collection_entry.h"
 
 namespace infinity {
 

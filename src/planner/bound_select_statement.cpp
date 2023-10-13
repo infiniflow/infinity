@@ -3,16 +3,17 @@
 //
 
 #include "bound_select_statement.h"
+#include "planner/bind_context.h"
+#include "storage/storage.h"
+#include "expression/subquery_expression.h"
+#include "expression/expression_transformer.h"
+#include "function/table/knn_scan.h"
+#include "main/query_context.h"
 #include "bound/base_table_ref.h"
 #include "bound/cross_product_table_ref.h"
-#include "bound/dummy_table_ref.h"
 #include "bound/join_table_ref.h"
 #include "bound/subquery_table_ref.h"
 #include "planner/subquery/subquery_unnest.h"
-
-#include "common/utility/infinity_assert.h"
-#include "expression/expression_transformer.h"
-#include "function/table/knn_scan.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_dummy_scan.h"

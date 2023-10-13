@@ -4,12 +4,16 @@
 
 #pragma once
 
-#include "function.h"
-#include "function_data.h"
-#include "main/query_context.h"
-#include "storage/data_block.h"
+#include "function/function.h"
+#include "function/function_data.h"
+#include "common/types/logical_type.h"
+
+#include <functional>
 
 namespace infinity {
+
+class QueryContext;
+class DataBlock;
 
 class TableFunctionData : public FunctionData {
 public:

@@ -1,7 +1,5 @@
 #include "env.h"
 
-#include <type_traits>
-
 #if defined(__APPLE__)
 
 #define RETRY_ON_EINTR(err, expr)                                                                                                                    \

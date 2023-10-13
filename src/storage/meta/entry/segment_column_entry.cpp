@@ -3,17 +3,13 @@
 //
 
 #include "segment_column_entry.h"
-#include "common/default_values.h"
-#include "common/types/data_type.h"
 
-#include "common/types/logical_type.h"
+#include "common/column_vector/column_vector.h"
+
+#include "common/types/data_type.h"
 #include "common/types/varchar_layout.h"
-#include "common/utility/infinity_assert.h"
-#include "segment_entry.h"
+#include "storage/meta/entry/segment_entry.h"
 #include "storage/buffer/buffer_manager.h"
-#include "storage/buffer/column_buffer.h"
-#include <cstring>
-#include <string>
 
 namespace infinity {
 

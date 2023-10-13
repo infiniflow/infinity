@@ -2,23 +2,26 @@
 // Created by jinhai on 23-8-11.
 //
 
-#include "segment_entry.h"
-#include "common/default_values.h"
-#include "common/types/alias/smart_ptr.h"
-#include "common/types/alias/strings.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
+//
+//#include "common/default_values.h"
+//#include "common/types/alias/smart_ptr.h"
+//#include "common/types/alias/strings.h"
 #include "common/utility/defer_op.h"
-#include "common/utility/exception.h"
-#include "common/utility/infinity_assert.h"
+//#include "common/utility/exception.h"
+//#include "common/utility/infinity_assert.h"
 #include "common/utility/random.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVFFlat.h"
 #include "faiss/index_io.h"
-#include "storage/buffer/object_handle.h"
-#include "storage/index_def/index_def.h"
+//#include "storage/buffer/object_handle.h"
+//#include "storage/index_def/index_def.h"
 #include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
 #include "storage/txn/txn.h"
-#include <ctime>
+#include "storage/meta/entry/data_access_state.h"
+//#include <ctime>
 
 namespace infinity {
 

@@ -4,13 +4,12 @@
 
 #pragma once
 
-#include <utility>
-
 #include "executor/hash_table.h"
 #include "executor/physical_operator.h"
-#include "expression/base_expression.h"
 
 namespace infinity {
+
+class BaseExpression;
 
 struct HashRange {
     i64 start_{};

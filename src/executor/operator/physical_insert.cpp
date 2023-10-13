@@ -3,10 +3,17 @@
 //
 
 #include "physical_insert.h"
-#include "common/utility/infinity_assert.h"
+#include "storage/data_block.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/meta/entry/db_entry.h"
+#include "storage/txn/txn.h"
+#include "storage/table.h"
+#include "storage/table_def.h"
+
 #include "executor/expression/expression_evaluator.h"
 #include "executor/expression/expression_state.h"
-#include "expression/value_expression.h"
+#include "executor/operator_state.h"
+#include "main/query_context.h"
 
 namespace infinity {
 

@@ -1,6 +1,7 @@
-#include "object_handle.h"
+#include "storage/buffer/object_handle.h"
 #include "faiss/impl/io.h"
 #include "faiss/index_io.h"
+#include "storage/buffer/buffer_handle.h"
 
 namespace infinity {
 
@@ -10,7 +11,7 @@ ObjectHandle::ObjectHandle(BufferHandle *buffer_handle) : buffer_handle_(buffer_
 //     buffer_handle_->AddRefCount();
 // }
 
-ObjectHandle::ObjectHandle(ObjectHandle &&other) : buffer_handle_(other.buffer_handle_) { other.buffer_handle_ = nullptr; }
+ObjectHandle::ObjectHandle(ObjectHandle &&other) noexcept : buffer_handle_(other.buffer_handle_) { other.buffer_handle_ = nullptr; }
 
 // ObjectHandle& ObjectHandle::operator=(const ObjectHandle &other) {
 //     if (buffer_handle_) {
@@ -24,7 +25,7 @@ ObjectHandle::ObjectHandle(ObjectHandle &&other) : buffer_handle_(other.buffer_h
 //     return *this;
 // }
 
-ObjectHandle &ObjectHandle::operator=(ObjectHandle &&other) {
+ObjectHandle &ObjectHandle::operator=(ObjectHandle &&other) noexcept {
     if (buffer_handle_) {
         buffer_handle_->UnloadData();
     }
@@ -35,8 +36,7 @@ ObjectHandle &ObjectHandle::operator=(ObjectHandle &&other) {
     return *this;
 }
 
-ObjectHandle::~ObjectHandle() {
-}
+ObjectHandle::~ObjectHandle() {}
 
 SharedPtr<String> ObjectHandle::GetDir() const {
     return buffer_handle_->current_dir_; // TODO shenyushi: check if shared_ptr is needed here
@@ -47,7 +47,7 @@ SharedPtr<String> ObjectHandle::GetDir() const {
 CommonObjectHandle::CommonObjectHandle(BufferHandle *buffer_handle) : ObjectHandle(buffer_handle) {}
 
 CommonObjectHandle::~CommonObjectHandle() {
-    if(ptr_ != nullptr && buffer_handle_ != nullptr) {
+    if (ptr_ != nullptr && buffer_handle_ != nullptr) {
         buffer_handle_->UnloadData();
     }
 }

@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include <utility>
-
 #include "planner/logical_node.h"
+#include "parser/statement/extra/extra_ddl_info.h"
+#include "common/types/logical_type.h"
 
 namespace infinity {
 
@@ -25,21 +25,13 @@ public:
         : LogicalNode(node_id, LogicalNodeType::kCreateCollection), schema_name_(std::move(schema_name)),
           collection_name_(std::move(collection_name_)), table_index_(table_index), conflict_type_(conflict_type) {}
 
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const final { return {}; }
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final {
-        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-        result->emplace_back("OK");
-        return result;
-    }
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final {
-        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        return result_type;
-    }
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
 
-    String ToString(i64 &space) final;
+    String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalCreateCollection"; }
 

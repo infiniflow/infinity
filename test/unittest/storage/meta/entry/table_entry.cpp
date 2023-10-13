@@ -3,14 +3,11 @@
 //
 
 #include "base_test.h"
+#include "storage/meta/meta_state.h"
+#include "storage/data_block.h"
+#include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
-#include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
-#include "storage/buffer/column_buffer.h"
 #include "storage/table_def.h"
-#include "storage/txn/txn_manager.h"
-#include <gtest/gtest.h>
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

@@ -4,13 +4,15 @@
 
 #pragma once
 
-#include "logical_node.h"
-#include "optimizer_rule.h"
-#include <memory>
-#include <vector>
+//#include "logical_node.h"
+//#include "optimizer_rule.h"
+#include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/containers.h"
 
 namespace infinity {
 
+class OptimizerRule;
+class LogicalNode;
 class QueryContext;
 
 class Optimizer {

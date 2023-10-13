@@ -3,12 +3,8 @@
 //
 
 #include "base_test.h"
-#include "parser/parser_result.h"
-#include "parser/sql_parser.h"
-
 #include "main/infinity.h"
-#include "main/logger.h"
-#include <gtest/gtest.h>
+#include "parser/sql_parser.h"
 
 class StatementParsingTest : public BaseTest {
     void SetUp() override {

@@ -2,7 +2,14 @@
 // Created by JinHai on 2022/9/14.
 //
 
-#include "seq_scan.h"
+#include "function/table/seq_scan.h"
+
+#include "storage/storage.h"
+#include "storage/data_block.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "common/column_vector/column_vector.h"
+
+#include "main/query_context.h"
 
 namespace infinity {
 

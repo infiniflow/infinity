@@ -10,6 +10,8 @@
 
 namespace infinity {
 
+class ColumnExpression;
+
 class SubqueryExpression : public BaseExpression {
 public:
     explicit SubqueryExpression(SharedPtr<BoundSelectStatement> select_node, SubqueryType subquery_type);

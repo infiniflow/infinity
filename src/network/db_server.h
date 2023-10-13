@@ -6,11 +6,14 @@
 
 #include "common/singleton.h"
 #include "common/types/alias/concurrency.h"
-#include "connection.h"
+#include "common/types/alias/strings.h"
+#include "common/types/alias/smart_ptr.h"
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
 namespace infinity {
+
+class Connection;
 
 struct StartupParameter {
     SharedPtr<String> config_path{};

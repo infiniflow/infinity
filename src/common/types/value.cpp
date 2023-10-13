@@ -3,12 +3,9 @@
 //
 
 #include "value.h"
+#include "common/column_vector/column_vector.h"
 #include "common/types/info/embedding_info.h"
-#include "common/utility/infinity_assert.h"
 #include "function/cast/cast_function.h"
-#include "main/stats/global_resource_usage.h"
-
-#include <utility>
 
 namespace infinity {
 

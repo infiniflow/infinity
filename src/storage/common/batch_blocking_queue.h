@@ -4,12 +4,16 @@
 
 #pragma once
 
-#include "async_task.h"
-#include "blockingconcurrentqueue.h"
+//#include "storage/common/async_task.h"
 #include "common/types/alias/containers.h"
 #include "common/types/alias/primitives.h"
+#include "common/types/alias/smart_ptr.h"
+#include "blockingconcurrentqueue.h"
+#include <condition_variable>
 
 namespace infinity {
+
+class AsyncTask;
 
 class BatchBlockingQueue {
 public:

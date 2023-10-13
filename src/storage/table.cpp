@@ -2,7 +2,9 @@
 // Created by JinHai on 2022/7/29.
 //
 
-#include "table.h"
+#include "storage/table.h"
+#include "storage/data_block.h"
+#include "storage/table_def.h"
 
 namespace infinity {
 
@@ -65,5 +67,38 @@ void Table::UnionWith(const SharedPtr<Table> &other) {
 
     this->definition_ptr_->UnionWith(other->definition_ptr_);
 }
+
+void Table::Append(const SharedPtr<DataBlock> &data_block) {
+    data_blocks_.emplace_back(data_block);
+    UpdateRowCount(data_block->row_count());
+}
+
+SharedPtr<Table> Table::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<Table>(std::move(table_def_ptr), type); }
+
+SharedPtr<Table> Table::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
+    SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
+    return Make(result_table_def_ptr, TableType::kResult);
+}
+
+SharedPtr<Table> Table::MakeEmptyResultTable() {
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
+    return Make(result_table_def_ptr, TableType::kResult);
+}
+
+Table::Table(SharedPtr<TableDef> table_def_ptr, TableType type)
+    : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
+      definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
+
+SizeT Table::ColumnCount() const { return definition_ptr_->column_count(); }
+
+SharedPtr<String> Table::TableName() const { return definition_ptr_->table_name(); }
+
+const SharedPtr<String> &Table::SchemaName() const { return definition_ptr_->schema_name(); }
+
+SizeT Table::GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
+
+String &Table::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
+
+SharedPtr<DataType> Table::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
 
 } // namespace infinity

@@ -1,15 +1,10 @@
-#include <gtest/gtest.h>
 
 #include "base_test.h"
 #include "common/memory/memory_pool.h"
-#include "main/infinity.h"
-#include "main/logger.h"
 #include "storage/invertedindex/format/buffered_byte_slice.h"
-#include "storage/invertedindex/format/buffered_byte_slice_reader.h"
 #include "storage/invertedindex/format/doc_list_encoder.h"
 #include "storage/invertedindex/format/doc_list_format_option.h"
 #include "storage/invertedindex/format/inmem_doc_list_decoder.h"
-#include <iostream>
 
 namespace infinity {
 

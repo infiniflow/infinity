@@ -6,14 +6,16 @@
 
 #include "executor/physical_operator.h"
 #include "storage/common/global_block_id.h"
-
-#include <memory>
+#include "parser/statement/select_statement.h"
 
 namespace infinity {
 
 class BaseTableRef;
-
 class BaseExpression;
+class TableCollectionEntry;
+class BlockIndex;
+class KnnScanInputState;
+class KnnScanOutputState;
 
 class PhysicalKnnScan final : public PhysicalOperator {
 public:

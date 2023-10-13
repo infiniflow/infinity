@@ -2,9 +2,9 @@
 // Created by jinhai on 23-1-12.
 //
 
-#include "function/scalar_function.h"
+#include "function/scalar/not.h"
+#include "storage/meta/catalog.h"
 #include "function/scalar_function_set.h"
-#include "less.h"
 
 namespace infinity {
 
