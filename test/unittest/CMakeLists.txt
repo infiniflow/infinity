@@ -70,6 +70,8 @@ add_executable(test_main
         ${third_party_src}
 )
 
+target_precompile_headers(test_main REUSE_FROM infinity_parser)
+
 target_link_libraries(test_main
         gtest
         gtest_main
