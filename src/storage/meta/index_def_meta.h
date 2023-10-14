@@ -4,15 +4,14 @@
 #include "common/types/alias/containers.h"
 #include "common/types/alias/primitives.h"
 #include "common/types/alias/smart_ptr.h"
-#include "storage/meta/definition/index_def/index_def.h"
+#include "json.hpp"
 #include "storage/meta/entry/base_entry.h"
 
 namespace infinity {
 
 class TxnManager;
-
+class IndexDef;
 class TableCollectionEntry;
-
 class BufferManager;
 
 class IndexDefMeta {

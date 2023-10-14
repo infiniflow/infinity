@@ -2,8 +2,7 @@
 
 #include "common/utility/infinity_assert.h"
 #include "common/utility/serializable.h"
-#include "storage/meta/definition/index_def/ivfflat_index_def.h"
-#include "storage/storage.h"
+#include "ivfflat_index_def.h"
 
 #include <cstdint>
 #include <memory>

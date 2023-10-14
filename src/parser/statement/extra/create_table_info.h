@@ -12,9 +12,9 @@
 #include "common/types/info/embedding_info.h"
 #include "common/types/info/varchar_info.h"
 #include "extra_ddl_info.h"
+#include "parser/definition/column_def.h"
 #include "parser/statement/select_statement.h"
 #include "parser/statement/statement_common.h"
-#include "storage/meta/definition/column_def.h"
 
 namespace infinity {
 

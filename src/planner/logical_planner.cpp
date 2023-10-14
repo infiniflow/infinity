@@ -9,6 +9,7 @@
 
 #include "expression/cast_expression.h"
 #include "function/cast/cast_function.h"
+#include "parser/definition/ivfflat_index_def.h"
 #include "planner/binder/insert_binder.h"
 #include "planner/explain_logical_plan.h"
 #include "planner/node/logical_create_collection.h"
@@ -30,7 +31,6 @@
 #include "query_binder.h"
 #include "src/parser/statement.h"
 #include "storage/io/local_file_system.h"
-#include "storage/meta/definition/index_def/ivfflat_index_def.h"
 
 namespace infinity {
 

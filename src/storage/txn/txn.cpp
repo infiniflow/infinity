@@ -3,9 +3,9 @@
 //
 
 #include "txn.h"
+#include "parser/definition/table_def.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
-#include "storage/meta/definition/table_def.h"
 #include "storage/meta/entry/index_def_entry.h"
 #include "storage/meta/entry/index_entry.h"
 #include "storage/meta/entry/segment_entry.h"

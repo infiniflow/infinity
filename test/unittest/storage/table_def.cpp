@@ -2,7 +2,7 @@
 // Created by jinhai on 22-12-25.
 //
 
-#include "storage/meta/definition/table_def.h"
+#include "parser/definition/table_def.h"
 #include "base_test.h"
 #include "main/infinity.h"
 

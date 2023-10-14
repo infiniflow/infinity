@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "common/types/complex/row_id.h"
 #include "storage/base_table.h"
 
