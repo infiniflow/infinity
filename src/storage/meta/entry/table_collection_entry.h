@@ -99,6 +99,8 @@ public:
     static UniquePtr<TableCollectionEntry>
     Deserialize(const nlohmann::json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
 
+    virtual void MergeFrom(BaseEntry &other);
+
 public:
     u64 GetColumnIdByName(const String &column_name);
 

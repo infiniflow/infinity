@@ -24,16 +24,13 @@ class SegmentEntry;
 class DataBlock;
 
 struct BlockVersion {
-    BlockVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
-        for (SizeT i = 0; i < capacity; ++i) {
-            created_[i] = 0;
-            deleted_[i] = 0;
-            txn_ptr_[i] = nullptr;
-        }
-    }
-    Vector<TxnTimeStamp> created_{};
+    BlockVersion(SizeT capacity) : deleted_(capacity) {}
+    int32_t GetRowCount(TxnTimeStamp begin_ts);
+    void LoadFromFile(const String &version_path);
+    void SaveToFile(const String &version_path);
+
+    Vector<std::pair<TxnTimeStamp, int32_t>> created_{};
     Vector<TxnTimeStamp> deleted_{};
-    Vector<Txn*> txn_ptr_{};
 };
 
 struct BlockEntry : public BaseEntry {
@@ -58,11 +55,10 @@ public:
     TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
     TxnTimeStamp checkpoint_ts_{0};
 
-    Txn* txn_ptr_{nullptr};
+    Txn *txn_ptr_{nullptr};
 
     // checkpoint state
     i16 checkpoint_row_count_{0};
-    std::string checkpoint_dir_{};
 
 public:
     static int AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows);
@@ -82,6 +78,8 @@ public:
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
     static int Room(BlockEntry *block_entry);
+
+    void MergeFrom(BaseEntry &other) override;
 
 private:
     static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);

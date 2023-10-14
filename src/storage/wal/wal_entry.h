@@ -194,7 +194,8 @@ struct WalCmdDelete : public WalCmd {
 };
 
 struct WalCmdCheckpoint : public WalCmd {
-    WalCmdCheckpoint(int64_t max_commit_ts_, String catalog_path) : max_commit_ts_(max_commit_ts_), catalog_path_(catalog_path) {}
+    WalCmdCheckpoint(int64_t max_commit_ts, bool is_full_checkpoint, String catalog_path)
+        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path) {}
     virtual WalCommandType GetType() { return WalCommandType::CHECKPOINT; }
 
     virtual bool operator==(const WalCmd &other) const;
@@ -204,6 +205,7 @@ struct WalCmdCheckpoint : public WalCmd {
     virtual void WriteAdv(char *&buf) const;
 
     int64_t max_commit_ts_;
+    bool is_full_checkpoint_;
     String catalog_path_;
 };
 

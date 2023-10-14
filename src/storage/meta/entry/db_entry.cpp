@@ -210,4 +210,20 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     return res;
 }
 
+void DBEntry::MergeFrom(BaseEntry &other) {
+    auto db_entry2 = dynamic_cast<DBEntry *>(&other);
+    StorageAssert(db_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
+    // No locking here since only the load stage needs MergeFrom.
+    StorageAssert(*this->db_name_ == *db_entry2->db_name_, "DBEntry::MergeFrom requires db_name_ match");
+    StorageAssert(*this->db_entry_dir_ == *db_entry2->db_entry_dir_, "DBEntry::MergeFrom requires db_entry_dir_ match");
+    for (auto &[table_name, table_meta2] : db_entry2->tables_) {
+        auto it = this->tables_.find(table_name);
+        if (it == this->tables_.end()) {
+            this->tables_.emplace(table_name, std::move(table_meta2));
+        } else {
+            it->second->MergeFrom(*table_meta2.get());
+        }
+    }
+}
+
 } // namespace infinity
