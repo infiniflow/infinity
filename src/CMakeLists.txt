@@ -102,7 +102,12 @@ add_library(infinity_parser STATIC
         ${parser_src}
         ${BISON_PARSER_OUTPUTS}
         ${FLEX_LEXER_OUTPUTS})
-
+target_precompile_headers(infinity_parser
+        PRIVATE
+        common/types/alias/strings.h
+        common/types/alias/primitives.h
+        common/types/alias/containers.h
+        common/types/alias/concurrency.h)
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(infinity_parser PUBLIC "/usr/local/include")
 #target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tlsf")
@@ -130,6 +135,7 @@ set(INFINITY_CORE_SOURCE
 
 add_library(infinity_core STATIC ${INFINITY_CORE_SOURCE})
 target_link_libraries(infinity_core PRIVATE onnxruntime_mlas)
+target_precompile_headers(infinity_core REUSE_FROM infinity_parser)
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 #find_package(BLAS REQUIRED)
@@ -160,6 +166,7 @@ add_executable(infinity_main
 )
 target_include_directories(infinity_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
 #set_property(TARGET infinity_main PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
+target_precompile_headers(infinity_main REUSE_FROM infinity_parser)
 
 target_link_libraries(
         infinity_main
