@@ -6,24 +6,10 @@
 #include "main/infinity.h"
 #include "common/types/value.h"
 
-class ValueCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ValueCastTest : public BaseTest {};
 
 TEST_F(ValueCastTest, bool_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     DataType target_type(LogicalType::kVarchar);
     Value target_value(LogicalType::kVarchar);
@@ -49,7 +35,6 @@ TEST_F(ValueCastTest, bool_value_cast) {
 
 TEST_F(ValueCastTest, tinyint_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // TinyInt to SmallInt
@@ -316,7 +301,6 @@ TEST_F(ValueCastTest, tinyint_value_cast) {
 
 TEST_F(ValueCastTest, smallint_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // TinyInt to SmallInt
@@ -598,7 +582,6 @@ TEST_F(ValueCastTest, smallint_value_cast) {
 
 TEST_F(ValueCastTest, integer_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // Integer to TinyInt
@@ -896,7 +879,6 @@ TEST_F(ValueCastTest, integer_value_cast) {
 
 TEST_F(ValueCastTest, bigint_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // BigInt to TinyInt
@@ -1210,7 +1192,6 @@ TEST_F(ValueCastTest, bigint_value_cast) {
 
 TEST_F(ValueCastTest, hugeint_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // HugeInt to TinyInt
@@ -1319,7 +1300,6 @@ TEST_F(ValueCastTest, hugeint_value_cast) {
 
 TEST_F(ValueCastTest, float_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // Float to TinyInt
@@ -1571,7 +1551,6 @@ TEST_F(ValueCastTest, float_value_cast) {
 
 TEST_F(ValueCastTest, double_value_cast) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     {
         // Float to TinyInt

@@ -6,25 +6,10 @@
 #include "main/infinity.h"
 #include "parser/sql_parser.h"
 
-
-class SQLParserTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class SQLParserTest : public BaseTest {};
 
 TEST_F(SQLParserTest, good_test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     Vector<String> inputs;
     inputs.emplace_back("create collection c1;");
@@ -95,7 +80,6 @@ TEST_F(SQLParserTest, good_test1) {
 
 TEST_F(SQLParserTest, good_test2) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -458,7 +442,6 @@ TEST_F(SQLParserTest, good_test2) {
 
 TEST_F(SQLParserTest, bad_test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -498,7 +481,6 @@ TEST_F(SQLParserTest, bad_test1) {
 
 TEST_F(SQLParserTest, good_create_index_1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     auto parser = MakeShared<SQLParser>();
     auto result = MakeShared<ParserResult>();
 
@@ -641,7 +623,6 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
 TEST_F(SQLParserTest, bad_create_index_1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 

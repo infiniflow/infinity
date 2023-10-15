@@ -4,6 +4,7 @@
 
 #include "sql_runner.h"
 #include "planner/bind_context.h"
+#include <iostream>
 
 namespace infinity {
 
@@ -15,7 +16,7 @@ namespace infinity {
  */
 SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
     if (print) {
-        LOG_TRACE("{}", sql_text);
+        std::cout << sql_text << std::endl;
     }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();

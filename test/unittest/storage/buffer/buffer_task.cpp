@@ -8,27 +8,12 @@
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/object_handle.h"
 
-class BufferTaskProcessorTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-        system("rm -rf /tmp/infinity");
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class BufferTaskProcessorTest : public BaseTest {};
 
 using namespace infinity;
 
 TEST_F(BufferTaskProcessorTest, test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
     SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");

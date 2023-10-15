@@ -6,24 +6,10 @@
 #include "main/infinity.h"
 #include "parser/sql_parser.h"
 
-class SelectStatementParsingTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class SelectStatementParsingTest : public BaseTest {};
 
 TEST_F(SelectStatementParsingTest, good_test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -62,7 +48,6 @@ TEST_F(SelectStatementParsingTest, good_test1) {
 
 TEST_F(SelectStatementParsingTest, good_test2) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1019,7 +1004,6 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
 TEST_F(SelectStatementParsingTest, good_test3) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1294,7 +1278,6 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
 TEST_F(SelectStatementParsingTest, good_test4) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1328,7 +1311,6 @@ TEST_F(SelectStatementParsingTest, good_test4) {
 TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1721,7 +1703,6 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 

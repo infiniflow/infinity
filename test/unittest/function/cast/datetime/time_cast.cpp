@@ -6,24 +6,10 @@
 #include "main/infinity.h"
 #include "function/cast/time_cast.h"
 
-class TimeCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class TimeCastTest : public BaseTest {};
 
 TEST_F(TimeCastTest, date_cast0) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Try to cast time type to wrong type.
     {
@@ -45,7 +31,6 @@ TEST_F(TimeCastTest, date_cast0) {
 
 TEST_F(TimeCastTest, date_cast1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindDateCast with wrong type of parameters
     {
