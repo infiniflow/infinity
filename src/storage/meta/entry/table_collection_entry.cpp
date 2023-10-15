@@ -3,8 +3,8 @@
 //
 
 #include "storage/meta/entry/table_collection_entry.h"
+#include "parser/definition/index_def.h"
 #include "storage/common/block_index.h"
-#include "storage/definition/index_def/index_def.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/index_def_meta.h"
 #include "storage/meta/table_collection_meta.h"

@@ -110,9 +110,9 @@ struct WalCmdCreateIndex : public WalCmd {
 
     virtual void WriteAdv(char *&buf) const override;
 
-    String db_name_;
-    String table_name_;
-    SharedPtr<IndexDef> index_def_;
+    String db_name_{};
+    String table_name_{};
+    SharedPtr<IndexDef> index_def_{};
 };
 
 struct WalCmdDropTable : public WalCmd {

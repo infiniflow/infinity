@@ -1,5 +1,4 @@
 #include "index_entry.h"
-
 #include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/object_handle.h"
 #include "storage/meta/entry/segment_entry.h"

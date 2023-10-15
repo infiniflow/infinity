@@ -2,10 +2,11 @@
 // Created by jinhai on 23-7-10.
 //
 
+#include "storage/buffer/buffer_manager.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "storage/buffer/buffer_manager.h"
 #include "storage/buffer/buffer_task.h"
+#include "storage/buffer/object_handle.h"
 
 class BufferMgrTest : public BaseTest {
     void SetUp() override;

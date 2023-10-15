@@ -9,8 +9,8 @@
 namespace infinity {
 
 class BufferManager;
-
 class SegmentEntry;
+class FaissIndexPtr;
 
 class IndexEntry : BaseEntry {
 private:

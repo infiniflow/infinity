@@ -1,5 +1,6 @@
 #include "storage/buffer/object_handle.h"
 #include "storage/buffer/buffer_handle.h"
+#include "storage/buffer/faiss_index_ptr.h"
 
 namespace infinity {
 
@@ -44,7 +45,7 @@ SharedPtr<String> ObjectHandle::GetDir() const { return buffer_handle_->current_
 
 faiss::Index *ObjectHandle::GetIndex() { return static_cast<faiss::Index *>(GetRaw()); }
 
-void ObjectHandle::WriteFaissIndex(faiss::Index *index) {
+void ObjectHandle::WriteFaissIndex(FaissIndexPtr *index) {
     buffer_handle_->data_ = static_cast<void *>(index);
     ptr_ = static_cast<void *>(index);
 }

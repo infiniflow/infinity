@@ -3,8 +3,8 @@
 //
 
 #include "physical_flush.h"
+#include "parser/definition/table_def.h"
 #include "storage/table.h"
-#include "storage/table_def.h"
 
 #include "executor/operator_state.h"
 #include "main/query_context.h"

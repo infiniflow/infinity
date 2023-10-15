@@ -3,9 +3,9 @@
 //
 #include "base_test.h"
 #include "main/infinity.h"
-#include "test_helper/sql_runner.h"
+#include "parser/definition/table_def.h"
 #include "storage/table.h"
-#include "storage/table_def.h"
+#include "test_helper/sql_runner.h"
 
 class FragmentTest : public BaseTest {
     void SetUp() override {

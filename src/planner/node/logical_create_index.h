@@ -10,20 +10,11 @@ class IndexDef;
 
 class LogicalCreateIndex : public LogicalNode {
 public:
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const override { return {}; };
+    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const override;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const override {
-        SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
-        result->emplace_back("OK");
-        return result;
-    }
+    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const override;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override {
-        SharedPtr<Vector<SharedPtr<DataType>>> result_type = MakeShared<Vector<SharedPtr<DataType>>>();
-        result_type->emplace_back(MakeShared<DataType>(LogicalType::kInteger));
-        return result_type;
-    }
-
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
     String ToString(i64 &space) const final; // TTT shenyushi: should be const
 
     inline String name() override { return "LogicalCreateIndex"; }

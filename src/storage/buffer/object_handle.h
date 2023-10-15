@@ -11,6 +11,7 @@ class Index;
 namespace infinity {
 
 class BufferHandle;
+class FaissIndexPtr;
 
 class ObjectHandle {
 protected:
@@ -38,7 +39,7 @@ public:
 
     [[nodiscard]] inline faiss::Index *GetIndex();
 
-    void WriteFaissIndex(faiss::Index *index);
+    void WriteFaissIndex(FaissIndexPtr *index);
 
 private:
     [[nodiscard]] void *GetRaw();

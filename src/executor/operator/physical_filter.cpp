@@ -5,10 +5,10 @@
 #include "physical_filter.h"
 #include "executor/expression/expression_state.h"
 #include "executor/operator_state.h"
-#include "storage/table.h"
-#include "storage/table_def.h"
-#include "storage/data_block.h"
+#include "parser/definition/table_def.h"
 #include "parser/statement/extra/create_table_info.h"
+#include "storage/data_block.h"
+#include "storage/table.h"
 
 namespace infinity {
 

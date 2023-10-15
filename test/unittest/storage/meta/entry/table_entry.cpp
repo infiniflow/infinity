@@ -6,7 +6,10 @@
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
 #include "parser/definition/table_def.h"
+#include "storage/buffer/column_buffer.h"
 #include "storage/data_block.h"
+#include "storage/meta/entry/block_column_entry.h"
+#include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/meta_state.h"
 
 class TableEntryTest : public BaseTest {

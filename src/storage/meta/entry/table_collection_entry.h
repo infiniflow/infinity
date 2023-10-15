@@ -8,6 +8,7 @@
 #include "json.hpp"
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/meta/entry/table_collecton_type.h"
+#include "storage/meta/index_def_meta.h"
 
 namespace infinity {
 
@@ -26,7 +27,6 @@ class SegmentEntry;
 class IndexEntry;
 class IndexDef;
 class AppendState;
-class IndexDefMeta;
 
 struct TableCollectionEntry : public BaseEntry {
 public:

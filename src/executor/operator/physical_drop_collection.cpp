@@ -3,11 +3,11 @@
 //
 
 #include "executor/operator/physical_drop_collection.h"
-#include "storage/txn/txn.h"
-#include "main/query_context.h"
 #include "executor/operator_state.h"
-#include "storage/table_def.h"
+#include "main/query_context.h"
+#include "parser/definition/table_def.h"
 #include "storage/table.h"
+#include "storage/txn/txn.h"
 
 namespace infinity {
 

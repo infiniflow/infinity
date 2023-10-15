@@ -5,6 +5,7 @@
 #include "storage/meta/entry/block_column_entry.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/varchar_layout.h"
+#include "parser/definition/column_def.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/entry/block_entry.h"
 #include "storage/meta/entry/segment_column_entry.h"
@@ -18,7 +19,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const Bloc
 
     block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
 
-    block_column_entry->column_type_ = block_entry->segment_entry_->table_entry_->columns_[column_id]->type();
+    auto &column_def = *block_entry->segment_entry_->table_entry_->columns_[column_id];
+    block_column_entry->column_type_ = column_def.type();
     DataType *column_type = block_column_entry->column_type_.get();
 
     SizeT row_capacity = block_entry->row_capacity_;

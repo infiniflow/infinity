@@ -196,7 +196,7 @@ void *BufferHandle::LoadData() {
                         try {
                             faiss::Index *index = faiss::read_index(file_path().c_str());
                             res = reinterpret_cast<ptr_t>(index);
-                        } catch (faiss::FaissException xcp) {
+                        } catch (faiss::FaissException &xcp) {
                             LOG_ERROR(xcp.msg);
                             return nullptr;
                         }

@@ -4,9 +4,20 @@
 
 #include "explain_logical_plan.h"
 
+#include "expression/aggregate_expression.h"
+#include "expression/between_expression.h"
+#include "expression/case_expression.h"
+#include "expression/cast_expression.h"
+#include "expression/column_expression.h"
+#include "expression/function_expression.h"
+#include "expression/in_expression.h"
+#include "expression/knn_expression.h"
+#include "expression/reference_expression.h"
+#include "expression/value_expression.h"
 #include "logical_node.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_create_collection.h"
+#include "planner/node/logical_create_index.h"
 #include "planner/node/logical_create_schema.h"
 #include "planner/node/logical_create_table.h"
 #include "planner/node/logical_create_view.h"
@@ -27,17 +38,6 @@
 #include "planner/node/logical_show.h"
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_table_scan.h"
-
-#include "expression/column_expression.h"
-#include "expression/aggregate_expression.h"
-#include "expression/between_expression.h"
-#include "expression/case_expression.h"
-#include "expression/cast_expression.h"
-#include "expression/function_expression.h"
-#include "expression/in_expression.h"
-#include "expression/knn_expression.h"
-#include "expression/reference_expression.h"
-#include "expression/value_expression.h"
 #include "storage/meta/entry/db_entry.h"
 
 namespace infinity {
