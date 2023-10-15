@@ -14,6 +14,7 @@ module;
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <exception>
 
 export module stl;
 
@@ -207,6 +208,10 @@ inline UniquePtr<T> MakeUnique(Args &&...args) {
 // DB Type
 
 using ColumnID = u32;
+
+// Exception
+
+using Exception = std::exception;
 
 }
 

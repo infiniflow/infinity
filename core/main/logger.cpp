@@ -2,61 +2,57 @@
 // Created by jinhai on 23-10-15.
 //
 
-
 module;
 
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/spdlog.h"
-
-#include <memory>
+// #include "spdlog/sinks/stdout_color_sinks.h"
+// #include "spdlog/sinks/rotating_file_sink.h"
+// #include "spdlog/spdlog.h"
+//
+// #include <memory>
 
 module logger;
 
-//import stl;
-//import config;
-//import third_party;
+import stl;
+import config;
+import third_party;
 
 namespace infinity {
 
-static std::shared_ptr<spdlog::sinks::stdout_color_sink_mt> stdout_sinker = nullptr;
-static std::shared_ptr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nullptr;
+static SharedPtr<spd_stdout_color_sink> stdout_sinker = nullptr;
+static SharedPtr<spd_rotating_file_sink> rotating_file_sinker = nullptr;
 
-std::shared_ptr<spdlog::logger> infinity_logger = nullptr;
+SharedPtr<spd_logger> infinity_logger = nullptr;
 
 void Logger::Initialize(const Config *config_ptr) {
-#if 0
     try {
-        if (stdout_sinker == nullptr) {
-            stdout_sinker = std::make_shared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
+        if (stdout_sinker.get() == nullptr) {
+            stdout_sinker = MakeShared<spd_stdout_color_sink>(); // NOLINT
         }
 
-        size_t log_max_size = config_ptr->log_max_size();
-        size_t log_file_rotate_count = config_ptr->log_file_rotate_count();
+        SizeT log_max_size = config_ptr->log_max_size();
+        SizeT log_file_rotate_count = config_ptr->log_file_rotate_count();
 
-        if (rotating_file_sinker == nullptr) {
-            rotating_file_sinker = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(*config_ptr->log_file_path(),
-                                                                                    log_max_size,
-                                                                                    log_file_rotate_count); // NOLINT
+        if (rotating_file_sinker.get() == nullptr) {
+            rotating_file_sinker = MakeShared<spd_rotating_file_sink>(*config_ptr->log_file_path(), log_max_size,
+                                                                      log_file_rotate_count); // NOLINT
         }
 
-        std::vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
+        Vector<spd_sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
 
-        infinity_logger = std::make_shared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
-        spdlog::register_logger(infinity_logger);
+        infinity_logger = MakeShared<spd_logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+        RegisterLogger(infinity_logger);
 
-        spdlog::set_level(config_ptr->log_level());
+        SetLogLevel(config_ptr->log_level());
 
-    } catch (const std::exception &e) {
-//        Printf("Initialize logger failed: {}", e.what());
+    } catch (const Exception &e) {
+        Printf("Initialize logger failed: {}", e.what());
         throw e;
     }
-#endif
 }
 
 void Logger::Shutdown() {
-    if (stdout_sinker != nullptr && rotating_file_sinker != nullptr) {
-        spdlog::shutdown();
+    if (stdout_sinker.get() != nullptr && rotating_file_sinker.get() != nullptr) {
+        ShutdownLogger();
         stdout_sinker = nullptr;
         rotating_file_sinker = nullptr;
     }

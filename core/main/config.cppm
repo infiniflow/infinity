@@ -14,8 +14,6 @@ import third_party;
 
 namespace infinity {
 
-enum class LogLevel { kTrace, kInfo, kWarning, kError, kFatal };
-
 export struct Options {
     // General
     String version{};
