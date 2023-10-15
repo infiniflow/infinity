@@ -17,10 +17,10 @@ Infinity::Init(const SharedPtr <String>& config_path) {
         return;
     } else {
         // Config
-//        config_ = MakeUnique<Config>();
-//        config_->Init(config_path);
-//
-//        Logger::Initialize(config_.get());
+        config_ = MakeUnique<Config>();
+        config_->Init(config_path);
+
+        Logger::Initialize(config_.get());
 //
 //        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
 //

@@ -61,7 +61,7 @@ export struct Options {
 
 export struct Config {
 public:
-    SharedPtr<String> Init(SharedPtr<String> &config_path);
+    SharedPtr<String> Init(const SharedPtr<String> &config_path);
 
     void PrintAll() const;
 

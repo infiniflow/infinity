@@ -15,6 +15,7 @@ module;
 #include <unordered_map>
 #include <unordered_set>
 #include <exception>
+#include <charconv>
 
 export module stl;
 
@@ -51,6 +52,31 @@ using HashSet = std::unordered_set<S>;
 // String
 
 using String = std::basic_string<char>;
+
+inline bool IsEqual(const String& s1, const String& s2) {
+    return s1 == s2;
+}
+
+inline bool IsEqual(const String& s1, const char* s2) {
+    return s1 == s2;
+}
+
+void ToUpper(String& str) {
+    std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+}
+
+void ToLower(String& str) {
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+}
+
+const char* FromChars(const char* first, const char* last, unsigned long& value) {
+    auto res = std::from_chars(first, last, value);
+    if(res.ec == std::errc()) {
+        return res.ptr;
+    } else {
+        return nullptr;
+    }
+}
 
 // ToString()
 
@@ -143,6 +169,12 @@ inline String ToString(long double __val) {
 }
 #endif // _GLIBCXX_USE_C99_STDIO
 
+// stoi
+inline int
+StrToInt(const std::string& str, size_t* idx = 0, int base = 10) {
+    return std::stoi(str, idx, base);
+}
+
 // Primitives
 
 using i8 = int8_t;
@@ -211,7 +243,7 @@ using ColumnID = u32;
 
 // Exception
 
-using Exception = std::exception;
+using StlException = std::exception;
 
 }
 

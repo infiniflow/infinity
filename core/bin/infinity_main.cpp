@@ -45,7 +45,7 @@ auto main(int argc, char **argv) -> int {
            "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
            "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
-    Printf("Infinity, version: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}",
+    Printf("Infinity, version: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
            version_major(),
            version_minor(),
            version_patch(),
@@ -58,7 +58,7 @@ auto main(int argc, char **argv) -> int {
     ParseArguments(argc, argv, parameters);
 
     infinity::DBServer db_server(parameters);
-//    db_server.Run();
+    db_server.Run();
 
     return 0;
 }

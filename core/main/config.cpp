@@ -25,16 +25,46 @@ import logger;
 
 namespace infinity {
 
-
 u64 Config::GetAvailableMem() {
     u64 pages = sysconf(_SC_PHYS_PAGES);
     u64 page_size = sysconf(_SC_PAGE_SIZE); // Byte
     return pages * page_size;
 }
 
+void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias) {
+    parsed_time_zone = time_zone_str.substr(0, 3);
+    ToUpper(parsed_time_zone);
+    parsed_time_zone_bias = StrToInt(time_zone_str.substr(3, String::npos));
+}
+
+SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {
+
+    HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
+    if (byte_size_str.empty()) {
+        return MakeShared<String>("No byte size is given");
+        ;
+    }
+
+    u64 factor;
+    const char* ptr = FromChars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
+    if(ptr == nullptr) {
+        return MakeShared<String>("Unrecognized byte size");
+    } else {
+        String unit = ptr;
+        ToLower(unit);
+        auto it = byte_unit.find(unit);
+        if(it != byte_unit.end()) {
+            byte_size = factor * it->second;
+            return nullptr;
+        } else {
+            return MakeShared<String>("Unrecognized byte size");
+        }
+    }
+}
+
 // extern SharedPtr<spdlogger> infinity_logger;
 
-SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
+SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr <String> result;
 
     // Default general config
@@ -141,30 +171,27 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
         }
     } else {
         Printf("Read config from: {}", *config_path);
-//        auto config = TomlParseFile(*config_path);
+        auto config = TomlParseFile(*config_path);
 //        auto config = toml::parse_file(*config_path);
-    }
-}
-#if 0
         // General
         {
             auto general_config = config["general"];
 
             String infinity_version = general_config["version"].value_or("invalid");
-            if (default_version == infinity_version) {
+            if(IsEqual(default_version, infinity_version)) {
                 return MakeShared<String>("Unmatched version in config file.");
             }
             option_.version = infinity_version;
 
             String time_zone_str = general_config["timezone"].value_or("invalid");
-            if (time_zone_str == "invalid") {
+            if(IsEqual(time_zone_str, "invalid")) {
                 result = MakeShared<String>("Timezone isn't given in config file.");
                 return result;
             }
 
             try {
                 ParseTimeZoneStr(time_zone_str, option_.time_zone, option_.time_zone_bias);
-            } catch (...) {
+            } catch(...) {
                 result = MakeShared<String>(Format("Timezone can't be recognized: {}", time_zone_str));
                 return result;
             }
@@ -177,7 +204,7 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
 
             String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
             result = ParseByteSize(total_memory_size_str, option_.total_memory_size);
-            if (result != nullptr) {
+            if (result.get() != nullptr) {
                 return result;
             }
             if (option_.total_memory_size > default_total_memory_size) {
@@ -189,7 +216,7 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
 
             String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
             result = ParseByteSize(query_memory_limit_str, option_.query_memory_limit);
-            if (result != nullptr) {
+            if (result.get() != nullptr) {
                 return result;
             }
             if (option_.query_memory_limit > default_query_memory_limit) {
@@ -221,28 +248,30 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
             auto log_config = config["log"];
             option_.log_filename = MakeShared<String>(log_config["log_filename"].value_or(*default_log_filename));
             option_.log_dir = MakeShared<String>(log_config["log_dir"].value_or(*default_log_dir));
-            option_.log_file_path = MakeShared<String>(*option_.log_dir + '/' + *option_.log_filename);
+
+            String log_file_path = Format("{}/{}", *option_.log_dir, *option_.log_filename);
+            option_.log_file_path = MakeShared<String>(log_file_path);
             option_.log_to_stdout = log_config["log_to_stdout"].value_or(default_log_to_stdout);
 
             String log_max_size_str = log_config["log_max_size"].value_or("1GB");
             result = ParseByteSize(log_max_size_str, option_.log_max_size);
-            if (result != nullptr) {
+            if (result.get() != nullptr) {
                 return result;
             }
 
             option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
 
             String log_level = log_config["log_level"].value_or("invalid");
-            if (log_level == "trace") {
-                option_.log_level = spdlog_level::trace;
-            } else if (log_level == "info") {
-                option_.log_level = spdlog_level::info;
-            } else if (log_level == "warning") {
-                option_.log_level = spdlog_level::warn;
-            } else if (log_level == "error") {
-                option_.log_level = spdlog_level::err;
-            } else if (log_level == "critical") {
-                option_.log_level = spdlog_level::critical;
+            if(IsEqual(log_level, "trace")) {
+                option_.log_level = LogLevel::kTrace;
+            } else if (IsEqual(log_level, "info")) {
+                option_.log_level = LogLevel::kInfo;
+            } else if (IsEqual(log_level, "warning")) {
+                option_.log_level = LogLevel::kWarning;
+            } else if (IsEqual(log_level, "error")) {
+                option_.log_level = LogLevel::kError;
+            } else if (IsEqual(log_level, "critical")) {
+                option_.log_level = LogLevel::kFatal;
             } else {
                 result = MakeShared<String>("Invalid log level in config file");
                 return result;
@@ -262,7 +291,7 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
             auto buffer_config = config["buffer"];
             String buffer_pool_size_str = buffer_config["buffer_pool_size"].value_or("4GB");
             result = ParseByteSize(buffer_pool_size_str, option_.buffer_pool_size);
-            if (result != nullptr) {
+            if (result.get() != nullptr) {
                 return result;
             }
             option_.temp_dir = MakeShared<String>(buffer_config["temp_dir"].value_or("invalid"));
@@ -277,7 +306,7 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
             option_.delta_checkpoint_txn_interval_ = wal_config["delta_checkpoint_txn_interval"].value_or(delta_checkpoint_txn_interval);
             auto wal_file_size_threshold_str = wal_config["wal_file_size_threshold"].value_or("10KB");
             result = ParseByteSize(wal_file_size_threshold_str, option_.wal_size_threshold_);
-            if (result != nullptr) {
+            if (result.get() != nullptr) {
                 return result;
             }
         }
@@ -287,81 +316,46 @@ SharedPtr<String> Config::Init(SharedPtr<String> &config_path) {
 }
 
 void Config::PrintAll() const {
-    if (infinity_logger != nullptr) {
-        infinity::infinity_logger->info("Infinity system parameters: ");
+    Printf("Infinity system parameters: \n");
 
-        // General
-        infinity::infinity_logger->info(" - version: " + option_.version);
-        infinity::infinity_logger->info(" - timezone: " + option_.time_zone + std::to_string(option_.time_zone_bias));
+    // General
+    Printf(" - version: {}\n", option_.version);
+    Printf(" - timezone: {}{}\n", option_.time_zone, option_.time_zone_bias);
 
-        // System
-        infinity::infinity_logger->info(" - total_cpu_number: " + std::to_string(option_.total_cpu_number));
-        infinity::infinity_logger->info(" - total_memory_size: " + std::to_string(option_.total_memory_size));
-        infinity::infinity_logger->info(" - query_cpu_limit: " + std::to_string(option_.query_cpu_limit));
-        infinity::infinity_logger->info(" - query_memory_limit: " + std::to_string(option_.query_memory_limit));
+    // System
+    Printf(" - total_cpu_number: {}\n", option_.total_cpu_number);
+    Printf(" - total_memory_size: {}\n", option_.total_memory_size);
+    Printf(" - query_cpu_limit: {}\n", option_.query_cpu_limit);
+    Printf(" - query_memory_limit: {}\n", option_.query_memory_limit);
 
-        // Network
-        infinity::infinity_logger->info(" - listen address: " + option_.listen_address);
-        infinity::infinity_logger->info(" - postgres port: " + std::to_string(option_.pg_port));
-        infinity::infinity_logger->info(" - http port: " + std::to_string(option_.http_port));
-        infinity::infinity_logger->info(" - sdk port: " + std::to_string(option_.sdk_port));
+    // Network
+    Printf(" - listen address: {}\n", option_.listen_address);
+    Printf(" - postgres port: {}\n", option_.pg_port);
+    Printf(" - http port: {}\n", option_.http_port);
+    Printf(" - sdk port: {}\n", option_.sdk_port);
 
-        // Log
-        infinity::infinity_logger->info(" - log_file_path: " + *option_.log_file_path);
-        infinity::infinity_logger->info(" - log_to_stdout: " + std::to_string(option_.log_to_stdout));
-        infinity::infinity_logger->info(" - log_max_size: " + std::to_string(option_.log_max_size));
-        infinity::infinity_logger->info(" - log_file_rotate_count: " + std::to_string(option_.log_file_rotate_count));
-        infinity::infinity_logger->info(" - log_level: " + String(spdlog::level::to_short_c_str(option_.log_level)));
+    // Log
+    Printf(" - log_file_path: {}\n", option_.log_file_path->c_str());
+    Printf(" - log_to_stdout: {}\n", option_.log_to_stdout);
+    Printf(" - log_max_size: {}\n", option_.log_max_size);
+    Printf(" - log_file_rotate_count: {}\n", option_.log_file_rotate_count);
+    Printf(" - log_level: {}\n", LogLevel2Str(option_.log_level));
 
-        // Storage
-        infinity::infinity_logger->info(" - data_dir: " + *option_.data_dir);
-        infinity::infinity_logger->info(" - wal_dir: " + *option_.wal_dir);
-        infinity::infinity_logger->info(" - default_row_size: " + std::to_string(option_.default_row_size));
+    // Storage
+    Printf(" - data_dir: {}\n", option_.data_dir->c_str());
+    Printf(" - wal_dir: {}\n", option_.wal_dir->c_str());
+    Printf(" - default_row_size: {}\n", option_.default_row_size);
 
-        // Buffer
-        infinity::infinity_logger->info(" - buffer_pool_size: " + std::to_string(option_.buffer_pool_size));
-        infinity::infinity_logger->info(" - temp_dir: " + *option_.temp_dir);
+    // Buffer
+    Printf(" - buffer_pool_size: {}\n", option_.buffer_pool_size);
+    Printf(" - temp_dir: {}\n", option_.temp_dir->c_str());
 
-        // Wal
-        infinity::infinity_logger->info(" - full_checkpoint_time_interval: " + std::to_string(option_.full_checkpoint_time_interval_));
-        infinity::infinity_logger->info(" - full_checkpoint_txn_interval: " + std::to_string(option_.full_checkpoint_txn_interval_));
-        infinity::infinity_logger->info(" - delta_checkpoint_time_interval: " + std::to_string(option_.delta_checkpoint_time_interval_));
-        infinity::infinity_logger->info(" - delta_checkpoint_txn_interval: " + std::to_string(option_.delta_checkpoint_txn_interval_));
-        infinity::infinity_logger->info(" - wal_size_threshold: " + std::to_string(option_.wal_size_threshold_));
-    }
+    // Wal
+    Printf(" - full_checkpoint_time_interval: {}\n", option_.buffer_pool_size);
+    Printf(" - full_checkpoint_txn_interval: {}\n", option_.full_checkpoint_txn_interval_);
+    Printf(" - delta_checkpoint_time_interval: {}\n", option_.delta_checkpoint_time_interval_);
+    Printf(" - delta_checkpoint_txn_interval: {}\n", option_.delta_checkpoint_txn_interval_);
+    Printf(" - wal_size_threshold: {}\n", option_.wal_size_threshold_);
 }
-
-void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, int32_t &parsed_time_zone_bias) {
-    parsed_time_zone = time_zone_str.substr(0, 3);
-    std::transform(parsed_time_zone.begin(), parsed_time_zone.end(), parsed_time_zone.begin(), ::toupper);
-    parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
-}
-
-SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {
-
-    std::unordered_map<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
-    if (byte_size_str.empty()) {
-        return MakeShared<String>("No byte size is given");
-        ;
-    }
-
-    u64 factor;
-    auto [ptr, error_code] = std::from_chars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
-    if (error_code == std::errc()) {
-        String unit = ptr;
-        std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
-        auto it = byte_unit.find(unit);
-        if (it != byte_unit.end()) {
-            byte_size = factor * it->second;
-            return nullptr;
-        } else {
-            return MakeShared<String>("Unrecognized byte size");
-        }
-    } else {
-        return MakeShared<String>("Unrecognized byte size");
-    }
-}
-#endif
-
 
 } // namespace infinity

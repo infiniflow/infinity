@@ -21,11 +21,11 @@ void DBServer::Run() {
     initialized = true;
 
     Infinity::instance().Init(config_path_);
-//    u16 pg_port = Infinity::instance().config()->pg_port();
-//    const String &listen_address_ref = Infinity::instance().config()->listen_address();
-//
-//    boost_error_code error;
-//    asio_ip_addr address = asio_make_address(listen_address_ref, error);
+    u16 pg_port = Infinity::instance().config()->pg_port();
+    const String &listen_address_ref = Infinity::instance().config()->listen_address();
+
+    boost_error_code error;
+    asio_ip_addr address = asio_make_address(listen_address_ref, error);
 //    if (error) {
 //        GeneralError(fmt::format("Not a valid IPv4 address: {}", listen_address_ref));
 //    }
@@ -39,7 +39,7 @@ void DBServer::Run() {
 //        LOG_INFO("Startup database server, at: {} and port: {}", listen_address_ref, pg_port);
 //    }
 //
-//    Infinity::instance().config()->PrintAll();
+    Infinity::instance().config()->PrintAll();
 //
 //    LOG_INFO("Run 'psql -h {} -p {}' to connect to the server.", listen_address_ref, pg_port);
 //

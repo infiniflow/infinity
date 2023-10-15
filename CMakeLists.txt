@@ -68,6 +68,7 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile the unit test
 add_subdirectory(test/unittest)
+#add_subdirectory(core/unit_test)
 
 # Compile benchmark
 add_subdirectory(benchmark)

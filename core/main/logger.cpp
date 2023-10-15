@@ -44,7 +44,7 @@ void Logger::Initialize(const Config *config_ptr) {
 
         SetLogLevel(config_ptr->log_level());
 
-    } catch (const Exception &e) {
+    } catch (const StlException &e) {
         Printf("Initialize logger failed: {}", e.what());
         throw e;
     }

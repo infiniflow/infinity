@@ -18,7 +18,7 @@ export extern std::shared_ptr<spdlog::logger> infinity_logger;
 
 class Config;
 
-class Logger {
+export class Logger {
 public:
     static void
     Initialize(const Config* config_ptr);
