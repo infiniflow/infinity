@@ -10,14 +10,12 @@
 namespace infinity {
 
 class BufferManager;
-
 class Txn;
-
 class TableCollectionEntry;
-
 class IndexDef;
-
+class IndexEntry;
 class AppendState;
+class TxnTableStore;
 
 enum DataSegmentStatus : i8 {
     kSegmentOpen,
@@ -77,9 +75,8 @@ public:
 
     SharedPtr<String> index_dir_{};
 
-    HashMap<u64, SharedPtr<String>> index_name_map_{};
+    HashMap<SharedPtr<String>, SharedPtr<IndexEntry>> index_entry_map_{};
 
-    // TODO shenyushi 3: add index here
 public:
     [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
 
@@ -92,11 +89,23 @@ public:
 
     static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id);
+    static void CreateIndexScalar(SegmentEntry *segment_entry,
+                                  Txn *txn_ptr,
+                                  const IndexDef &index_def,
+                                  u64 column_id,
+                                  BufferManager *buffer_mgr,
+                                  TxnTableStore *txn_store);
 
-    static void CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension);
+    static SharedPtr<IndexEntry> CreateIndexEmbedding(SegmentEntry *segment_entry,
+                                                      const IndexDef &index_def,
+                                                      u64 column_id,
+                                                      int dimension,
+                                                      BufferManager *buffer_mgr,
+                                                      TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
+
+    static void CommitCreateIndexFile(SegmentEntry *segment_entry, Txn *txn_ptr, SharedPtr<IndexEntry> index_entry);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
 
@@ -121,8 +130,6 @@ public:
 
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);
-
-    static SharedPtr<String> DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id);
 };
 
 } // namespace infinity

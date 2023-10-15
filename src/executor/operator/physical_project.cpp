@@ -3,10 +3,10 @@
 //
 
 #include "physical_project.h"
-#include "storage/table.h"
-#include "storage/table_def.h"
-#include "storage/data_block.h"
+#include "parser/definition/table_def.h"
 #include "parser/statement/extra/create_table_info.h"
+#include "storage/data_block.h"
+#include "storage/table.h"
 
 #include "executor/expression/expression_evaluator.h"
 #include "executor/expression/expression_state.h"

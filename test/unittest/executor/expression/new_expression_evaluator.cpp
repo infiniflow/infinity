@@ -14,12 +14,12 @@
 #include "expression/in_expression.h"
 #include "expression/reference_expression.h"
 #include "expression/value_expression.h"
-#include "main/infinity.h"
 #include "function/scalar/add.h"
 #include "function/scalar/subtract.h"
 #include "function/scalar_function_set.h"
+#include "main/infinity.h"
+#include "parser/definition/table_def.h"
 #include "storage/table.h"
-#include "storage/table_def.h"
 
 class ExpressionEvaluatorTest : public BaseTest {
     void SetUp() override {

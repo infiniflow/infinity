@@ -3,12 +3,16 @@
 //
 
 #include "txn.h"
-#include "storage/meta/meta_state.h"
+#include "parser/definition/table_def.h"
+#include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
-#include "storage/table_def.h"
+#include "storage/meta/entry/index_def_entry.h"
+#include "storage/meta/entry/index_entry.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/index_def_meta.h"
+#include "storage/meta/meta_state.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
-#include "storage/buffer/buffer_manager.h"
 
 namespace infinity {
 
@@ -319,15 +323,42 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
 }
 
 EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+    TxnState txn_state = txn_context_.GetTxnState();
+
+    if (txn_state != TxnState::kStarted) {
+        LOG_TRACE("Transaction is not started");
+        return {.entry_ = nullptr, .err_ = MakeUnique<String>("Transaction is not started")};
+    }
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg != nullptr) {
         return {nullptr, std::move(err_msg)};
     }
-    NotImplementError("Not implemented")
 
-        auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
-    // TODO shenyushi 4: add wal entry
+    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, GetBufferMgr());
+
+    if (res.entry_ == nullptr) {
+        return res;
+    }
+    if (res.entry_->entry_type_ != EntryType::kIndexDef) {
+        return {nullptr, MakeUnique<String>("Invalid index type")};
+    }
+    auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
+    txn_indexes_.insert(index_def_entry);
+    index_names_.insert(*index_def->index_name_);
+
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
+
+    TxnTableStore *table_store{nullptr};
+    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+    }
+    table_store = txn_tables_store_[table_name].get();
+
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, GetBufferMgr());
+
     return res;
 }
 
@@ -493,15 +524,41 @@ void Txn::CommitTxnBottom() {
     txn_context_.SetTxnCommitted();
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
+    bool is_read_only_txn = true;
     // Commit databases to memory catalog
     for (auto *db_entry : txn_dbs_) {
         db_entry->Commit(commit_ts);
+        is_read_only_txn = false;
     }
 
     // Commit tables to memory catalog
     for (auto *table_entry : txn_tables_) {
         table_entry->Commit(commit_ts);
+        is_read_only_txn = false;
     }
+
+    //  Commit indexes in catalog
+    for (auto *index_def_entry : txn_indexes_) {
+        index_def_entry->Commit(commit_ts);
+        is_read_only_txn = false;
+    }
+
+    // Commit the prepared data
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->Commit();
+        is_read_only_txn = false;
+    }
+
+    // TODO: Flush the whole catalog.
+    if (!is_read_only_txn) {
+        String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir() + "/catalog";
+        String file_name = "META_" + std::to_string(txn_id_) + ".json";
+        LOG_TRACE("Going to store META as file {}/{}", dir_name, file_name);
+        NewCatalog::SaveAsFile(catalog_, dir_name, file_name);
+    }
+
+    // Reset the LSN of WAL
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
@@ -523,11 +580,16 @@ void Txn::RollbackTxn() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
-    for (const auto &base_entry : txn_tables_) {
-        auto *table_entry = (TableCollectionEntry *)(base_entry);
+    for (const auto &table_entry : txn_tables_) {
         TableCollectionMeta *table_meta = TableCollectionEntry::GetTableMeta(table_entry);
         DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
         DBEntry::RemoveTableCollectionEntry(db_entry, *table_meta->table_collection_name_, txn_id_, txn_mgr_);
+    }
+
+    for (const auto &index_def_entry : txn_indexes_) {
+        IndexDefMeta *index_def_meta = index_def_entry->index_def_meta_;
+        TableCollectionEntry *table_entry = index_def_meta->table_collection_entry_;
+        TableCollectionEntry::RemoveIndexEntry(table_entry, index_def_meta->index_name_, txn_id_, txn_mgr_);
     }
 
     for (const auto &db_name : db_names_) {

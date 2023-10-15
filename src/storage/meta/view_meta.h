@@ -6,8 +6,9 @@
 
 #include <utility>
 
+#include "common/types/alias/concurrency.h"
+#include "parser/definition/column_def.h"
 #include "storage/meta/entry/base_entry.h"
-#include "storage/table_def.h"
 
 namespace infinity {
 

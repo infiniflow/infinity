@@ -3,12 +3,10 @@
 //
 
 #include "physical_create_table.h"
-#include "storage/table.h"
-
-#include "storage/txn/txn.h"
-#include "main/query_context.h"
-#include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
+#include "main/query_context.h"
+#include "storage/table.h"
+#include "storage/txn/txn.h"
 
 #include <utility>
 

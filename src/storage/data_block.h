@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include "common/types/alias/db_type.h"
-#include "common/types/alias/smart_ptr.h"
 #include "common/default_values.h"
+#include "common/types/alias/smart_ptr.h"
 #include "common/types/value.h"
 
 namespace infinity {

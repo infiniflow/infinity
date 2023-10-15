@@ -35,6 +35,7 @@ enum class LogicalNodeType : uint8_t {
     kCreateSchema,
     kCreateView,
     kDropTable,
+    kDropIndex,
     kDropCollection,
     kDropSchema,
     kDropView,

@@ -1,15 +1,17 @@
 #pragma once
 
 #include "common/types/alias/containers.h"
-#include "common/types/alias/db_type.h"
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/strings.h"
+#include "common/types/complex/row_id.h"
 #include <cstdint>
 #include <roaring/roaring.hh>
 
 namespace infinity {
 
 class TableDef;
+
+class IndexDef;
 
 class DataBlock;
 
@@ -23,6 +25,7 @@ enum class WalCommandType : uint8_t {
     CREATE_TABLE = 3,
     DROP_TABLE = 4,
     ALTER_INFO = 5,
+    CREATE_INDEX = 6,
 
     // -----------------------------
     // Data
@@ -93,6 +96,23 @@ struct WalCmdCreateTable : public WalCmd {
 
     String db_name;
     SharedPtr<TableDef> table_def;
+};
+
+struct WalCmdCreateIndex : public WalCmd {
+    WalCmdCreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def)
+        : db_name_(db_name), table_name_(table_name), index_def_(index_def) {}
+
+    virtual WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
+
+    virtual bool operator==(const WalCmd &other) const override;
+
+    virtual int32_t GetSizeInBytes() const override;
+
+    virtual void WriteAdv(char *&buf) const override;
+
+    String db_name_{};
+    String table_name_{};
+    SharedPtr<IndexDef> index_def_{};
 };
 
 struct WalCmdDropTable : public WalCmd {

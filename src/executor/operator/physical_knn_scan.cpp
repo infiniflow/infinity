@@ -3,11 +3,13 @@
 //
 
 #include "physical_knn_scan.h"
+#include "executor/operator_state.h"
 #include "function/table/knn_scan_data.h"
-#include "storage/storage.h"
-#include "storage/data_block.h"
-
+#include "main/query_context.h"
 #include "planner/bound/base_table_ref.h"
+#include "storage/buffer/column_buffer.h"
+#include "storage/common/block_index.h"
+#include "storage/data_block.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas.h"
 #include "storage/knnindex/knn_flat/knn_flat_ip_blas_reservoir.h"
@@ -18,10 +20,9 @@
 #include "storage/knnindex/knn_flat/knn_flat_l2_reservoir.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1.h"
 #include "storage/knnindex/knn_flat/knn_flat_l2_top1_blas.h"
-
-#include "executor/operator_state.h"
-#include "main/query_context.h"
-#include "storage/common/block_index.h"
+#include "storage/meta/entry/block_column_entry.h"
+#include "storage/meta/entry/block_entry.h"
+#include "storage/storage.h"
 
 namespace infinity {
 
@@ -167,7 +168,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                                 for (; column_id < column_count; ++column_id) {
                                     ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
                                                                                                  query_context->storage()->buffer_manager());
-
 
                                     ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
                                     output_state->data_block_->AppendValueByPtr(column_id, ptr);
@@ -361,14 +361,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                                     ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
                                                                                                  query_context->storage()->buffer_manager());
 
-
                                     ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
                                     output_state->data_block_->AppendValueByPtr(column_id, ptr);
                                 }
 
                                 output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
                                 output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-
                             }
 
                             for (SizeT column_id = 0; column_id < column_count; ++column_id) {

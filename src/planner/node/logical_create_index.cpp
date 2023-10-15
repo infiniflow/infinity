@@ -1,9 +1,9 @@
 
-#include "common/types/logical_type.h"
-#include "planner/column_binding.h"
-#include "common/types/data_type.h"
 #include "planner/node/logical_create_index.h"
-#include "storage/index_def/index_def.h"
+#include "common/types/data_type.h"
+#include "common/types/logical_type.h"
+#include "parser/definition/index_def.h"
+#include "planner/column_binding.h"
 
 namespace infinity {
 

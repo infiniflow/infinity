@@ -4,8 +4,9 @@
 
 #pragma once
 
+#include "parser/definition/table_def.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "planner/logical_node.h"
-#include "storage/table_def.h"
 
 namespace infinity {
 

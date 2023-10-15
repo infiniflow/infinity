@@ -28,8 +28,12 @@ struct ParserContext {
 
 class PhysicalImport : public PhysicalOperator {
 public:
-    explicit
-    PhysicalImport(uint64_t id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type)
+    explicit PhysicalImport(uint64_t id,
+                            TableCollectionEntry *table_collection_entry,
+                            String file_path,
+                            bool header,
+                            char delimiter,
+                            CopyFileType type)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id), table_collection_entry_(table_collection_entry),
           file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 

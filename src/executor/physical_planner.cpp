@@ -3,7 +3,39 @@
 //
 
 #include "physical_planner.h"
+#include "executor/operator/physcial_drop_view.h"
+#include "executor/operator/physical_aggregate.h"
+#include "executor/operator/physical_alter.h"
+#include "executor/operator/physical_create_collection.h"
 #include "executor/operator/physical_create_index.h"
+#include "executor/operator/physical_create_schema.h"
+#include "executor/operator/physical_create_table.h"
+#include "executor/operator/physical_create_view.h"
+#include "executor/operator/physical_cross_product.h"
+#include "executor/operator/physical_delete.h"
+#include "executor/operator/physical_drop_collection.h"
+#include "executor/operator/physical_drop_schema.h"
+#include "executor/operator/physical_drop_table.h"
+#include "executor/operator/physical_dummy_scan.h"
+#include "executor/operator/physical_explain.h"
+#include "executor/operator/physical_export.h"
+#include "executor/operator/physical_filter.h"
+#include "executor/operator/physical_flush.h"
+#include "executor/operator/physical_hash_join.h"
+#include "executor/operator/physical_import.h"
+#include "executor/operator/physical_insert.h"
+#include "executor/operator/physical_knn_scan.h"
+#include "executor/operator/physical_limit.h"
+#include "executor/operator/physical_merge_knn.h"
+#include "executor/operator/physical_nested_loop_join.h"
+#include "executor/operator/physical_prepared_plan.h"
+#include "executor/operator/physical_project.h"
+#include "executor/operator/physical_show.h"
+#include "executor/operator/physical_sort.h"
+#include "executor/operator/physical_table_scan.h"
+#include "executor/operator/physical_union_all.h"
+#include "executor/operator/physical_update.h"
+#include "explain_physical_plan.h"
 #include "planner/node/logical_aggregate.h"
 #include "planner/node/logical_create_collection.h"
 #include "planner/node/logical_create_index.h"
@@ -28,44 +60,6 @@
 #include "planner/node/logical_project.h"
 #include "planner/node/logical_sort.h"
 #include "planner/node/logical_table_scan.h"
-
-#include "executor/operator/physcial_drop_view.h"
-#include "executor/operator/physical_aggregate.h"
-#include "executor/operator/physical_alter.h"
-#include "executor/operator/physical_create_collection.h"
-#include "executor/operator/physical_create_schema.h"
-#include "executor/operator/physical_create_table.h"
-#include "executor/operator/physical_create_view.h"
-#include "executor/operator/physical_cross_product.h"
-#include "executor/operator/physical_delete.h"
-#include "executor/operator/physical_drop_collection.h"
-#include "executor/operator/physical_drop_schema.h"
-#include "executor/operator/physical_drop_table.h"
-#include "executor/operator/physical_dummy_operator.h"
-#include "executor/operator/physical_dummy_scan.h"
-#include "executor/operator/physical_explain.h"
-#include "executor/operator/physical_export.h"
-#include "executor/operator/physical_filter.h"
-#include "executor/operator/physical_flush.h"
-#include "executor/operator/physical_hash_join.h"
-#include "executor/operator/physical_import.h"
-#include "executor/operator/physical_index_join.h"
-#include "executor/operator/physical_index_scan.h"
-#include "executor/operator/physical_insert.h"
-#include "executor/operator/physical_knn_scan.h"
-#include "executor/operator/physical_limit.h"
-#include "executor/operator/physical_merge_knn.h"
-#include "executor/operator/physical_nested_loop_join.h"
-#include "executor/operator/physical_prepared_plan.h"
-#include "executor/operator/physical_project.h"
-#include "executor/operator/physical_show.h"
-#include "executor/operator/physical_sort.h"
-#include "executor/operator/physical_table_scan.h"
-#include "executor/operator/physical_top.h"
-#include "executor/operator/physical_union_all.h"
-#include "executor/operator/physical_update.h"
-#include "explain_physical_plan.h"
-#include "planner/bound/base_table_ref.h"
 
 namespace infinity {
 
@@ -235,10 +229,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
     auto logical_create_index = std::static_pointer_cast<LogicalCreateIndex>(logical_operator);
-    return PhysicalCreateIndex::Make(logical_create_index->schema_name(),
-                                     logical_create_index->table_name(),
-                                     logical_create_index->index_definition(),
-                                     logical_create_index->conflict_type(),
+    return PhysicalCreateIndex::Make(logical_create_index->schema_name_,
+                                     logical_create_index->table_name_,
+                                     logical_create_index->index_definition_,
+                                     logical_create_index->conflict_type_,
                                      logical_create_index->GetOutputNames(),
                                      logical_create_index->GetOutputTypes(),
                                      logical_create_index->node_id());

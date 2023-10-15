@@ -2,10 +2,11 @@
 // Created by jinhai on 23-7-21.
 //
 
+#include "storage/buffer/buffer_task.h"
 #include "base_test.h"
 #include "main/infinity.h"
 #include "storage/buffer/buffer_manager.h"
-#include "storage/buffer/buffer_task.h"
+#include "storage/buffer/object_handle.h"
 
 class BufferTaskProcessorTest : public BaseTest {
     void SetUp() override {
@@ -44,7 +45,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/_tmp/c1.col");
 
-        CommonObjectHandle object_handle1(buf_handle1);
+        ObjectHandle object_handle1(buf_handle1);
         ptr_t buf_ptr1 = object_handle1.GetData();
         for (i64 i = 0; i < elem_count; ++i) {
             ((i64 *)buf_ptr1)[i] = i;
@@ -57,7 +58,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/_tmp/c2.col");
 
-        CommonObjectHandle object_handle2(buf_handle2);
+        ObjectHandle object_handle2(buf_handle2);
         ptr_t buf_ptr2 = object_handle2.GetData();
         for (i32 i = 0; i < elem_count; ++i) {
             ((i32 *)buf_ptr2)[i] = i + 10;
@@ -92,7 +93,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/data/c1.col");
 
-        CommonObjectHandle object_handle1(buf_handle1);
+        ObjectHandle object_handle1(buf_handle1);
         ptr_t data_ptr = object_handle1.GetData();
         EXPECT_NE(data_ptr, nullptr);
 
@@ -107,7 +108,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/data/c2.col");
 
-        CommonObjectHandle object_handle2(buf_handle2);
+        ObjectHandle object_handle2(buf_handle2);
         ptr_t data_ptr2 = object_handle2.GetData();
         EXPECT_NE(data_ptr2, nullptr);
 

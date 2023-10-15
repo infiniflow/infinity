@@ -4,7 +4,7 @@
 
 #include "base_test.h"
 #include "main/infinity.h"
-#include "storage/table_def.h"
+#include "parser/definition/table_def.h"
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {

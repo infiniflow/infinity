@@ -3,12 +3,12 @@
 //
 
 #include "physical_cross_product.h"
-#include "common/utility/infinity_assert.h"
-#include "parser/statement/extra/create_table_info.h"
-#include "storage/table_def.h"
-#include "storage/table.h"
-#include "storage/data_block.h"
 #include "common/column_vector/column_vector.h"
+#include "common/utility/infinity_assert.h"
+#include "parser/definition/table_def.h"
+#include "parser/statement/extra/create_table_info.h"
+#include "storage/data_block.h"
+#include "storage/table.h"
 
 namespace infinity {
 

@@ -3,11 +3,10 @@
 //
 
 #include "executor/operator/physcial_drop_view.h"
-#include "storage/txn/txn.h"
 #include "main/query_context.h"
-#include "parser/statement/extra/create_table_info.h"
+#include "parser/definition/table_def.h"
 #include "storage/table.h"
-#include "storage/table_def.h"
+#include "storage/txn/txn.h"
 
 namespace infinity {
 

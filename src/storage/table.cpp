@@ -3,8 +3,8 @@
 //
 
 #include "storage/table.h"
+#include "parser/definition/table_def.h"
 #include "storage/data_block.h"
-#include "storage/table_def.h"
 
 namespace infinity {
 
