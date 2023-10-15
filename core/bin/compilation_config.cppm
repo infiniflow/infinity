@@ -12,10 +12,10 @@ export module compilation_config;
 #define VERSION_MINOR 1
 #define VERSION_PATCH 0
 
-#define BUILD_TIME "2023-10-15 16:10.14"
+#define BUILD_TIME "2023-10-15 17:35.43"
 #define GIT_BRANCH_NAME "main"
 #define GIT_COMMIT_ID ""
-#define BUILD_TYPE "Release"
+#define BUILD_TYPE "Debug"
 
 #define TEST_DATA_PATH "/home/jinhai/Documents/development/infinity/test/data"
 #define CSV_DATA_PATH "/home/jinhai/Documents/development/infinity/third_party/zsv/data"

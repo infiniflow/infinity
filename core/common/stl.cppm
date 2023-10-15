@@ -61,6 +61,13 @@ inline bool IsEqual(const String& s1, const char* s2) {
     return s1 == s2;
 }
 
+inline String TrimPath(const String &path) {
+    const auto pos = path.find("/src/");
+    if (pos == String::npos)
+        return path;
+    return path.substr(pos + 1);
+}
+
 void ToUpper(String& str) {
     std::transform(str.begin(), str.end(), str.begin(), ::toupper);
 }
