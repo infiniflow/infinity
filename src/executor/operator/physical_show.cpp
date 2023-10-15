@@ -3,13 +3,13 @@
 //
 
 #include "physical_show.h"
+#include "executor/operator_state.h"
 #include "main/query_context.h"
-#include "storage/txn/txn.h"
-#include "storage/table_def.h"
+#include "parser/definition/table_def.h"
 #include "storage/data_block.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "storage/meta/entry/view_entry.h"
-#include "executor/operator_state.h"
+#include "storage/txn/txn.h"
 
 #include "common/types/logical_type.h"
 #include "common/utility/infinity_assert.h"

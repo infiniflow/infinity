@@ -5,10 +5,10 @@
 #include "base_test.h"
 #include "main/infinity.h"
 
-#include "storage/table.h"
-#include "storage/table_def.h"
 #include "common/column_vector/column_vector.h"
+#include "parser/definition/table_def.h"
 #include "storage/data_block.h"
+#include "storage/table.h"
 
 class TableTest : public BaseTest {
     void SetUp() override {

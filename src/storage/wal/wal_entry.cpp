@@ -1,15 +1,12 @@
 #include "wal_entry.h"
+
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
+#include "parser/definition/table_def.h"
 #include "storage/data_block.h"
-#include "storage/table_def.h"
-#include <concepts>
+
 #include <cstdint>
 #include <cstring>
-#include <format>
-#include <iostream>
-#include <string>
-#include <type_traits>
 
 namespace infinity {
 
@@ -72,6 +69,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
             cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
             break;
         }
+        case WalCommandType::CREATE_INDEX: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
+            break;
+        }
         default:
             StorageError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
@@ -84,6 +88,12 @@ bool WalCmdCreateTable::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTable *>(&other);
     return other_cmd != nullptr && db_name == other_cmd->db_name && table_def != nullptr && other_cmd->table_def != nullptr &&
            *table_def == *other_cmd->table_def;
+}
+
+bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_ != nullptr &&
+           other_cmd->index_def_ != nullptr && *index_def_ == *other_cmd->index_def_;
 }
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
@@ -126,6 +136,11 @@ int32_t WalCmdCreateTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + this->table_def->GetSizeInBytes();
 }
 
+int32_t WalCmdCreateIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+           this->index_def_->GetSizeInBytes();
+}
+
 int32_t WalCmdDropTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size();
 }
@@ -160,6 +175,13 @@ void WalCmdCreateTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE);
     WriteBufAdv(buf, this->db_name);
     this->table_def->WriteAdv(buf);
+}
+
+void WalCmdCreateIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    index_def_->WriteAdv(buf);
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {

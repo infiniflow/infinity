@@ -340,7 +340,43 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
                                   bool is_recursive,
                                   i64 intent_size) {
-    // TODO shenyushi -1
+    {
+        String create_header_str;
+        if (intent_size != 0) {
+            create_header_str = String(intent_size - 2, ' ') + "-> CREATE INDEX ";
+        } else {
+            create_header_str = "CREATE INDEX ";
+        }
+
+        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(create_header_str));
+    }
+
+    {
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name_;
+        result->emplace_back(MakeShared<String>(schema_name_str));
+    }
+
+    {
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name_;
+        result->emplace_back(MakeShared<String>(table_name_str));
+    }
+
+    // Index definition
+    {
+        String index_def_str = String(intent_size, ' ') + " - index definition: " + create_node->index_def_ptr_->ToString();
+        result->emplace_back(MakeShared<String>(index_def_str));
+    }
+
+    {
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type_);
+        result->emplace_back(MakeShared<String>(conflict_type_str));
+    }
+
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,

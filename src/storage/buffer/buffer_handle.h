@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "common/types/alias/concurrency.h"
 #include "common/types/data_type.h"
 #include "storage/io/file_system.h"
-#include "common/types/alias/concurrency.h"
 
 namespace infinity {
 
@@ -14,7 +14,9 @@ class AsyncBatchProcessor;
 
 enum class BufferType {
     kTempFile,
+    kTempFaissIndex,
     kFile,
+    kFaissIndex,
     kExtraBlock,
     kInvalid,
 };
@@ -31,27 +33,35 @@ using BufferWriteFN = void (*)(const String &path, DataType data_type);
 
 class ObjectHandle;
 
-class CommonObjectHandle;
-
-class IndexObjectHandle;
-
 // BufferHandle is never destructed
 class BufferHandle {
-    friend ObjectHandle;
-    friend CommonObjectHandle;
-    friend IndexObjectHandle;
+    friend class ObjectHandle;
 
     friend class BufferMgrTest;
 
 public:
     explicit BufferHandle(void *buffer_mgr);
 
-    ~BufferHandle() = default;
+private:
+    void DeleteData();
+
+    String file_path() {
+        String file_path;
+        if (current_dir_ == nullptr or current_dir_->empty()) {
+            file_path = *base_dir_ + '/' + *file_name_;
+        } else {
+            file_path = *current_dir_ + '/' + *file_name_;
+        }
+        return file_path;
+    }
+
+public:
+    ~BufferHandle() { DeleteData(); }
 
     inline void SetID(u64 id) { id_ = id; }
 
 private:
-    ptr_t LoadData();
+    void *LoadData();
 
 public:
     void UnloadData();
@@ -85,11 +95,11 @@ public:
 
 private:
     UniquePtr<FileHandler> file_handler_{nullptr};
+    void *data_{nullptr};
 
 public:
     RWMutex rw_locker_{};
 
-    UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
     void *buffer_mgr_{};
     u64 reference_count_{0};
@@ -102,9 +112,6 @@ public:
     SharedPtr<String> file_name_{};   // ex. 0.col
     offset_t offset_{};
     u64 id_{};
-
-    // file descriptor
-    int fd_{};
 
     // function to read and write the file.
     BufferReadFN read_func_{};

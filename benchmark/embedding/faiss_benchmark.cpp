@@ -4,48 +4,41 @@
 
 #include <thread>
 
-
-#include "main/profiler/base_profiler.h"
 #include "faiss/IndexFlat.h"
-#include "helper.h"
 #include "faiss/IndexIVFFlat.h"
-#include "faiss/index_io.h"
-#include "hnswlib/hnswlib.h"
-#include "scheduler.h"
 #include "faiss/IndexScalarQuantizer.h"
+#include "faiss/index_io.h"
+#include "helper.h"
+#include "hnswlib/hnswlib.h"
+#include "main/profiler/base_profiler.h"
+#include "scheduler.h"
 
 using namespace infinity;
 
-enum class IndexType {
-    kFlat,
-    kIVFFlat,
-    kIVFSQ8,
-    kHnsw
-};
+enum class IndexType { kFlat, kIVFFlat, kIVFSQ8, kHnsw };
 
-static const char* sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.fvecs";
-static const char* sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn.fvecs";
-static const char* sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
-static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
-static const char* ivf_index_name = "ivf_index.bin";
-static const char* ivfsq8_index_name = "ivfsq8_index.bin";
-static const char* flat_index_name = "flat_index.bin";
-static const char* hnsw_index_l2_name = "hnsw_index_l2.bin";
+static const char *sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.fvecs";
+static const char *sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn.fvecs";
+static const char *sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
+static const char *sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
+static const char *ivf_index_name = "ivf_index.bin";
+static const char *ivfsq8_index_name = "ivfsq8_index.bin";
+static const char *flat_index_name = "flat_index.bin";
+static const char *hnsw_index_l2_name = "hnsw_index_l2.bin";
 
-void
-batch_run_on_cpu(faiss::Index* index,
-                 IndexType index_type,
-                 float* query_vectors,
-                 SizeT query_count,
-                 SizeT dimension,
-                 SizeT top_k,
-                 const int* ground_truth) {
-    faiss::idx_t* I = new faiss::idx_t[query_count * top_k];
-    float* D = new float[query_count * top_k];
+void batch_run_on_cpu(faiss::Index *index,
+                      IndexType index_type,
+                      float *query_vectors,
+                      SizeT query_count,
+                      SizeT dimension,
+                      SizeT top_k,
+                      const int *ground_truth) {
+    faiss::idx_t *I = new faiss::idx_t[query_count * top_k];
+    float *D = new float[query_count * top_k];
 
-    switch(index_type) {
+    switch (index_type) {
         case IndexType::kIVFFlat: {
-            faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
+            faiss::IndexIVFFlat *ivf_flat_index = (faiss::IndexIVFFlat *)index;
             ivf_flat_index->nprobe = 32; // Default value is 1;
             ivf_flat_index->search(query_count, query_vectors, top_k, D, I);
             break;
@@ -64,15 +57,15 @@ batch_run_on_cpu(faiss::Index* index,
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
-    for(int i = 0; i < query_count; i++) {
+    for (int i = 0; i < query_count; i++) {
         int gt_nn = ground_truth[i * top_k];
-        for(int j = 0; j < top_k; j++) {
-            if(I[i * top_k + j] == gt_nn) {
-                if(j < 1)
+        for (int j = 0; j < top_k; j++) {
+            if (I[i * top_k + j] == gt_nn) {
+                if (j < 1)
                     n_1++;
-                if(j < 10)
+                if (j < 10)
                     n_10++;
-                if(j < 100)
+                if (j < 100)
                     n_100++;
             }
         }
@@ -85,49 +78,46 @@ batch_run_on_cpu(faiss::Index* index,
     delete[] D;
 }
 
-void
-single_run_on_cpu(void* index,
-                  IndexType index_type,
-                  float* query_vectors,
-                  SizeT query_count,
-                  SizeT dimension,
-                  SizeT top_k,
-                  const int* ground_truth) {
-    std::cout << "Begin to search " << query_count << " query, memory: "
-              << get_current_rss() / 1000000 << " MB" << std::endl;
+void single_run_on_cpu(void *index,
+                       IndexType index_type,
+                       float *query_vectors,
+                       SizeT query_count,
+                       SizeT dimension,
+                       SizeT top_k,
+                       const int *ground_truth) {
+    std::cout << "Begin to search " << query_count << " query, memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
 
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    faiss::idx_t* I = new faiss::idx_t[top_k];
-    float* D = new float[top_k];
+    faiss::idx_t *I = new faiss::idx_t[top_k];
+    float *D = new float[top_k];
 
     // evaluate result by hand.
     int n_1 = 0, n_10 = 0, n_100 = 0;
-    for(SizeT query_index = 0; query_index < query_count; ++query_index) {
-        float* query_vector = &query_vectors[dimension * query_index];
+    for (SizeT query_index = 0; query_index < query_count; ++query_index) {
+        float *query_vector = &query_vectors[dimension * query_index];
 
-        switch(index_type) {
+        switch (index_type) {
             case IndexType::kIVFFlat: {
-                faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
+                faiss::IndexIVFFlat *ivf_flat_index = (faiss::IndexIVFFlat *)index;
                 ivf_flat_index->nprobe = 32; // Default value is 1;
                 ivf_flat_index->search(1, query_vector, top_k, D, I);
                 break;
             }
             case IndexType::kHnsw: {
                 SizeT ef_construction = 200;
-                hnswlib::HierarchicalNSW<float>* hnsw_index = (hnswlib::HierarchicalNSW<float>*)index;
+                hnswlib::HierarchicalNSW<float> *hnsw_index = (hnswlib::HierarchicalNSW<float> *)index;
                 hnsw_index->setEf(ef_construction);
-                std::priority_queue<std::pair<float, hnswlib::labeltype>> result
-                        = hnsw_index->searchKnn(query_vector, top_k);
-                for(SizeT idx = 0; idx < top_k; ++idx) {
+                std::priority_queue<std::pair<float, hnswlib::labeltype>> result = hnsw_index->searchKnn(query_vector, top_k);
+                for (SizeT idx = 0; idx < top_k; ++idx) {
                     I[idx] = result.top().second;
                     result.pop();
                 }
                 break;
             }
             case IndexType::kFlat: {
-                faiss::IndexFlatL2* flat_index = (faiss::IndexFlatL2*)index;
+                faiss::IndexFlatL2 *flat_index = (faiss::IndexFlatL2 *)index;
                 flat_index->search(1, query_vector, top_k, D, I);
                 break;
             }
@@ -136,27 +126,25 @@ single_run_on_cpu(void* index,
         }
 
         int gt_nn = ground_truth[query_index * top_k];
-        for(int j = 0; j < top_k; j++) {
-            if(I[j] == gt_nn) {
-                if(j < 1)
+        for (int j = 0; j < top_k; j++) {
+            if (I[j] == gt_nn) {
+                if (j < 1)
                     n_1++;
-                if(j < 10)
+                if (j < 10)
                     n_10++;
-                if(j < 100)
+                if (j < 100)
                     n_100++;
             }
         }
 
-        if(query_index % 1000 == 0) {
-            std::cout << query_index << ", " << get_current_rss() / 1000000 << " MB, "
-                      << profiler.ElapsedToString() << std::endl;
-//            std::cout << n_1 << " " << n_10 << " " << n_100 << std::endl;
+        if (query_index % 1000 == 0) {
+            std::cout << query_index << ", " << get_current_rss() / 1000000 << " MB, " << profiler.ElapsedToString() << std::endl;
+            //            std::cout << n_1 << " " << n_10 << " " << n_100 << std::endl;
         }
     }
 
     profiler.End();
-    std::cout << "Search: " << profiler.ElapsedToString() << ", "
-              << get_current_rss() / 1000000 << " MB" << std::endl;
+    std::cout << "Search: " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
 
     printf("R@1 = %.4f\n", n_1 / float(query_count));
     printf("R@10 = %.4f\n", n_10 / float(query_count));
@@ -166,234 +154,199 @@ single_run_on_cpu(void* index,
     delete[] D;
 }
 
-
 struct AnnFlatTask : public Task {
-    inline explicit
-    AnnFlatTask(faiss::Index* index,
-                SizeT dimension,
-                SizeT query_count,
-                f32* query_vectors,
-                SizeT top_k,
-                i64*& result_id,
-                f32*& result_distance)
-            : Task(TaskType::kAnnFlat),
-              index_(index),
-              dimension_(dimension),
-              query_count_(query_count),
-              query_vectors_(query_vectors),
-              top_k_(top_k),
-              result_id_(result_id),
-              result_distance_(result_distance) {}
+    inline explicit AnnFlatTask(faiss::Index *index,
+                                SizeT dimension,
+                                SizeT query_count,
+                                f32 *query_vectors,
+                                SizeT top_k,
+                                i64 *&result_id,
+                                f32 *&result_distance)
+        : Task(TaskType::kAnnFlat), index_(index), dimension_(dimension), query_count_(query_count), query_vectors_(query_vectors), top_k_(top_k),
+          result_id_(result_id), result_distance_(result_distance) {}
 
-    void
-    run(i64 worker_id) override {
+    void run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-//        for(SizeT idx = 0; idx < query_count_; ++ idx) {
-//            f32* one_query_ptr = &query_vectors_[idx * dimension_];
-//            i64* one_result_ids = &result_id_[idx * top_k_];
-//            f32* one_result_distances = &result_distance_[idx * top_k_];
-//            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
-////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
-//        }
+        //        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+        //            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+        //            i64* one_result_ids = &result_id_[idx * top_k_];
+        //            f32* one_result_distances = &result_distance_[idx * top_k_];
+        //            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
+        ////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+        //        }
 
         index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
 
         profiler.End();
-//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
-//                  << get_current_rss() / 1000000 << " MB" << std::endl;
+        //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+        //                  << get_current_rss() / 1000000 << " MB" << std::endl;
         printf("Run AnnFlat by worker: %ld, spend: %s\n", (long)worker_id, profiler.ElapsedToString().c_str());
-//        usleep(1000 * 1000);
+        //        usleep(1000 * 1000);
     }
 
 private:
-    faiss::Index* index_{nullptr};
+    faiss::Index *index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32* query_vectors_{nullptr};
+    f32 *query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64* result_id_{nullptr}; // I
-    f32* result_distance_{nullptr}; // D
+    i64 *result_id_{nullptr};       // I
+    f32 *result_distance_{nullptr}; // D
 };
 
 struct AnnIVFFlatTask : public Task {
-    inline explicit
-    AnnIVFFlatTask(faiss::Index* index,
-                   SizeT dimension,
-                   SizeT query_count,
-                   f32* query_vectors,
-                   SizeT top_k,
-                   i64*& result_id,
-                   f32*& result_distance)
-            : Task(TaskType::kAnnIVFFlat),
-              index_(index),
-              dimension_(dimension),
-              query_count_(query_count),
-              query_vectors_(query_vectors),
-              top_k_(top_k),
-              result_id_(result_id),
-              result_distance_(result_distance) {}
+    inline explicit AnnIVFFlatTask(faiss::Index *index,
+                                   SizeT dimension,
+                                   SizeT query_count,
+                                   f32 *query_vectors,
+                                   SizeT top_k,
+                                   i64 *&result_id,
+                                   f32 *&result_distance)
+        : Task(TaskType::kAnnIVFFlat), index_(index), dimension_(dimension), query_count_(query_count), query_vectors_(query_vectors), top_k_(top_k),
+          result_id_(result_id), result_distance_(result_distance) {}
 
-    void
-    run(i64 worker_id) override {
+    void run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-//        for(SizeT idx = 0; idx < query_count_; ++ idx) {
-//            f32* one_query_ptr = &query_vectors_[idx * dimension_];
-//            i64* one_result_ids = &result_id_[idx * top_k_];
-//            f32* one_result_distances = &result_distance_[idx * top_k_];
-//            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
-////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
-//        }
+        //        for(SizeT idx = 0; idx < query_count_; ++ idx) {
+        //            f32* one_query_ptr = &query_vectors_[idx * dimension_];
+        //            i64* one_result_ids = &result_id_[idx * top_k_];
+        //            f32* one_result_distances = &result_distance_[idx * top_k_];
+        //            index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
+        ////            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+        //        }
 
         index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
 
         profiler.End();
-//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
-//                  << get_current_rss() / 1000000 << " MB" << std::endl;
-//        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
-//        usleep(1000 * 1000);
+        //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+        //                  << get_current_rss() / 1000000 << " MB" << std::endl;
+        //        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+        //        usleep(1000 * 1000);
     }
 
 private:
-    faiss::Index* index_{nullptr};
+    faiss::Index *index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32* query_vectors_{nullptr};
+    f32 *query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64* result_id_{nullptr}; // I
-    f32* result_distance_{nullptr}; // D
+    i64 *result_id_{nullptr};       // I
+    f32 *result_distance_{nullptr}; // D
 };
 
 struct AnnIVFSQ8Task : public Task {
-    inline explicit
-    AnnIVFSQ8Task(faiss::Index* index,
-                  SizeT dimension,
-                  SizeT query_count,
-                  f32* query_vectors,
-                  SizeT top_k,
-                  i64*& result_id,
-                  f32*& result_distance)
-            : Task(TaskType::kAnnIVFSQ8),
-              index_(index),
-              dimension_(dimension),
-              query_count_(query_count),
-              query_vectors_(query_vectors),
-              top_k_(top_k),
-              result_id_(result_id),
-              result_distance_(result_distance) {}
+    inline explicit AnnIVFSQ8Task(faiss::Index *index,
+                                  SizeT dimension,
+                                  SizeT query_count,
+                                  f32 *query_vectors,
+                                  SizeT top_k,
+                                  i64 *&result_id,
+                                  f32 *&result_distance)
+        : Task(TaskType::kAnnIVFSQ8), index_(index), dimension_(dimension), query_count_(query_count), query_vectors_(query_vectors), top_k_(top_k),
+          result_id_(result_id), result_distance_(result_distance) {}
 
-    void
-    run(i64 worker_id) override {
+    void run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for(SizeT idx = 0; idx < query_count_; ++idx) {
-            f32* one_query_ptr = &query_vectors_[idx * dimension_];
-            i64* one_result_ids = &result_id_[idx * top_k_];
-            f32* one_result_distances = &result_distance_[idx * top_k_];
+        for (SizeT idx = 0; idx < query_count_; ++idx) {
+            f32 *one_query_ptr = &query_vectors_[idx * dimension_];
+            i64 *one_result_ids = &result_id_[idx * top_k_];
+            f32 *one_result_distances = &result_distance_[idx * top_k_];
             index_->search(1, one_query_ptr, top_k_, one_result_distances, one_result_ids);
-//            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+            //            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
         }
 
-//        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+        //        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
 
         profiler.End();
-//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
-//                  << get_current_rss() / 1000000 << " MB" << std::endl;
-//        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
-//        usleep(1000 * 1000);
+        //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+        //                  << get_current_rss() / 1000000 << " MB" << std::endl;
+        //        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+        //        usleep(1000 * 1000);
     }
 
 private:
-    faiss::Index* index_{nullptr};
+    faiss::Index *index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32* query_vectors_{nullptr};
+    f32 *query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64* result_id_{nullptr}; // I
-    f32* result_distance_{nullptr}; // D
+    i64 *result_id_{nullptr};       // I
+    f32 *result_distance_{nullptr}; // D
 };
 
 struct AnnHNSWTask : public Task {
-    inline explicit
-    AnnHNSWTask(hnswlib::HierarchicalNSW<float>* index,
-                SizeT dimension,
-                SizeT query_count,
-                f32* query_vectors,
-                SizeT top_k,
-                i64*& result_id,
-                f32*& result_distance)
-            : Task(TaskType::kAnnHNSW),
-              index_(index),
-              dimension_(dimension),
-              query_count_(query_count),
-              query_vectors_(query_vectors),
-              top_k_(top_k),
-              result_id_(result_id),
-              result_distance_(result_distance) {}
+    inline explicit AnnHNSWTask(hnswlib::HierarchicalNSW<float> *index,
+                                SizeT dimension,
+                                SizeT query_count,
+                                f32 *query_vectors,
+                                SizeT top_k,
+                                i64 *&result_id,
+                                f32 *&result_distance)
+        : Task(TaskType::kAnnHNSW), index_(index), dimension_(dimension), query_count_(query_count), query_vectors_(query_vectors), top_k_(top_k),
+          result_id_(result_id), result_distance_(result_distance) {}
 
-    void
-    run(i64 worker_id) override {
+    void run(i64 worker_id) override {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for(SizeT idx = 0; idx < query_count_; ++idx) {
-            f32* one_query_ptr = &query_vectors_[idx * dimension_];
-            i64* one_result_ids = &result_id_[idx * top_k_];
-            f32* one_result_distances = &result_distance_[idx * top_k_];
-            std::priority_queue<std::pair<float, hnswlib::labeltype>> result =
-                    index_->searchKnn(one_query_ptr, top_k_);
-            for(SizeT k = 0; k < top_k_; ++k) {
+        for (SizeT idx = 0; idx < query_count_; ++idx) {
+            f32 *one_query_ptr = &query_vectors_[idx * dimension_];
+            i64 *one_result_ids = &result_id_[idx * top_k_];
+            f32 *one_result_distances = &result_distance_[idx * top_k_];
+            std::priority_queue<std::pair<float, hnswlib::labeltype>> result = index_->searchKnn(one_query_ptr, top_k_);
+            for (SizeT k = 0; k < top_k_; ++k) {
                 one_result_ids[k] = result.top().second;
                 result.pop();
             }
-//            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
+            //            printf("worker id: %ld, query: %f, result: %ld\n", worker_id, *one_query_ptr, *one_result_ids);
         }
 
-//        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
+        //        index_->search(query_count_, query_vectors_, top_k_, result_distance_, result_id_);
 
         profiler.End();
-//        std::cout << "Search: " << profiler.ElapsedToString() << ", "
-//                  << get_current_rss() / 1000000 << " MB" << std::endl;
-//        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
-//        usleep(1000 * 1000);
+        //        std::cout << "Search: " << profiler.ElapsedToString() << ", "
+        //                  << get_current_rss() / 1000000 << " MB" << std::endl;
+        //        printf("Run AnnIVFFlat by worker: %ld, spend: %s\n", worker_id, profiler.ElapsedToString().c_str());
+        //        usleep(1000 * 1000);
     }
 
 private:
-    hnswlib::HierarchicalNSW<float>* index_{nullptr};
+    hnswlib::HierarchicalNSW<float> *index_{nullptr};
     SizeT dimension_{0};
     SizeT query_count_{0};
-    f32* query_vectors_{nullptr};
+    f32 *query_vectors_{nullptr};
     SizeT top_k_{0};
-    i64* result_id_{nullptr}; // I
-    f32* result_distance_{nullptr}; // D
+    i64 *result_id_{nullptr};       // I
+    f32 *result_distance_{nullptr}; // D
 };
 
-void
-scheduler_run_on_cpu(void* index,
-                     IndexType index_type,
-                     float* total_query_vectors,
-                     SizeT total_query_count,
-                     SizeT dimension,
-                     SizeT top_k,
-                     const i32* ground_truth) {
-//    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
-//    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
-//    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
-//    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-//    const HashSet<i64> cpu_mask{1, 3, 5, 7};
+void scheduler_run_on_cpu(void *index,
+                          IndexType index_type,
+                          float *total_query_vectors,
+                          SizeT total_query_count,
+                          SizeT dimension,
+                          SizeT top_k,
+                          const i32 *ground_truth) {
+    //    const HashSet<i64> cpu_mask{1, 3, 5, 7, 9, 11, 13, 15};
+    //    const HashSet<i64> cpu_mask{1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15};
+    //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
+    //    const HashSet<i64> cpu_mask{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    //    const HashSet<i64> cpu_mask{1, 3, 5, 7};
     const HashSet<i64> cpu_mask;
-//    total_query_count = 16;
+    //    total_query_count = 16;
 
     i64 cpu_count = std::thread::hardware_concurrency();
     HashSet<i64> cpu_set;
-    for(i64 idx = 0; idx < cpu_count; ++idx) {
-        if(!cpu_mask.contains(idx)) {
+    for (i64 idx = 0; idx < cpu_count; ++idx) {
+        if (!cpu_mask.contains(idx)) {
             cpu_set.insert(idx);
         }
     }
 
     SizeT task_count = cpu_set.size();
-    if(task_count == 0) {
+    if (task_count == 0) {
         assert(false || !"No cpu available");
     }
     SizeT base_task_size = total_query_count / task_count;
@@ -402,68 +355,46 @@ scheduler_run_on_cpu(void* index,
     Vector<UniquePtr<Task>> tasks;
     tasks.reserve(task_count);
 
-    i64* total_result_ids = new faiss::idx_t[total_query_count * top_k];
-    f32* total_result_distances = new float[total_query_count * top_k];
+    i64 *total_result_ids = new faiss::idx_t[total_query_count * top_k];
+    f32 *total_result_distances = new float[total_query_count * top_k];
 
-    for(SizeT idx = 0; idx < task_count; ++idx) {
+    for (SizeT idx = 0; idx < task_count; ++idx) {
         SizeT query_count = base_task_size;
-        if(reminder_size > 0) {
+        if (reminder_size > 0) {
             ++query_count;
             --reminder_size;
         }
-        f32* query_vectors = &total_query_vectors[query_offset * dimension];
+        f32 *query_vectors = &total_query_vectors[query_offset * dimension];
 
-        i64* result_ids = &total_result_ids[query_offset * top_k];
-        f32* result_distances = &total_result_distances[query_offset * top_k];
+        i64 *result_ids = &total_result_ids[query_offset * top_k];
+        f32 *result_distances = &total_result_distances[query_offset * top_k];
 
-        switch(index_type) {
+        switch (index_type) {
 
             case IndexType::kIVFFlat: {
-                faiss::IndexIVFFlat* ivf_flat_index = (faiss::IndexIVFFlat*)index;
+                faiss::IndexIVFFlat *ivf_flat_index = (faiss::IndexIVFFlat *)index;
                 ivf_flat_index->nprobe = 32; // Default value is 1;
-                tasks.emplace_back(MakeUnique<AnnIVFFlatTask>(ivf_flat_index,
-                                                              dimension,
-                                                              query_count,
-                                                              query_vectors,
-                                                              top_k,
-                                                              result_ids,
-                                                              result_distances));
+                tasks.emplace_back(
+                    MakeUnique<AnnIVFFlatTask>(ivf_flat_index, dimension, query_count, query_vectors, top_k, result_ids, result_distances));
                 break;
             }
             case IndexType::kIVFSQ8: {
-                faiss::IndexIVFScalarQuantizer* ivf_sq8_index = (faiss::IndexIVFScalarQuantizer*)index;
+                faiss::IndexIVFScalarQuantizer *ivf_sq8_index = (faiss::IndexIVFScalarQuantizer *)index;
                 ivf_sq8_index->nprobe = 32; // Default value is 1;
-                tasks.emplace_back(MakeUnique<AnnIVFSQ8Task>(ivf_sq8_index,
-                                                             dimension,
-                                                             query_count,
-                                                             query_vectors,
-                                                             top_k,
-                                                             result_ids,
-                                                             result_distances));
+                tasks.emplace_back(
+                    MakeUnique<AnnIVFSQ8Task>(ivf_sq8_index, dimension, query_count, query_vectors, top_k, result_ids, result_distances));
                 break;
             }
             case IndexType::kHnsw: {
                 SizeT ef_construction = 200;
-                hnswlib::HierarchicalNSW<float>* hnsw_index = (hnswlib::HierarchicalNSW<float>*)index;
+                hnswlib::HierarchicalNSW<float> *hnsw_index = (hnswlib::HierarchicalNSW<float> *)index;
                 hnsw_index->setEf(ef_construction);
-                tasks.emplace_back(MakeUnique<AnnHNSWTask>(hnsw_index,
-                                                           dimension,
-                                                           query_count,
-                                                           query_vectors,
-                                                           top_k,
-                                                           result_ids,
-                                                           result_distances));
+                tasks.emplace_back(MakeUnique<AnnHNSWTask>(hnsw_index, dimension, query_count, query_vectors, top_k, result_ids, result_distances));
                 break;
             }
             case IndexType::kFlat: {
-                faiss::IndexFlatL2* flat_index = (faiss::IndexFlatL2*)index;
-                tasks.emplace_back(MakeUnique<AnnFlatTask>(flat_index,
-                                                           dimension,
-                                                           query_count,
-                                                           query_vectors,
-                                                           top_k,
-                                                           result_ids,
-                                                           result_distances));
+                faiss::IndexFlatL2 *flat_index = (faiss::IndexFlatL2 *)index;
+                tasks.emplace_back(MakeUnique<AnnFlatTask>(flat_index, dimension, query_count, query_vectors, top_k, result_ids, result_distances));
                 break;
             }
             default:
@@ -476,7 +407,7 @@ scheduler_run_on_cpu(void* index,
     Scheduler scheduler;
     scheduler.Init(cpu_set);
     i64 task_id{0};
-    for(i64 cpu_id: cpu_set) {
+    for (i64 cpu_id : cpu_set) {
         scheduler.ScheduleTask(cpu_id, tasks[task_id].get());
         ++task_id;
     }
@@ -485,28 +416,28 @@ scheduler_run_on_cpu(void* index,
 
     int n_1 = 0, n_10 = 0, n_100 = 0;
     HashSet<i32> gt1, gt10, gt100;
-    for(int i = 0; i < total_query_count; i++) {
-        for(int j = 0; j < top_k; ++j) {
+    for (int i = 0; i < total_query_count; i++) {
+        for (int j = 0; j < top_k; ++j) {
             i32 gt_id = ground_truth[i * top_k + j];
-            if(j < 1) {
+            if (j < 1) {
                 gt1.insert(gt_id);
             }
-            if(j < 10) {
+            if (j < 10) {
                 gt10.insert(gt_id);
             }
-            if(j < 100) {
+            if (j < 100) {
                 gt100.insert(gt_id);
             }
         }
-        for(int j = 0; j < top_k; j++) {
+        for (int j = 0; j < top_k; j++) {
             i32 result_id = total_result_ids[i * top_k + j];
-            if(j < 1 && gt1.contains(result_id)) {
+            if (j < 1 && gt1.contains(result_id)) {
                 ++n_1;
             }
-            if(j < 10 && gt10.contains(result_id)) {
+            if (j < 10 && gt10.contains(result_id)) {
                 ++n_10;
             }
-            if(j < 100 && gt100.contains(result_id)) {
+            if (j < 100 && gt100.contains(result_id)) {
                 ++n_100;
             }
         }
@@ -519,40 +450,35 @@ scheduler_run_on_cpu(void* index,
     delete[] total_result_distances;
 }
 
-static float*
-float_vector_read(const char* fname, size_t* dimension, size_t* row_count, const char* comment) {
+static float *float_vector_read(const char *fname, size_t *dimension, size_t *row_count, const char *comment) {
     infinity::BaseProfiler profiler;
     profiler.Begin();
-    float* float_vec = fvecs_read(fname, dimension, row_count);
+    float *float_vec = fvecs_read(fname, dimension, row_count);
     profiler.End();
-    if(comment != nullptr) {
-        std::cout << "Load " << comment << ": " << profiler.ElapsedToString() << ", "
-                  << get_current_rss() / 1000000 << " MB" << std::endl;
+    if (comment != nullptr) {
+        std::cout << "Load " << comment << ": " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
     }
     return float_vec;
 }
 
-static int*
-integer_vector_read(const char* fname, size_t* dimension, size_t* row_count, const char* comment) {
+static int *integer_vector_read(const char *fname, size_t *dimension, size_t *row_count, const char *comment) {
     infinity::BaseProfiler profiler;
     profiler.Begin();
-    int* float_vec = ivecs_read(fname, dimension, row_count);
+    int *float_vec = ivecs_read(fname, dimension, row_count);
     profiler.End();
-    if(comment != nullptr) {
-        std::cout << "Load " << comment << ": " << profiler.ElapsedToString() << ", "
-                  << get_current_rss() / 1000000 << " MB" << std::endl;
+    if (comment != nullptr) {
+        std::cout << "Load " << comment << ": " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
     }
     return float_vec;
 }
 
-void
-benchmark_flat() {
+void benchmark_flat() {
     std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
-    faiss::Index* index;
+    faiss::Index *index;
     int dimension = 128;
     std::ifstream f(flat_index_name);
-    if(f.good()) {
+    if (f.good()) {
         // Found index file
         std::cout << "Found flat index file ... " << std::endl;
         index = faiss::read_index(flat_index_name);
@@ -563,20 +489,14 @@ benchmark_flat() {
             profiler.Begin();
             index = new faiss::IndexFlatL2(dimension);
             profiler.End();
-            std::cout << "Create Flat index: " << profiler.ElapsedToString() << ", "
-                      << get_current_rss() / 1000000 << " MB" << std::endl;
+            std::cout << "Create Flat index: " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
         }
 
         // Read base vector data
         SizeT base_vector_row_count{0};
         SizeT base_vector_dimension{0};
-        float* base_vectors{nullptr};
-        {
-            base_vectors = float_vector_read(sift1m_base,
-                                             &base_vector_dimension,
-                                             &base_vector_row_count,
-                                             "Base Vector");
-        }
+        float *base_vectors{nullptr};
+        { base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector"); }
 
         {
             // Build index
@@ -584,8 +504,7 @@ benchmark_flat() {
             profiler.Begin();
             index->add(base_vector_row_count, base_vectors);
             profiler.End();
-            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", "
-                      << get_current_rss() / 1000000 << " MB" << std::endl;
+            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
         }
 
         delete[] base_vectors;
@@ -596,18 +515,15 @@ benchmark_flat() {
     // Read query vector data
     SizeT query_vector_row_count{0};
     SizeT query_vector_dimension{0};
-    float* query_vectors;
+    float *query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query,
-                                          &query_vector_dimension,
-                                          &query_vector_row_count,
-                                          "Query Vector");
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
-    SizeT top_k{0};                // number of results per query in the GT
-    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT top_k{0};             // number of results per query in the GT
+    i32 *ground_truth{nullptr}; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -618,17 +534,10 @@ benchmark_flat() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
-              << get_current_rss() / 1000000 << "MB" << std::endl;
-//    single_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-//    batch_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index,
-                         IndexType::kFlat,
-                         query_vectors,
-                         query_vector_row_count,
-                         dimension,
-                         top_k,
-                         ground_truth);
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+    //    single_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    //    batch_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index, IndexType::kFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -640,17 +549,16 @@ benchmark_flat() {
     std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
 }
 
-void
-benchmark_ivfflat() {
+void benchmark_ivfflat() {
     std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
     int dimension = 128;
     size_t centroids_count = 4096;
     faiss::IndexFlatL2 quantizer(dimension);
-    faiss::Index* index = nullptr;
+    faiss::Index *index = nullptr;
 
     std::ifstream f(ivf_index_name);
-    if(f.good()) {
+    if (f.good()) {
         // Found index file
         std::cout << "Found index file ... " << std::endl;
         index = faiss::read_index(ivf_index_name);
@@ -670,10 +578,7 @@ benchmark_ivfflat() {
         {
             infinity::BaseProfiler profiler;
             profiler.Begin();
-            float* train_vectors = float_vector_read(sift1m_train,
-                                                     &train_vector_dimension,
-                                                     &train_vector_row_count,
-                                                     "Train Vector");
+            float *train_vectors = float_vector_read(sift1m_train, &train_vector_dimension, &train_vector_row_count, "Train Vector");
             profiler.End();
 
             profiler.Begin();
@@ -686,13 +591,8 @@ benchmark_ivfflat() {
         // Read base vector data
         SizeT base_vector_row_count{0};
         SizeT base_vector_dimension{0};
-        float* base_vectors{nullptr};
-        {
-            base_vectors = float_vector_read(sift1m_base,
-                                             &base_vector_dimension,
-                                             &base_vector_row_count,
-                                             "Base Vector");
-        }
+        float *base_vectors{nullptr};
+        { base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector"); }
 
         {
             // Build index
@@ -700,8 +600,7 @@ benchmark_ivfflat() {
             profiler.Begin();
             index->add(base_vector_row_count, base_vectors);
             profiler.End();
-            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", "
-                      << get_current_rss() / 1000000 << " MB" << std::endl;
+            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
         }
 
         delete[] base_vectors;
@@ -712,18 +611,15 @@ benchmark_ivfflat() {
     // Read query vector data
     SizeT query_vector_row_count{0};
     SizeT query_vector_dimension{0};
-    float* query_vectors;
+    float *query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query,
-                                          &query_vector_dimension,
-                                          &query_vector_row_count,
-                                          "Query Vector");
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
-    SizeT top_k{0};                // number of results per query in the GT
-    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT top_k{0};             // number of results per query in the GT
+    i32 *ground_truth{nullptr}; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -734,17 +630,10 @@ benchmark_ivfflat() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
-              << get_current_rss() / 1000000 << "MB" << std::endl;
-//    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-//    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index,
-                         IndexType::kIVFFlat,
-                         query_vectors,
-                         query_vector_row_count,
-                         dimension,
-                         top_k,
-                         ground_truth);
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+    //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    //    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -756,17 +645,16 @@ benchmark_ivfflat() {
     std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
 }
 
-void
-benchmark_ivfsq8() {
+void benchmark_ivfsq8() {
     std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
     int dimension = 128;
     size_t centroids_count = 4096;
     faiss::IndexFlatL2 quantizer(dimension);
-    faiss::Index* index = nullptr;
+    faiss::Index *index = nullptr;
 
     std::ifstream f(ivfsq8_index_name);
-    if(f.good()) {
+    if (f.good()) {
         // Found index file
         std::cout << "Found index file ... " << std::endl;
         index = faiss::read_index(ivfsq8_index_name);
@@ -790,10 +678,7 @@ benchmark_ivfsq8() {
         {
             infinity::BaseProfiler profiler;
             profiler.Begin();
-            float* train_vectors = float_vector_read(sift1m_train,
-                                                     &train_vector_dimension,
-                                                     &train_vector_row_count,
-                                                     "Train Vector");
+            float *train_vectors = float_vector_read(sift1m_train, &train_vector_dimension, &train_vector_row_count, "Train Vector");
             profiler.End();
 
             profiler.Begin();
@@ -806,13 +691,8 @@ benchmark_ivfsq8() {
         // Read base vector data
         SizeT base_vector_row_count{0};
         SizeT base_vector_dimension{0};
-        float* base_vectors{nullptr};
-        {
-            base_vectors = float_vector_read(sift1m_base,
-                                             &base_vector_dimension,
-                                             &base_vector_row_count,
-                                             "Base Vector");
-        }
+        float *base_vectors{nullptr};
+        { base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector"); }
 
         {
             // Build index
@@ -820,8 +700,7 @@ benchmark_ivfsq8() {
             profiler.Begin();
             index->add(base_vector_row_count, base_vectors);
             profiler.End();
-            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", "
-                      << get_current_rss() / 1000000 << " MB" << std::endl;
+            std::cout << "Insert Base Vector into index: " << profiler.ElapsedToString() << ", " << get_current_rss() / 1000000 << " MB" << std::endl;
         }
 
         delete[] base_vectors;
@@ -832,18 +711,15 @@ benchmark_ivfsq8() {
     // Read query vector data
     SizeT query_vector_row_count{0};
     SizeT query_vector_dimension{0};
-    float* query_vectors;
+    float *query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query,
-                                          &query_vector_dimension,
-                                          &query_vector_row_count,
-                                          "Query Vector");
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
-    SizeT top_k{0};                // number of results per query in the GT
-    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT top_k{0};             // number of results per query in the GT
+    i32 *ground_truth{nullptr}; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -854,17 +730,10 @@ benchmark_ivfsq8() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
-              << get_current_rss() / 1000000 << "MB" << std::endl;
-//    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-//    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(index,
-                         IndexType::kIVFSQ8,
-                         query_vectors,
-                         query_vector_row_count,
-                         dimension,
-                         top_k,
-                         ground_truth);
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
+    //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    //    single_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(index, IndexType::kIVFSQ8, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -876,8 +745,7 @@ benchmark_ivfsq8() {
     std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
 }
 
-void
-benchmark_hnsw() {
+void benchmark_hnsw() {
     std::cout << "Before query, current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
     SizeT dimension = 128;
@@ -885,42 +753,37 @@ benchmark_hnsw() {
     SizeT ef_construction = 200;
     assert(dimension == 128 || !"embedding dimension isn't 128");
     hnswlib::L2Space l2space(dimension);
-    hnswlib::HierarchicalNSW<float>* hnsw_index = nullptr;
+    hnswlib::HierarchicalNSW<float> *hnsw_index = nullptr;
 
     std::ifstream f(hnsw_index_l2_name);
-    if(f.good()) {
+    if (f.good()) {
         // Found index file
         std::cout << "Found index file ... " << std::endl;
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
     } else {
-        SizeT max_elements = 10000000;        // create index
+        SizeT max_elements = 10000000; // create index
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
 
         // Read base vector data
         SizeT base_vector_row_count{0};
         SizeT base_vector_dimension{0};
-        float* base_vectors{nullptr};
-        {
-            base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count,
-                                             "Base Vector");
-        }
+        float *base_vectors{nullptr};
+        { base_vectors = float_vector_read(sift1m_base, &base_vector_dimension, &base_vector_row_count, "Base Vector"); }
 
         {
             // Insert data into index
             infinity::BaseProfiler profiler;
             profiler.Begin();
             // insert data into index
-            for(SizeT idx = 0; idx < base_vector_row_count; ++idx) {
+            for (SizeT idx = 0; idx < base_vector_row_count; ++idx) {
                 hnsw_index->addPoint(base_vectors + idx * dimension, idx);
 
-                if(idx % 100000 == 0) {
-                    std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, "
-                              << profiler.ElapsedToString() << std::endl;
+                if (idx % 100000 == 0) {
+                    std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, " << profiler.ElapsedToString() << std::endl;
                 }
             }
             profiler.End();
-            std::cout << "Insert data cost: " << profiler.ElapsedToString()
-                      << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+            std::cout << "Insert data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
             hnsw_index->saveIndex(hnsw_index_l2_name);
         }
         delete[] base_vectors;
@@ -929,18 +792,15 @@ benchmark_hnsw() {
     // Read query vector data
     SizeT query_vector_row_count{0};
     SizeT query_vector_dimension{0};
-    float* query_vectors;
+    float *query_vectors;
     {
-        query_vectors = float_vector_read(sift1m_query,
-                                          &query_vector_dimension,
-                                          &query_vector_row_count,
-                                          "Query Vector");
+        query_vectors = float_vector_read(sift1m_query, &query_vector_dimension, &query_vector_row_count, "Query Vector");
         assert(query_vector_dimension == dimension || !"query does not have same dimension as base set");
     }
 
     // Read ground truth
-    SizeT top_k{0};                // number of results per query in the GT
-    i32* ground_truth{nullptr};   // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    SizeT top_k{0};             // number of results per query in the GT
+    i32 *ground_truth{nullptr}; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     SizeT ground_truth_row_count{0};
     {
         // load ground-truth
@@ -951,18 +811,11 @@ benchmark_hnsw() {
     infinity::BaseProfiler profiler;
     profiler.Begin();
 
-    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: "
-              << get_current_rss() / 1000000 << "MB" << std::endl;
+    std::cout << "Start to query: " << query_vector_row_count << " vectors, Current memory: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
-//    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-//    single_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
-    scheduler_run_on_cpu(hnsw_index,
-                         IndexType::kHnsw,
-                         query_vectors,
-                         query_vector_row_count,
-                         dimension,
-                         top_k,
-                         ground_truth);
+    //    batch_run_on_cpu(index, IndexType::kIVFFlat, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    //    single_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
+    scheduler_run_on_cpu(hnsw_index, IndexType::kHnsw, query_vectors, query_vector_row_count, dimension, top_k, ground_truth);
     profiler.End();
     std::cout << "Spend total: " << profiler.ElapsedToString() << std::endl;
 
@@ -972,24 +825,22 @@ benchmark_hnsw() {
         delete hnsw_index;
     }
     std::cout << "Memory: " << get_current_rss() / 1000000 << " MB" << std::endl;
-
 }
 
-void
-scheduler_test() {
+void scheduler_test() {
     Scheduler scheduler;
     u32 thread_count = std::thread::hardware_concurrency();
     Vector<UniquePtr<DummyTask>> tasks;
     tasks.reserve(thread_count);
     HashSet<i64> cpu_set;
-    for(i64 idx = 0; idx < thread_count; ++idx) {
+    for (i64 idx = 0; idx < thread_count; ++idx) {
         cpu_set.insert(idx);
         tasks.emplace_back(std::move(MakeUnique<DummyTask>()));
     }
 
     scheduler.Init(cpu_set);
-    for(i64 idx = 0; idx < 5; ++idx) {
-        for(i64 cpu_id: cpu_set) {
+    for (i64 idx = 0; idx < 5; ++idx) {
+        for (i64 cpu_id : cpu_set) {
             scheduler.ScheduleTask(cpu_id, tasks[cpu_id].get());
         }
     }
@@ -997,13 +848,12 @@ scheduler_test() {
     scheduler.Uninit();
 }
 
-auto
-main() -> int {
-//    benchmark_flat();
-//    benchmark_flat();
-//    benchmark_ivfflat();
+auto main() -> int {
+    //    benchmark_flat();
+    //    benchmark_flat();
+    //    benchmark_ivfflat();
     benchmark_ivfsq8();
-//    benchmark_hnsw();
-//    scheduler_test();
+    //    benchmark_hnsw();
+    //    scheduler_test();
     return 0;
 }

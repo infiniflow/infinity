@@ -3,13 +3,14 @@
 //
 
 #include "function/table/seq_scan.h"
-
-#include "storage/storage.h"
-#include "storage/data_block.h"
-#include "storage/meta/entry/table_collection_entry.h"
 #include "common/column_vector/column_vector.h"
-
 #include "main/query_context.h"
+#include "storage/buffer/column_buffer.h"
+#include "storage/data_block.h"
+#include "storage/meta/entry/block_column_entry.h"
+#include "storage/meta/entry/segment_entry.h"
+#include "storage/meta/entry/table_collection_entry.h"
+#include "storage/storage.h"
 
 namespace infinity {
 

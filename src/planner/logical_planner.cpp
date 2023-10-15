@@ -4,11 +4,12 @@
 
 #include "logical_planner.h"
 #include "main/query_context.h"
-#include "storage/txn/txn.h"
 #include "storage/meta/entry/table_collection_entry.h"
+#include "storage/txn/txn.h"
 
 #include "expression/cast_expression.h"
 #include "function/cast/cast_function.h"
+#include "parser/definition/ivfflat_index_def.h"
 #include "planner/binder/insert_binder.h"
 #include "planner/explain_logical_plan.h"
 #include "planner/node/logical_create_collection.h"
@@ -29,7 +30,6 @@
 #include "planner/node/logical_show.h"
 #include "query_binder.h"
 #include "src/parser/statement.h"
-#include "storage/index_def/ivfflat_index_def.h"
 #include "storage/io/local_file_system.h"
 
 namespace infinity {
@@ -376,7 +376,7 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     }
 
     Vector<String> column_names(*create_index_info->column_names_);
-    String index_name = std::move(create_index_info->index_name_);
+    auto index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     IndexMethod method_type = IndexMethod::kInvalid;
     if (create_index_info->method_type_ == "IVFFlat") {
         method_type = IndexMethod::kIVFFlat;
@@ -387,12 +387,13 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     } else {
         PlannerException("Invalid index method type.");
     }
-    auto index_def_common = IndexDefCommon(std::move(index_name), std::move(method_type), std::move(column_names));
+    // auto index_def_common = IndexDefCommon(std::move(index_name), std::move(method_type), std::move(column_names));
 
     SharedPtr<IndexDef> index_def_ptr = nullptr;
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
-            index_def_ptr = IVFFlatIndexDef::Make(std::move(index_def_common), *create_index_info->index_para_list_);
+            index_def_ptr =
+                IVFFlatIndexDef::Make(std::move(index_name), std::move(method_type), std::move(column_names), *create_index_info->index_para_list_);
             break;
         }
         case IndexMethod::kInvalid: {

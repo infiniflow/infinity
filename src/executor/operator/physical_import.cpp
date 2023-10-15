@@ -3,27 +3,23 @@
 //
 
 #include "physical_import.h"
-
-#include "storage/meta/entry/db_entry.h"
-#include "storage/txn/txn.h"
-#include "storage/wal/wal_entry.h"
-#include "storage/table.h"
-#include "storage/table_def.h"
-
-#include "common/default_values.h"
 #include "common/types/data_type.h"
 #include "common/types/info/varchar_info.h"
-
 #include "common/types/logical_type.h"
 #include "common/utility/defer_op.h"
 #include "common/utility/infinity_assert.h"
 #include "executor/operator_state.h"
 #include "main/query_context.h"
+#include "parser/definition/table_def.h"
 #include "storage/buffer/buffer_handle.h"
 #include "storage/io/local_file_system.h"
+#include "storage/meta/entry/db_entry.h"
 #include "storage/meta/entry/segment_column_entry.h"
 #include "storage/meta/entry/segment_entry.h"
+#include "storage/table.h"
+#include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
+#include "storage/wal/wal_entry.h"
 #include <cstring>
 
 extern "C" {
@@ -121,7 +117,7 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
                                                                               segment_id,
                                                                               query_context->GetTxn()->GetBufferMgr());
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    CommonObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
+    ObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
 
     while (true) {
@@ -160,7 +156,7 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
                                                               query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
-            object_handle = CommonObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
+            object_handle = ObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
         }
     }
     return vector_n;

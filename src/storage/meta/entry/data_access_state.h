@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "common/types/alias/db_type.h"
 #include "storage/data_block.h"
 
 namespace infinity {
