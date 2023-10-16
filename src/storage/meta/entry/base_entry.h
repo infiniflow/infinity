@@ -5,9 +5,7 @@
 #pragma once
 
 #include "common/default_values.h"
-#include "common/types/alias/concurrency.h"
 #include "common/types/alias/smart_ptr.h"
-// #include "storage/txn/txn_state.h"
 
 namespace infinity {
 

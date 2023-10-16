@@ -43,3 +43,13 @@ CREATE INDEX [[IF NOT EXISTS] name] ON table_name (column_name[, ...]) USING met
 
 <!-- TODO shenyushi
 such as: centroids_count, MetricType -->
+
+### DROP INDEX
+
+DROP INDEX — remove an index
+
+#### Synopsis
+
+```sql
+DROP INDEX [IF EXISTS] name ON table_name
+```

@@ -4,6 +4,7 @@
 
 #include "storage/meta/entry/table_collection_entry.h"
 #include "parser/definition/index_def.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/common/block_index.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/meta/index_def_meta.h"
@@ -38,8 +39,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                               ConflictType conflict_type,
                                               u64 txn_id,
                                               TxnTimeStamp begin_ts,
-                                              TxnManager *txn_mgr,
-                                              BufferManager *buffer_mgr) {
+                                              TxnManager *txn_mgr) {
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
     if (index_def->index_name_->empty()) {
@@ -81,10 +81,37 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
     return res;
 }
 
-EntryResult
-TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    NotImplementError("Not implemented.");
-    // TODO
+EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
+                                            const String &index_name,
+                                            ConflictType conflict_type,
+                                            u64 txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr) {
+    table_entry->rw_locker_.lock_shared();
+
+    IndexDefMeta *index_meta{nullptr};
+    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
+        index_meta = iter->second.get();
+    }
+    table_entry->rw_locker_.unlock_shared();
+    if (index_meta == nullptr) {
+        switch (conflict_type) {
+            LOG_TRACE("Attempt to drop not existed index entry {}", index_name);
+            case ConflictType::kIgnore: {
+                return {nullptr, nullptr};
+            }
+            case ConflictType::kError: {
+                return {nullptr, MakeUnique<String>("Attempt to drop not existed index entry")};
+            }
+            default: {
+                StorageError("Invalid conflict type.");
+            } break;
+        }
+        StorageError("Should not reach here.");
+    } else {
+        LOG_TRACE("Drop index entry {}", index_name);
+        return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
+    }
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {

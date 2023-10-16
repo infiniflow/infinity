@@ -496,10 +496,14 @@ void LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<Bi
     auto *drop_index_info = (DropIndexInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_index_info->schema_name_);
+    SharedPtr<String> table_name_ptr = MakeShared<String>(drop_index_info->table_name_);
     SharedPtr<String> index_name_ptr = MakeShared<String>(drop_index_info->index_name_);
 
-    SharedPtr<LogicalNode> logical_drop_index =
-        MakeShared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(), schema_name_ptr, index_name_ptr, drop_index_info->conflict_type_);
+    SharedPtr<LogicalNode> logical_drop_index = MakeShared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                             schema_name_ptr,
+                                                                             table_name_ptr,
+                                                                             index_name_ptr,
+                                                                             drop_index_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back("OK");

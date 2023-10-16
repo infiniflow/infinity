@@ -96,6 +96,11 @@ bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
            other_cmd->index_def_ != nullptr && *index_def_ == *other_cmd->index_def_;
 }
 
+bool WalCmdDropIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropIndex *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_name_ == other_cmd->index_name_;
+}
+
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
     if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir)
@@ -145,6 +150,11 @@ int32_t WalCmdDropTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size();
 }
 
+int32_t WalCmdDropIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+           this->index_name_.size();
+}
+
 int32_t WalCmdImport::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size() + sizeof(int32_t) +
            this->segment_dir.size();
@@ -188,6 +198,13 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_TABLE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
+}
+
+void WalCmdDropIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
 }
 
 void WalCmdImport::WriteAdv(char *&buf) const {

@@ -12,7 +12,7 @@ class BufferManager;
 class SegmentEntry;
 class FaissIndexPtr;
 
-class IndexEntry : BaseEntry {
+class IndexEntry : public BaseEntry {
 private:
     explicit IndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferHandle *buffer_handle)
         : BaseEntry(EntryType::kIndex), segment_entry_(segment_entry), index_name_(std::move(index_name)), buffer_handle_(buffer_handle){};

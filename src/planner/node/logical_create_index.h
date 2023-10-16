@@ -14,8 +14,7 @@ public:
     [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const override;
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
-
-    String ToString(i64 &space) const final; // TTT shenyushi: should be const
+    String ToString(i64 &space) const final;
 
     inline String name() override { return "LogicalCreateIndex"; }
 

@@ -334,7 +334,6 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
 
     auto *table_entry = static_cast<TableCollectionEntry *>(res.entry_);
     txn_tables_.insert(table_entry);
-    table_names_.insert(*table_def->table_name());
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
     return res;
 }
@@ -354,7 +353,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
         return {nullptr, std::move(err_msg)};
     }
 
-    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, GetBufferMgr());
+    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if (res.entry_ == nullptr) {
         return res;
@@ -364,7 +363,6 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
     txn_indexes_.insert(index_def_entry);
-    index_names_.insert(*index_def->index_name_);
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
 
@@ -411,12 +409,37 @@ EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &
         txn_tables_.insert(dropped_table_entry);
     }
 
-    if (table_names_.contains(table_name)) {
-        table_names_.erase(table_name);
-    } else {
-        table_names_.insert(table_name);
-    }
     wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
+    return res;
+}
+
+EntryResult Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
+    TxnState txn_state = txn_context_.GetTxnState();
+    if (txn_state != TxnState::kStarted) {
+        LOG_TRACE("Transaction isn't started.")
+        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
+    }
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    TableCollectionEntry *table_entry{nullptr};
+    UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
+    if (err_msg != nullptr) {
+        return {nullptr, std::move(err_msg)};
+    }
+
+    EntryResult res = TableCollectionEntry::DropIndex(table_entry, index_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    if (res.entry_ == nullptr) {
+        return res;
+    }
+
+    auto dropped_index_entry = static_cast<IndexDefEntry *>(res.entry_);
+    if (txn_indexes_.contains(dropped_index_entry)) {
+        txn_indexes_.erase(dropped_index_entry);
+    } else {
+        txn_indexes_.insert(dropped_index_entry);
+    }
+
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
     return res;
 }
 
@@ -480,7 +503,6 @@ EntryResult Txn::CreateCollection(const String &db_name, const String &collectio
 
     auto *table_entry = static_cast<TableCollectionEntry *>(res.entry_);
     txn_tables_.insert(table_entry);
-    table_names_.insert(collection_name);
     return res;
 }
 

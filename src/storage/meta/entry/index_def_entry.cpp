@@ -16,7 +16,9 @@ nlohmann::json IndexDefEntry::Serialize(const IndexDefEntry *index_def_entry) {
     json["commit_ts"] = index_def_entry->commit_ts_.load();
     json["txn_id"] = index_def_entry->txn_id_.load();
     json["delete"] = index_def_entry->deleted_;
-    json["index_def"] = index_def_entry->index_def_->Serialize();
+    if (!index_def_entry->deleted_) {
+        json["index_def"] = index_def_entry->index_def_->Serialize();
+    }
     return json;
 }
 

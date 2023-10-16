@@ -3,10 +3,10 @@
 //
 
 #include "physical_sink.h"
-#include "executor/operator_state.h"
 #include "common/utility/infinity_assert.h"
-#include "spdlog/fmt/fmt.h"
+#include "executor/operator_state.h"
 #include "parser/statement/extra/create_table_info.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 
@@ -143,16 +143,12 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCreateIndex: {
-            auto *output_state =
-                static_cast<CreateIndexOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateIndexOutputState *>(task_output_state);
             if (output_state->error_message_ != nullptr) {
-                result_sink_state->error_message_ =
-                    std::move(output_state->error_message_);
+                result_sink_state->error_message_ = std::move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(
-                        0, MakeShared<DataType>(LogicalType::kInteger), "OK",
-                        HashSet<ConstraintType>()),
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
                 };
             }
             break;
@@ -194,6 +190,17 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+            }
+            break;
+        }
+        case PhysicalOperatorType::kDropIndex: {
+            auto *output_state = static_cast<DropIndexOutputState *>(task_output_state);
+            if (output_state->error_message_ != nullptr) {
+                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            } else {
+                result_sink_state->result_def_ = {
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                };
             }
             break;
         }

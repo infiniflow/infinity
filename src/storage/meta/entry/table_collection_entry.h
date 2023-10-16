@@ -22,10 +22,11 @@ class BlockIndex;
 class ColumnDef;
 class DeleteState;
 class ScanState;
-class IndexMeta;
 class SegmentEntry;
-class IndexEntry;
+class IndexMeta;
+class IndexDefEntry;
 class IndexDef;
+class IndexEntry;
 class AppendState;
 
 struct TableCollectionEntry : public BaseEntry {
@@ -44,10 +45,14 @@ public:
                                    ConflictType conflict_type,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts,
-                                   TxnManager *txn_mgr,
-                                   BufferManager *buffer_mgr);
+                                   TxnManager *txn_mgr);
 
-    static EntryResult DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static EntryResult DropIndex(TableCollectionEntry *table_entry,
+                                 const String &index_name,
+                                 ConflictType conflict_type,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr);
 
     static EntryResult GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
 

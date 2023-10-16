@@ -1,0 +1,35 @@
+# name: test/sql/ddl/create_index/test_index.sql
+# description: Test create index
+# group: [ddl, create_index]
+
+statement ok
+DROP TABLE IF EXISTS test_index;
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement ok
+CREATE TABLE test_index (col1 embedding(float,128));
+
+# import data from fvecs file
+statement ok
+COPY test_index FROM './test/data/fvecs/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+
+statement ok
+CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement error
+CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+CREATE INDEX IF NOT EXISTS idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+CREATE INDEX ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+DROP INDEX idx1 ON test_index;
+
+statement error
+DROP INDEX idx1 ON test_index;
+
+statement ok
+DROP INDEX IF EXISTS idx1 ON test_index;
