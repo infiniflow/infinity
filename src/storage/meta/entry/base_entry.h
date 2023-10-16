@@ -30,7 +30,7 @@ struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
-            deleted_ = false;
+            deleted_ = true;
         }
     }
 

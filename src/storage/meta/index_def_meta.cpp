@@ -1,10 +1,10 @@
 #include "index_def_meta.h"
-
 #include "common/default_values.h"
 #include "common/types/alias/concurrency.h"
 #include "common/utility/infinity_assert.h"
 #include "json.hpp"
 #include "main/logger.h"
+#include "parser/statement/extra/extra_ddl_info.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/meta/entry/index_def_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
@@ -12,9 +12,13 @@
 #include "storage/txn/txn_state.h"
 
 namespace infinity {
-EntryResult
-IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> index_def, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    auto index_def_entry = MakeUnique<IndexDefEntry>(std::move(index_def), index_def_meta, txn_id, begin_ts);
+EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
+                                         SharedPtr<IndexDef> index_def,
+                                         ConflictType conflict_type,
+                                         u64 txn_id,
+                                         TxnTimeStamp begin_ts,
+                                         TxnManager *txn_mgr) {
+    auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts);
     IndexDefEntry *res = index_def_entry.get();
 
     // write lock guard
@@ -22,8 +26,7 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
     if (index_def_meta->entry_list_.empty()) {
         // Insert a dummy entry
         auto dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
-        dummy_entry->deleted_ = true;
-        index_def_meta->entry_list_.emplace_back(std::move(dummy_entry));
+        index_def_meta->entry_list_.emplace_front(std::move(dummy_entry));
     }
 
     BaseEntry *header_base_entry = index_def_meta->entry_list_.front().get();
@@ -33,11 +36,22 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
         if (begin_ts > header_base_entry->commit_ts_) {
             if (header_base_entry->deleted_) {
                 // No conflict. The dummy entry commit_ts is 0 and deleted so can always reach here.
-                index_def_meta->entry_list_.emplace_back(std::move(index_def_entry));
+                index_def_meta->entry_list_.emplace_front(std::move(index_def_entry));
                 return {.entry_ = res, .err_ = nullptr};
             } else {
                 LOG_TRACE("Duplicated index: {}.", *index_def->index_name_);
-                return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
+                switch (conflict_type) {
+                    case ConflictType::kIgnore: {
+                        return {.entry_ = nullptr, .err_ = nullptr};
+                    }
+                    case ConflictType::kError: {
+                        return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
+                    }
+                    default: {
+                        StorageError("Invalid conflict type");
+                    }
+                }
+                StorageError("Cannot reach here");
             }
         } else {
             // Write-Write conflict
@@ -55,11 +69,22 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
                 if (header_base_entry->txn_id_ == txn_id) {
                     // Same txn
                     if (header_base_entry->deleted_) {
-                        index_def_meta->entry_list_.emplace_back(std::move(index_def_entry));
+                        index_def_meta->entry_list_.emplace_front(std::move(index_def_entry));
                         return {.entry_ = res, .err_ = nullptr};
                     } else {
                         LOG_TRACE("Duplicated index: {}.", *index_def->index_name_);
-                        return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
+                        switch (conflict_type) {
+                            case ConflictType::kIgnore: {
+                                return {.entry_ = nullptr, .err_ = nullptr};
+                            }
+                            case ConflictType::kError: {
+                                return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
+                            }
+                            default: {
+                                StorageError("Invalid conflict type");
+                            }
+                        }
+                        StorageError("Cannot reach here");
                     }
                 } else {
                     LOG_TRACE("Write-Write conflict: There is an uncommitted index.");
@@ -72,7 +97,7 @@ IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta, SharedPtr<IndexDef> i
             case TxnState::kRollbacking: {
                 // Remove the header entry
                 index_def_meta->entry_list_.pop_front();
-                index_def_meta->entry_list_.emplace_back(std::move(index_def_entry));
+                index_def_meta->entry_list_.emplace_front(std::move(index_def_entry));
                 return {.entry_ = res, .err_ = nullptr};
             }
             default:
@@ -111,7 +136,7 @@ nlohmann::json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
 
     for (const auto &entry : index_def_meta->entry_list_) {
         if (entry->entry_type_ == EntryType::kIndexDef) {
-            json["entries"].push_back(IndexDefEntry::Serialize(static_cast<IndexDefEntry *>(entry.get())));
+            json["entries"].emplace_back(IndexDefEntry::Serialize(static_cast<IndexDefEntry *>(entry.get())));
         } else if (entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE("Skip dummy entry during serialize index {} meta", *index_def_meta->index_name_);
         } else {

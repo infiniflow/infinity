@@ -12,7 +12,6 @@
 #include "storage/io/local_file_system.h"
 #include "storage/meta/entry/data_access_state.h"
 #include "storage/meta/entry/index_entry.h"
-#include "storage/txn/txn.h"
 #include "storage/meta/entry/table_collection_entry.h"
 #include "storage/txn/txn.h"
 #include "storage/txn/txn_store.h"
@@ -182,7 +181,7 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
 
 void SegmentEntry::CommitCreateIndexFile(SegmentEntry *segment_entry, Txn *txn_ptr, SharedPtr<IndexEntry> index_entry) {
     IndexEntry::Flush(index_entry.get());
-    segment_entry->index_entry_map_.emplace(index_entry->index_name(), std::move(index_entry));
+    segment_entry->index_entry_map_.emplace(*index_entry->index_name_, std::move(index_entry));
 }
 
 void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count) {
@@ -190,10 +189,9 @@ void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 s
     std::unique_lock<std::shared_mutex> lck(segment_entry->rw_locker_);
     if (segment_entry->min_row_ts_ == 0) {
         segment_entry->min_row_ts_ = commit_ts;
-    for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
-        IndexEntry::Flush(index_entry.get());
-    }
-
+        for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
+            IndexEntry::Flush(index_entry.get());
+        }
     }
     segment_entry->max_row_ts_ = std::max(segment_entry->max_row_ts_, commit_ts);
 }
@@ -244,7 +242,7 @@ nlohmann::json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp
             continue;
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry, max_commit_ts));
     }
-    for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
+    for (const auto &[_index_name, index_entry] : segment_entry->index_entry_map_) {
         IndexEntry::Flush(index_entry.get());
         json_res["index_entries"].emplace_back(IndexEntry::Serialize(index_entry.get()));
     }
@@ -277,7 +275,7 @@ SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableCollect
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
             SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
-            segment_entry->index_entry_map_.emplace(index_entry->index_name(), std::move(index_entry));
+            segment_entry->index_entry_map_.emplace(*index_entry->index_name_, std::move(index_entry));
         }
     }
 

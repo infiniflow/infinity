@@ -39,11 +39,10 @@ private:
     static inline String IndexDirName(const String &segment_entry_dir) { return segment_entry_dir + "/index"; }
 
 public:
-    [[nodiscard]] inline SharedPtr<String> index_name() { return index_name_; }
+    const SegmentEntry *segment_entry_{};
+    const SharedPtr<String> index_name_{};
 
 private:
-    SegmentEntry *segment_entry_{};
-    SharedPtr<String> index_name_{};
     BufferHandle *buffer_handle_{};
 };
 } // namespace infinity

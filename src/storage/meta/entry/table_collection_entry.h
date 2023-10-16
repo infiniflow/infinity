@@ -117,7 +117,8 @@ public:
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
 
-    HashMap<SharedPtr<String>, UniquePtr<IndexDefMeta>> indexes_{};
+    //
+    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
 };
 
 } // namespace infinity

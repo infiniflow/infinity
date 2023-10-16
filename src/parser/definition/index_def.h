@@ -58,7 +58,7 @@ public:
     static SharedPtr<IndexDef> Deserialize(const nlohmann::json &index_def_json);
 
 public:
-    const SharedPtr<String> index_name_{};
+    SharedPtr<String> index_name_{};
     const IndexMethod method_type_{IndexMethod::kInvalid};
     const Vector<String> column_names_{};
 };

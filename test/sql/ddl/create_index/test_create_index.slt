@@ -7,13 +7,20 @@ DROP TABLE IF EXISTS test_create_index;
 
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement ok
-CREATE TABLE test_create_index (co1 embedding(float,128));
+CREATE TABLE test_create_index (col1 embedding(float,128));
 
 # import data from fvecs file
-query I
+statement ok
 COPY test_create_index FROM '/tmp/infinity/sqllogictest/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
-----
 
-#query I
-#CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
-#----
+statement ok
+CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement error
+CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+CREATE INDEX IF NOT EXISTS idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+
+statement ok
+CREATE INDEX ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);

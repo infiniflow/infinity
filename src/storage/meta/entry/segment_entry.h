@@ -59,7 +59,8 @@ public:
 
     SharedPtr<String> index_dir_{};
 
-    HashMap<SharedPtr<String>, SharedPtr<IndexEntry>> index_entry_map_{};
+    // Want key type to be const String or shared_ptr<const String>
+    HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
     static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry,

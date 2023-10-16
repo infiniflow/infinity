@@ -42,8 +42,23 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                               BufferManager *buffer_mgr) {
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
-    if (table_entry->indexes_.find(index_def->index_name_) != table_entry->indexes_.end()) {
-        index_def_meta = table_entry->indexes_[index_def->index_name_].get();
+    if (index_def->index_name_->empty()) {
+        // set default index name
+        int index_id = 0;
+        String index_name_base = "idx";
+        for (const auto &column_name : index_def->column_names_) {
+            index_name_base += "_" + column_name;
+        }
+        while (true) {
+            auto index_name = index_id > 0 ? (index_name_base + "_" + std::to_string(index_id)) : index_name_base;
+            if (auto iter = table_entry->indexes_.find(index_name); iter == table_entry->indexes_.end()) {
+                index_def->index_name_ = MakeShared<String>(std::move(index_name));
+                break;
+            }
+            index_id++;
+        }
+    } else if (auto iter = table_entry->indexes_.find(*index_def->index_name_); iter != table_entry->indexes_.end()) {
+        index_def_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
 
@@ -53,7 +68,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         index_def_meta = new_index_def_meta.get();
 
         table_entry->rw_locker_.lock();
-        table_entry->indexes_[index_def->index_name_] = std::move(new_index_def_meta);
+        table_entry->indexes_[*index_def->index_name_] = std::move(new_index_def_meta);
         table_entry->rw_locker_.unlock();
 
         LOG_TRACE("Add new index entry for {} in new index meta of table_entry {} ", *index_def->index_name_, *table_entry->table_entry_dir_);
@@ -61,7 +76,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         LOG_TRACE("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_);
     }
     IndexDef *index_def_ptr = index_def.get();
-    EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, std::move(index_def), txn_id, begin_ts, txn_mgr);
+    EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, std::move(index_def), conflict_type, txn_id, begin_ts, txn_mgr);
 
     return res;
 }
@@ -81,8 +96,8 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
     table_entry->rw_locker_.lock_shared();
 
     IndexDefMeta *index_def_meta{nullptr};
-    if (table_entry->indexes_.find(index_name) != table_entry->indexes_.end()) {
-        index_def_meta = table_entry->indexes_[index_name].get();
+    if (auto iter = table_entry->indexes_.find(*index_name); iter != table_entry->indexes_.end()) {
+        index_def_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
 
@@ -356,7 +371,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json &table_entry_json, TableC
     if (table_entry_json.contains("indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
             UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            table_entry->indexes_.emplace(index_def_meta->index_name_, std::move(index_def_meta));
+            table_entry->indexes_.emplace(*index_def_meta->index_name_, std::move(index_def_meta));
         }
     }
 
