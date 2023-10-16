@@ -8,6 +8,8 @@ module infinity;
 
 import stl;
 import logger;
+import config;
+import resource_manager;
 
 namespace infinity {
 
@@ -21,9 +23,9 @@ Infinity::Init(const SharedPtr <String>& config_path) {
         config_->Init(config_path);
 
         Logger::Initialize(config_.get());
-//
-//        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
-//
+
+        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
+
 //        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
 //
 //        storage_ = MakeUnique<Storage>(config_.get());

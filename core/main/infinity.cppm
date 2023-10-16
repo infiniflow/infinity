@@ -8,6 +8,7 @@ export module infinity;
 import singleton;
 import stl;
 import config;
+import resource_manager;
 
 //#include "resource_manager.h"
 //#include "scheduler/fragment_scheduler.h"
@@ -22,8 +23,8 @@ public:
     [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
 //
 //    [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
-//
-//    [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
+
+    [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
     void Init(const SharedPtr<String> &config_path);
 
@@ -35,7 +36,7 @@ private:
     Infinity() = default;
 
     UniquePtr<Config> config_{};
-//    UniquePtr<ResourceManager> resource_manager_{};
+    UniquePtr<ResourceManager> resource_manager_{};
 //    UniquePtr<FragmentScheduler> fragment_scheduler_{};
 //    UniquePtr<Storage> storage_{};
 
