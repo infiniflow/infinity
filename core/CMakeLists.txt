@@ -53,6 +53,30 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        scheduler_cpp
+        CONFIGURE_DEPENDS
+        scheduler/*.cpp
+)
+
+file(GLOB_RECURSE
+        scheduler_cppm
+        CONFIGURE_DEPENDS
+        scheduler/*.cppm
+)
+
+file(GLOB_RECURSE
+        storage_cpp
+        CONFIGURE_DEPENDS
+        storage/*.cpp
+)
+
+file(GLOB_RECURSE
+        storage_cppm
+        CONFIGURE_DEPENDS
+        storage/*.cppm
+)
+
+file(GLOB_RECURSE
         common_cpp
         CONFIGURE_DEPENDS
         common/*.cpp
@@ -70,6 +94,8 @@ add_executable(infinity
         ${infinity_cpp}
         ${network_cpp}
         ${planner_cpp}
+        ${scheduler_cpp}
+        ${storage_cpp}
 )
 
 target_sources(infinity
@@ -80,6 +106,8 @@ target_sources(infinity
         ${network_cppm}
         ${common_cppm}
         ${planner_cppm}
+        ${scheduler_cppm}
+        ${storage_cppm}
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -118,6 +146,8 @@ add_executable(unit_test
         ${infinity_cpp}
         ${network_cpp}
         ${planner_cpp}
+        ${scheduler_cpp}
+        ${storage_cpp}
 #        ${planner_test_src}
 #        ${storage_test_src}
 #        ${parser_test_src}
@@ -148,6 +178,8 @@ target_sources(unit_test
         ${network_cppm}
         ${common_cppm}
         ${planner_cppm}
+        ${scheduler_cppm}
+        ${storage_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

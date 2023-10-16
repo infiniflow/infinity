@@ -8,6 +8,7 @@ import boost;
 import stl;
 import session;
 import pg_protocol_handler;
+import query_context;
 
 export module connection;
 
@@ -36,8 +37,8 @@ private:
 
     void HandleRequest();
 
-//    void HandlerSimpleQuery(QueryContext *query_context);
-//
+    void HandlerSimpleQuery(QueryContext *query_context);
+
 //    void SendTableDescription(const SharedPtr<Table> &result_table);
 //
 //    void SendQueryResponse(const QueryResult &query_result);

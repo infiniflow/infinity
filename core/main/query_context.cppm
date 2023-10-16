@@ -9,6 +9,10 @@ import stl;
 import config;
 import session;
 import resource_manager;
+import fragment_scheduler;
+import profiler;
+import storage;
+import txn;
 
 export module query_context;
 
@@ -30,8 +34,8 @@ struct QueryResult {
     [[nodiscard]] String ToString() const;
 };
 
-class QueryContext {
-#if 0
+export class QueryContext {
+
 public:
     explicit QueryContext() = default;
 
@@ -53,7 +57,6 @@ public:
     }
 
     QueryResult Query(const String &query);
-    //    static QueryResult Execute(const String& query);
 
     inline void set_current_schema(const String &current_schema) { current_schema_ = current_schema; }
 
@@ -90,6 +93,7 @@ public:
     [[nodiscard]] inline ResourceManager *resource_manager() { return resource_manager_; }
 
 private:
+
     SharedPtr<QueryProfiler> query_metrics_;
 
     const Config *global_config_{};
@@ -117,7 +121,7 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
-#endif
+
 };
 
 } // namespace infinity

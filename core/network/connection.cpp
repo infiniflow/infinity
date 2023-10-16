@@ -9,8 +9,12 @@ import boost;
 import stl;
 import session;
 import infinity_exception;
+import infinity_assert;
 import pg_message;
 import logger;
+import query_context;
+import infinity;
+import third_party;
 
 module connection;
 
@@ -61,54 +65,54 @@ void Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
 // FIXME
-//    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
-//    query_context_ptr->Init(session_.get(),
-//                            Infinity::instance().config(),
-//                            Infinity::instance().fragment_scheduler(),
-//                            Infinity::instance().storage(),
-//                            Infinity::instance().resource_manager());
-//    query_context_ptr->set_current_schema(session_->current_database());
-//
-//    switch (cmd_type) {
-//        case PGMessageType::kBindCommand: {
-//            LOG_TRACE("BindCommand");
-//            break;
-//        }
-//        case PGMessageType::kDescribeCommand: {
-//            LOG_TRACE("DescribeCommand");
-//            break;
-//        }
-//        case PGMessageType::kExecuteCommand: {
-//            LOG_TRACE("ExecuteCommand");
-//            break;
-//        }
-//        case PGMessageType::kParseCommand: {
-//            LOG_TRACE("ParseCommand");
-//            break;
-//        }
-//        case PGMessageType::kSimpleQueryCommand: {
-//            HandlerSimpleQuery(query_context_ptr.get());
-//            break;
-//        }
-//        case PGMessageType::kSyncCommand: {
-//            LOG_TRACE("SyncCommand");
-//            break;
-//        }
-//        case PGMessageType::kTerminateCommand: {
-//            terminate_connection_ = true;
-//            break;
-//        }
-//        default: {
-//            NetworkAssert(false, "Unknown command type");
-//        }
-//    }
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
+    query_context_ptr->Init(session_.get(),
+                            Infinity::instance().config(),
+                            Infinity::instance().fragment_scheduler(),
+                            Infinity::instance().storage(),
+                            Infinity::instance().resource_manager());
+    query_context_ptr->set_current_schema(session_->current_database());
+
+    switch (cmd_type) {
+        case PGMessageType::kBindCommand: {
+            LOG_TRACE("BindCommand");
+            break;
+        }
+        case PGMessageType::kDescribeCommand: {
+            LOG_TRACE("DescribeCommand");
+            break;
+        }
+        case PGMessageType::kExecuteCommand: {
+            LOG_TRACE("ExecuteCommand");
+            break;
+        }
+        case PGMessageType::kParseCommand: {
+            LOG_TRACE("ParseCommand");
+            break;
+        }
+        case PGMessageType::kSimpleQueryCommand: {
+            HandlerSimpleQuery(query_context_ptr.get());
+            break;
+        }
+        case PGMessageType::kSyncCommand: {
+            LOG_TRACE("SyncCommand");
+            break;
+        }
+        case PGMessageType::kTerminateCommand: {
+            terminate_connection_ = true;
+            break;
+        }
+        default: {
+            Error<NetworkException>("Unknown command type", __FILE_NAME__, __LINE__);
+        }
+    }
 }
 
-//void Connection::HandlerSimpleQuery(QueryContext *query_context) {
-//    const String &query = pg_handler_->read_command_body();
-//    LOG_TRACE("Query: {}", query);
-//
-//    // Start to execute the query.
+void Connection::HandlerSimpleQuery(QueryContext *query_context) {
+    const String &query = pg_handler_->read_command_body();
+    LOG_TRACE(Format("Query: {}", query));
+
+    // Start to execute the query.
 //    QueryResult result = query_context->Query(query);
 //
 //    // Response to the result message to client
@@ -124,7 +128,7 @@ void Connection::HandleRequest() {
 //    }
 //
 //    pg_handler_->send_ready_for_query();
-//}
+}
 //
 //void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
 //    u32 column_name_length_sum = 0;

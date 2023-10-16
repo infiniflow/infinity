@@ -9,20 +9,18 @@ import singleton;
 import stl;
 import config;
 import resource_manager;
-
-//#include "resource_manager.h"
-//#include "scheduler/fragment_scheduler.h"
-//#include "storage/storage.h"
+import fragment_scheduler;
+import storage;
 
 namespace infinity {
 
 export class Infinity : public Singleton<Infinity> {
 public:
-//    [[nodiscard]] inline FragmentScheduler *fragment_scheduler() noexcept { return fragment_scheduler_.get(); }
-//
+    [[nodiscard]] inline FragmentScheduler *fragment_scheduler() noexcept { return fragment_scheduler_.get(); }
+
     [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
-//
-//    [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
+
+    [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
 
     [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
@@ -37,8 +35,8 @@ private:
 
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};
-//    UniquePtr<FragmentScheduler> fragment_scheduler_{};
-//    UniquePtr<Storage> storage_{};
+    UniquePtr<FragmentScheduler> fragment_scheduler_{};
+    UniquePtr<Storage> storage_{};
 
     bool initialized_{false};
 };

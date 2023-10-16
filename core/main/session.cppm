@@ -5,6 +5,7 @@
 module;
 
 import stl;
+import txn;
 
 export module session;
 
@@ -26,8 +27,7 @@ public:
     }
 
 public:
-    // FIXME
-//    Txn *txn_{};
+    Txn *txn_{};
 
 private:
     // Current schema

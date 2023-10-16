@@ -10,6 +10,8 @@ import stl;
 import logger;
 import config;
 import resource_manager;
+import fragment_scheduler;
+import storage;
 
 namespace infinity {
 
@@ -26,9 +28,9 @@ Infinity::Init(const SharedPtr <String>& config_path) {
 
         resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
 
-//        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
-//
-//        storage_ = MakeUnique<Storage>(config_.get());
+        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
+
+        storage_ = MakeUnique<Storage>(config_.get());
 //        storage_->Init();
 
         initialized_ = true;
