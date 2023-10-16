@@ -120,7 +120,7 @@ void TxnTableStore::PrepareCommit() {
  */
 void TxnTableStore::Commit() {
     Txn *txn_ptr = (Txn *)txn_;
-    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
+    // TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
     TableCollectionEntry::CommitCreateIndexFile(table_entry_, txn_, uncommitted_indexes_);
 }
 

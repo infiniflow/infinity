@@ -21,13 +21,15 @@ class SeqGenerator {
 public:
     // Begin with 1 to avoid distinguish uninitialized value and the minimal
     // valid value.
-    SeqGenerator(int64_t begin = 1) : next_seq_(begin) {}
+    explicit SeqGenerator(i64 begin = 1) : next_seq_(begin) {}
     int64_t Generate() { return next_seq_.fetch_add(1); }
     int64_t GetLast() { return next_seq_.load() - 1; }
 
 private:
     std::atomic<int64_t> next_seq_;
 };
+
+class WalEntry;
 
 class WalManager {
 public:
@@ -60,7 +62,7 @@ public:
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
-    int64_t ReplayWalFile();
+    i64 ReplayWalFile();
 
     void RecycleWalFile();
 private:

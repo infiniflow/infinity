@@ -6,12 +6,14 @@
 
 #include "main/config.h"
 #include "meta/catalog.h"
-#include "txn/txn_manager.h"
 #include "storage/buffer/buffer_manager.h"
+#include "storage/txn/txn_manager.h"
 #include "storage/wal/wal_manager.h"
 
 namespace infinity {
-
+class WalManager;
+class TxnManager;
+class BufferManager;
 class Storage {
 public:
     explicit Storage(const Config *config_ptr);

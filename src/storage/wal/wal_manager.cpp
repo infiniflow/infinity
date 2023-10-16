@@ -185,7 +185,11 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush mainloop end");
 }
 
-// Do checkpoint for transactions which's commit_ts no larger than the given one.
+/*****************************************************************************
+ * CHECKPOINT WAL FILE
+ *****************************************************************************/
+
+// Do checkpoint for transactions which's lsn no larger than the given one.
 void WalManager::Checkpoint() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
     while (running_.load()) {
@@ -334,64 +338,55 @@ int64_t WalManager::ReplayWalFile() {
     // Then we check the wal.log.1 file, if it exists, we will replay it.
 
     // 2.1 Get the max commit timestamp of the transactions in the wal files.
-    int64_t max_commit_ts = 0;
+    i64 max_commit_ts = 0;
     // 2.2 Replay the wal files one by one.
+
+    Vector<SharedPtr<WalEntry>> replay_entries;
     for (const auto &wal_file : wal_list_) {
         // 2.2.1 Open the wal file.
 
-        std::ifstream ifs(wal_file, std::ios::binary | std::ios::ate);
-        if (!ifs.is_open()) {
-            throw StorageException("Failed to open wal file: " + wal_file);
+        String catalog_path;
+        WalEntryIterator iterator(wal_file);
+        iterator.Init();
+
+        // phase 1: find the max commit ts and catalog path
+        while (iterator.Next()) {
+            auto wal_entry = iterator.GetEntry();
+
+            if (!wal_entry->ISCheckPoint()) {
+                replay_entries.push_back(wal_entry);
+            } else {
+                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                LOG_INFO("Checkpoint Max Commit Ts: {}", max_commit_ts);
+                LOG_INFO("Catalog Path: {}", catalog_path);
+                break;
+            }
         }
-        std::streamsize size = ifs.tellg();
-        ifs.seekg(size - 4, std::ios::beg);
-        int32_t entry_size;
 
-        ifs.read(reinterpret_cast<char *>(&entry_size), 4);
+        // phase 2: by the max commit ts, find the entries to replay
+        while (iterator.Next()) {
+            auto wal_entry = iterator.GetEntry();
+            if (wal_entry->commit_ts > max_commit_ts) {
+                replay_entries.push_back(wal_entry);
+            }
+        }
+    }
 
-        ifs.seekg(size - 4 - (entry_size - 4), std::ios::beg);
-
-        std::vector<char> buf(entry_size);
-
-        ifs.read(buf.data(), entry_size);
-
-        ifs.close();
-
-        char *ptr = buf.data();
-
-        auto entry = WalEntry::ReadAdv(ptr, entry_size);
-
-        // How to traverse the wal file from back to front?
-        // We will use the entry's tail to traverse the wal file.
-        // The entry's tail is 4B, which is the size of the entry.
-        // So we can get the entry's size.
-        // The entry's content is entry_size bytes.
-        // So we can get the entry's content.
-        // Deserialize the entry.
-
+    // phase 3: replay the entries
+    for (const auto &entry : replay_entries) {
+        LOG_INFO("WAL ENTRY COMMIT TS: {}", entry->commit_ts);
         for (const auto &cmd : entry->cmds) {
-            LOG_INFO("WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            // TODO fixme
+            cmd->Replay(storage_, entry->txn_id, entry->commit_ts);
         }
-        max_commit_ts = entry->commit_ts;
-
-        auto commands = entry->cmds;
-
-        break;
     }
 
     return max_commit_ts;
-
-    // 2.2.2 Read the wal file.
-    // Get the last entry of the wal file.
-    // the entry's tail is 4B, which is the size of the entry.
-    // So we can get the entry's size.
-
-    // Get the entry's content.
-    // The entry's content is entry_size bytes.
-
-    // So we can get the entry's content.
-    // Deserialize the entry.
 }
+/*****************************************************************************
+ * GC WAL FILE
+ *****************************************************************************/
 
 /**
  * @brief Gc the old wal files.

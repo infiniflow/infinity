@@ -38,8 +38,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                               ConflictType conflict_type,
                                               u64 txn_id,
                                               TxnTimeStamp begin_ts,
-                                              TxnManager *txn_mgr,
-                                              BufferManager *buffer_mgr) {
+                                              TxnManager *txn_mgr) {
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
     if (table_entry->indexes_.find(index_def->index_name_) != table_entry->indexes_.end()) {

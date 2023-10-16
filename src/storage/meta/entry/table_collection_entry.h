@@ -44,8 +44,7 @@ public:
                                    ConflictType conflict_type,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts,
-                                   TxnManager *txn_mgr,
-                                   BufferManager *buffer_mgr);
+                                   TxnManager *txn_mgr);
 
     static EntryResult DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 

@@ -1,4 +1,5 @@
 #include "wal_entry.h"
+#include <storage/meta/catalog.h>
 
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
@@ -8,11 +9,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <format>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <type_traits>
 
 namespace infinity {
 
@@ -147,8 +143,8 @@ i32 WalCmdCreateIndex::GetSizeInBytes() const {
            this->index_def_->GetSizeInBytes();
 }
 
-int32_t WalCmdDropTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(i32) + this->table_name.size();
+i32 WalCmdDropTable::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size();
 }
 
 i32 WalCmdImport::GetSizeInBytes() const {
@@ -224,6 +220,85 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, this->catalog_path_);
+}
+
+void WalCmdCheckpoint::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    // nothing to do
+}
+void WalCmdCreateDatabase::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto result = NewCatalog::CreateDatabase(storage->catalog(), db_name, txn_id, commit_ts, nullptr);
+    if (!result.Success()) {
+        StorageError("Wal Replay: Create database failed");
+    }
+}
+void WalCmdCreateTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        StorageError("Wal Replay: Get database failed");
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto result = DBEntry::CreateTableCollection(db_entry,
+                                                 TableCollectionType::kTableEntry,
+                                                 table_def->table_name(),
+                                                 table_def->columns(),
+                                                 txn_id,
+                                                 commit_ts,
+                                                 nullptr);
+    if (!result.Success()) {
+        StorageError("Wal Replay: Create table failed");
+    }
+}
+void WalCmdCreateIndex::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name_, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        StorageError("Wal Replay: Get database failed");
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto table_entry_result = DBEntry::GetTableCollection(db_entry, table_name_, txn_id, commit_ts);
+    if (!table_entry_result.Success()) {
+        StorageError("Wal Replay: Get table failed");
+    }
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+    auto result = TableCollectionEntry::CreateIndex(table_entry, index_def_, conflict_type_, txn_id, commit_ts, nullptr);
+    if (!result.Success()) {
+        StorageError("Wal Replay: Create index failed");
+    }
+}
+void WalCmdDropDatabase::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto result = NewCatalog::DropDatabase(storage->catalog(), db_name, txn_id, commit_ts, nullptr);
+    if (!result.Success()) {
+        StorageError("Wal Replay: Drop database failed");
+    }
+}
+void WalCmdDropTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        StorageError("Wal Replay: Get database failed");
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto result = DBEntry::DropTableCollection(db_entry, table_name, conflict_type_, txn_id, commit_ts, nullptr);
+    if (!result.Success()) {
+        StorageError("Wal Replay: Drop table failed");
+    }
+}
+void WalCmdDelete::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdDelete Replay Not implemented"); }
+void WalCmdImport::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdImport Replay Not implemented"); }
+void WalCmdAppend::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
+    auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        StorageError("Wal Replay: Get database failed");
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto table_entry_result = DBEntry::GetTableCollection(db_entry, table_name, txn_id, commit_ts);
+    if (!table_entry_result.Success()) {
+        StorageError("Wal Replay: Get table failed");
+    }
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+
+    auto table_store = MakeShared<TxnTableStore>(table_name, table_entry, nullptr);
+    table_store->Append(block);
+
+    TableCollectionEntry::Append(table_entry, /*Txn*/ nullptr, table_store.get(), storage->buffer_manager());
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {

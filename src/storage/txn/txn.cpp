@@ -332,7 +332,7 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
         return {nullptr, MakeUnique<String>("Invalid database type")};
     }
 
-    auto *table_entry = static_cast<TableCollectionEntry *>(res.entry_);
+    auto *table_entry = dynamic_cast<TableCollectionEntry *>(res.entry_);
     txn_tables_.insert(table_entry);
     table_names_.insert(*table_def->table_name());
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
@@ -354,7 +354,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
         return {nullptr, std::move(err_msg)};
     }
 
-    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, GetBufferMgr());
+    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if (res.entry_ == nullptr) {
         return res;
