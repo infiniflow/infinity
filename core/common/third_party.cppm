@@ -7,7 +7,10 @@ module;
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+
 #include "toml.hpp"
+
+#include "magic_enum.hpp"
 
 export module third_party;
 
@@ -74,10 +77,9 @@ export using spd_rotating_file_sink = spdlog::sinks::rotating_file_sink_mt;
 export using spd_logger = spdlog::logger;
 export using spd_log_level = spdlog::level::level_enum;
 
-export template<typename T>
-inline void spd_log(const T &msg, spd_log_level log_level)
-{
-    switch(log_level) {
+export template <typename T>
+inline void spd_log(const T &msg, spd_log_level log_level) {
+    switch (log_level) {
         case spdlog::level::trace: {
             return spdlog::default_logger_raw()->trace(msg);
         }
@@ -96,7 +98,6 @@ inline void spd_log(const T &msg, spd_log_level log_level)
         default:
             assert(false);
     }
-
 }
 
 // cxxopts
@@ -113,5 +114,11 @@ export using ParseResult = cxxopts::ParseResult;
 using TomlParseResult = toml::parse_result;
 //
 export TomlParseResult TomlParseFile(const std::string &file_path) { return toml::parse_file(file_path); }
+
+// Returns integer value from enum value.
+export template <typename E>
+constexpr auto EnumInteger(E value) noexcept -> magic_enum::detail::enable_if_t<E, magic_enum::underlying_type_t<E>> {
+    return static_cast<magic_enum::underlying_type_t<E>>(value);
+}
 
 } // namespace infinity

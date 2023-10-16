@@ -257,26 +257,33 @@ using ColumnID = u32;
 
 using StlException = std::exception;
 
-// Algo
-template<typename _InputIterator, typename _Size, typename _OutputIterator>
-constexpr
-inline _OutputIterator
-CopyN(_InputIterator __first, _Size __n, _OutputIterator __result)
-{
-    return std::copy_n(__first, __n, __result);
+// Move
+template<typename _Tp>
+_GLIBCXX_NODISCARD
+constexpr typename std::remove_reference<_Tp>::type&&
+Move(_Tp&& __t) noexcept
+{ return static_cast<typename std::remove_reference<_Tp>::type&&>(__t); }
+
+// Chrono
+using Clock = std::chrono::high_resolution_clock;
+
+template<typename T>
+using TimePoint = std::chrono::time_point<T, std::chrono::nanoseconds>;
+
+using NanoSeconds = std::chrono::nanoseconds;
+using MicroSeconds = std::chrono::microseconds;
+using MilliSeconds = std::chrono::milliseconds;
+using Seconds = std::chrono::seconds;
+
+inline NanoSeconds ElapsedFromStart(const TimePoint<Clock>& end, const TimePoint<Clock>& start) {
+    return end - start;
 }
 
-//template<typename _InputIterator, typename _Distance>
-//__attribute__((__always_inline__))
-//inline _GLIBCXX17_CONSTEXPR void
-//Advance(_InputIterator& __i, _Distance __n)
-//{
-//    // concept requirements -- taken care of in __advance
-//    typename std::iterator_traits<_InputIterator>::difference_type __d = __n;
-//    std::__advance(__i, __d, std::__iterator_category(__i));
-//}
-
-
+template<typename T>
+T
+ChronoCast(const NanoSeconds& nano_seconds) {
+    return std::chrono::duration_cast<T>(nano_seconds);
+}
 
 }
 

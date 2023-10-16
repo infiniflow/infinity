@@ -41,6 +41,24 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        planner_cpp
+        CONFIGURE_DEPENDS
+        planner/*.cpp
+)
+
+file(GLOB_RECURSE
+        planner_cppm
+        CONFIGURE_DEPENDS
+        planner/*.cppm
+)
+
+file(GLOB_RECURSE
+        common_cpp
+        CONFIGURE_DEPENDS
+        common/*.cpp
+)
+
+file(GLOB_RECURSE
         common_cppm
         CONFIGURE_DEPENDS
         common/*.cppm
@@ -51,6 +69,7 @@ add_executable(infinity
         ${main_cpp}
         ${infinity_cpp}
         ${network_cpp}
+        ${planner_cpp}
 )
 
 target_sources(infinity
@@ -60,6 +79,7 @@ target_sources(infinity
         ${infinity_cppm}
         ${network_cppm}
         ${common_cppm}
+        ${planner_cppm}
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -67,11 +87,12 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdl
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 
 ### unit test
 
 file(GLOB_RECURSE
-        ut_main_cpp
+        ut_test_main_cpp
         CONFIGURE_DEPENDS
         unit_test/main.cpp
 )
@@ -82,12 +103,21 @@ file(GLOB_RECURSE
         unit_test/common/*.cpp
 )
 
+file(GLOB_RECURSE
+        ut_main_cpp
+        CONFIGURE_DEPENDS
+        unit_test/main/*.cpp
+)
+
 add_executable(unit_test
-        ${ut_main_cpp}
+        ${ut_test_main_cpp}
         ${ut_common_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
-#        ${main_test_src}
+        ${ut_main_cpp}
+        ${infinity_cpp}
+        ${network_cpp}
+        ${planner_cpp}
 #        ${planner_test_src}
 #        ${storage_test_src}
 #        ${parser_test_src}
@@ -113,10 +143,11 @@ target_link_libraries(unit_test
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-#        ${main_cppm}
-#        ${infinity_cppm}
-#        ${network_cppm}
+        ${main_cppm}
+        ${infinity_cppm}
+        ${network_cppm}
         ${common_cppm}
+        ${planner_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -124,6 +155,7 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spd
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 
