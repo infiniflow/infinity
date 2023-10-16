@@ -15,6 +15,7 @@ import logger;
 import query_context;
 import infinity;
 import third_party;
+import table;
 
 module connection;
 
@@ -113,24 +114,24 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     LOG_TRACE(Format("Query: {}", query));
 
     // Start to execute the query.
-//    QueryResult result = query_context->Query(query);
-//
-//    // Response to the result message to client
-//    if (result.result_ == nullptr) {
-//        HashMap<PGMessageType, String> error_message_map;
-//        String response_message = "Error: " + query;
-//        error_message_map[PGMessageType::kHumanReadableError] = response_message;
-//        pg_handler_->send_error_response(error_message_map);
-//    } else {
-//        // Have result
-//        SendTableDescription(result.result_);
-//        SendQueryResponse(result);
-//    }
-//
+    QueryResult result = query_context->Query(query);
+
+    // Response to the result message to client
+    if (result.result_.get() == nullptr) {
+        HashMap<PGMessageType, String> error_message_map;
+        String response_message = Format("Error: {}", query);
+        error_message_map[PGMessageType::kHumanReadableError] = response_message;
+        pg_handler_->send_error_response(error_message_map);
+    } else {
+        // Have result
+        SendTableDescription(result.result_);
+        SendQueryResponse(result);
+    }
+
 //    pg_handler_->send_ready_for_query();
 }
-//
-//void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
+
+void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
 //    u32 column_name_length_sum = 0;
 //    SizeT column_count = result_table->ColumnCount();
 //    for (SizeT idx = 0; idx < column_count; ++idx) {
@@ -261,9 +262,9 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
 //
 //        pg_handler_->SendDescription(result_table->GetColumnNameById(idx), object_id, object_width);
 //    }
-//}
-//
-//void Connection::SendQueryResponse(const QueryResult &query_result) {
+}
+
+void Connection::SendQueryResponse(const QueryResult &query_result) {
 //
 //    const SharedPtr<Table> &result_table = query_result.result_;
 //    SizeT column_count = result_table->ColumnCount();
@@ -311,6 +312,6 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
 //    }
 //
 //    pg_handler_->SendComplete(message);
-//}
+}
 
 } // namespace infinity

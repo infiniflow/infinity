@@ -13,6 +13,7 @@ import fragment_scheduler;
 import profiler;
 import storage;
 import txn;
+import table;
 
 export module query_context;
 
@@ -27,8 +28,8 @@ namespace infinity {
 //class Txn;
 //class Config;
 
-struct QueryResult {
-//    SharedPtr<Table> result_;
+export struct QueryResult {
+    SharedPtr<Table> result_;
     LogicalNodeType root_operator_type_;
 
     [[nodiscard]] String ToString() const;

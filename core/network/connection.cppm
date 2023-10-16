@@ -9,6 +9,7 @@ import stl;
 import session;
 import pg_protocol_handler;
 import query_context;
+import table;
 
 export module connection;
 
@@ -39,9 +40,9 @@ private:
 
     void HandlerSimpleQuery(QueryContext *query_context);
 
-//    void SendTableDescription(const SharedPtr<Table> &result_table);
-//
-//    void SendQueryResponse(const QueryResult &query_result);
+    void SendTableDescription(const SharedPtr<Table> &result_table);
+
+    void SendQueryResponse(const QueryResult &query_result);
 
 private:
     const SharedPtr<AsioSocket> socket_;
