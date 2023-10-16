@@ -74,6 +74,31 @@ export using spd_rotating_file_sink = spdlog::sinks::rotating_file_sink_mt;
 export using spd_logger = spdlog::logger;
 export using spd_log_level = spdlog::level::level_enum;
 
+export template<typename T>
+inline void spd_log(const T &msg, spd_log_level log_level)
+{
+    switch(log_level) {
+        case spdlog::level::trace: {
+            return spdlog::default_logger_raw()->trace(msg);
+        }
+        case spdlog::level::info: {
+            return spdlog::default_logger_raw()->info(msg);
+        }
+        case spdlog::level::warn: {
+            return spdlog::default_logger_raw()->warn(msg);
+        }
+        case spdlog::level::err: {
+            return spdlog::default_logger_raw()->error(msg);
+        }
+        case spdlog::level::critical: {
+            return spdlog::default_logger_raw()->critical(msg);
+        }
+        default:
+            assert(false);
+    }
+
+}
+
 // cxxopts
 export using CxxOptions = cxxopts::Options;
 

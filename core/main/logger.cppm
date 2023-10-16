@@ -3,8 +3,8 @@
 //
 module;
 
-#include "spdlog/logger.h"
-#include <memory>
+import stl;
+import third_party;
 
 export module logger;
 
@@ -14,7 +14,7 @@ export module logger;
 
 namespace infinity {
 
-export extern std::shared_ptr<spdlog::logger> infinity_logger;
+export extern SharedPtr<spd_logger> infinity_logger;
 
 class Config;
 
@@ -26,5 +26,30 @@ public:
     static void
     Shutdown();
 };
+
+export inline void
+LOG_TRACE(const String& msg) {
+    spd_log(msg, spd_log_level::trace);
+}
+
+export inline void
+LOG_INFO(const String& msg) {
+    spd_log(msg, spd_log_level::info);
+}
+
+export inline void
+LOG_WARN(const String& msg) {
+    spd_log(msg, spd_log_level::warn);
+}
+
+export inline void
+LOG_ERROR(const String& msg) {
+    spd_log(msg, spd_log_level::err);
+}
+
+export inline void
+LOG_CRITICAL(const String& msg) {
+    spd_log(msg, spd_log_level::critical);
+}
 
 }

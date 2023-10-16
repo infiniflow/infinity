@@ -4,12 +4,6 @@
 
 module;
 
-// #include "spdlog/sinks/stdout_color_sinks.h"
-// #include "spdlog/sinks/rotating_file_sink.h"
-// #include "spdlog/spdlog.h"
-//
-// #include <memory>
-
 module logger;
 
 import stl;

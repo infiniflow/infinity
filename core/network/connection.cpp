@@ -10,6 +10,7 @@ import stl;
 import session;
 import infinity_exception;
 import pg_message;
+import logger;
 
 module connection;
 
@@ -32,12 +33,12 @@ void Connection::Run() {
         try {
             HandleRequest();
         } catch (const infinity::ClientException &e) {
-//            LOG_TRACE("Client is closed");
+            LOG_TRACE("Client is closed");
             return;
         } catch (const Exception &e) {
             HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
-//            LOG_ERROR(e.what());
+            LOG_ERROR(e.what());
             pg_handler_->send_error_response(error_message_map);
             pg_handler_->send_ready_for_query();
         }
