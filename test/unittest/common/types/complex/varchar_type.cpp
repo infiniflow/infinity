@@ -5,24 +5,10 @@
 #include "base_test.h"
 #include "main/infinity.h"
 
-class VarcharTypeTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class VarcharTypeTest : public BaseTest {};
 
 TEST_F(VarcharTypeTest, TestInit) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
@@ -69,13 +55,12 @@ TEST_F(VarcharTypeTest, TestInit) {
 
 TEST_F(VarcharTypeTest, TestConstructor1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
     // Constructor from string
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -90,13 +75,12 @@ TEST_F(VarcharTypeTest, TestConstructor1) {
 
 TEST_F(VarcharTypeTest, TestConstructor2) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
     // Constructor from char*
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1.c_str());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -111,13 +95,12 @@ TEST_F(VarcharTypeTest, TestConstructor2) {
 
 TEST_F(VarcharTypeTest, TestConstructor3) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
     // Constructor from char* and length
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1.c_str(), s1.length());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -132,13 +115,12 @@ TEST_F(VarcharTypeTest, TestConstructor3) {
 
 TEST_F(VarcharTypeTest, TestCopy) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
     // Copy constructor
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2 = v1;
         EXPECT_EQ(v1.length, s1.length());
@@ -148,7 +130,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
     }
 
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s2);
         VarcharType v2 = v1;
         EXPECT_EQ(v1.length, s2.length());
@@ -160,13 +142,12 @@ TEST_F(VarcharTypeTest, TestCopy) {
 
 TEST_F(VarcharTypeTest, TestMove) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
     // Move constructor 1
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2 = std::move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -177,7 +158,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
     // Move constructor 2
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s2);
         VarcharType v2 = std::move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -190,14 +171,13 @@ TEST_F(VarcharTypeTest, TestMove) {
 
 TEST_F(VarcharTypeTest, TestCopyAssignment) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
     String s3 = "Hello World, Php is the best programming language in the world";
 
     // Copy Assignment 1
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2;
         v2 = v1;
@@ -209,7 +189,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 2
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s2);
         VarcharType v2;
         v2 = v1;
@@ -221,7 +201,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 3
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2(s2);
         VarcharType v3(s3);
@@ -241,14 +221,13 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
 TEST_F(VarcharTypeTest, TestMoveAssignment) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
     String s3 = "Hello World, Php is the best programming language in the world";
 
     // Move constructor 1
     {
-        LOG_TRACE("===============================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2;
         v2 = std::move(v1);
@@ -260,7 +239,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move constructor 2
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s2);
         VarcharType v2;
         v2 = std::move(v1);
@@ -273,7 +252,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move Assignment 3
     {
-        LOG_TRACE("================");
+        std::cout << std::string(80, '=') << std::endl;
         VarcharType v1(s1);
         VarcharType v2(s2);
         VarcharType v3(s3);

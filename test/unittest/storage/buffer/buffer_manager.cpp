@@ -10,14 +10,6 @@
 
 class BufferMgrTest : public BaseTest {
     void SetUp() override;
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity");
-    }
 };
 
 void BufferMgrTest::SetUp() {
@@ -84,7 +76,6 @@ void BufferMgrTest::SetUp() {
 
 TEST_F(BufferMgrTest, test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
     SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");

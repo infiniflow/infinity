@@ -6,24 +6,10 @@
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
 
-class ColumnVectorDateTimeTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorDateTimeTest : public BaseTest {};
 
 TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
@@ -147,7 +133,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
@@ -237,7 +222,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
 TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
@@ -274,7 +258,6 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
@@ -310,7 +293,6 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
@@ -434,7 +416,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
@@ -524,7 +505,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
 TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
@@ -561,7 +541,6 @@ TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
@@ -597,7 +576,6 @@ TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
@@ -725,7 +703,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
@@ -818,7 +795,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
 TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
@@ -857,7 +833,6 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
@@ -895,7 +870,6 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
@@ -1023,7 +997,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
@@ -1116,7 +1089,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
@@ -1155,7 +1127,6 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
@@ -1193,7 +1164,6 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
@@ -1320,7 +1290,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
 TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
@@ -1412,7 +1381,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
 TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
@@ -1450,7 +1418,6 @@ TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);

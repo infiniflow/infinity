@@ -6,24 +6,10 @@
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
 
-class ColumnVectorVarcharTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorVarcharTest : public BaseTest {};
 
 TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -193,7 +179,6 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -309,7 +294,6 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
 TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -367,7 +351,6 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 
 TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -424,7 +407,6 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 
 TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -597,7 +579,6 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -713,7 +694,6 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
 TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);

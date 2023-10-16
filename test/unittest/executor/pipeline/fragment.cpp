@@ -1,32 +1,16 @@
 //
 // Created by xwg on 23-9-6.
 //
-#include "base_test.h"
-#include "main/infinity.h"
+#include "infinity_test.h"
 #include "parser/definition/table_def.h"
 #include "storage/table.h"
 #include "test_helper/sql_runner.h"
+#include "test_helper/sql_runner.h"
 
-class FragmentTest : public BaseTest {
-    void SetUp() override {
-        system("rm -rf /tmp/infinity/");
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/");
-    }
-};
+class FragmentTest : public InfinityTest {};
 
 TEST_F(FragmentTest, test_build_fragment) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     /// DDL
     auto result0 = SQLRunner::Run("create table t1(a bigint)", true);
     EXPECT_EQ(result0->definition_ptr_.get()->columns()[0]->name_, "OK");

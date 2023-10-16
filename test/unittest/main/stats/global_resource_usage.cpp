@@ -20,7 +20,6 @@ class GlobalResourceUsageTest : public BaseTest {
 
 TEST_F(GlobalResourceUsageTest, usage_test) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Object count
     GlobalResourceUsage::IncrObjectCount();

@@ -6,24 +6,10 @@
 #include "common/column_vector/bitmask.h"
 #include "main/infinity.h"
 
-class BitmaskBufferTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class BitmaskBufferTest : public BaseTest {};
 
 TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count = 8192;
 
@@ -57,7 +43,6 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
 
 TEST_F(BitmaskBufferTest, ReadWrite) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     constexpr size_t bit_count = 8192;
     std::vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count), Bitmask::Make(bit_count), Bitmask::Make(bit_count)};
