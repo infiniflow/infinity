@@ -16,6 +16,8 @@ module;
 #include <unordered_set>
 #include <exception>
 #include <charconv>
+#include <algorithm>
+#include <optional>
 
 export module stl;
 
@@ -48,6 +50,9 @@ using HashMap = std::unordered_map<S, T>;
 
 template <typename S>
 using HashSet = std::unordered_set<S>;
+
+template <typename T>
+using Optional = std::optional<T>;
 
 // String
 
@@ -251,6 +256,27 @@ using ColumnID = u32;
 // Exception
 
 using StlException = std::exception;
+
+// Algo
+template<typename _InputIterator, typename _Size, typename _OutputIterator>
+constexpr
+inline _OutputIterator
+CopyN(_InputIterator __first, _Size __n, _OutputIterator __result)
+{
+    return std::copy_n(__first, __n, __result);
+}
+
+//template<typename _InputIterator, typename _Distance>
+//__attribute__((__always_inline__))
+//inline _GLIBCXX17_CONSTEXPR void
+//Advance(_InputIterator& __i, _Distance __n)
+//{
+//    // concept requirements -- taken care of in __advance
+//    typename std::iterator_traits<_InputIterator>::difference_type __d = __n;
+//    std::__advance(__i, __d, std::__iterator_category(__i));
+//}
+
+
 
 }
 

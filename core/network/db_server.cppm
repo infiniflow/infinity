@@ -4,6 +4,7 @@ module;
 import stl;
 import singleton;
 import boost;
+import connection;
 
 export module db_server;
 
@@ -23,13 +24,13 @@ public:
 
 private:
     void CreateConnection();
-//
-//    void StartConnection(SharedPtr<Connection> &connection);
-//
+
+    void StartConnection(SharedPtr<Connection> &connection);
+
     atomic_bool initialized{false};
-//    au64 running_connection_count_{0};
-    asio_io_service io_service_{};
-    UniquePtr<asio_acceptor> acceptor_ptr_{};
+    au64 running_connection_count_{0};
+    AsioIOService io_service_{};
+    UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
 };
 

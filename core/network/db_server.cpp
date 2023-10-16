@@ -11,6 +11,7 @@ import boost;
 import third_party;
 import infinity_exception;
 import infinity_assert;
+import connection;
 
 namespace infinity {
 
@@ -27,13 +28,13 @@ void DBServer::Run() {
     u16 pg_port = Infinity::instance().config()->pg_port();
     const String &listen_address_ref = Infinity::instance().config()->listen_address();
 
-    boost_error_code error;
-    asio_ip_addr address = asio_make_address(listen_address_ref, error);
+    BoostErrorCode error;
+    AsioIpAddr address = asio_make_address(listen_address_ref, error);
     if (error) {
         Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref), __FILE_NAME__, __LINE__);
     }
 
-    acceptor_ptr_ = MakeUnique<asio_acceptor>(io_service_, asio_end_point(address, pg_port));
+    acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));
     CreateConnection();
 
     if (config_path_) {
@@ -61,22 +62,22 @@ void DBServer::Shutdown() {
 }
 
 void DBServer::CreateConnection() {
-//    SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
+    SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
 //    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
 }
 
-//void DBServer::StartConnection(SharedPtr<Connection> &connection) {
-//    std::thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
-//        ++num_running_connections;
-//        connection->Run();
-//
-//        // User disconnected
-//        connection.reset();
-//        --num_running_connections;
-//    });
-//
-//    connection_thread.detach();
-//    CreateConnection();
-//}
+void DBServer::StartConnection(SharedPtr<Connection> &connection) {
+    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
+        ++num_running_connections;
+        connection->Run();
+
+        // User disconnected
+        connection.reset();
+        --num_running_connections;
+    });
+
+    connection_thread.detach();
+    CreateConnection();
+}
 
 } // namespace infinity
