@@ -8,6 +8,9 @@ module db_server;
 import infinity;
 import stl;
 import boost;
+import third_party;
+import infinity_exception;
+import infinity_assert;
 
 namespace infinity {
 
@@ -26,24 +29,24 @@ void DBServer::Run() {
 
     boost_error_code error;
     asio_ip_addr address = asio_make_address(listen_address_ref, error);
-//    if (error) {
-//        GeneralError(fmt::format("Not a valid IPv4 address: {}", listen_address_ref));
-//    }
-//
-//    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_, boost::asio::ip::tcp::endpoint(address, pg_port));
-//    CreateConnection();
-//
-//    if (config_path_) {
-//        LOG_INFO("Startup database server, at: {} and port: {}, config: {}", listen_address_ref, pg_port, *config_path_);
-//    } else {
-//        LOG_INFO("Startup database server, at: {} and port: {}", listen_address_ref, pg_port);
-//    }
-//
+    if (error) {
+        Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref), __FILE_NAME__, __LINE__);
+    }
+
+    acceptor_ptr_ = MakeUnique<asio_acceptor>(io_service_, asio_end_point(address, pg_port));
+    CreateConnection();
+
+    if (config_path_) {
+        Printf("Startup database server, at: {} and port: {}, config: {}\n", listen_address_ref, pg_port, *config_path_);
+    } else {
+        Printf("Startup database server, at: {} and port: {}\n", listen_address_ref, pg_port);
+    }
+
     Infinity::instance().config()->PrintAll();
-//
-//    LOG_INFO("Run 'psql -h {} -p {}' to connect to the server.", listen_address_ref, pg_port);
-//
-//    io_service_.run();
+
+    Printf("Run 'psql -h {} -p {}' to connect to the server.", listen_address_ref, pg_port);
+
+    io_service_.run();
 }
 
 void DBServer::Shutdown() {

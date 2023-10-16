@@ -3,6 +3,7 @@ module;
 
 import stl;
 import singleton;
+import boost;
 
 export module db_server;
 
@@ -27,8 +28,8 @@ private:
 //
     atomic_bool initialized{false};
 //    au64 running_connection_count_{0};
-//    boost::asio::io_service io_service_{};
-//    UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
+    asio_io_service io_service_{};
+    UniquePtr<asio_acceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
 };
 

@@ -15,6 +15,8 @@ namespace infinity {
 export using boost_error_code = boost::system::error_code;
 export using asio_ip_addr = boost::asio::ip::address;
 export using asio_acceptor = boost::asio::ip::tcp::acceptor;
+export using asio_io_service = boost::asio::io_service;
+export using asio_end_point = boost::asio::ip::tcp::endpoint;
 
 export asio_ip_addr asio_make_address(const std::string &str, boost::system::error_code &ec) BOOST_ASIO_NOEXCEPT {
     return boost::asio::ip::make_address(str.c_str(), ec);

@@ -12,7 +12,7 @@ export module compilation_config;
 #define VERSION_MINOR 1
 #define VERSION_PATCH 0
 
-#define BUILD_TIME "2023-10-15 17:35.43"
+#define BUILD_TIME "2023-10-16 08:48.27"
 #define GIT_BRANCH_NAME "main"
 #define GIT_COMMIT_ID ""
 #define BUILD_TYPE "Debug"
