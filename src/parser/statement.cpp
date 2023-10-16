@@ -438,6 +438,15 @@ void Statement::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector<
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
+        case ShowStmtType::kIndexes: {
+            result->emplace_back(MakeShared<String>("SHOW INDEXES: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            break;
+        }
     }
 }
 

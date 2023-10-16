@@ -144,14 +144,15 @@ nlohmann::json IndexDef::Serialize() const {
 SharedPtr<IndexDef> IndexDef::Deserialize(const nlohmann::json &index_def_json) {
     SharedPtr<IndexDef> res = nullptr;
     auto index_name = MakeShared<String>(index_def_json["index_name"]);
-    IndexMethod method_type = index_def_json["method_type"];
+    IndexMethod method_type = StringToIndexMethod(index_def_json["method_type"]);
     Vector<String> column_names = index_def_json["column_names"];
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
             size_t centroids_count = index_def_json["centroids_count"];
-            MetricType metric_type = index_def_json["metric_type"];
+            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             auto ptr = MakeShared<IVFFlatIndexDef>(std::move(index_name), method_type, std::move(column_names), centroids_count, metric_type);
             res = std::static_pointer_cast<IndexDef>(ptr);
+            break;
         }
         case IndexMethod::kInvalid: {
             StorageError("Error index method while deserializing");

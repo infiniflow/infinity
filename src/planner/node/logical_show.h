@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "planner/logical_node.h"
 #include "planner/column_binding.h"
+#include "planner/logical_node.h"
 #include "storage/table.h"
 
 namespace infinity {
@@ -15,6 +15,7 @@ enum class ShowType {
     kShowTables,
     kShowViews,
     kShowColumn,
+    kShowIndexes,
     kIntermediate,
 };
 

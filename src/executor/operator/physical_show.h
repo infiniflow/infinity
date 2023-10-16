@@ -6,8 +6,6 @@
 
 #include "executor/physical_operator.h"
 #include "planner/node/logical_show.h"
-#include "storage/collection.h"
-#include "storage/view.h"
 
 namespace infinity {
 
@@ -56,6 +54,8 @@ private:
 
     /// Execute push based describe table
     void ExecuteShowColumns(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+
+    void ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};

@@ -195,13 +195,39 @@ void IndexDefMeta::DeleteNewEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnM
     index_def_meta->entry_list_.erase(removed_iter, index_def_meta->entry_list_.end());
 }
 
-EntryResult IndexDefMeta::GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts) { NotImplementError("Not implemented"); }
+EntryResult IndexDefMeta::GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+    std::shared_lock<RWMutex> r_locker(index_def_meta->rw_locker_);
+    for (const auto &index_def_entry : index_def_meta->entry_list_) {
+        if (index_def_entry->entry_type_ == EntryType::kDummy) {
+            LOG_TRACE("No valid index def entry");
+            return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid index def entry")};
+        }
+
+        if (index_def_entry->commit_ts_ < UNCOMMIT_TS) {
+            // committed
+            if (begin_ts > index_def_entry->commit_ts_) {
+                if (index_def_entry->deleted_) {
+                    LOG_TRACE("No valid index def entry");
+                    return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid index def entry")};
+                } else {
+                    return {.entry_ = index_def_entry.get(), .err_ = nullptr};
+                }
+            }
+        } else if (txn_id == index_def_entry->txn_id_) {
+            // same txn
+            return {.entry_ = index_def_entry.get(), .err_ = nullptr};
+        }
+    }
+    LOG_TRACE("No valid index def entry");
+    return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid index def entry")};
+}
 
 SharedPtr<String> IndexDefMeta::ToString(IndexDefMeta *index_def_meta) { NotImplementError("Not implemented"); }
 
 nlohmann::json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
     nlohmann::json json;
 
+    json["index_name"] = *index_def_meta->index_name_;
     for (const auto &entry : index_def_meta->entry_list_) {
         if (entry->entry_type_ == EntryType::kIndexDef) {
             json["entries"].emplace_back(IndexDefEntry::Serialize(static_cast<IndexDefEntry *>(entry.get())));
@@ -215,15 +241,15 @@ nlohmann::json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
 }
 
 UniquePtr<IndexDefMeta> IndexDefMeta::Deserialize(const nlohmann::json &index_def_meta_json, TableCollectionEntry *table_collection_entry) {
-    auto table_entry_dir = MakeShared<String>(index_def_meta_json["table_entry_dir"]);
     auto index_name = MakeShared<String>(index_def_meta_json["index_name"]);
     LOG_TRACE("load index {}", *index_name);
 
     auto res = MakeUnique<IndexDefMeta>(std::move(index_name), table_collection_entry);
     if (index_def_meta_json.contains("entries")) {
-        for (const auto &entry_json : index_def_meta_json["entries"]) {
-            auto entry = IndexDefEntry::Deserialize(entry_json, res.get());
-            res->entry_list_.emplace_back(std::move(entry));
+        auto &entries = index_def_meta_json["entries"];
+        for (auto iter = entries.rbegin(); iter != entries.rend(); iter++) {
+            auto entry = IndexDefEntry::Deserialize(*iter, res.get());
+            res->entry_list_.emplace_front(std::move(entry));
         }
     }
     return res;

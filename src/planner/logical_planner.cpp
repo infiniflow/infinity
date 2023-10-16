@@ -611,9 +611,21 @@ void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindCon
         case ShowStmtType::kColumns: {
             return BuildShowColumns(statement, bind_context_ptr);
         }
+        case ShowStmtType::kIndexes: {
+            return BuildShowIndexes(statement, bind_context_ptr);
+        }
         default:
             PlannerError("Unexpected show statement type.");
     }
+}
+
+void LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndexes,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
 }
 
 void LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
