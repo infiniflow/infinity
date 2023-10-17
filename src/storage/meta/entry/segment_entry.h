@@ -87,7 +87,7 @@ public:
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 
-    static void CommitCreateIndexFile(SegmentEntry *segment_entry, Txn *txn_ptr, SharedPtr<IndexEntry> index_entry);
+    static void CommitCreateIndexFile(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
 

@@ -12,6 +12,12 @@ class BufferManager;
 class SegmentEntry;
 class FaissIndexPtr;
 
+enum IndexStatus : i8 {
+    kIndexOpen,
+    kIndexClosed,
+    kIndexFlushing,
+};
+
 class IndexEntry : public BaseEntry {
 private:
     explicit IndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferHandle *buffer_handle)
@@ -27,7 +33,9 @@ private:
 public:
     [[nodiscard]] static ObjectHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
 
-    static void Flush(const IndexEntry *index_entry);
+    static bool PrepareFlush(IndexEntry *index_entry);
+
+    static bool Flush(IndexEntry *index_entry);
 
     static nlohmann::json Serialize(const IndexEntry *index_entry);
 
@@ -43,6 +51,8 @@ public:
     const SharedPtr<String> index_name_{};
 
 private:
+    std::atomic<IndexStatus> status_{IndexStatus::kIndexOpen};
+
     BufferHandle *buffer_handle_{};
 };
 } // namespace infinity

@@ -23,6 +23,7 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
     StorageAssert(!index_def_meta->entry_list_.empty(), "entry list should never be empty.");
 
     BaseEntry *header_base_entry = index_def_meta->entry_list_.front().get();
+    // FIXME shenyushi: use enum instead of int
     int status = -1; // 0: success, 1: conflict, 2: duplicate
     if (header_base_entry->commit_ts_ < UNCOMMIT_TS) {
         // Header has committed or is dummy.

@@ -71,8 +71,7 @@ public:
 
     static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);
 
-    static void
-    CommitCreateIndexFile(TableCollectionEntry *table_entry, Txn *txn_ptr, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
+    static void CommitCreateIndexFile(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 

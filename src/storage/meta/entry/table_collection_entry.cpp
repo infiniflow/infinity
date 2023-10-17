@@ -146,9 +146,8 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
             std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_); // prevent another read conflict with this append operation
             if (table_entry->unsealed_segment_ == nullptr || SegmentEntry::Room(table_entry->unsealed_segment_) <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(table_entry,
-                                                                                        TableCollectionEntry::GetNextSegmentID(table_entry),
-                                                                                        buffer_mgr);
+                SharedPtr<SegmentEntry> new_segment =
+                    SegmentEntry::MakeNewSegmentEntry(table_entry, TableCollectionEntry::GetNextSegmentID(table_entry), buffer_mgr);
                 table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
                 table_entry->unsealed_segment_ = new_segment.get();
                 LOG_TRACE("Add a new segment");
@@ -228,11 +227,10 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
     }
 }
 
-void TableCollectionEntry::CommitCreateIndexFile(TableCollectionEntry *table_entry,
-                                                 Txn *txn_ptr,
-                                                 const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
+void TableCollectionEntry::CommitCreateIndexFile(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
+    // FIXME: One index_entry is created for one segment_entry.
     for (const auto &[segment_id, index_entry] : uncommitted_indexes) {
-        SegmentEntry::CommitCreateIndexFile(table_entry->segments_[segment_id].get(), txn_ptr, index_entry);
+        SegmentEntry::CommitCreateIndexFile(table_entry->segments_[segment_id].get(), index_entry);
     }
 }
 
@@ -262,7 +260,7 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
         Vector<TxnTimeStamp> &created = block_entry->block_version_->created_;
-        for(SizeT i = 0; i < block_entry->row_count_; ++i) {
+        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
             created[i] = commit_ts;
         }
     }
@@ -333,8 +331,8 @@ nlohmann::json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry
             segments.push_back(segment_pair.second);
         }
 
-    for (const auto &[index_name, index_def_meta] : table_entry->indexes_) {
-        json_res["indexes"].emplace_back(IndexDefMeta::Serialize(index_def_meta.get()));
+        for (const auto &[index_name, index_def_meta] : table_entry->indexes_) {
+            json_res["indexes"].emplace_back(IndexDefMeta::Serialize(index_def_meta.get()));
         }
     }
 

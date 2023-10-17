@@ -35,12 +35,25 @@ SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, Sh
     return index_handle;
 }
 
-void IndexEntry::Flush(const IndexEntry *index_entry) {
-    if (index_entry->buffer_handle_) {
-        index_entry->buffer_handle_->WriteFile(0);
-        index_entry->buffer_handle_->SyncFile();
-        index_entry->buffer_handle_->CloseFile();
+bool IndexEntry::PrepareFlush(IndexEntry *index_entry) {
+    IndexStatus expected = IndexStatus::kIndexOpen;
+    return index_entry->status_.compare_exchange_strong(expected, IndexStatus::kIndexFlushing);
+}
+
+bool IndexEntry::Flush(IndexEntry *index_entry) {
+    if (index_entry->buffer_handle_ == nullptr) {
+        LOG_WARN("Index entry is not initialized");
+        return false;
     }
+    index_entry->buffer_handle_->WriteFile(0);
+    index_entry->buffer_handle_->SyncFile();
+    index_entry->buffer_handle_->CloseFile();
+    IndexStatus expected = IndexStatus::kIndexFlushing;
+    if (!index_entry->status_.compare_exchange_strong(expected, IndexStatus::kIndexClosed)) {
+        LOG_WARN("Index entry is expected as flushing status");
+        return false;
+    }
+    return true;
 }
 
 nlohmann::json IndexEntry::Serialize(const IndexEntry *index_entry) {

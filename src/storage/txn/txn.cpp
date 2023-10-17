@@ -7,7 +7,6 @@
 // Created by jinhai on 23-6-4.
 //
 
-#include "txn.h"
 #include "parser/definition/table_def.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
@@ -18,6 +17,7 @@
 #include "storage/meta/meta_state.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
+#include "txn.h"
 
 namespace infinity {
 
@@ -364,8 +364,6 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
     txn_indexes_.insert(index_def_entry);
 
-    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
-
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
         txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
@@ -374,6 +372,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
 
     TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, GetBufferMgr());
 
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;
 }
 
@@ -573,13 +572,6 @@ void Txn::CommitTxnBottom() {
     for (auto *index_def_entry : txn_indexes_) {
         index_def_entry->Commit(commit_ts);
     }
-
-    // Commit the prepared data
-    for (const auto &name_table_pair : txn_tables_store_) {
-        TxnTableStore *table_local_store = name_table_pair.second.get();
-        table_local_store->Commit();
-    }
-
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
