@@ -7,6 +7,7 @@ module;
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+#include "json.hpp"
 
 #include "toml.hpp"
 
@@ -120,5 +121,8 @@ export template <typename E>
 constexpr auto EnumInteger(E value) noexcept -> magic_enum::detail::enable_if_t<E, magic_enum::underlying_type_t<E>> {
     return static_cast<magic_enum::underlying_type_t<E>>(value);
 }
+
+// Json Parser
+export using Json = nlohmann::json;
 
 } // namespace infinity

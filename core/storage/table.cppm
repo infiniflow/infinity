@@ -4,8 +4,14 @@
 
 module;
 
+import table_def;
 import base_table;
 import stl;
+import parser;
+import data_block;
+import infinity_exception;
+import infinity_assert;
+import third_party;
 
 export module table;
 
@@ -23,7 +29,7 @@ enum class TableType {
 };
 
 export class Table : public BaseTable {
-#if 0
+
 public:
     static SharedPtr<Table> Make(SharedPtr<TableDef> table_def_ptr, TableType type);
 
@@ -50,8 +56,9 @@ public:
     [[nodiscard]] SizeT DataBlockCount() const { return data_blocks_.size(); }
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
-        StorageAssert(idx < data_blocks_.size(),
-                      "Attempt to access invalid index: " + std::to_string(idx) + "/" + std::to_string(DataBlockCount())) return data_blocks_[idx];
+        Assert<StorageException>(idx < data_blocks_.size(),
+                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()), __FILE_NAME__, __LINE__);
+        return data_blocks_[idx];
     }
 
     [[nodiscard]] String &GetColumnNameById(SizeT idx) const;
@@ -62,7 +69,7 @@ public:
 
     inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
 
-    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = std::move(result_msg); }
+    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = Move(result_msg); }
 
     [[nodiscard]] inline String *result_msg() const { return result_msg_.get(); }
 
@@ -80,7 +87,7 @@ public:
     TableType type_{TableType::kInvalid};
     Vector<SharedPtr<DataBlock>> data_blocks_{};
     SharedPtr<String> result_msg_{};
-#endif
+
 };
 
 } // namespace infinity

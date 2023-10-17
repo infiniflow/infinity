@@ -90,6 +90,12 @@ file(GLOB_RECURSE
         common/*.cppm
 )
 
+file(GLOB_RECURSE
+        parser_cppm
+        CONFIGURE_DEPENDS
+        parser/*.cppm
+)
+
 
 add_executable(infinity
         ${main_cpp}
@@ -110,6 +116,11 @@ target_sources(infinity
         ${planner_cppm}
         ${scheduler_cppm}
         ${storage_cppm}
+        ${parser_cppm}
+)
+
+target_link_libraries(infinity
+        sql_parser
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -118,6 +129,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxo
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 
 ### unit test
 
@@ -164,6 +176,7 @@ target_link_libraries(unit_test
         gtest_main
         gmock
         gmock_main
+        sql_parser
 )
 
 #add_executable(unittest
@@ -182,6 +195,7 @@ target_sources(unit_test
         ${planner_cppm}
         ${scheduler_cppm}
         ${storage_cppm}
+        ${parser_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -190,6 +204,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxx
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
-
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 

@@ -132,7 +132,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
 }
 
 void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
-//    u32 column_name_length_sum = 0;
+    u32 column_name_length_sum = 0;
 //    SizeT column_count = result_table->ColumnCount();
 //    for (SizeT idx = 0; idx < column_count; ++idx) {
 //        column_name_length_sum += result_table->GetColumnNameById(idx).length();

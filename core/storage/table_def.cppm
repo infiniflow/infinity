@@ -4,14 +4,16 @@
 module;
 
 import stl;
+import parser;
+import index_def;
 
 export module table_def;
 
 
 namespace infinity {
 
-class TableDef {
-#if 0
+export class TableDef {
+
 public:
     static inline SharedPtr<TableDef> Make(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns) {
         return MakeShared<TableDef>(Move(schema), Move(table_name), Move(columns));
@@ -36,7 +38,7 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<TableDef> ReadAdv(char *&ptr, int32_t maxbytes);
+    static SharedPtr<TableDef> ReadAdv(char *&ptr, i32 maxbytes);
 
     [[nodiscard]] inline const Vector<SharedPtr<ColumnDef>> &columns() const { return columns_; }
 
@@ -63,9 +65,7 @@ private:
     HashMap<String, SizeT> column_name2id_{};
     SharedPtr<String> table_name_{};
     SharedPtr<String> schema_name_{};
-
     Vector<IndexDef> indexes_{};
-#endif
 };
 
 } // namespace infinity
