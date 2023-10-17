@@ -61,7 +61,8 @@ public:
 public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
 
-    static void CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, BufferManager *buffer_mgr);
+    static void
+    CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
 
     static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr);
 

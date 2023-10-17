@@ -11,7 +11,6 @@ IndexDefEntry::IndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_
 
 nlohmann::json IndexDefEntry::Serialize(const IndexDefEntry *index_def_entry) {
     nlohmann::json json;
-    // TODO shenyushi: json field name should has no underline suffix
     json["begin_ts"] = index_def_entry->begin_ts_;
     json["commit_ts"] = index_def_entry->commit_ts_.load();
     json["txn_id"] = index_def_entry->txn_id_.load();

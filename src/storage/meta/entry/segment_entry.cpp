@@ -112,6 +112,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                                                          const IndexDef &index_def,
                                                          u64 column_id,
                                                          int dimension,
+                                                         TxnTimeStamp create_ts,
                                                          BufferManager *buffer_mgr,
                                                          TxnTableStore *txn_store) {
     Vector<SharedPtr<IndexEntry>> index_entries;
@@ -151,7 +152,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                 }
             }
 
-            auto index_entry = IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, buffer_mgr, new FaissIndexPtr(index, quantizer));
+            auto index_entry =
+                IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, create_ts, buffer_mgr, new FaissIndexPtr(index, quantizer));
 
             txn_store->CreateIndexFile(segment_entry->segment_id_, std::move(index_entry));
             return index_entry;
@@ -188,9 +190,9 @@ void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 s
     std::unique_lock<std::shared_mutex> lck(segment_entry->rw_locker_);
     if (segment_entry->min_row_ts_ == 0) {
         segment_entry->min_row_ts_ = commit_ts;
-        for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
-            IndexEntry::Flush(index_entry.get());
-        }
+        // for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
+        //     IndexEntry::Flush(index_entry.get(), commit_ts);
+        // }
     }
     segment_entry->max_row_ts_ = std::max(segment_entry->max_row_ts_, commit_ts);
 }
@@ -242,7 +244,7 @@ nlohmann::json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry, max_commit_ts));
     }
     for (const auto &[_index_name, index_entry] : segment_entry->index_entry_map_) {
-        IndexEntry::Flush(index_entry.get());
+        IndexEntry::Flush(index_entry.get(), max_commit_ts);
         json_res["index_entries"].emplace_back(IndexEntry::Serialize(index_entry.get()));
     }
     return json_res;
