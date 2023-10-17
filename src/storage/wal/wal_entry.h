@@ -26,6 +26,7 @@ enum class WalCommandType : uint8_t {
     DROP_TABLE = 4,
     ALTER_INFO = 5,
     CREATE_INDEX = 6,
+    DROP_INDEX = 7,
 
     // -----------------------------
     // Data
@@ -131,6 +132,23 @@ struct WalCmdDropTable : public WalCmd {
     String table_name;
 };
 
+struct WalCmdDropIndex : public WalCmd {
+    WalCmdDropIndex(const String &db_name, const String &table_name, const String &index_name)
+        : db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+
+    virtual WalCommandType GetType() override { return WalCommandType::DROP_INDEX; }
+
+    virtual bool operator==(const WalCmd &other) const override;
+
+    virtual int32_t GetSizeInBytes() const override;
+
+    virtual void WriteAdv(char *&buf) const override;
+
+    const String db_name_{};
+    const String table_name_{};
+    const String index_name_{};
+};
+
 struct WalCmdImport : public WalCmd {
     WalCmdImport(const String &db_name_, const String &table_name_, const String &segment_dir_)
         : db_name(db_name_), table_name(table_name_), segment_dir(segment_dir_) {}
@@ -190,7 +208,7 @@ struct WalCmdCheckpoint : public WalCmd {
 };
 
 struct WalEntryHeader {
-    int32_t size; // size of payload, excluding the header, round to multi
+    int32_t size; // size of payload, including the header, round to multi
     // of 4. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
     uint32_t checksum; // crc32 of the entry, including the header and the

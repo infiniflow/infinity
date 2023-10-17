@@ -6,24 +6,10 @@
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
 
-class ColumnVectorBlobTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorBlobTest : public BaseTest {};
 
 TEST_F(ColumnVectorBlobTest, flat_blob) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -193,7 +179,6 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -311,7 +296,6 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
 TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -375,7 +359,6 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 
 TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);

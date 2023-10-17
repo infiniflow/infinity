@@ -2,9 +2,9 @@
 // Created by tangdonghai on 23-9-6.
 //
 
-#include "base_test.h"
 #include "common/column_vector/column_vector.h"
 #include "common/types/data_type.h"
+#include "infinity_test.h"
 
 #include "common/types/logical_type.h"
 #include "function/table/seq_scan.h"
@@ -17,26 +17,10 @@
 #include "storage/storage.h"
 #include <math.h>
 
-class TableScanTest : public BaseTest {
-    void SetUp() override {
-        system("rm -rf /tmp/infinity");
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity");
-    }
-};
+class TableScanTest : public InfinityTest {};
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
     RegisterSeqScanFunction(catalog);
     RegisterTableScanFunction(catalog);

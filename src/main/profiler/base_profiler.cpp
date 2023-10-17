@@ -16,12 +16,12 @@ void BaseProfiler::Begin() {
 void BaseProfiler::End() {
     if (finished_)
         return;
-    end_ts_ = Now();
+    max_row_ts_ = Now();
     finished_ = true;
 }
 
 std::chrono::nanoseconds BaseProfiler::ElapsedInternal() const {
-    auto now = finished_ ? end_ts_ : Now();
+    auto now = finished_ ? max_row_ts_ : Now();
     return now - begin_ts_;
 }
 

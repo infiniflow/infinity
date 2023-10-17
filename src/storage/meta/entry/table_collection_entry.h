@@ -22,10 +22,11 @@ class BlockIndex;
 class ColumnDef;
 class DeleteState;
 class ScanState;
-class IndexMeta;
 class SegmentEntry;
-class IndexEntry;
+class IndexMeta;
+class IndexDefEntry;
 class IndexDef;
+class IndexEntry;
 class AppendState;
 
 struct TableCollectionEntry : public BaseEntry {
@@ -44,10 +45,14 @@ public:
                                    ConflictType conflict_type,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts,
-                                   TxnManager *txn_mgr,
-                                   BufferManager *buffer_mgr);
+                                   TxnManager *txn_mgr);
 
-    static EntryResult DropIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static EntryResult DropIndex(TableCollectionEntry *table_entry,
+                                 const String &index_name,
+                                 ConflictType conflict_type,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr);
 
     static EntryResult GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
 
@@ -56,7 +61,8 @@ public:
 public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
 
-    static void CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, BufferManager *buffer_mgr);
+    static void
+    CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
 
     static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr);
 
@@ -66,8 +72,7 @@ public:
 
     static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);
 
-    static void
-    CommitCreateIndexFile(TableCollectionEntry *table_entry, Txn *txn_ptr, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
+    static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 
@@ -75,8 +80,7 @@ public:
 
     static UniquePtr<String> RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static UniquePtr<String>
-    ImportAppendSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment, AppendState &append_state);
+    static UniquePtr<String> ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment);
 
     static inline u64 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
 
@@ -90,7 +94,7 @@ public:
 
     static SharedPtr<BlockIndex> GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static nlohmann::json Serialize(const TableCollectionEntry *table_entry);
+    static nlohmann::json Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableCollectionEntry>
     Deserialize(const nlohmann::json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
@@ -118,7 +122,8 @@ public:
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
 
-    HashMap<SharedPtr<String>, UniquePtr<IndexDefMeta>> indexes_{};
+    //
+    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
 };
 
 } // namespace infinity

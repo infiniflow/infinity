@@ -6,24 +6,10 @@
 #include "main/infinity.h"
 #include "function/cast/integer_cast.h"
 
-class TinyIntegerCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class TinyIntegerCastTest : public BaseTest {};
 
 TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // TinyInt to SmallInt, throw exception
     {
@@ -195,7 +181,6 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast0) {
 
 TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kTinyInt);
     SharedPtr<ColumnVector> col_source = MakeShared<ColumnVector>(source_type);

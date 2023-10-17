@@ -6,20 +6,7 @@
 #include "main/infinity.h"
 #include "bin/compilation_config.h"
 
-class ConfigTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ConfigTest : public BaseTest {};
 
 static size_t GetAvailableMem() {
     size_t pages = sysconf(_SC_PHYS_PAGES);
@@ -29,7 +16,6 @@ static size_t GetAvailableMem() {
 
 TEST_F(ConfigTest, test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<String> path = nullptr;
     Config config;
     config.Init(path);
@@ -68,7 +54,6 @@ TEST_F(ConfigTest, test1) {
 
 TEST_F(ConfigTest, test2) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     SharedPtr<String> path = MakeShared<String>(String(TEST_DATA_PATH) + "/config/infinity_conf.toml");
     Config config;
     config.Init(path);

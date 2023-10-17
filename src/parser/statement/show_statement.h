@@ -13,6 +13,7 @@ enum class ShowStmtType {
     kTables,
     kCollections,
     kViews,
+    kIndexes,
 };
 
 class ShowStatement : public BaseStatement {

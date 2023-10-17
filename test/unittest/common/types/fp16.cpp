@@ -3,24 +3,10 @@
 #include "common/types/value.h"
 #include "common/types/number/float16.h"
 
-class FP16TypeTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class FP16TypeTest : public BaseTest {};
 
 TEST_F(FP16TypeTest, test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     const uint16_t min_po2_f16 = UINT16_C(0x0400);
     const uint16_t eighths_f16 = UINT16_C(0x3000);
     const uint16_t quarter_f16 = UINT16_C(0x3400);

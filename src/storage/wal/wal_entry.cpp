@@ -76,6 +76,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
             cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
             break;
         }
+        case WalCommandType::DROP_INDEX: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
+            break;
+        }
         default:
             StorageError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
@@ -94,6 +101,11 @@ bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_ != nullptr &&
            other_cmd->index_def_ != nullptr && *index_def_ == *other_cmd->index_def_;
+}
+
+bool WalCmdDropIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropIndex *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_name_ == other_cmd->index_name_;
 }
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
@@ -137,12 +149,17 @@ int32_t WalCmdCreateTable::GetSizeInBytes() const {
 }
 
 int32_t WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() +
            this->index_def_->GetSizeInBytes();
 }
 
 int32_t WalCmdDropTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size();
+}
+
+int32_t WalCmdDropIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+           this->index_name_.size();
 }
 
 int32_t WalCmdImport::GetSizeInBytes() const {
@@ -188,6 +205,13 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_TABLE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
+}
+
+void WalCmdDropIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
 }
 
 void WalCmdImport::WriteAdv(char *&buf) const {

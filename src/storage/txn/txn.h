@@ -83,6 +83,8 @@ public:
 
     EntryResult DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
 
+    EntryResult DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
+
     EntryResult GetCollectionByName(const String &db_name, const String &table_name);
 
     // Fixme: view definition should be given
@@ -136,12 +138,10 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    void Checkpoint(const TxnTimeStamp max_commit_ts);
+    void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 private:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
-    void CheckpointFlushMemTable();
-    void CheckpointFlushCatalog();
 
 private:
     NewCatalog *catalog_{};
@@ -150,8 +150,6 @@ private:
 
     // Related database
     Set<String> db_names_{};
-    Set<String> table_names_{};
-    Set<String> index_names_{};
 
     // Txn store
     Set<DBEntry *> txn_dbs_{};
@@ -175,10 +173,6 @@ private:
 
     // Txn Manager
     TxnManager *txn_mgr_{};
-
-    bool is_checkpoint_{false};
-    // Checkpoint max commit ts only for checkpoint
-    TxnTimeStamp max_commit_ts_{};
 };
 
 } // namespace infinity

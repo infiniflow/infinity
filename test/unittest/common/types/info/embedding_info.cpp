@@ -6,24 +6,10 @@
 #include "main/infinity.h"
 #include "common/types/info/embedding_info.h"
 
-class EmbeddingInfoTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class EmbeddingInfoTest : public BaseTest {};
 
 TEST_F(EmbeddingInfoTest, embedding_info_A) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     EXPECT_THROW(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, EMBEDDING_LIMIT + 1), TypeException);
 
@@ -39,6 +25,6 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
 
     nlohmann::json json;
     json["type_info"] = embedding_info_ptr->Serialize();
-    LOG_TRACE("{}", json.dump());
+    std::cout << json.dump() << std::endl;
     //    EXPECT_EQ(json.dump(), "{\"type_info\":{\"precision\":38,\"scale\":38}}");
 }

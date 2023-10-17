@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "common/types/alias/smart_ptr.h"
 #include "common/types/alias/containers.h"
+#include "common/types/alias/smart_ptr.h"
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"
 #include "storage/common/global_block_id.h"
@@ -331,13 +331,11 @@ struct CreateTableOutputState : public OutputState {
 };
 
 struct CreateIndexInputState : public InputState {
-    inline explicit
-    CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
+    inline explicit CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
 };
 
 struct CreateIndexOutputState : public OutputState {
-    inline explicit
-    CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
+    inline explicit CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
 };
 
 // Create Collection
@@ -374,6 +372,14 @@ struct DropTableInputState : public InputState {
 
 struct DropTableOutputState : public OutputState {
     inline explicit DropTableOutputState() : OutputState(PhysicalOperatorType::kDropTable) {}
+};
+
+struct DropIndexInputState : public InputState {
+    inline explicit DropIndexInputState() : InputState(PhysicalOperatorType::kDropIndex) {}
+};
+
+struct DropIndexOutputState : public OutputState {
+    inline explicit DropIndexOutputState() : OutputState(PhysicalOperatorType::kDropIndex) {}
 };
 
 // Drop Collection

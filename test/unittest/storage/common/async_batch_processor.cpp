@@ -8,20 +8,7 @@
 #include "storage/common/commit_task.h"
 #include "storage/common/async_dummy_task.h"
 
-class AsyncTaskProcessorTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class AsyncTaskProcessorTest : public BaseTest {};
 
 using namespace infinity;
 
@@ -29,7 +16,7 @@ SharedPtr<AsyncTask> OnPrepareTest(List<SharedPtr<AsyncTask>> &async_tasks) {
     SharedPtr<CommitTask> commit_task = MakeShared<CommitTask>(async_tasks.size());
     for (const auto &async_task : async_tasks) {
         async_task->Prepare();
-        LOG_TRACE("OnPrepare: " + async_task->ToString());
+        std::cout << "OnPrepare: " << async_task->ToString() << std::endl;
         commit_task->Append(async_task.get());
     }
     return commit_task;
@@ -38,12 +25,11 @@ SharedPtr<AsyncTask> OnPrepareTest(List<SharedPtr<AsyncTask>> &async_tasks) {
 void OnCommitTest(const SharedPtr<AsyncTask> &commit_task) {
     //    async_task->Notify();
     commit_task->Commit();
-    LOG_TRACE("OnCommit: " + commit_task->ToString());
+    std::cout << "OnCommit: " << commit_task->ToString() << std::endl;
 }
 
 TEST_F(AsyncTaskProcessorTest, test1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
     AsyncBatchProcessor processor(10 * 1024, 1024, OnPrepareTest, OnCommitTest);
     processor.Start();
 

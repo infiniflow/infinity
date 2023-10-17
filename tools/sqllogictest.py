@@ -1,8 +1,10 @@
 import argparse
 import os
 import shutil
+
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
+
 
 def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
     # create dest_dir if it doesn't exist
@@ -32,12 +34,10 @@ def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
 
     # run sqllogictest-rs for each test file
     for test_file_path in test_file_paths:
-        print("running test file: " + test_file_path)
-        # run sqllogictest-rs
-        os.system(sqllogictest_rs_path + " " + test_file_path)
-
-        print("finished running test file: " + test_file_path)
-        print("----------------------------------------------------------\n")
+        cmd = sqllogictest_rs_path + " " + test_file_path
+        print(cmd)
+        os.system(cmd)
+        print("-"*80)
 
     print(len(test_file_paths))
 
@@ -56,19 +56,24 @@ def main():
 
     dest_dir = '/tmp/infinity/sqllogictest'
 
+    sqllogictest_path = shutil.which('sqllogictest')
+    if sqllogictest_path is None:
+        print("Please install sqllogictest from https://github.com/risinglightdb/sqllogictest-rs")
+        return
     parser = argparse.ArgumentParser(description='SQL Logic Test For Infinity')
 
-    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='./tools/sqllogictest',
-                        dest='path')
-    parser.add_argument('-s', '--src', help='path of src directory', type=str, default=src_dir, dest='src')
-    parser.add_argument('-t', '--test', help='path of test directory', type=str, default=test_dir, dest='test')
-    parser.add_argument('-d', '--dest', help='path of dest directory', type=str, default=dest_dir, dest='dest')
+    parser.add_argument('-s', '--src', help='path of src directory',
+                        type=str, default=src_dir, dest='src')
+    parser.add_argument('-t', '--test', help='path of test directory',
+                        type=str, default=test_dir, dest='test')
+    parser.add_argument('-d', '--dest', help='path of dest directory',
+                        type=str, default=dest_dir, dest='dest')
 
     args = parser.parse_args()
 
     # get bin sqllogictest-rs path from input argument
 
-    _main(args.path, args.src, args.test, args.dest)
+    _main(sqllogictest_path, args.src, args.test, args.dest)
 
     return
 

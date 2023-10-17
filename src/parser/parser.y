@@ -555,7 +555,6 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     create_view_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     $$->create_info_ = create_view_info;
 }
-// TODO shenyushi 4: should support default index name if the name does not exist
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (para[, ...para])]; */
 | CREATE INDEX if_not_exists_info ON table_name '(' identifier_array ')' USING IDENTIFIER with_index_para_list {
     $$ = new infinity::CreateStatement();
@@ -972,20 +971,24 @@ drop_statement: DROP DATABASE if_exists IDENTIFIER {
     delete $4;
 }
 
-/* DROP INDEX index_name; */
-| DROP INDEX if_exists table_name {
+/* DROP INDEX index_name ON table_name; */
+| DROP INDEX if_exists IDENTIFIER ON table_name {
     $$ = new infinity::DropStatement();
     std::shared_ptr<infinity::DropIndexInfo> drop_index_info = std::make_shared<infinity::DropIndexInfo>();
-    if($4->schema_name_ptr_ != nullptr) {
-        drop_index_info->schema_name_ = $4->schema_name_ptr_;
-        free($4->schema_name_ptr_);
-    }
-    drop_index_info->index_name_ = $4->table_name_ptr_;
-    free($4->table_name_ptr_);
-    delete $4;
 
     $$->drop_info_ = drop_index_info;
     $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+
+    drop_index_info->index_name_ = $4;
+    free($4);
+
+    if($6->schema_name_ptr_ != nullptr) {
+        drop_index_info->schema_name_ = $6->schema_name_ptr_;
+        free($6->schema_name_ptr_);
+    }
+    drop_index_info->table_name_ = $6->table_name_ptr_;
+    free($6->table_name_ptr_);
+    delete $6;
 };
 
 /*
@@ -1415,6 +1418,17 @@ show_statement: SHOW TABLES {
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
     delete $2;
+}
+| DESCRIBE INDEX table_name {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndexes;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 };
 
 /*
@@ -2218,7 +2232,6 @@ if_not_exists_info : if_not_exists IDENTIFIER {
     $$ = new infinity::IfNotExistsInfo();
 }
 
-// TODO shenyushi -1: Can no parameter be represented as this?
 with_index_para_list : WITH '(' index_para_list ')' {
     $$ = std::move($3);
 }

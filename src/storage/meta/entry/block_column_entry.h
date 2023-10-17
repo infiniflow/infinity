@@ -44,7 +44,7 @@ public:
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
-    static nlohmann::json Serialize(const BlockColumnEntry *block_column_entry);
+    static nlohmann::json Serialize(BlockColumnEntry *block_column_entry);
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 };

@@ -20,7 +20,7 @@ class BufferManager;
 
 struct NewCatalog {
 public:
-    explicit NewCatalog(SharedPtr<String> dir);
+    explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
     static EntryResult CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -30,8 +30,6 @@ public:
     static EntryResult GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts);
 
     static void RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr);
-
-    static Vector<DBEntry *> Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts);
 
 #if 0
 
@@ -81,13 +79,13 @@ public:
 
     static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
-    static nlohmann::json Serialize(const NewCatalog *catalog);
+    static nlohmann::json Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
     static UniquePtr<NewCatalog> LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr);
 
-    static void SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, const String &file_name);
+    static void SaveAsFile(NewCatalog *catalog_ptr, TxnTimeStamp max_commit_ts, const String &dir, const String &file_name, bool is_full_checkpoint);
 
 public:
     SharedPtr<String> current_dir_{nullptr};

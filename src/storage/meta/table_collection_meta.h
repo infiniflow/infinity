@@ -44,7 +44,7 @@ public:
 
     static inline DBEntry *GetDBEntry(TableCollectionMeta *table_meta) { return table_meta->db_entry_; }
 
-    static nlohmann::json Serialize(const TableCollectionMeta *table_meta);
+    static nlohmann::json Serialize(TableCollectionMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableCollectionMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 

@@ -10,21 +10,18 @@
 
 namespace infinity {
 
-constexpr i64 DEFAULT_VECTOR_SIZE = 8192;
+constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
+constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
 constexpr i64 MAX_VARCHAR_SIZE = 65535;
 constexpr i64 MAX_BLOB_SIZE = 65536L * 65536L;
 constexpr i64 MAX_BITMAP_SIZE = 65536;
 constexpr i64 EMBEDDING_LIMIT = 65536;
 
-constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 128;
-constexpr SizeT DEFAULT_SEGMENT_ROW = 1024 * 1024;
+constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 16384;
 constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;
 constexpr SizeT DEFAULT_WRITER_PREPARE_QUEUE_SIZE = 1024;
 constexpr SizeT DEFAULT_READER_COMMIT_QUEUE_SIZE = 1024;
 constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
-
-constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();
-constexpr u64 MAX_TIMESTAMP = std::numeric_limits<u64>::max();
 
 constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<TxnTimeStamp>::max();
 constexpr i32 INVALID_SEGMENT_ID = std::numeric_limits<i32>::max();
@@ -38,10 +35,9 @@ constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
 constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
 constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024;
-constexpr SizeT FULL_CHECKPOINT_TIME_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
-constexpr SizeT FULL_CHECKPOINT_TXN_INTERVAL = 100 * 1000;           // txn count
-constexpr SizeT DELTA_CHECKPOINT_TIME_INTERVAL = 20000;              // 20 seconds
-constexpr SizeT DELTA_CHECKPOINT_TXN_INTERVAL = 3;                   // txn count
+constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
+constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
+constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
 const String WAL_FILE_TEMP_FILE = "wal.log";
 const String WAL_FILE_PREFIX = "wal.log.";
 

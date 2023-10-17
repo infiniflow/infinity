@@ -6,25 +6,11 @@
 #include "common/column_vector/column_vector.h"
 #include "main/infinity.h"
 
-class ColumnVectorBitmapTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorBitmapTest : public BaseTest {};
 
 TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -191,7 +177,6 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -306,7 +291,6 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
 TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -367,7 +351,6 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
 
 TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);

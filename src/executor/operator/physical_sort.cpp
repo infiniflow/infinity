@@ -374,8 +374,8 @@ SharedPtr<Table> PhysicalSort::GenerateOutput(const SharedPtr<Table> &input_tabl
 
         output_table->Append(output_datablock);
     }
-    return output_table;
 #endif
+    return output_table;
 }
 
 } // namespace infinity

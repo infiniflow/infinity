@@ -48,7 +48,7 @@ public:
 
     static SharedPtr<String> ToString(DBEntry *db_entry);
 
-    static nlohmann::json Serialize(const DBEntry *db_entry);
+    static nlohmann::json Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 

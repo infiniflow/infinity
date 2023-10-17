@@ -51,7 +51,7 @@ public:
 
     static void Flush(SegmentColumnEntry *column_data_entry, SizeT row_count);
 
-    static nlohmann::json Serialize(const SegmentColumnEntry *column_data_entry);
+    static nlohmann::json Serialize(SegmentColumnEntry *column_data_entry);
 
     static SharedPtr<SegmentColumnEntry> Deserialize(const nlohmann::json &column_data_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 

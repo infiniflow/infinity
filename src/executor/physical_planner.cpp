@@ -14,6 +14,7 @@
 #include "executor/operator/physical_cross_product.h"
 #include "executor/operator/physical_delete.h"
 #include "executor/operator/physical_drop_collection.h"
+#include "executor/operator/physical_drop_index.h"
 #include "executor/operator/physical_drop_schema.h"
 #include "executor/operator/physical_drop_table.h"
 #include "executor/operator/physical_dummy_scan.h"
@@ -44,6 +45,7 @@
 #include "planner/node/logical_create_view.h"
 #include "planner/node/logical_cross_product.h"
 #include "planner/node/logical_drop_collection.h"
+#include "planner/node/logical_drop_index.h"
 #include "planner/node/logical_drop_schema.h"
 #include "planner/node/logical_drop_table.h"
 #include "planner/node/logical_drop_view.h"
@@ -86,6 +88,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kDropTable: {
             result = BuildDropTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropIndex: {
+            result = BuildDropIndex(logical_operator);
             break;
         }
         case LogicalNodeType::kDropCollection: {
@@ -279,6 +285,17 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<Logi
                                          logical_drop_table->GetOutputNames(),
                                          logical_drop_table->GetOutputTypes(),
                                          logical_drop_table->node_id());
+}
+
+SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalDropIndex> logical_drop_index = std::static_pointer_cast<LogicalDropIndex>(logical_operator);
+    return MakeShared<PhysicalDropIndex>(logical_drop_index->schema_name(),
+                                         logical_drop_index->table_name(),
+                                         logical_drop_index->index_name(),
+                                         logical_drop_index->conflict_type(),
+                                         logical_drop_index->GetOutputNames(),
+                                         logical_drop_index->GetOutputTypes(),
+                                         logical_drop_index->node_id());
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {

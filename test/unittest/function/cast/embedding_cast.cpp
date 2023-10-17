@@ -6,20 +6,7 @@
 #include "main/infinity.h"
 #include "function/cast/embedding_cast.h"
 
-class EmbeddingCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class EmbeddingCastTest : public BaseTest {};
 
 // TEST_F(EmbeddingCastTest, uuid_cast0) {
 //     using namespace infinity;
@@ -62,7 +49,6 @@ class EmbeddingCastTest : public BaseTest {
 
 TEST_F(EmbeddingCastTest, embedding_cast1) {
     using namespace infinity;
-    LOG_TRACE("Test name: {}.{}", test_info_->test_case_name(), test_info_->name());
 
     // Call BindEmbeddingCast with wrong type of parameters
     {
@@ -109,12 +95,6 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
         ColumnVector col_target(target_type);
         col_target.Initialize();
-
-//        EmbeddingT* embedding_ptr = (EmbeddingT*)(col_source.data_ptr_);
-//        for (i64 i = 0; i < 1; ++ i) {
-//            String s = EmbeddingT::Embedding2String(embedding_ptr[i], embedding_info->Type(), embedding_info->Dimension());
-//            LOG_TRACE("{}", s);
-//        }
 
 // FIXME: Embedding type width isn't sizeof(EmbeddingT)
 // But UnaryExecute will only use the sizeof(type) to iterate each value.
