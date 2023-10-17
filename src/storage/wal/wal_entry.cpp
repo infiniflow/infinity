@@ -235,6 +235,7 @@ void WalCmdCreateDatabase::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     if (!result.Success()) {
         StorageError("Wal Replay: Create database failed");
     }
+    result.entry_->Commit(commit_ts);
 }
 void WalCmdCreateTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name, txn_id, commit_ts);
@@ -252,6 +253,7 @@ void WalCmdCreateTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     if (!result.Success()) {
         StorageError("Wal Replay: Create table failed");
     }
+    result.entry_->Commit(commit_ts);
 }
 void WalCmdCreateIndex::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name_, txn_id, commit_ts);
@@ -268,12 +270,14 @@ void WalCmdCreateIndex::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     if (!result.Success()) {
         StorageError("Wal Replay: Create index failed");
     }
+    result.entry_->Commit(commit_ts);
 }
 void WalCmdDropDatabase::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     auto result = NewCatalog::DropDatabase(storage->catalog(), db_name, txn_id, commit_ts, nullptr);
     if (!result.Success()) {
         StorageError("Wal Replay: Drop database failed");
     }
+    result.entry_->Commit(commit_ts);
 }
 void WalCmdDropTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage->catalog(), db_name, txn_id, commit_ts);
@@ -285,6 +289,7 @@ void WalCmdDropTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     if (!result.Success()) {
         StorageError("Wal Replay: Drop table failed");
     }
+    result.entry_->Commit(commit_ts);
 }
 void WalCmdDelete::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdDelete Replay Not implemented"); }
 void WalCmdImport::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdImport Replay Not implemented"); }
@@ -302,8 +307,10 @@ void WalCmdAppend::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
 
     auto table_store = MakeShared<TxnTableStore>(table_name, table_entry, nullptr);
     table_store->Append(block);
-
-    TableCollectionEntry::Append(table_entry, /*Txn*/ nullptr, table_store.get(), storage->buffer_manager());
+    // todo fix me
+    auto append_state = MakeUnique<AppendState>(this->blocks_);
+    table_store->PrepareCommit();
+    table_store->Commit();
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {
