@@ -24,12 +24,6 @@ TEST_F(ExceptionTest, all_exception_cases) {
     }
 
     try {
-        throw infinity::ParserException("Unsupported syntax");
-    } catch (std::exception &e) {
-        EXPECT_EQ(std::string(e.what()), "Parser Error: Unsupported syntax");
-    }
-
-    try {
         throw infinity::PlannerException("Doesn't support this usage:", "SELECT *");
     } catch (std::exception &e) {
         EXPECT_EQ(std::string(e.what()), "Planner Error: Doesn't support this usage: SELECT *");

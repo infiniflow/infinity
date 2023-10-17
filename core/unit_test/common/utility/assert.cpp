@@ -25,10 +25,6 @@ TEST_F(AssertTest, all_assert_cases) {
     EXPECT_ANY_THROW(Error<NetworkException>("Error", __FILE__, __LINE__));
     Assert<NetworkException>(true, "Error", __FILE__, __LINE__);
 
-    EXPECT_ANY_THROW(Assert<ParserException>(false, "Error", __FILE__, __LINE__));
-    EXPECT_ANY_THROW(Error<ParserException>("Error", __FILE__, __LINE__));
-    Assert<ParserException>(true, "Error", __FILE__, __LINE__);
-
     EXPECT_ANY_THROW(Assert<PlannerException>(false, "Error", __FILE__, __LINE__));
     EXPECT_ANY_THROW(Error<CatalogException>("Error", __FILE__, __LINE__));
     Assert<PlannerException>(true, "Error", __FILE__, __LINE__);
