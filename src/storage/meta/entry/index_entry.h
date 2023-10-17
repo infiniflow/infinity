@@ -12,7 +12,13 @@ class BufferManager;
 class SegmentEntry;
 class FaissIndexPtr;
 
-class IndexEntry : BaseEntry {
+enum IndexStatus : i8 {
+    kIndexOpen,
+    kIndexClosed,
+    kIndexFlushing,
+};
+
+class IndexEntry : public BaseEntry {
 private:
     explicit IndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferHandle *buffer_handle)
         : BaseEntry(EntryType::kIndex), segment_entry_(segment_entry), index_name_(std::move(index_name)), buffer_handle_(buffer_handle){};
@@ -27,7 +33,9 @@ private:
 public:
     [[nodiscard]] static ObjectHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
 
-    static void Flush(const IndexEntry *index_entry);
+    static bool PrepareFlush(IndexEntry *index_entry);
+
+    static bool Flush(IndexEntry *index_entry);
 
     static nlohmann::json Serialize(const IndexEntry *index_entry);
 
@@ -39,11 +47,12 @@ private:
     static inline String IndexDirName(const String &segment_entry_dir) { return segment_entry_dir + "/index"; }
 
 public:
-    [[nodiscard]] inline SharedPtr<String> index_name() { return index_name_; }
+    const SegmentEntry *segment_entry_{};
+    const SharedPtr<String> index_name_{};
 
 private:
-    SegmentEntry *segment_entry_{};
-    SharedPtr<String> index_name_{};
+    std::atomic<IndexStatus> status_{IndexStatus::kIndexOpen};
+
     BufferHandle *buffer_handle_{};
 };
 } // namespace infinity

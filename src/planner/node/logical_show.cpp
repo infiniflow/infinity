@@ -15,6 +15,8 @@ String ToString(ShowType type) {
             return "Show views";
         case ShowType::kShowColumn:
             return "Show column";
+        case ShowType::kShowIndexes:
+            return "Show indexes";
         default: {
             PlannerError("Invalid chunk scan type");
         }

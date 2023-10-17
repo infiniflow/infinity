@@ -3,6 +3,7 @@
 //
 
 #include "extra_ddl_info.h"
+#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

@@ -16,15 +16,19 @@ nlohmann::json IndexDefEntry::Serialize(const IndexDefEntry *index_def_entry) {
     json["commit_ts"] = index_def_entry->commit_ts_.load();
     json["txn_id"] = index_def_entry->txn_id_.load();
     json["delete"] = index_def_entry->deleted_;
-    json["index_def"] = index_def_entry->index_def_->Serialize();
+    if (!index_def_entry->deleted_) {
+        json["index_def"] = index_def_entry->index_def_->Serialize();
+    }
     return json;
 }
 
 UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const nlohmann::json &index_def_entry_json, IndexDefMeta *index_def_meta) {
     u64 txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
-    // IndexDef::Deserialize(index_def_entry_json["index_def"], IndexDef &index_def)
-    auto index_def_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts);
+    TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
+    auto index_def = IndexDef::Deserialize(index_def_entry_json["index_def"]);
+    auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts);
+    index_def_entry->commit_ts_.store(commit_ts);
     return index_def_entry;
 }
 } // namespace infinity

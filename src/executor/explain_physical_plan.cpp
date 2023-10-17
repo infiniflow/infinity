@@ -1097,6 +1097,28 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowIndexes: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ') + "-> SHOW INDEXES ";
+            } else {
+                show_str = "SHOW INDEXES ";
+            }
+            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            show_column_db_str += show_node->db_name();
+            result->emplace_back(MakeShared<String>(show_column_db_str));
+
+            String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
+            show_column_table_str += show_node->object_name();
+            result->emplace_back(MakeShared<String>(show_column_table_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, ...]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         default: {
             PlannerError("Invalid show type")
         }

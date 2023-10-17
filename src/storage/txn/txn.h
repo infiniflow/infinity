@@ -83,6 +83,8 @@ public:
 
     EntryResult DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
 
+    EntryResult DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
+
     EntryResult GetCollectionByName(const String &db_name, const String &table_name);
 
     // Fixme: view definition should be given
@@ -148,8 +150,6 @@ private:
 
     // Related database
     Set<String> db_names_{};
-    Set<String> table_names_{};
-    Set<String> index_names_{};
 
     // Txn store
     Set<DBEntry *> txn_dbs_{};

@@ -972,20 +972,24 @@ drop_statement: DROP DATABASE if_exists IDENTIFIER {
     delete $4;
 }
 
-/* DROP INDEX index_name; */
-| DROP INDEX if_exists table_name {
+/* DROP INDEX index_name ON table_name; */
+| DROP INDEX if_exists IDENTIFIER ON table_name {
     $$ = new infinity::DropStatement();
     std::shared_ptr<infinity::DropIndexInfo> drop_index_info = std::make_shared<infinity::DropIndexInfo>();
-    if($4->schema_name_ptr_ != nullptr) {
-        drop_index_info->schema_name_ = $4->schema_name_ptr_;
-        free($4->schema_name_ptr_);
-    }
-    drop_index_info->index_name_ = $4->table_name_ptr_;
-    free($4->table_name_ptr_);
-    delete $4;
 
     $$->drop_info_ = drop_index_info;
     $$->drop_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
+
+    drop_index_info->index_name_ = $4;
+    free($4);
+
+    if($6->schema_name_ptr_ != nullptr) {
+        drop_index_info->schema_name_ = $6->schema_name_ptr_;
+        free($6->schema_name_ptr_);
+    }
+    drop_index_info->table_name_ = $6->table_name_ptr_;
+    free($6->table_name_ptr_);
+    delete $6;
 };
 
 /*
@@ -1415,6 +1419,17 @@ show_statement: SHOW TABLES {
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
     delete $2;
+}
+| DESCRIBE INDEX table_name {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndexes;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 };
 
 /*

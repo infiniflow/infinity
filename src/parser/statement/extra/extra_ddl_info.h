@@ -5,7 +5,6 @@
 #pragma once
 
 #include "common/types/alias/strings.h"
-#include "common/utility/infinity_assert.h"
 
 namespace infinity {
 

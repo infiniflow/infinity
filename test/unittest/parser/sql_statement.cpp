@@ -153,7 +153,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "DROP INDEX index1;";
+        String input_sql = "DROP INDEX index1 ON table1;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -165,6 +165,7 @@ TEST_F(StatementParsingTest, good_test1) {
             EXPECT_EQ(drop_statement->drop_info_->type_, DDLType::kIndex);
             DropIndexInfo *drop_info = (DropIndexInfo *)drop_statement->drop_info_.get();
             EXPECT_EQ(drop_info->index_name_, "index1");
+            EXPECT_EQ(drop_info->table_name_, "table1");
             EXPECT_EQ(drop_info->conflict_type_, ConflictType::kError);
         }
 

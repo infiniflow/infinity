@@ -1,6 +1,4 @@
 #include "ivfflat_index_def.h"
-
-#include "common/utility/infinity_assert.h"
 #include "common/utility/serializable.h"
 
 namespace infinity {
