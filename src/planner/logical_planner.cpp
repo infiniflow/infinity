@@ -392,8 +392,7 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     SharedPtr<IndexDef> index_def_ptr = nullptr;
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
-            index_def_ptr =
-                IVFFlatIndexDef::Make(std::move(index_name), std::move(method_type), std::move(column_names), *create_index_info->index_para_list_);
+            index_def_ptr = IVFFlatIndexDef::Make(std::move(index_name), std::move(column_names), *create_index_info->index_para_list_);
             break;
         }
         case IndexMethod::kInvalid: {

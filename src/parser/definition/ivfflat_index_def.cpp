@@ -3,10 +3,7 @@
 
 namespace infinity {
 
-SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name,
-                                          IndexMethod method_type,
-                                          Vector<String> column_names,
-                                          const Vector<InitParameter *> &index_para_list) {
+SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list) {
     size_t centroids_count = 0;
     MetricType metric_type = MetricType::kInvalid;
     for (auto para : index_para_list) {
@@ -19,7 +16,7 @@ SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name,
     if (centroids_count == 0 || metric_type == MetricType::kInvalid) {
         StorageException("Lack index parameters");
     }
-    auto ptr = MakeShared<IVFFlatIndexDef>(std::move(index_name), method_type, std::move(column_names), centroids_count, metric_type);
+    auto ptr = MakeShared<IVFFlatIndexDef>(std::move(index_name), IndexMethod::kIVFFlat, std::move(column_names), centroids_count, metric_type);
     return std::static_pointer_cast<IndexDef>(ptr);
 }
 

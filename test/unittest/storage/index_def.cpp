@@ -10,7 +10,7 @@ TEST_F(IndexDefTest, ReadWrite) {
     Vector<InitParameter *> parameters;
     parameters.emplace_back(new InitParameter("centroids_count", "100"));
     parameters.emplace_back(new InitParameter("metric", "l2"));
-    auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"), IndexMethod::kIVFFlat, columns, parameters);
+    auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"), columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
 
     int32_t exp_size = index_def->GetSizeInBytes();

@@ -8,8 +8,7 @@
 namespace infinity {
 class IVFFlatIndexDef : public IndexDef {
 public:
-    static SharedPtr<IndexDef>
-    Make(SharedPtr<String> index_name, IndexMethod method_type, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
 
     IVFFlatIndexDef(SharedPtr<String> index_name,
                     IndexMethod method_type,
