@@ -5,6 +5,9 @@ module;
 
 import stl;
 import default_values;
+import selection;
+import parser;
+import column_vector;
 
 export module data_block;
 
@@ -19,7 +22,7 @@ public:
 
 public:
     DataBlock() = default;
-#if 0
+
     void Init(const DataBlock *input, const SharedPtr<Selection> &input_select);
 
     void Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selection> &input_select);
@@ -36,7 +39,7 @@ public:
 
     // Reset to just initialized state.
     void Reset();
-
+#if 0
     [[nodiscard]] Value GetValue(SizeT column_index, SizeT row_index) const;
 
     void SetValue(SizeT column_index, SizeT row_index, const Value &val);

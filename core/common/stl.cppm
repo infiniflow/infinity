@@ -2,6 +2,7 @@
 module;
 
 #include "ctpl_stl.h"
+#include <cstring>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
@@ -221,6 +222,7 @@ using ThreadPool = ctpl::thread_pool;
 using Thread = std::thread;
 
 using au64 = std::atomic_uint64_t;
+using ai64 = std::atomic_int64_t;
 using aptr = std::atomic_uintptr_t;
 using atomic_bool = std::atomic_bool;
 
@@ -264,6 +266,13 @@ constexpr typename std::remove_reference<_Tp>::type&&
 Move(_Tp&& __t) noexcept
 { return static_cast<typename std::remove_reference<_Tp>::type&&>(__t); }
 
+// Forward
+template<typename _Tp>
+_GLIBCXX_NODISCARD
+constexpr _Tp&&
+Forward(typename std::remove_reference<_Tp>::type& __t) noexcept
+{ return static_cast<_Tp&&>(__t); }
+
 // Chrono
 using Clock = std::chrono::high_resolution_clock;
 
@@ -283,6 +292,11 @@ template<typename T>
 T
 ChronoCast(const NanoSeconds& nano_seconds) {
     return std::chrono::duration_cast<T>(nano_seconds);
+}
+
+// Memcpy
+void *Memcpy(void *__restrict dest, const void *__restrict src, size_t n) {
+    return memcpy(dest, src, n);
 }
 
 }

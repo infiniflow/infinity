@@ -71,12 +71,6 @@ public:
     explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
 };
 
-export class ParserException : public Exception {
-public:
-    template <typename... Args>
-    explicit ParserException(Args... params) : Exception(BuildMessage(String("Parser Error:"), params...)) {}
-};
-
 export class PlannerException : public Exception {
 public:
     template <typename... Args>
