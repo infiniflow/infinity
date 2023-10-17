@@ -219,20 +219,21 @@ SharedPtr<String> DBMeta::ToString(DBMeta *db_meta) {
     return res;
 }
 
-nlohmann::json DBMeta::Serialize(const DBMeta *db_meta) {
+nlohmann::json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
-
-    json_res["data_dir"] = *db_meta->data_dir_;
-    json_res["db_name"] = *db_meta->db_name_;
-    for (const auto &base_entry : db_meta->entry_list_) {
-        if (base_entry->entry_type_ == EntryType::kDatabase) {
-            DBEntry *db_entry = (DBEntry *)base_entry.get();
-            json_res["entries"].emplace_back(DBEntry::Serialize(db_entry));
-        } else if (base_entry->entry_type_ == EntryType::kDummy) {
-            ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
-        } else {
-            StorageError("Unexpected entry type");
+    Vector<DBEntry *> db_entries;
+    {
+        std::shared_lock<std::shared_mutex> lck(db_meta->rw_locker_);
+        json_res["data_dir"] = *db_meta->data_dir_;
+        json_res["db_name"] = *db_meta->db_name_;
+        // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
+        for (auto &db_entry : db_meta->entry_list_) {
+            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->Committed() && db_entry->commit_ts_ <= max_commit_ts)
+                db_entries.push_back((DBEntry *)db_entry.get());
         }
+    }
+    for (DBEntry *db_entry : db_entries) {
+        json_res["entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -247,6 +248,7 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
             res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
         }
     }
+    res->entry_list_.sort([](const UniquePtr<BaseEntry> &ent1, const UniquePtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     return res;
 }
 

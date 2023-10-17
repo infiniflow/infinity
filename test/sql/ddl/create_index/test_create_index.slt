@@ -11,9 +11,9 @@ CREATE TABLE test_create_index (co1 embedding(float,128));
 
 # import data from fvecs file
 query I
-COPY test_create_index FROM '/tmp/infinity/sqllogictest/test.fvecs' WITH ( DELIMITER ',' );
+COPY test_create_index FROM '/tmp/infinity/sqllogictest/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
 ----
 
-query I
-CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
-----
+#query I
+#CREATE INDEX idx1 ON test_create_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+#----

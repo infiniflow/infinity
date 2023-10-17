@@ -40,7 +40,7 @@ private:
     [[nodiscard]] std::chrono::nanoseconds ElapsedInternal() const;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> begin_ts_{};
-    std::chrono::time_point<std::chrono::high_resolution_clock> end_ts_{};
+    std::chrono::time_point<std::chrono::high_resolution_clock> max_row_ts_{};
 
     bool finished_ = false;
     String name_{};

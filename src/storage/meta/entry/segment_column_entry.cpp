@@ -187,7 +187,7 @@ void SegmentColumnEntry::Flush(SegmentColumnEntry *column_data_entry, SizeT row_
     }
 }
 
-nlohmann::json SegmentColumnEntry::Serialize(const SegmentColumnEntry *column_data_entry) {
+nlohmann::json SegmentColumnEntry::Serialize(SegmentColumnEntry *column_data_entry) {
     nlohmann::json json_res;
     json_res["column_type"] = column_data_entry->column_type_->Serialize();
     json_res["base_dir"] = *column_data_entry->base_dir_;

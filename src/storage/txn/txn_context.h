@@ -47,8 +47,8 @@ public:
 
     inline void SetTxnRollbacked() {
         std::unique_lock<RWMutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kRollbacking) {
-            StorageError("Transaction isn't in ROLLBACKING status.")
+        if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
+            StorageError("Transaction isn't in ROLLBACKING or COMMITING status.")
         }
         state_ = TxnState::kRollbacked;
     }

@@ -191,26 +191,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
     }
 }
 
-nlohmann::json BlockColumnEntry::Serialize(const BlockColumnEntry *block_column_entry) {
+nlohmann::json BlockColumnEntry::Serialize(BlockColumnEntry *block_column_entry) {
     nlohmann::json json_res;
     json_res["column_id"] = block_column_entry->column_id_;
-    //    json_res["base_dir"] = *block_column_entry->base_dir_;
-    //    json_res["file_name"] = *block_column_entry->file_name_;
     if (block_column_entry->outline_info_) {
         auto &outline_info = block_column_entry->outline_info_;
         json_res["next_outline_idx"] = outline_info->next_file_idx;
     }
-
     return json_res;
 }
 
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
-
-    //    SharedPtr<String> base_dir = MakeShared<String>(column_data_json["base_dir"]);
-    //    SharedPtr<String> file_name = MakeShared<String>(column_data_json["file_name"]);
-
     UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr);
     if (block_column_entry->outline_info_ != nullptr) {
         auto outline_info = block_column_entry->outline_info_.get();

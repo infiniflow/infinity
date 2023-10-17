@@ -51,10 +51,10 @@ struct Options {
 
     // Wal
     u64 wal_size_threshold_{};
-    u64 full_checkpoint_time_interval_{};
+    u64 full_checkpoint_interval_sec_{};
     u64 full_checkpoint_txn_interval_{};
-    u64 delta_checkpoint_time_interval_{};
-    u64 delta_checkpoint_txn_interval_{};
+    u64 delta_checkpoint_interval_sec_{};
+    u64 delta_checkpoint_interval_wal_bytes_{};
 };
 
 struct Config {
@@ -113,13 +113,13 @@ public:
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return option_.temp_dir; }
 
     // Wal
-    [[nodiscard]] inline u64 full_checkpoint_time_interval() const { return option_.full_checkpoint_time_interval_; }
+    [[nodiscard]] inline u64 full_checkpoint_interval_sec() const { return option_.full_checkpoint_interval_sec_; }
 
     [[nodiscard]] inline u64 full_checkpoint_txn_interval() const { return option_.full_checkpoint_txn_interval_; }
 
-    [[nodiscard]] inline u64 delta_checkpoint_time_interval() const { return option_.delta_checkpoint_time_interval_; }
+    [[nodiscard]] inline u64 delta_checkpoint_interval_sec() const { return option_.delta_checkpoint_interval_sec_; }
 
-    [[nodiscard]] inline u64 delta_checkpoint_txn_interval() const { return option_.delta_checkpoint_txn_interval_; }
+    [[nodiscard]] inline u64 delta_checkpoint_interval_wal_bytes() const { return option_.delta_checkpoint_interval_wal_bytes_; }
 
     [[nodiscard]] inline u64 wal_size_threshold() const { return option_.wal_size_threshold_; }
 
