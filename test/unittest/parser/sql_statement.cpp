@@ -5,7 +5,6 @@
 #include "base_test.h"
 #include "parser/sql_parser.h"
 
-
 #include "main/infinity.h"
 
 class StatementParsingTest : public BaseTest {};
