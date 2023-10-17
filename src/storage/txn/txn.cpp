@@ -552,6 +552,7 @@ void Txn::CommitTxnBottom() {
         for (const auto &name_table_pair : txn_tables_store_) {
             TxnTableStore *table_local_store = name_table_pair.second.get();
             table_local_store->PrepareCommit();
+            table_local_store->Commit();
         }
     }
 

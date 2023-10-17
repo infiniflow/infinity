@@ -59,5 +59,5 @@ DROP INDEX [IF EXISTS] name ON table_name;
 #### Synopsis
 
 ```sql
-DESCRIBE INDEX ON table_name;
+DESCRIBE INDEX table_name;
 ```

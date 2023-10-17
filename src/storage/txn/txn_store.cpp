@@ -112,19 +112,17 @@ void TxnTableStore::PrepareCommit() {
 
     TableCollectionEntry::Delete(table_entry_, txn_, delete_state_, txn_ptr->GetBufferMgr());
 
-    TableCollectionEntry::CommitCreateIndexFile(table_entry_, uncommitted_indexes_);
+    TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
 
     LOG_TRACE("Transaction local storage table: {}, Complete commit preparing", this->table_name_);
 }
 
-// /**
-//  * @attention deprecated
-//  * @brief Call for really commit the data to disk.
-//  */
-// void TxnTableStore::Commit() {
-//     Txn *txn_ptr = (Txn *)txn_;
-//     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
-//     TableCollectionEntry::CommitCreateIndexFile(table_entry_, txn_, uncommitted_indexes_);
-// }
+/**
+ * @brief Call for really commit the data to disk.
+ */
+void TxnTableStore::Commit() {
+    Txn *txn_ptr = (Txn *)txn_;
+    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
+}
 
 } // namespace infinity

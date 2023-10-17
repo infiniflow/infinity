@@ -227,10 +227,10 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
     }
 }
 
-void TableCollectionEntry::CommitCreateIndexFile(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
+void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
     // FIXME: One index_entry is created for one segment_entry.
     for (const auto &[segment_id, index_entry] : uncommitted_indexes) {
-        SegmentEntry::CommitCreateIndexFile(table_entry->segments_[segment_id].get(), index_entry);
+        SegmentEntry::CommitCreateIndex(table_entry->segments_[segment_id].get(), index_entry);
     }
 }
 

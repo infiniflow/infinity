@@ -63,9 +63,7 @@ public:
     HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
-    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry,
-                                                       u64 segment_id,
-                                                       BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr);
 
     static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
@@ -87,7 +85,7 @@ public:
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 
-    static void CommitCreateIndexFile(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
+    static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
 

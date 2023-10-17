@@ -179,7 +179,7 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
     BlockEntry::CommitAppend(block_entry.get(), txn_ptr);
 }
 
-void SegmentEntry::CommitCreateIndexFile(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry) {
+void SegmentEntry::CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry) {
     segment_entry->index_entry_map_.emplace(*index_entry->index_name_, std::move(index_entry));
 }
 
