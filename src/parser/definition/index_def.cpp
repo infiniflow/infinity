@@ -68,25 +68,26 @@ MetricType StringToMetricType(const String &str) {
 namespace infinity {
 
 bool IndexDef::operator==(const IndexDef &other) const {
-    return index_name_ == other.index_name_ && method_type_ == other.method_type_ && column_names_ == other.column_names_;
+    return *index_name_ == *other.index_name_ && method_type_ == other.method_type_ && column_names_ == other.column_names_;
 }
 
 bool IndexDef::operator!=(const IndexDef &other) const { return !(*this == other); }
 
 int32_t IndexDef::GetSizeInBytes() const {
     int32_t size = 0;
-    size += sizeof(method_type_);
     size += sizeof(int32_t) + index_name_->length();
+    size += sizeof(method_type_);
     size += sizeof(int32_t);
     for (const String &column_name : column_names_) {
-        size += sizeof(int32_t) + column_name.length(); // Note shenyushi: whether to add sizeof(int32_t) ?
+        size += sizeof(int32_t) + column_name.length();
     }
     return size;
 }
 
 void IndexDef::WriteAdv(char *&ptr) const {
-    WriteBufAdv(ptr, index_name_);
+    WriteBufAdv(ptr, *index_name_);
     WriteBufAdv(ptr, method_type_);
+    WriteBufAdv(ptr, static_cast<int32_t>(column_names_.size()));
     for (const String &column_name : column_names_) {
         WriteBufAdv(ptr, column_name);
     }
@@ -109,6 +110,7 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
             auto res1 = MakeShared<IVFFlatIndexDef>(index_name, method_type, column_names, centroids_count, metric_type);
             res = std::static_pointer_cast<IndexDef>(res1);
+            break;
         }
         case IndexMethod::kInvalid: {
             StorageError("Error index method while reading");
