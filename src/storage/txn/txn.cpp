@@ -370,7 +370,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     table_store = txn_tables_store_[table_name].get();
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, GetBufferMgr());
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, begin_ts, GetBufferMgr());
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;
@@ -547,16 +547,18 @@ void Txn::CommitTxn() {
 }
 
 void Txn::CommitTxnBottom() {
-    {
-        // prepare to commit txn local data into table
-        for (const auto &name_table_pair : txn_tables_store_) {
-            TxnTableStore *table_local_store = name_table_pair.second.get();
-            table_local_store->PrepareCommit();
-            table_local_store->Commit();
-        }
+    // prepare to commit txn local data into table
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->PrepareCommit();
     }
 
     txn_context_.SetTxnCommitted();
+
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->Commit();
+    }
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
     // Commit databases to memory catalog

@@ -80,6 +80,7 @@ public:
                                                       const IndexDef &index_def,
                                                       u64 column_id,
                                                       int dimension,
+                                                      TxnTimeStamp create_ts,
                                                       BufferManager *buffer_mgr,
                                                       TxnTableStore *txn_store);
 

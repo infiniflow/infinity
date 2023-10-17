@@ -159,7 +159,11 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
     }
 }
 
-void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, BufferManager *buffer_mgr) {
+void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
+                                           void *txn_store,
+                                           const IndexDef &index_def,
+                                           TxnTimeStamp begin_ts,
+                                           BufferManager *buffer_mgr) {
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
     switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
@@ -180,7 +184,13 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry, vo
             }
 
             for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-                SegmentEntry::CreateIndexEmbedding(segment_entry.get(), index_def, column_id, embedding_info->Dimension(), buffer_mgr, txn_store_ptr);
+                SegmentEntry::CreateIndexEmbedding(segment_entry.get(),
+                                                   index_def,
+                                                   column_id,
+                                                   embedding_info->Dimension(),
+                                                   begin_ts,
+                                                   buffer_mgr,
+                                                   txn_store_ptr);
             }
             break;
         }

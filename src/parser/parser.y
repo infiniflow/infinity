@@ -555,7 +555,6 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     create_view_info->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     $$->create_info_ = create_view_info;
 }
-// TODO shenyushi 4: should support default index name if the name does not exist
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (para[, ...para])]; */
 | CREATE INDEX if_not_exists_info ON table_name '(' identifier_array ')' USING IDENTIFIER with_index_para_list {
     $$ = new infinity::CreateStatement();
@@ -2233,7 +2232,6 @@ if_not_exists_info : if_not_exists IDENTIFIER {
     $$ = new infinity::IfNotExistsInfo();
 }
 
-// TODO shenyushi -1: Can no parameter be represented as this?
 with_index_para_list : WITH '(' index_para_list ')' {
     $$ = std::move($3);
 }

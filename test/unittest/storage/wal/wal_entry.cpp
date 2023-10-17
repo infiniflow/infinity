@@ -1,7 +1,9 @@
 
 #include "base_test.h"
 #include "main/infinity.h"
+#include "parser/definition/ivfflat_index_def.h"
 #include "parser/definition/table_def.h"
+#include "parser/statement/statement_common.h"
 #include "storage/data_block.h"
 
 class WalEntryTest : public BaseTest {};
@@ -46,6 +48,13 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+
+    auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
+                                           Vector<String>{"col1", "col2"},
+                                           Vector<InitParameter *>{new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")});
+    entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def));
+
+    entry->cmds.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
 
     SharedPtr<DataBlock> data_block = DataBlock::Make();
     Vector<SharedPtr<DataType>> column_types;
