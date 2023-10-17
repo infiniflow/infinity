@@ -1,9 +1,7 @@
 
-#include "base_test.h"
+#include "infinity_test.h"
 #include "main/infinity.h"
 #include "main/logger.h"
-#include "main/profiler/base_profiler.h"
-#include "main/stats/global_resource_usage.h"
 #include "storage/data_block.h"
 #include "storage/txn/txn_manager.h"
 #include <fstream>
@@ -65,9 +63,9 @@ void MockWalFile() {
 
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
-        entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
-        entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+        entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
+        entry->cmds.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
+        entry->cmds.push_back(MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -121,7 +119,7 @@ void MockWalFile() {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1", ConflictType::kIgnore));
         entry->commit_ts = 4;
         i32 expect_size = entry->GetSizeInBytes();
         std::vector<char> buf(expect_size);
@@ -144,9 +142,9 @@ void MockWalFile() {
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
-    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
+    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1", ConflictType::kIgnore));
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
-    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
+    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1", ConflictType::kIgnore));
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
     SharedPtr<DataBlock> data_block = DataBlock::Make();
@@ -181,8 +179,11 @@ TEST_F(WalEntryTest, ReadWrite) {
 }
 
 TEST_F(WalEntryTest, WalEntryIterator) {
-    MockWalFile();
+    using namespace infinity;
 
+    Storage *storage = infinity::Infinity::instance().storage();
+
+    MockWalFile();
     String wal_file_path = "/tmp/infinity/wal/wal.log";
 
     WalEntryIterator iterator1(wal_file_path);

@@ -33,7 +33,7 @@ public:
 
     void PrepareCommit();
 
-    void Commit();
+    void Commit() const;
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};

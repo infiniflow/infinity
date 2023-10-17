@@ -271,7 +271,7 @@ EntryResult Txn::DropDatabase(const String &db_name, ConflictType conflict_type)
     } else {
         db_names_.insert(db_name);
     }
-    wal_entry_->cmds.push_back(MakeShared<WalCmdDropDatabase>(db_name));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropDatabase>(db_name, conflict_type));
     return res;
 }
 
@@ -366,7 +366,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     txn_indexes_.insert(index_def_entry);
     index_names_.insert(*index_def->index_name_);
 
-    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, conflict_type));
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
@@ -416,7 +416,7 @@ EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &
     } else {
         table_names_.insert(table_name);
     }
-    wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name, conflict_type));
     return res;
 }
 
@@ -526,15 +526,21 @@ void Txn::CommitTxn() {
 }
 
 void Txn::CommitTxnBottom() {
-    {
-        // prepare to commit txn local data into table
-        for (const auto &name_table_pair : txn_tables_store_) {
-            TxnTableStore *table_local_store = name_table_pair.second.get();
-            table_local_store->PrepareCommit();
-        }
+
+    // prepare to commit txn local data into table
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->PrepareCommit();
     }
 
     txn_context_.SetTxnCommitted();
+
+    // Commit the prepared data
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->Commit();
+    }
+
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
     // Commit databases to memory catalog
@@ -551,13 +557,6 @@ void Txn::CommitTxnBottom() {
     for (auto *index_def_entry : txn_indexes_) {
         index_def_entry->Commit(commit_ts);
     }
-
-    // Commit the prepared data
-    for (const auto &name_table_pair : txn_tables_store_) {
-        TxnTableStore *table_local_store = name_table_pair.second.get();
-        table_local_store->Commit();
-    }
-
 
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 

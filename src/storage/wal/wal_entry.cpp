@@ -1,14 +1,13 @@
 #include "wal_entry.h"
-#include <storage/meta/catalog.h>
-
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
-#include "parser/definition/table_def.h"
-#include "storage/data_block.h"
-#include "storage/table_def.h"
 
-#include <cstdint>
+#include "storage/data_block.h"
+
 #include <cstring>
+#include <fstream>
+#include <iostream>
+#include <string>
 
 namespace infinity {
 
@@ -24,7 +23,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::DROP_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropDatabase>(db_name);
+            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
+            cmd = MakeShared<WalCmdDropDatabase>(db_name, conflict_type);
             break;
         }
         case WalCommandType::CREATE_TABLE: {
@@ -36,7 +36,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::DROP_TABLE: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
+            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
+            cmd = MakeShared<WalCmdDropTable>(db_name, table_name, conflict_type);
             break;
         }
         case WalCommandType::IMPORT: {
@@ -74,8 +75,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
+            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
             SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, conflict_type);
             break;
         }
         default:
@@ -132,19 +134,19 @@ bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
 
 i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
 
-i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
+i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(ConflictType); }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + this->table_def->GetSizeInBytes();
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->index_def_->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
+           this->index_def_->GetSizeInBytes() + sizeof(ConflictType);
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(ConflictType);
 }
 
 i32 WalCmdImport::GetSizeInBytes() const {
@@ -171,6 +173,7 @@ void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_DATABASE);
     WriteBufAdv(buf, this->db_name);
+    WriteBufAdv(buf, this->conflict_type_);
 }
 
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
@@ -183,6 +186,7 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->conflict_type_);
     index_def_->WriteAdv(buf);
 }
 
@@ -190,6 +194,7 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_TABLE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
+    WriteBufAdv(buf, this->conflict_type_);
 }
 
 void WalCmdImport::WriteAdv(char *&buf) const {
@@ -226,7 +231,7 @@ void WalCmdCheckpoint::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     // nothing to do
 }
 void WalCmdCreateDatabase::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
-    auto result = NewCatalog::CreateDatabase(storage->catalog(), db_name, txn_id, commit_ts, nullptr);
+    auto result = NewCatalog::CreateDatabase(storage->catalog(), db_name, txn_id, commit_ts, storage->txn_manager());
     if (!result.Success()) {
         StorageError("Wal Replay: Create database failed");
     }

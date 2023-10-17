@@ -317,7 +317,7 @@ int64_t WalManager::ReplayWalFile() {
     // wal_list_ is a vector of string, each string is a wal file path.
     // wal_list_ is sorted by the suffix of the wal file path.
     // e.g. wal_list_ = {wal.log.1, wal.log.2, wal.log.3}
-    LOG_INFO("WAL PATH: {}", wal_path_.c_str());
+    LOG_INFO("Wal path: {}", wal_path_.c_str());
     for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
         if (entry.is_regular_file()) {
             wal_list_.push_back(entry.path().string());
@@ -329,60 +329,59 @@ int64_t WalManager::ReplayWalFile() {
 
     // log the wal files.
     for (const auto &wal_file : wal_list_) {
-        LOG_INFO("WAL FILE: {}", wal_file.c_str());
+        LOG_INFO("List wal file: {}", wal_file.c_str());
     }
-
-    // 2. Replay the wal files one by one.
-    // We will replay the wal files in the order of wal_list_.
-    // First we check the wal.log file, if it exists, we will replay it first.
-    // Then we check the wal.log.1 file, if it exists, we will replay it.
-
-    // 2.1 Get the max commit timestamp of the transactions in the wal files.
+    LOG_INFO("List wal file size: {}", wal_list_.size());
     i64 max_commit_ts = 0;
-    // 2.2 Replay the wal files one by one.
-
+    String catalog_path;
     Vector<SharedPtr<WalEntry>> replay_entries;
     for (const auto &wal_file : wal_list_) {
-        // 2.2.1 Open the wal file.
 
-        String catalog_path;
         WalEntryIterator iterator(wal_file);
         iterator.Init();
 
         // phase 1: find the max commit ts and catalog path
+        LOG_INFO("Phase 1: find the max commit ts and catalog path")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
-
-            if (!wal_entry->ISCheckPoint()) {
-                replay_entries.push_back(wal_entry);
-            } else {
+            replay_entries.push_back(wal_entry);
+            if (wal_entry->ISCheckPoint()) {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-                LOG_INFO("Checkpoint Max Commit Ts: {}", max_commit_ts);
+                LOG_INFO("Checkpoint max commit ts: {}", max_commit_ts);
                 LOG_INFO("Catalog Path: {}", catalog_path);
                 break;
             }
         }
 
         // phase 2: by the max commit ts, find the entries to replay
+        LOG_INFO("Phase 2: by the max commit ts, find the entries to replay")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
-            if (wal_entry->commit_ts > max_commit_ts) {
+            if (wal_entry->commit_ts > max_commit_ts && !wal_entry->ISCheckPoint()) {
                 replay_entries.push_back(wal_entry);
             }
         }
     }
 
     // phase 3: replay the entries
+    LOG_INFO("Phase 3: replay the entries")
+    std::reverse(replay_entries.begin(), replay_entries.end());
+    i64 last_commit_ts = 0;
     for (const auto &entry : replay_entries) {
-        LOG_INFO("WAL ENTRY COMMIT TS: {}", entry->commit_ts);
+        if (entry->commit_ts > last_commit_ts) {
+            last_commit_ts = entry->commit_ts;
+        }
+        if (entry->ISCheckPoint()) {
+            continue;
+        }
+        LOG_INFO("Wal entry commit ts: {}", entry->commit_ts);
         for (const auto &cmd : entry->cmds) {
-            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
-            // TODO fixme
+            LOG_INFO("  Wal cmd: {}", WalCommandTypeToString(cmd->GetType()).c_str());
             cmd->Replay(storage_, entry->txn_id, entry->commit_ts);
         }
     }
 
-    return max_commit_ts;
+    return last_commit_ts;
 }
 /*****************************************************************************
  * GC WAL FILE

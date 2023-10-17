@@ -25,10 +25,8 @@ void Storage::Init() {
                                       config_ptr_->full_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_wal_bytes());
-    auto start_time_stamp = wal_mgr_->ReplayWalFile();
 
     // Construct txn manager
-    // TODO:xuanwei if replay wal file, should not create new catalog. must load from wal file. if no wal file, should create new catalog.
     SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
     if (catalog_file_entry == nullptr) {
         // No catalog file at all
@@ -37,7 +35,9 @@ void Storage::Init() {
             MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
     } else {
         // load catalog file.
+
         new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
+        i64 start_time_stamp = wal_mgr_->ReplayWalFile();
         txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                           buffer_mgr_.get(),
                                           std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
