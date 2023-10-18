@@ -85,6 +85,7 @@ target_link_libraries(test_main
         gfortran
         fastpfor
         newpfor
+        openfst
 )
 
 target_include_directories(test_main PUBLIC "${CMAKE_SOURCE_DIR}/third_party/simdjson")

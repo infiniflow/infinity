@@ -115,6 +115,7 @@ target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_par
 #target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
+target_include_directories(infinity_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
 
 # Configure the version file
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.h)
@@ -178,6 +179,7 @@ target_link_libraries(
         gfortran
         fastpfor
         newpfor
+        openfst
         zsv_parser
 
         ${EXTERNAL_LIBS}
