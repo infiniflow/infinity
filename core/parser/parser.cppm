@@ -6,10 +6,14 @@ module;
 #include "statement/extra/create_table_info.h"
 #include "type/logical_type.h"
 #include "type/number/float16.h"
+#include "sql_parser.h"
 
 export module parser;
 
 namespace infinity {
+
+export using SQLParser = SQLParser;
+export using ParserResult = ParserResult;
 
 export using LogicalType = LogicalType;
 export using ColumnDef = ColumnDef;
@@ -103,6 +107,54 @@ export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
 
 // Parser Exception
 export using ParserException = ParserException;
+
+export using StatementType = StatementType;
+export using DDLType = DDLType;
+export using ConflictType = ConflictType;
+export using ConstraintType = ConstraintType;
+export using KnnDistanceType = KnnDistanceType;
+
+export using CreateTableInfo = CreateTableInfo;
+export using CreateIndexInfo = CreateIndexInfo;
+export using DropIndexInfo = DropIndexInfo;
+export using DropTableInfo = DropTableInfo;
+
+export using TableRefType = TableRefType;
+export using TableReference = TableReference;
+export using JoinReference = JoinReference;
+export using CrossProductReference = CrossProductReference;
+export using SubqueryReference = SubqueryReference;
+
+export using ShowStmtType = ShowStmtType;
+export using CopyFileType = CopyFileType;
+export using SetOperatorType = SetOperatorType;
+
+export using BaseStatement = BaseStatement;
+export using CreateStatement = CreateStatement;
+export using SelectStatement = SelectStatement;
+export using UpdateStatement = UpdateStatement;
+export using InsertStatement = InsertStatement;
+export using DropStatement = DropStatement;
+export using ShowStatement = ShowStatement;
+export using CopyStatement = CopyStatement;
+
+export using ParsedExprType = ParsedExprType;
+export using OrderType = OrderType;
+export using LiteralType = LiteralType;
+export using SubqueryType = SubqueryType;
+export using JoinType = JoinType;
+
+export using ColumnExpr = ColumnExpr;
+export using ConstantExpr = ConstantExpr;
+export using FunctionExpr = FunctionExpr;
+export using KnnExpr = KnnExpr;
+export using BetweenExpr = BetweenExpr;
+export using SubqueryExpr = SubqueryExpr;
+export using CaseExpr = CaseExpr;
+export using WhenThen = WhenThen;
+export using CastExpr = CastExpr;
+export using WithExpr = WithExpr;
+export using UpdateExpr = UpdateExpr;
 
 //export template <typename T>
 //T ReadBuf(char *const buf);

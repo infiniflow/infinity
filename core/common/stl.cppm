@@ -21,6 +21,7 @@ module;
 #include <unordered_set>
 #include <vector>
 #include <sstream>
+#include <filesystem>
 
 export module stl;
 
@@ -325,6 +326,17 @@ export {
     inline std::basic_ostream<_CharT, _Traits>&
     Endl(std::basic_ostream<_CharT, _Traits>& __os)
     { return std::flush(__os.put(__os.widen('\n'))); }
+
+    // Dir
+    using Path = std::filesystem::path;
+
+    inline Vector<String> GetFilesFromDir(const String& path) {
+        Vector<String> result;
+        for (auto& i : std::filesystem::directory_iterator(path)) {
+            result.emplace_back(i.path().string());
+        }
+        return result;
+    }
 }
 
 } // namespace infinity
