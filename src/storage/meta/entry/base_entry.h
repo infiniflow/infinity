@@ -5,9 +5,7 @@
 #pragma once
 
 #include "common/default_values.h"
-#include "common/types/alias/concurrency.h"
 #include "common/types/alias/smart_ptr.h"
-// #include "storage/txn/txn_state.h"
 
 namespace infinity {
 
@@ -30,7 +28,7 @@ struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
-            deleted_ = false;
+            deleted_ = true;
         }
     }
 

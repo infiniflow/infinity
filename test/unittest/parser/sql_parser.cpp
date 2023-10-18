@@ -2,9 +2,9 @@
 // Created by jinhai on 23-2-26.
 //
 
+#include "parser/sql_parser.h"
 #include "base_test.h"
 #include "main/infinity.h"
-#include "parser/sql_parser.h"
 
 class SQLParserTest : public BaseTest {};
 

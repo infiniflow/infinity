@@ -3,9 +3,9 @@
 //
 
 #include "fragment_builder.h"
+#include "common/utility/infinity_assert.h"
 #include "executor/operator/physical_explain.h"
 #include "explain_fragment.h"
-#include "common/utility/infinity_assert.h"
 #include "main/logger.h"
 
 namespace infinity {
@@ -67,6 +67,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
         case PhysicalOperatorType::kDropTable:
+        case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:

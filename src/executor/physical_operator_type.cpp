@@ -80,6 +80,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateView";
         case PhysicalOperatorType::kDropTable:
             return "DropTable";
+        case PhysicalOperatorType::kDropIndex:
+            return "DropIndex";
         case PhysicalOperatorType::kDropCollection:
             return "DropCollection";
         case PhysicalOperatorType::kDropDatabase:

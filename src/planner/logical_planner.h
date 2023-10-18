@@ -24,9 +24,9 @@
 // #include "parser/statement/update_statement.h"
 // #include "planner/bind_context.h"
 
-#include "common/types/alias/strings.h"
 #include "common/types/alias/containers.h"
 #include "common/types/alias/smart_ptr.h"
+#include "common/types/alias/strings.h"
 #include "common/types/data_type.h"
 
 namespace infinity {
@@ -48,7 +48,6 @@ class ShowStatement;
 class FlushStatement;
 class ExplainStatement;
 class LogicalNode;
-
 
 class LogicalPlanner {
 public:
@@ -120,6 +119,8 @@ public:
     void BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     void BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    void BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     void BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

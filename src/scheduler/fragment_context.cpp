@@ -553,10 +553,10 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
             }
             case PhysicalOperatorType::kCreateIndex: {
                 BuildSerialTaskStateTemplate<CreateIndexInputState, CreateIndexOutputState>(fragment_operators,
-                                                                                              tasks,
-                                                                                              operator_id,
-                                                                                              operator_count,
-                                                                                              parent_context);
+                                                                                            tasks,
+                                                                                            operator_id,
+                                                                                            operator_count,
+                                                                                            parent_context);
                 break;
             }
             case PhysicalOperatorType::kCreateCollection: {
@@ -585,6 +585,14 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
             }
             case PhysicalOperatorType::kDropTable: {
                 BuildSerialTaskStateTemplate<DropTableInputState, DropTableOutputState>(fragment_operators,
+                                                                                        tasks,
+                                                                                        operator_id,
+                                                                                        operator_count,
+                                                                                        parent_context);
+                break;
+            }
+            case PhysicalOperatorType::kDropIndex: {
+                BuildSerialTaskStateTemplate<DropIndexInputState, DropIndexOutputState>(fragment_operators,
                                                                                         tasks,
                                                                                         operator_id,
                                                                                         operator_count,
@@ -816,6 +824,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
         case PhysicalOperatorType::kDropTable:
+        case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:
@@ -982,6 +991,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
         case PhysicalOperatorType::kDropTable:
+        case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView: {

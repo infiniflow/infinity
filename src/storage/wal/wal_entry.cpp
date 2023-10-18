@@ -1,13 +1,12 @@
 #include "wal_entry.h"
+
 #include "common/utility/crc.hpp"
 #include "common/utility/serializable.h"
-
+#include "parser/definition/table_def.h"
 #include "storage/data_block.h"
 
 #include <cstring>
 #include <fstream>
-#include <iostream>
-#include <string>
 
 namespace infinity {
 
@@ -23,7 +22,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::DROP_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
+            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
             cmd = MakeShared<WalCmdDropDatabase>(db_name, conflict_type);
             break;
         }
@@ -36,7 +35,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::DROP_TABLE: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
+            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
             cmd = MakeShared<WalCmdDropTable>(db_name, table_name, conflict_type);
             break;
         }
@@ -75,9 +74,16 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            ConflictType conflict_type = ReadBufAdv<ConflictType>(ptr);
+            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
             SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
             cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, conflict_type);
+            break;
+        }
+        case WalCommandType::DROP_INDEX: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
             break;
         }
         default:
@@ -98,6 +104,11 @@ bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_ != nullptr &&
            other_cmd->index_def_ != nullptr && *index_def_ == *other_cmd->index_def_;
+}
+
+bool WalCmdDropIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropIndex *>(&other);
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_name_ == other_cmd->index_name_;
 }
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
@@ -149,6 +160,11 @@ i32 WalCmdDropTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(ConflictType);
 }
 
+int32_t WalCmdDropIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() + sizeof(int32_t) +
+           this->index_name_.size();
+}
+
 i32 WalCmdImport::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
            this->segment_dir.size();
@@ -195,6 +211,13 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
     WriteBufAdv(buf, this->conflict_type_);
+}
+
+void WalCmdDropIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
 }
 
 void WalCmdImport::WriteAdv(char *&buf) const {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/types/logical_type.h"
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "planner/logical_node.h"
 
@@ -10,12 +9,12 @@ class IndexDef;
 
 class LogicalCreateIndex : public LogicalNode {
 public:
-    [[nodiscard]] inline Vector<ColumnBinding> GetColumnBindings() const override;
+    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const override;
 
-    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const override;
+    [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const override;
 
-    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
-    String ToString(i64 &space) const final; // TTT shenyushi: should be const
+    [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+    String ToString(i64 &space) const final;
 
     inline String name() override { return "LogicalCreateIndex"; }
 
