@@ -10,6 +10,8 @@ import infinity_exception;
 import parser;
 import third_party;
 import data_block;
+import table_def;
+import table_collection_type;
 
 module table;
 
@@ -38,19 +40,19 @@ static String TableTypeToString(TableType type) {
 }
 
 String Table::ToString() const {
-    //    std::stringstream ss;
-    //    ss << definition_ptr_->ToString();
-    //    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
-    //
-    //    SizeT block_count = data_blocks_.size();
-    //    for (SizeT idx = 0; idx < block_count; ++idx) {
-    //        ss << "Block " << idx << std::endl;
-    //        ss << data_blocks_[idx]->ToString();
-    //    }
-
-    //    return ss.str();
+//    StringStream ss;
+//    ss << definition_ptr_->ToString();
+//    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
+//
+//    SizeT block_count = data_blocks_.size();
+//    for (SizeT idx = 0; idx < block_count; ++idx) {
+//        ss << "Block " << idx << std::endl;
+//        ss << data_blocks_[idx]->ToString();
+//    }
+//
+//    return ss.str();
 }
-#if 0
+
 SharedPtr<Vector<RowID>> Table::GetRowIDVector() const {
     SizeT block_count = data_blocks_.size();
     SharedPtr<Vector<RowID>> result = MakeShared<Vector<RowID>>();
@@ -83,7 +85,7 @@ void Table::Append(const SharedPtr<DataBlock> &data_block) {
     UpdateRowCount(data_block->row_count());
 }
 
-SharedPtr<Table> Table::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<Table>(std::move(table_def_ptr), type); }
+SharedPtr<Table> Table::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<Table>(Move(table_def_ptr), type); }
 
 SharedPtr<Table> Table::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
     SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
@@ -97,7 +99,7 @@ SharedPtr<Table> Table::MakeEmptyResultTable() {
 
 Table::Table(SharedPtr<TableDef> table_def_ptr, TableType type)
     : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-      definition_ptr_(std::move(table_def_ptr)), row_count_(0), type_(type) {}
+      definition_ptr_(Move(table_def_ptr)), row_count_(0), type_(type) {}
 
 SizeT Table::ColumnCount() const { return definition_ptr_->column_count(); }
 
@@ -110,5 +112,5 @@ SizeT Table::GetColumnIdByName(const String &column_name) { return definition_pt
 String &Table::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
 
 SharedPtr<DataType> Table::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
-#endif
+
 } // namespace infinity

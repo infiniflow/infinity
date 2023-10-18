@@ -16,6 +16,8 @@ import query_context;
 import infinity;
 import third_party;
 import table;
+import parser;
+import logical_node_type;
 
 module connection;
 
@@ -133,185 +135,185 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
 
 void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
     u32 column_name_length_sum = 0;
-//    SizeT column_count = result_table->ColumnCount();
-//    for (SizeT idx = 0; idx < column_count; ++idx) {
-//        column_name_length_sum += result_table->GetColumnNameById(idx).length();
-//    }
-//
-//    // No output columns, no need to send table description, just return.
-//    if (column_name_length_sum == 0)
-//        return;
-//
-//    pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
-//
-//    for (SizeT idx = 0; idx < column_count; ++idx) {
-//        SharedPtr<DataType> column_type = result_table->GetColumnTypeById(idx);
-//
-//        u32 object_id = 0;
-//        i16 object_width = 0;
-//
-//        switch (column_type->type()) {
-//            case LogicalType::kBoolean: {
-//                object_id = 16;
-//                object_width = 1;
-//                break;
-//            }
-//            case LogicalType::kTinyInt: {
-//                object_id = 18; // char
-//                object_width = 1;
-//                break;
-//            }
-//            case LogicalType::kSmallInt: {
-//                object_id = 21;
-//                object_width = 2;
-//                break;
-//            }
-//            case LogicalType::kInteger: {
-//                object_id = 23;
-//                object_width = 4;
-//                break;
-//            }
-//            case LogicalType::kBigInt: {
-//                object_id = 20;
-//                object_width = 8;
-//                break;
-//            }
-//            case LogicalType::kFloat: {
-//                object_id = 700;
-//                object_width = 4;
-//                break;
-//            }
-//            case LogicalType::kDouble: {
-//                object_id = 701;
-//                object_width = 8;
-//                break;
-//            }
-//            case LogicalType::kVarchar: {
-//                object_id = 25;
-//                object_width = -1;
-//                break;
-//            }
-//            case LogicalType::kDate: {
-//                object_id = 1082;
-//                object_width = 8;
-//                break;
-//            }
-//            case LogicalType::kTime: {
-//                object_id = 1266;
-//                object_width = 12;
-//                break;
-//            }
-//            case LogicalType::kInterval: {
-//                object_id = 1186;
-//                object_width = 16;
-//                break;
-//            }
-//            case LogicalType::kEmbedding: {
-//                if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-//                    TypeError("Not embedding type")
-//                }
-//
-//                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-//                switch (embedding_info->Type()) {
-//
-//                    case kElemBit: {
-//                        object_id = 1000;
-//                        object_width = 1;
-//                        break;
-//                    }
-//                    case kElemInt8: {
-//                        object_id = 1002;
-//                        object_width = 1;
-//                        break;
-//                    }
-//                    case kElemInt16: {
-//                        object_id = 1005;
-//                        object_width = 2;
-//                        break;
-//                    }
-//                    case kElemInt32: {
-//                        object_id = 1007;
-//                        object_width = 4;
-//                        break;
-//                    }
-//                    case kElemInt64: {
-//                        object_id = 1016;
-//                        object_width = 8;
-//                        break;
-//                    }
-//                    case kElemFloat: {
-//                        object_id = 1021;
-//                        object_width = 4;
-//                        break;
-//                    }
-//                    case kElemDouble: {
-//                        object_id = 1022;
-//                        object_width = 8;
-//                        break;
-//                    }
-//                    case kElemInvalid: {
-//                        TypeError("Invalid embedding data type")
-//                    }
-//                }
-//                break;
-//            }
-//            default: {
-//                TypeError("Unexpected type");
-//            }
-//        }
-//
-//        pg_handler_->SendDescription(result_table->GetColumnNameById(idx), object_id, object_width);
-//    }
+    SizeT column_count = result_table->ColumnCount();
+    for (SizeT idx = 0; idx < column_count; ++idx) {
+        column_name_length_sum += result_table->GetColumnNameById(idx).length();
+    }
+
+    // No output columns, no need to send table description, just return.
+    if (column_name_length_sum == 0)
+        return;
+
+    pg_handler_->SendDescriptionHeader(column_name_length_sum, column_count);
+
+    for (SizeT idx = 0; idx < column_count; ++idx) {
+        SharedPtr<DataType> column_type = result_table->GetColumnTypeById(idx);
+
+        u32 object_id = 0;
+        i16 object_width = 0;
+
+        switch (column_type->type()) {
+            case LogicalType::kBoolean: {
+                object_id = 16;
+                object_width = 1;
+                break;
+            }
+            case LogicalType::kTinyInt: {
+                object_id = 18; // char
+                object_width = 1;
+                break;
+            }
+            case LogicalType::kSmallInt: {
+                object_id = 21;
+                object_width = 2;
+                break;
+            }
+            case LogicalType::kInteger: {
+                object_id = 23;
+                object_width = 4;
+                break;
+            }
+            case LogicalType::kBigInt: {
+                object_id = 20;
+                object_width = 8;
+                break;
+            }
+            case LogicalType::kFloat: {
+                object_id = 700;
+                object_width = 4;
+                break;
+            }
+            case LogicalType::kDouble: {
+                object_id = 701;
+                object_width = 8;
+                break;
+            }
+            case LogicalType::kVarchar: {
+                object_id = 25;
+                object_width = -1;
+                break;
+            }
+            case LogicalType::kDate: {
+                object_id = 1082;
+                object_width = 8;
+                break;
+            }
+            case LogicalType::kTime: {
+                object_id = 1266;
+                object_width = 12;
+                break;
+            }
+            case LogicalType::kInterval: {
+                object_id = 1186;
+                object_width = 16;
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
+                    Error<TypeException>("Not embedding type", __FILE_NAME__, __LINE__);
+                }
+
+                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+                switch (embedding_info->Type()) {
+
+                    case kElemBit: {
+                        object_id = 1000;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt8: {
+                        object_id = 1002;
+                        object_width = 1;
+                        break;
+                    }
+                    case kElemInt16: {
+                        object_id = 1005;
+                        object_width = 2;
+                        break;
+                    }
+                    case kElemInt32: {
+                        object_id = 1007;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemInt64: {
+                        object_id = 1016;
+                        object_width = 8;
+                        break;
+                    }
+                    case kElemFloat: {
+                        object_id = 1021;
+                        object_width = 4;
+                        break;
+                    }
+                    case kElemDouble: {
+                        object_id = 1022;
+                        object_width = 8;
+                        break;
+                    }
+                    case kElemInvalid: {
+                        Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                    }
+                }
+                break;
+            }
+            default: {
+                Error<TypeException>("Unexpected type", __FILE_NAME__, __LINE__);
+            }
+        }
+
+        pg_handler_->SendDescription(result_table->GetColumnNameById(idx), object_id, object_width);
+    }
 }
 
 void Connection::SendQueryResponse(const QueryResult &query_result) {
-//
-//    const SharedPtr<Table> &result_table = query_result.result_;
-//    SizeT column_count = result_table->ColumnCount();
-//    auto values_as_strings = std::vector<std::optional<String>>(column_count);
-//    SizeT block_count = result_table->DataBlockCount();
-//    for (SizeT idx = 0; idx < block_count; ++idx) {
-//        auto block = result_table->GetDataBlockById(idx);
-//        SizeT row_count = block->row_count();
-//
-//        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-//            SizeT string_length_sum = 0;
-//
-//            // iterate each column_vector of the block
-//            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-//                auto &column_vector = block->column_vectors[column_id];
-//                const String string_value = column_vector->ToString(row_id);
-//                values_as_strings[column_id] = string_value;
-//                string_length_sum += string_value.size();
-//            }
-//            pg_handler_->SendData(values_as_strings, string_length_sum);
-//        }
-//    }
-//
-//    String message;
-//    switch (query_result.root_operator_type_) {
-//        case LogicalNodeType::kInsert: {
-//            message = "INSERT 0 1";
-//            break;
-//        }
-//        case LogicalNodeType::kUpdate: {
-//            message = "UPDATE -1";
-//            break;
-//        }
-//        case LogicalNodeType::kDelete: {
-//            message = "DELETE -1";
-//            break;
-//        }
-//        case LogicalNodeType::kImport: {
-//            message = *query_result.result_->result_msg();
-//            break;
-//        }
-//        default: {
-//            message = "SELECT " + std::to_string(query_result.result_->row_count());
-//        }
-//    }
-//
-//    pg_handler_->SendComplete(message);
+
+    const SharedPtr<Table> &result_table = query_result.result_;
+    SizeT column_count = result_table->ColumnCount();
+    auto values_as_strings = Vector<Optional<String>>(column_count);
+    SizeT block_count = result_table->DataBlockCount();
+    for (SizeT idx = 0; idx < block_count; ++idx) {
+        auto block = result_table->GetDataBlockById(idx);
+        SizeT row_count = block->row_count();
+
+        for (SizeT row_id = 0; row_id < row_count; ++row_id) {
+            SizeT string_length_sum = 0;
+
+            // iterate each column_vector of the block
+            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                auto &column_vector = block->column_vectors[column_id];
+                const String string_value = column_vector->ToString(row_id);
+                values_as_strings[column_id] = string_value;
+                string_length_sum += string_value.size();
+            }
+            pg_handler_->SendData(values_as_strings, string_length_sum);
+        }
+    }
+
+    String message;
+    switch (query_result.root_operator_type_) {
+        case LogicalNodeType::kInsert: {
+            message = "INSERT 0 1";
+            break;
+        }
+        case LogicalNodeType::kUpdate: {
+            message = "UPDATE -1";
+            break;
+        }
+        case LogicalNodeType::kDelete: {
+            message = "DELETE -1";
+            break;
+        }
+        case LogicalNodeType::kImport: {
+            message = *query_result.result_->result_msg();
+            break;
+        }
+        default: {
+            message = Format("SELECT {}", ToStr(query_result.result_->row_count()));
+        }
+    }
+
+    pg_handler_->SendComplete(message);
 }
 
 } // namespace infinity

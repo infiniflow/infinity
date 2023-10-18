@@ -8,6 +8,9 @@ import default_values;
 import selection;
 import parser;
 import column_vector;
+import value;
+import infinity_assert;
+import infinity_exception;
 
 export module data_block;
 
@@ -39,7 +42,7 @@ public:
 
     // Reset to just initialized state.
     void Reset();
-#if 0
+
     [[nodiscard]] Value GetValue(SizeT column_index, SizeT row_index) const;
 
     void SetValue(SizeT column_index, SizeT row_index, const Value &val);
@@ -69,9 +72,10 @@ public:
 
     [[nodiscard]] inline i16 row_count() const {
         if (!finalized) {
-            if (row_count_ == 0)
+            if (row_count_ == 0) {
                 return 0;
-            StorageError("Not finalized data block")
+            }
+            Error<StorageException>("Not finalized data block", __FILE_NAME__, __LINE__);
         }
         return row_count_;
     }
@@ -86,10 +90,10 @@ public:
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<DataBlock> ReadAdv(char *&ptr, int32_t maxbytes);
+    static SharedPtr<DataBlock> ReadAdv(char *&ptr, i32 maxbytes);
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
-#endif
+
 private:
     SizeT row_count_{0};
     SizeT column_count_{0};

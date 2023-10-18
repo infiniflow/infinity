@@ -156,6 +156,8 @@ export using CastExpr = CastExpr;
 export using WithExpr = WithExpr;
 export using UpdateExpr = UpdateExpr;
 
+export using ColumnDef = ColumnDef;
+
 //export template <typename T>
 //T ReadBuf(char *const buf);
 //
