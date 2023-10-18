@@ -191,6 +191,8 @@ struct WalCmdDropIndex : public WalCmd {
 
     virtual void WriteAdv(char *&buf) const override;
 
+    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
+
     const String db_name_{};
     const String table_name_{};
     const String index_name_{};

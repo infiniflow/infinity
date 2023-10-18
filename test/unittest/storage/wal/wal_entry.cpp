@@ -150,7 +150,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
                                            Vector<String>{"col1", "col2"},
                                            Vector<InitParameter *>{new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")});
-    entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def));
+    entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def, ConflictType::kIgnore));
 
     entry->cmds.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
 

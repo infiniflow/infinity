@@ -314,6 +314,7 @@ void WalCmdDropTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     }
     result.entry_->Commit(commit_ts);
 }
+void WalCmdDropIndex::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdDropIndex Replay Not implemented"); }
 void WalCmdDelete::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdDelete Replay Not implemented"); }
 void WalCmdImport::Replay(Storage *storage, u64 txn_id, u64 commit_ts) { NotImplementError("WalCmdImport Replay Not implemented"); }
 void WalCmdAppend::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
