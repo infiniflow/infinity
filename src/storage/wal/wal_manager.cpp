@@ -6,9 +6,11 @@
 #include "common/utility/exception.h"
 #include "main/logger.h"
 #include "storage/storage.h"
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <iterator>
+#include <regex>
 #include <vector>
 
 namespace infinity {
@@ -323,8 +325,20 @@ int64_t WalManager::ReplayWalFile() {
             wal_list_.push_back(entry.path().string());
         }
     }
-    std::sort(wal_list_.begin(), wal_list_.end(), [](const String &a, const String &b) {
-        return a.substr(a.find_last_of('.') + 1) > b.substr(b.find_last_of('.') + 1);
+    std::sort(wal_list_.begin(), wal_list_.end(), [](const std::string &a, const std::string &b) {
+        auto getLastNumber = [](const std::string &s) {
+            auto pos = s.find_last_of('.');
+            if (pos != std::string::npos) {
+                return std::stol(s.substr(pos + 1));
+            } else {
+                throw std::invalid_argument("No '.' found");
+            }
+        };
+
+        long numA = getLastNumber(a);
+        long numB = getLastNumber(b);
+
+        return numA > numB;
     });
 
     // log the wal files.
