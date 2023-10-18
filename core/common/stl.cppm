@@ -20,6 +20,7 @@ module;
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <sstream>
 
 export module stl;
 
@@ -299,6 +300,14 @@ export {
     template<typename T>
     using UniqueLock = std::unique_lock<T>;
 
+    // Stringstream
+    using StringStream = std::basic_stringstream<char>;
+
+    // Endl;
+    template<typename _CharT, typename _Traits>
+    inline std::basic_ostream<_CharT, _Traits>&
+    Endl(std::basic_ostream<_CharT, _Traits>& __os)
+    { return std::flush(__os.put(__os.widen('\n'))); }
 }
 
 } // namespace infinity

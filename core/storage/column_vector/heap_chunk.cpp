@@ -47,13 +47,16 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
 }
 
 String StringHeapMgr::Stats() const {
-//    std::stringstream ss;
-//    ss << "Chunk count: " << chunks_.size() << std::endl;
-//    for (u64 i = 0; auto &chunk : chunks_) {
-//        ss << "Chunk id: " << i++ << ", Capacity: " << chunk->capacity_ << ", Current pos: " << chunk->current_offset_
-//           << ", object count: " << chunk->object_count_ << std::endl;
-//    }
-//    return ss.str();
+    StringStream ss;
+    SizeT chunk_count = chunks_.size();
+    ss << "Chunk count: " << chunk_count << Endl;
+    for(SizeT idx = 0; idx < chunk_count; ++ idx) {
+        auto& chunk = chunks_[idx];
+        ss << "Chunk id: " << idx++ << ", Capacity: " << chunk->capacity_ << ", Current pos: " << chunk->current_offset_
+           << ", object count: " << chunk->object_count_ << Endl;
+    }
+
+    return ss.str();
 }
 
 } // namespace infinity

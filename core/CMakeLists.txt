@@ -146,6 +146,13 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_storage_cpp
+        CONFIGURE_DEPENDS
+        unit_test/storage/*.cpp
+)
+
+
+file(GLOB_RECURSE
         ut_main_cpp
         CONFIGURE_DEPENDS
         unit_test/main/*.cpp
@@ -154,9 +161,10 @@ file(GLOB_RECURSE
 add_executable(unit_test
         ${ut_test_main_cpp}
         ${ut_common_cpp}
+        ${ut_storage_cpp}
+        ${ut_main_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
-        ${ut_main_cpp}
         ${infinity_cpp}
         ${network_cpp}
         ${planner_cpp}
