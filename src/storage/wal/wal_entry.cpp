@@ -22,8 +22,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         }
         case WalCommandType::DROP_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
-            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
-            cmd = MakeShared<WalCmdDropDatabase>(db_name, conflict_type);
+            cmd = MakeShared<WalCmdDropDatabase>(db_name);
             break;
         }
         case WalCommandType::CREATE_TABLE: {
@@ -35,8 +34,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::DROP_TABLE: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
-            cmd = MakeShared<WalCmdDropTable>(db_name, table_name, conflict_type);
+            cmd = MakeShared<WalCmdDropTable>(db_name, table_name);
             break;
         }
         case WalCommandType::IMPORT: {
@@ -74,9 +72,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            auto conflict_type = ReadBufAdv<ConflictType>(ptr);
             SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, conflict_type);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -145,19 +142,18 @@ bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
 
 i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
 
-i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(ConflictType); }
+i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + this->table_def->GetSizeInBytes();
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-           this->index_def_->GetSizeInBytes() + sizeof(ConflictType);
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + this->index_def_->GetSizeInBytes();
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(ConflictType);
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size();
 }
 
 int32_t WalCmdDropIndex::GetSizeInBytes() const {
@@ -189,7 +185,6 @@ void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_DATABASE);
     WriteBufAdv(buf, this->db_name);
-    WriteBufAdv(buf, this->conflict_type_);
 }
 
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
@@ -202,7 +197,6 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->conflict_type_);
     index_def_->WriteAdv(buf);
 }
 
@@ -210,7 +204,6 @@ void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_TABLE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, this->conflict_type_);
 }
 
 void WalCmdDropIndex::WriteAdv(char *&buf) const {
@@ -289,7 +282,7 @@ void WalCmdCreateIndex::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
         StorageError("Wal Replay: Get table failed");
     }
     auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
-    auto result = TableCollectionEntry::CreateIndex(table_entry, index_def_, conflict_type_, txn_id, commit_ts, nullptr);
+    auto result = TableCollectionEntry::CreateIndex(table_entry, index_def_, ConflictType::kReplace, txn_id, commit_ts, nullptr);
     if (!result.Success()) {
         StorageError("Wal Replay: Create index failed");
     }
@@ -308,7 +301,7 @@ void WalCmdDropTable::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
         StorageError("Wal Replay: Get database failed");
     }
     auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
-    auto result = DBEntry::DropTableCollection(db_entry, table_name, conflict_type_, txn_id, commit_ts, nullptr);
+    auto result = DBEntry::DropTableCollection(db_entry, table_name, ConflictType::kReplace, txn_id, commit_ts, nullptr);
     if (!result.Success()) {
         StorageError("Wal Replay: Drop table failed");
     }
@@ -438,7 +431,7 @@ Pair<i64, String> WalEntry::GetCheckpointInfo() const {
     }
     return {-1, ""};
 }
-bool WalEntry::ISCheckPoint() const {
+bool WalEntry::IsCheckPoint() const {
     for (const auto &cmd : cmds) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             return true;

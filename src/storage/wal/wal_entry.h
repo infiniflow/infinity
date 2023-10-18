@@ -114,7 +114,7 @@ struct WalCmdCreateDatabase : public WalCmd {
 };
 
 struct WalCmdDropDatabase : public WalCmd {
-    explicit WalCmdDropDatabase(String db_name_, ConflictType conflict_type) : db_name(std::move(db_name_)), conflict_type_(conflict_type) {}
+    explicit WalCmdDropDatabase(String db_name_) : db_name(std::move(db_name_)) {}
 
     WalCommandType GetType() override { return WalCommandType::DROP_DATABASE; }
     bool operator==(const WalCmd &other) const override {
@@ -126,7 +126,6 @@ struct WalCmdDropDatabase : public WalCmd {
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
-    ConflictType conflict_type_{};
 };
 
 struct WalCmdCreateTable : public WalCmd {
@@ -143,8 +142,8 @@ struct WalCmdCreateTable : public WalCmd {
 };
 
 struct WalCmdCreateIndex : public WalCmd {
-    WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_def_(std::move(index_def)), conflict_type_(conflict_type) {}
+    WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexDef> index_def)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_def_(std::move(index_def)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
 
@@ -158,12 +157,10 @@ struct WalCmdCreateIndex : public WalCmd {
     String db_name_{};
     String table_name_{};
     SharedPtr<IndexDef> index_def_{};
-    ConflictType conflict_type_{};
 };
 
 struct WalCmdDropTable : public WalCmd {
-    WalCmdDropTable(const String &db_name_, const String &table_name_, ConflictType conflict_type)
-        : db_name(db_name_), table_name(table_name_), conflict_type_(conflict_type) {}
+    WalCmdDropTable(const String &db_name_, const String &table_name_) : db_name(db_name_), table_name(table_name_) {}
 
     WalCommandType GetType() override { return WalCommandType::DROP_TABLE; }
     bool operator==(const WalCmd &other) const override {
@@ -176,7 +173,6 @@ struct WalCmdDropTable : public WalCmd {
 
     String db_name;
     String table_name;
-    ConflictType conflict_type_{};
 };
 
 struct WalCmdDropIndex : public WalCmd {
@@ -284,7 +280,7 @@ struct WalEntry : WalEntryHeader {
 
     [[nodiscard]] Pair<i64, String> GetCheckpointInfo() const;
 
-    [[nodiscard]] bool ISCheckPoint() const;
+    [[nodiscard]] bool IsCheckPoint() const;
 };
 
 class WalEntryIterator {

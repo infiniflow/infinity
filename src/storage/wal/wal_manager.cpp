@@ -345,7 +345,7 @@ int64_t WalManager::ReplayWalFile() {
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
             replay_entries.push_back(wal_entry);
-            if (wal_entry->ISCheckPoint()) {
+            if (wal_entry->IsCheckPoint()) {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
                 LOG_INFO("Checkpoint max commit ts: {}", max_commit_ts);
                 LOG_INFO("Catalog Path: {}", catalog_path);
@@ -357,7 +357,7 @@ int64_t WalManager::ReplayWalFile() {
         LOG_INFO("Phase 2: by the max commit ts, find the entries to replay")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
-            if (wal_entry->commit_ts > max_commit_ts && !wal_entry->ISCheckPoint()) {
+            if (wal_entry->commit_ts > max_commit_ts && !wal_entry->IsCheckPoint()) {
                 replay_entries.push_back(wal_entry);
             }
         }
@@ -371,7 +371,7 @@ int64_t WalManager::ReplayWalFile() {
         if (entry->commit_ts > last_commit_ts) {
             last_commit_ts = entry->commit_ts;
         }
-        if (entry->ISCheckPoint()) {
+        if (entry->IsCheckPoint()) {
             continue;
         }
         LOG_INFO("Wal entry commit ts: {}", entry->commit_ts);

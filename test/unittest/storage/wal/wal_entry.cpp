@@ -8,22 +8,7 @@
 #include "storage/txn/txn_manager.h"
 #include <fstream>
 
-class WalEntryTest : public BaseTest {
-    void SetUp() override {
-        system("rm -rf /tmp/infinity");
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity");
-    }
-};
+class WalEntryTest : public BaseTest {};
 
 using namespace infinity;
 namespace fs = std::filesystem;
@@ -119,7 +104,7 @@ void MockWalFile() {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1", ConflictType::kIgnore));
+        entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
         entry->commit_ts = 4;
         i32 expect_size = entry->GetSizeInBytes();
         std::vector<char> buf(expect_size);
@@ -142,15 +127,15 @@ void MockWalFile() {
 TEST_F(WalEntryTest, ReadWrite) {
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("db1"));
-    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1", ConflictType::kIgnore));
+    entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
-    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1", ConflictType::kIgnore));
+    entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
 
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
                                            Vector<String>{"col1", "col2"},
                                            Vector<InitParameter *>{new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")});
-    entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def, ConflictType::kIgnore));
+    entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def));
 
     entry->cmds.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
 
@@ -185,6 +170,8 @@ TEST_F(WalEntryTest, ReadWrite) {
     EXPECT_EQ(ptr - buf_beg, exp_size);
 }
 
+void Println(const String &message1, const String &message2) { std::cout << message1 << message2 << std::endl; }
+
 TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
     MockWalFile();
@@ -194,9 +181,9 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     iterator1.Init();
     while (iterator1.Next()) {
         auto wal_entry = iterator1.GetEntry();
-        LOG_INFO("WAL ENTRY COMMIT TS: {}", wal_entry->commit_ts);
+        Println("WAL ENTRY COMMIT TS:", fmt::to_string(wal_entry->commit_ts));
         for (const auto &cmd : wal_entry->cmds) {
-            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
         }
     }
 
@@ -210,12 +197,12 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     while (iterator.Next()) {
         auto wal_entry = iterator.GetEntry();
 
-        if (!wal_entry->ISCheckPoint()) {
+        if (!wal_entry->IsCheckPoint()) {
             replay_entries.push_back(wal_entry);
         } else {
             std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-            LOG_INFO("Checkpoint Max Commit Ts: {}", max_commit_ts);
-            LOG_INFO("Catalog Path: {}", catalog_path);
+            Println("Checkpoint Max Commit Ts: {}", fmt::to_string(max_commit_ts));
+            Println("Catalog Path: {}", catalog_path);
             break;
         }
     }
@@ -229,11 +216,11 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
 
     // phase 3: replay the entries
-    LOG_INFO("Start to replay the entries")
+    Println("Start to replay the entries", "");
     for (const auto &entry : replay_entries) {
-        LOG_INFO("WAL ENTRY COMMIT TS: {}", entry->commit_ts);
+        Println("WAL ENTRY COMMIT TS:", fmt::to_string(entry->commit_ts));
         for (const auto &cmd : entry->cmds) {
-            LOG_INFO("  WAL CMD: {}", WalCommandTypeToString(cmd->GetType()).c_str());
+            Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
         }
     }
 
