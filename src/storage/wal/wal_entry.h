@@ -93,7 +93,7 @@ struct WalCmd {
     // Write to a char buffer
     virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
-    static SharedPtr<WalCmd> ReadAdv(char *&ptr, int32_t max_bytes);
+    static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 max_bytes);
 
     [[maybe_unused]] virtual void Replay(Storage *storage, u64 txn_id, u64 commit_ts) = 0;
 };
@@ -106,7 +106,7 @@ struct WalCmdCreateDatabase : public WalCmd {
         auto other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name;
     }
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -121,7 +121,7 @@ struct WalCmdDropDatabase : public WalCmd {
         auto other_cmd = dynamic_cast<const WalCmdDropDatabase *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name;
     }
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -134,7 +134,7 @@ struct WalCmdCreateTable : public WalCmd {
 
     WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -170,7 +170,7 @@ struct WalCmdDropTable : public WalCmd {
         auto other_cmd = dynamic_cast<const WalCmdDropTable *>(&other);
         return other_cmd != nullptr && db_name == other_cmd->db_name && table_name == other_cmd->table_name;
     }
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -187,7 +187,7 @@ struct WalCmdDropIndex : public WalCmd {
 
     virtual bool operator==(const WalCmd &other) const override;
 
-    virtual int32_t GetSizeInBytes() const override;
+    virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&buf) const override;
 
@@ -204,7 +204,7 @@ struct WalCmdImport : public WalCmd {
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -219,7 +219,7 @@ struct WalCmdAppend : public WalCmd {
 
     WalCommandType GetType() override { return WalCommandType::APPEND; }
     bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -234,7 +234,7 @@ struct WalCmdDelete : public WalCmd {
 
     WalCommandType GetType() override { return WalCommandType::DELETE; }
     bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -248,7 +248,7 @@ struct WalCmdCheckpoint : public WalCmd {
 
     WalCommandType GetType() override { return WalCommandType::CHECKPOINT; }
     bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] int32_t GetSizeInBytes() const override;
+    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
     void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
@@ -273,12 +273,12 @@ struct WalEntry : WalEntryHeader {
 
     // Estimated serialized size in bytes, ensured be no less than Write
     // requires, allowed be larger.
-    [[nodiscard]] int32_t GetSizeInBytes() const;
+    [[nodiscard]] i32 GetSizeInBytes() const;
 
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
-    static SharedPtr<WalEntry> ReadAdv(char *&ptr, int32_t max_bytes);
+    static SharedPtr<WalEntry> ReadAdv(char *&ptr, i32 max_bytes);
 
     Vector<SharedPtr<WalCmd>> cmds;
 

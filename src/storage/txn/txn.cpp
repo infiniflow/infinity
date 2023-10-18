@@ -266,7 +266,7 @@ EntryResult Txn::DropDatabase(const String &db_name, ConflictType conflict_type)
     } else {
         db_names_.insert(db_name);
     }
-    wal_entry_->cmds.push_back(MakeShared<WalCmdDropDatabase>(db_name, ConflictType::kIgnore));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropDatabase>(db_name, conflict_type));
     return res;
 }
 
@@ -367,7 +367,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
 
     TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, begin_ts, GetBufferMgr());
 
-    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, ConflictType::kIgnore));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def, conflict_type));
     return res;
 }
 
@@ -403,7 +403,7 @@ EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &
         txn_tables_.insert(dropped_table_entry);
     }
 
-    wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name, ConflictType::kIgnore));
+    wal_entry_->cmds.push_back(MakeShared<WalCmdDropTable>(db_name, table_name, conflict_type));
     return res;
 }
 

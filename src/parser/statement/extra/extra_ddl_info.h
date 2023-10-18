@@ -17,7 +17,7 @@ enum class DDLType {
     kIndex,
 };
 
-enum class ConflictType : uint8_t { kInvalid, kIgnore, kError, kReplace };
+enum class ConflictType : u8 { kInvalid, kIgnore, kError, kReplace };
 
 String ConflictTypeToStr(ConflictType type);
 

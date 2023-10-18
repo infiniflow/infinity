@@ -187,9 +187,6 @@ TEST_F(WalEntryTest, ReadWrite) {
 
 TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
-
-    Storage *storage = infinity::Infinity::instance().storage();
-
     MockWalFile();
     String wal_file_path = "/tmp/infinity/wal/wal.log";
 
