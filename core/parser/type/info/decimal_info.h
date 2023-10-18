@@ -30,6 +30,8 @@ public:
 
     [[nodiscard]] size_t Size() const override { return 16u; }
 
+    [[nodiscard]] nlohmann::json Serialize() const override;
+
     [[nodiscard]] inline std::string ToString() const override { return "decimal(" + std::to_string(precision_) + ", " + std::to_string(scale_) + ")"; }
 
 private:

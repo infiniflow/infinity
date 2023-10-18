@@ -5,6 +5,7 @@ module;
 
 #include "statement/extra/create_table_info.h"
 #include "type/logical_type.h"
+#include "type/number/float16.h"
 
 export module parser;
 
@@ -65,9 +66,28 @@ export using RowT = RowID;
 // Heterogeneous
 export using MixedT = MixedType;
 
+// TimeUnit
+export using TimeUnit = TimeUnit;
+
+export using float16_t = float16_t;
+
+export using IntegerMixedType = IntegerMixedType;
+export using FloatMixedType = FloatMixedType;
+export using ArrayMixedType = ArrayMixedType;
+export using BaseMixedType = BaseMixedType;
+export using LongStrMixedType = LongStrMixedType;
+export using MissingMixedType = MissingMixedType;
+export using ShortStrMixedType = ShortStrMixedType;
+export using MixedType = MixedType;
+export using MixedValueType = MixedValueType;
+export using TupleMixedType = TupleMixedType;
+
 export using TypeInfo = TypeInfo;
 export using EmbeddingDataType = EmbeddingDataType;
 export using EmbeddingInfo = EmbeddingInfo;
+export using DecimalInfo = DecimalInfo;
+export using BitmapInfo = BitmapInfo;
+export using VarcharInfo = VarcharInfo;
 
 export using TypeInfoType = TypeInfoType;
 
@@ -76,6 +96,13 @@ int32_t GetSizeInBytes(const T &value);
 
 export template <>
 int32_t GetSizeInBytes(const std::string &value);
+
+export constexpr int64_t MAX_VARCHAR_SIZE = MAX_VARCHAR_SIZE_INTERNAL;
+export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
+export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
+
+// Parser Exception
+export using ParserException = ParserException;
 
 //export template <typename T>
 //T ReadBuf(char *const buf);

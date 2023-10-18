@@ -218,11 +218,28 @@ export {
     using atomic_bool = std::atomic_bool;
 
     constexpr u64 u64_max = std::numeric_limits<u64>::max();
-    constexpr u64 i64_max = std::numeric_limits<i64>::max();
-    constexpr u64 u32_max = std::numeric_limits<u32>::max();
-    constexpr u64 i32_max = std::numeric_limits<i32>::max();
-    constexpr u64 i16_max = std::numeric_limits<i16>::max();
-    constexpr u64 u16_max = std::numeric_limits<u16>::max();
+    constexpr i64 i64_max = std::numeric_limits<i64>::max();
+    constexpr u32 u32_max = std::numeric_limits<u32>::max();
+    constexpr i32 i32_max = std::numeric_limits<i32>::max();
+    constexpr i16 i16_max = std::numeric_limits<i16>::max();
+    constexpr u16 u16_max = std::numeric_limits<u16>::max();
+    constexpr u16 i8_max = std::numeric_limits<i8>::max();
+    constexpr u16 u8_max = std::numeric_limits<u8>::max();
+
+    constexpr f32 f32_inf = std::numeric_limits<f32>::infinity();
+    constexpr f64 f64_inf = std::numeric_limits<f64>::infinity();
+
+    constexpr u64 u64_inf = std::numeric_limits<u64>::infinity();
+    constexpr i64 i64_inf = std::numeric_limits<i64>::infinity();
+    constexpr u32 u32_inf = std::numeric_limits<u32>::infinity();
+    constexpr i32 i32_inf = std::numeric_limits<i32>::infinity();
+    constexpr i16 i16_inf = std::numeric_limits<i16>::infinity();
+    constexpr u16 u16_inf = std::numeric_limits<u16>::infinity();
+    constexpr u16 i8_inf = std::numeric_limits<i8>::infinity();
+    constexpr u16 u8_inf = std::numeric_limits<u8>::infinity();
+
+    constexpr ptr_t ptr_inf = std::numeric_limits<ptr_t>::infinity();
+    constexpr u64* u64_ptr_inf = std::numeric_limits<u64*>::infinity();
 
     // Smart ptr
 

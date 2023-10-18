@@ -29,4 +29,11 @@ bool DecimalInfo::operator==(const TypeInfo &other) const {
     return this->precision_ == decimal_info_ptr->precision_ && this->scale_ == decimal_info_ptr->scale_;
 }
 
+nlohmann::json DecimalInfo::Serialize() const {
+    nlohmann::json res;
+    res["precision"] = precision_;
+    res["scale"] = scale_;
+    return res;
+}
+
 } // namespace infinity

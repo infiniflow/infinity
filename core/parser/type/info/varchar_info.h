@@ -23,6 +23,8 @@ public:
 
     [[nodiscard]] size_t Size() const override { return 16u; }
 
+    [[nodiscard]] nlohmann::json Serialize() const override;
+
     [[nodiscard]] inline std::string ToString() const override { return "varchar(" + std::to_string(dimension_) + ")"; }
 
 private:

@@ -25,6 +25,8 @@ public:
     // Array always costs 8 bytes. Real data is stored in heap memory.
     [[nodiscard]] size_t Size() const override { return 8u; }
 
+    [[nodiscard]] nlohmann::json Serialize() const override;
+
     [[nodiscard]] inline std::string ToString() const override { return "array(" + elem_type_.ToString() + ")"; }
 
 private:

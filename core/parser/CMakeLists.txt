@@ -22,3 +22,4 @@ add_library(sql_parser STATIC ${parser_files} ${BISON_PARSER_OUTPUTS} ${FLEX_LEX
 
 target_include_directories(sql_parser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
+target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")

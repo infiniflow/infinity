@@ -186,7 +186,7 @@ void DataType::WriteAdv(char *&ptr) const {
             ParserError("Array isn't implemented here.");
             break;
         case LogicalType::kBitmap: {
-            int64_t limit = MAX_BITMAP_SIZE;
+            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
             if (this->type_info_ != nullptr) {
                 const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
                 if (bitmap_info != nullptr)
@@ -217,7 +217,7 @@ void DataType::WriteAdv(char *&ptr) const {
             break;
         }
         case LogicalType::kVarchar: {
-            int32_t capacity = MAX_VARCHAR_SIZE;
+            int32_t capacity = MAX_VARCHAR_SIZE_INTERNAL;
             if (this->type_info_ != nullptr) {
                 const VarcharInfo *varchar_info = dynamic_cast<VarcharInfo *>(this->type_info_.get());
                 if (varchar_info != nullptr)
@@ -270,6 +270,54 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
     maxbytes = ptr_end - ptr;
     ParserAssert(maxbytes >= 0, "ptr goes out of range when reading DataType");
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(type, type_info);
+    return data_type;
+}
+
+
+nlohmann::json DataType::Serialize() {
+    nlohmann::json json_res;
+    json_res["data_type"] = this->type_;
+
+    if (this->type_info_ != nullptr) {
+        json_res["type_info"] = this->type_info_->Serialize();
+    }
+
+    return json_res;
+}
+
+std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_json) {
+    LogicalType logical_type = data_type_json["data_type"];
+    std::shared_ptr<TypeInfo> type_info{nullptr};
+    if (data_type_json.contains("type_info")) {
+        const nlohmann::json &type_info_json = data_type_json["type_info"];
+        switch (logical_type) {
+            case LogicalType::kArray: {
+                ParserError("Array isn't implemented here.");
+                type_info = nullptr;
+                break;
+            }
+            case LogicalType::kBitmap: {
+                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+                break;
+            }
+            case LogicalType::kDecimal: {
+                type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                break;
+            }
+            case LogicalType::kVarchar: {
+                type_info = VarcharInfo::Make(type_info_json["dimension"]);
+                break;
+            }
+            default:
+                // There's no type_info for other types
+                break;
+        }
+    }
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
     return data_type;
 }
 

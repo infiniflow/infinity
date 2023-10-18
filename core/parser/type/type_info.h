@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "json.hpp"
 #include <string>
 #include <cstdint>
 
@@ -50,6 +51,8 @@ public:
     [[nodiscard]] virtual size_t Size() const = 0;
 
     [[nodiscard]] inline TypeInfoType type() const noexcept { return type_; }
+
+    [[nodiscard]] virtual nlohmann::json Serialize() const = 0;
 
     [[nodiscard]] virtual std::string ToString() const = 0;
 

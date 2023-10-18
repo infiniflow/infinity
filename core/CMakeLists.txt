@@ -146,11 +146,16 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_parser_cpp
+        CONFIGURE_DEPENDS
+        unit_test/parser/*.cpp
+)
+
+file(GLOB_RECURSE
         ut_storage_cpp
         CONFIGURE_DEPENDS
         unit_test/storage/*.cpp
 )
-
 
 file(GLOB_RECURSE
         ut_main_cpp
@@ -163,6 +168,7 @@ add_executable(unit_test
         ${ut_common_cpp}
         ${ut_storage_cpp}
         ${ut_main_cpp}
+        ${ut_parser_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
         ${infinity_cpp}

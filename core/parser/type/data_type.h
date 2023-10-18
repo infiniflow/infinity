@@ -131,6 +131,11 @@ public:
         plain_type_ = false;
     }
 
+
+    nlohmann::json Serialize();
+
+    static std::shared_ptr<DataType> Deserialize(const nlohmann::json &data_type_json);
+
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     [[nodiscard]] int32_t GetSizeInBytes() const;
 
