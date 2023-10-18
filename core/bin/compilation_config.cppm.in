@@ -50,4 +50,8 @@ export char* git_commit_id() {
     return (char*)GIT_COMMIT_ID;
 }
 
+export char* test_data_path() {
+    return (char*)TEST_DATA_PATH;
+}
+
 }
