@@ -134,6 +134,11 @@ public:
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     [[nodiscard]] int32_t GetSizeInBytes() const;
 
+    // Write to a char buffer
+    void WriteAdv(char *&ptr) const;
+    // Read from a serialized version
+    static std::shared_ptr<DataType> ReadAdv(char *&ptr, int32_t maxbytes);
+
     [[nodiscard]] inline bool Plain() const { return plain_type_; }
 
 private:

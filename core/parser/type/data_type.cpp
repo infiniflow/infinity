@@ -10,6 +10,7 @@
 #include "type/type_info.h"
 #include "info/bitmap_info.h"
 #include "spdlog/fmt/fmt.h"
+#include "serializable.h"
 #include <charconv>
 
 namespace infinity {
@@ -176,6 +177,100 @@ int32_t DataType::GetSizeInBytes() const {
         }
     }
     return size;
+}
+
+void DataType::WriteAdv(char *&ptr) const {
+    WriteBufAdv<LogicalType>(ptr, this->type_);
+    switch (this->type_) {
+        case LogicalType::kArray:
+            ParserError("Array isn't implemented here.");
+            break;
+        case LogicalType::kBitmap: {
+            int64_t limit = MAX_BITMAP_SIZE;
+            if (this->type_info_ != nullptr) {
+                const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
+                if (bitmap_info != nullptr)
+                    limit = bitmap_info->length_limit();
+            }
+            WriteBufAdv<int64_t>(ptr, limit);
+            break;
+        }
+        case LogicalType::kDecimal: {
+            int64_t precision = 0;
+            int64_t scale = 0;
+            if (this->type_info_ != nullptr) {
+                const DecimalInfo *decimal_info = dynamic_cast<DecimalInfo *>(this->type_info_.get());
+                if (decimal_info != nullptr) {
+                    precision = decimal_info->precision();
+                    scale = decimal_info->scale();
+                }
+            }
+            WriteBufAdv<int64_t>(ptr, precision);
+            WriteBufAdv<int64_t>(ptr, scale);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            const EmbeddingInfo *embedding_info = dynamic_cast<EmbeddingInfo *>(this->type_info_.get());
+            ParserAssert(embedding_info != nullptr, fmt::format("kEmbedding associated type_info is nullptr here."));
+            WriteBufAdv<EmbeddingDataType>(ptr, embedding_info->Type());
+            WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
+            break;
+        }
+        case LogicalType::kVarchar: {
+            int32_t capacity = MAX_VARCHAR_SIZE;
+            if (this->type_info_ != nullptr) {
+                const VarcharInfo *varchar_info = dynamic_cast<VarcharInfo *>(this->type_info_.get());
+                if (varchar_info != nullptr)
+                    capacity = varchar_info->dimension();
+            }
+            WriteBufAdv<int32_t>(ptr, capacity);
+            break;
+        }
+        default:
+            // There's no type_info for other types
+            break;
+    }
+    return;
+}
+
+std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
+    char *const ptr_end = ptr + maxbytes;
+    LogicalType type = ReadBufAdv<LogicalType>(ptr);
+    std::shared_ptr<TypeInfo> type_info{nullptr};
+    switch (type) {
+        case LogicalType::kArray:
+            ParserError("Array isn't implemented here.");
+            break;
+        case LogicalType::kBitmap: {
+            int64_t limit = ReadBufAdv<int64_t>(ptr);
+            type_info = BitmapInfo::Make(limit);
+            break;
+        }
+        case LogicalType::kDecimal: {
+            int64_t precision = ReadBufAdv<int64_t>(ptr);
+            int64_t scale = ReadBufAdv<int64_t>(ptr);
+            type_info = DecimalInfo::Make(precision, scale);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
+            int32_t dimension = ReadBufAdv<int32_t>(ptr);
+            type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            int32_t dimension = ReadBufAdv<int32_t>(ptr);
+            type_info = VarcharInfo::Make(dimension);
+            break;
+        }
+        default:
+            // There's no type_info for other types
+            break;
+    }
+    maxbytes = ptr_end - ptr;
+    ParserAssert(maxbytes >= 0, "ptr goes out of range when reading DataType");
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(type, type_info);
+    return data_type;
 }
 
 template <>

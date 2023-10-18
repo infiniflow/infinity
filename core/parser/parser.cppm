@@ -69,6 +69,38 @@ export using TypeInfo = TypeInfo;
 export using EmbeddingDataType = EmbeddingDataType;
 export using EmbeddingInfo = EmbeddingInfo;
 
+export using TypeInfoType = TypeInfoType;
+
+export template <typename T>
+int32_t GetSizeInBytes(const T &value);
+
+export template <>
+int32_t GetSizeInBytes(const std::string &value);
+
+//export template <typename T>
+//T ReadBuf(char *const buf);
+//
+//export template <typename T>
+//T ReadBufAdv(char *&buf);
+//
+//export template <>
+//std::string ReadBuf<std::string>(char *const buf);
+//
+//export template <>
+//std::string ReadBufAdv<std::string>(char *&buf);
+//
+//export template <typename T>
+//void WriteBuf(char *const buf, const T &value);
+//
+//export template <typename T>
+//void WriteBufAdv(char *&buf, const T &value);
+//
+//export template <>
+//void WriteBuf<std::string>(char *const buf, const std::string &value);
+//
+//template <>
+//void WriteBufAdv<std::string>(char *&buf, const std::string &value);
+
 }
 
 
