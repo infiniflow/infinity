@@ -305,12 +305,16 @@ void WalCmdAppend::Replay(Storage *storage, u64 txn_id, u64 commit_ts) {
     }
     auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
 
-    auto table_store = MakeShared<TxnTableStore>(table_name, table_entry, nullptr);
+    auto fake_txn = MakeUnique<Txn>(storage->txn_manager(), storage->catalog(), txn_id);
+
+    auto table_store = MakeShared<TxnTableStore>(table_name, table_entry, fake_txn.get());
     table_store->Append(block);
-    // todo fix me
-    auto append_state = MakeUnique<AppendState>(this->blocks_);
-    table_store->PrepareCommit();
-    table_store->Commit();
+
+    auto append_state = MakeUnique<AppendState>(table_store->blocks_);
+    table_store->append_state_ = std::move(append_state);
+
+    TableCollectionEntry::Append(table_store->table_entry_, table_store->txn_, table_store.get(), storage->buffer_manager());
+    TableCollectionEntry::CommitAppend(table_store->table_entry_, table_store->txn_, table_store->append_state_.get());
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {
