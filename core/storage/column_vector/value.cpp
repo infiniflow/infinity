@@ -348,19 +348,19 @@ TimestampT Value::GetValue() const {
 
 template <>
 IntervalT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kInterval, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
     return value_.interval;
 }
 
 template <>
 ArrayT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kArray, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
     return array;
 }
 
 template <>
 PointT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kPoint, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
     return value_.point;
 }
 

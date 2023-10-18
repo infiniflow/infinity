@@ -15,7 +15,7 @@ inline void Assert(bool is_true, const String& message, const char* file_path, i
     if (!(is_true)) {
         String err_msg = message;
 #ifdef INFINITY_DEBUG
-        err_msg.append(" @").append(file_path).append(":").append(ToString(line));
+        err_msg.append(" @").append(file_path).append(":").append(ToStr(line));
 #endif
         throw ExceptionType(err_msg);                                                                                                               \
     }

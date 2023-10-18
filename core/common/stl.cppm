@@ -85,10 +85,10 @@ export {
         }
     }
 
-    // ToString()
+    // ToStr()
 
     _GLIBCXX_NODISCARD
-    inline String ToString(int __val)
+    inline String ToStr(int __val)
 #if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_INT__) <= 32
         noexcept // any 32-bit value fits in the SSO buffer
 #endif
@@ -102,7 +102,7 @@ export {
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(unsigned __val)
+    inline String ToStr(unsigned __val)
 #if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_INT__) <= 32
         noexcept // any 32-bit value fits in the SSO buffer
 #endif
@@ -113,7 +113,7 @@ export {
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(long __val)
+    inline String ToStr(long __val)
 #if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_LONG__) <= 32
         noexcept // any 32-bit value fits in the SSO buffer
 #endif
@@ -127,7 +127,7 @@ export {
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(unsigned long __val)
+    inline String ToStr(unsigned long __val)
 #if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_LONG__) <= 32
         noexcept // any 32-bit value fits in the SSO buffer
 #endif
@@ -138,7 +138,7 @@ export {
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(long long __val) {
+    inline String ToStr(long long __val) {
         const bool __neg = __val < 0;
         const unsigned long long __uval = __neg ? (unsigned long long)~__val + 1ull : __val;
         const auto __len = std::__detail::__to_chars_len(__uval);
@@ -148,7 +148,7 @@ export {
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(unsigned long long __val) {
+    inline String ToStr(unsigned long long __val) {
         String __str(std::__detail::__to_chars_len(__val), '\0');
         std::__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
         return __str;
@@ -158,19 +158,19 @@ export {
     // NB: (v)snprintf vs sprintf.
 
     _GLIBCXX_NODISCARD
-    inline String ToString(float __val) {
+    inline String ToStr(float __val) {
         const int __n = __gnu_cxx::__numeric_traits<float>::__max_exponent10 + 20;
         return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%f", __val);
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(double __val) {
+    inline String ToStr(double __val) {
         const int __n = __gnu_cxx::__numeric_traits<double>::__max_exponent10 + 20;
         return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%f", __val);
     }
 
     _GLIBCXX_NODISCARD
-    inline String ToString(long double __val) {
+    inline String ToStr(long double __val) {
         const int __n = __gnu_cxx::__numeric_traits<long double>::__max_exponent10 + 20;
         return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%Lf", __val);
     }

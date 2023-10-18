@@ -20,7 +20,7 @@ export module column_vector;
 
 namespace infinity {
 
-enum class ColumnVectorType : i8 {
+export enum class ColumnVectorType : i8 {
     kInvalid,
     kFlat,     // Stand without any encode
     kConstant, // All vector has same type and value
