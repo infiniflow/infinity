@@ -1,7 +1,7 @@
 #include "base_test.h"
-#include "storage/common/fst/automaton.h"
-#include "storage/common/fst/sorted_range_matcher.h"
-#include "storage/common/fst/table_matcher.h"
+#include "storage/invertedindex/common/fst/automaton.h"
+#include "storage/invertedindex/common/fst/sorted_range_matcher.h"
+#include "storage/invertedindex/common/fst/table_matcher.h"
 #include <string>
 
 class FSTUtilsTest : public BaseTest {

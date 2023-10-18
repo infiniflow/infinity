@@ -1,5 +1,5 @@
 #include "base_test.h"
-#include "storage/common/fst/string_weight.h"
+#include "storage/invertedindex/common/fst/string_weight.h"
 
 #include <string>
 
