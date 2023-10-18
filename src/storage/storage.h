@@ -28,9 +28,11 @@ public:
 
     void UnInit();
 
-private:
     static SharedPtr<DirEntry> GetLatestCatalog(const String &dir);
 
+    static bool CatalogDirExists(const String &dir);
+
+private:
     static void InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr);
 
 private:

@@ -94,8 +94,6 @@ struct WalCmd {
     virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
     static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 max_bytes);
-
-    [[maybe_unused]] virtual void Replay(Storage *storage, u64 txn_id, u64 commit_ts) = 0;
 };
 
 struct WalCmdCreateDatabase : public WalCmd {
@@ -108,7 +106,6 @@ struct WalCmdCreateDatabase : public WalCmd {
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
 };
@@ -123,7 +120,6 @@ struct WalCmdDropDatabase : public WalCmd {
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
 };
@@ -135,7 +131,6 @@ struct WalCmdCreateTable : public WalCmd {
     bool operator==(const WalCmd &other) const override;
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
     SharedPtr<TableDef> table_def;
@@ -152,7 +147,6 @@ struct WalCmdCreateIndex : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const override;
 
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name_{};
     String table_name_{};
@@ -169,7 +163,6 @@ struct WalCmdDropTable : public WalCmd {
     }
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
     String table_name;
@@ -181,13 +174,11 @@ struct WalCmdDropIndex : public WalCmd {
 
     virtual WalCommandType GetType() override { return WalCommandType::DROP_INDEX; }
 
-    virtual bool operator==(const WalCmd &other) const override;
+    bool operator==(const WalCmd &other) const override;
 
-    virtual i32 GetSizeInBytes() const override;
+    i32 GetSizeInBytes() const override;
 
-    virtual void WriteAdv(char *&buf) const override;
-
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
+    void WriteAdv(char *&buf) const override;
 
     const String db_name_{};
     const String table_name_{};
@@ -202,7 +193,6 @@ struct WalCmdImport : public WalCmd {
     bool operator==(const WalCmd &other) const override;
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
     String table_name;
@@ -217,7 +207,6 @@ struct WalCmdAppend : public WalCmd {
     bool operator==(const WalCmd &other) const override;
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
     String table_name;
@@ -232,7 +221,6 @@ struct WalCmdDelete : public WalCmd {
     bool operator==(const WalCmd &other) const override;
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     String db_name;
     String table_name;
@@ -246,7 +234,6 @@ struct WalCmdCheckpoint : public WalCmd {
     bool operator==(const WalCmd &other) const override;
     [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
-    void Replay(Storage *storage, u64 txn_id, u64 commit_ts) override;
 
     int64_t max_commit_ts_;
     String catalog_path_;

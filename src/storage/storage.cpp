@@ -92,6 +92,19 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
     return latest;
 }
 
+bool Storage::CatalogDirExists(const String &dir) {
+    LocalFileSystem fs;
+    if (!fs.Exists(dir)) {
+        fs.CreateDirectory(dir);
+        return false;
+    }
+    if (fs.ListDirectory(dir).empty()) {
+        return false;
+    }
+
+    return true;
+}
+
 void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     EntryResult create_res;
     Txn *new_txn = txn_mgr->CreateTxn();

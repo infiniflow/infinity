@@ -30,6 +30,16 @@ private:
 };
 
 class WalEntry;
+class WalCmdCheckpoint;
+class WalCmdCreateDatabase;
+class WalCmdDropDatabase;
+class WalCmdCreateTable;
+class WalCmdDropTable;
+class WalCmdCreateIndex;
+class WalCmdDropIndex;
+class WalCmdAppend;
+class WalCmdImport;
+class WalCmdDelete;
 
 class WalManager {
 public:
@@ -64,10 +74,22 @@ public:
 
     i64 ReplayWalFile();
 
+    void ReplayWalEntry(const WalEntry &entry);
+
     void RecycleWalFile();
 private:
     void SetWalState(TxnTimeStamp max_commit_ts, int64_t wal_size);
     void GetWalState(TxnTimeStamp& max_commit_ts, int64_t& wal_size);
+
+    void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts);
 
 public:
     u64 wal_size_threshold_{};
