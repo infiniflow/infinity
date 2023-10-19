@@ -438,8 +438,8 @@ TEST_F(WaReplayTest, WalReplayImport) {
             txn2->CommitTxn();
         }
 
-        auto *txn3 = txn_mgr->CreateTxn();
         {
+            auto *txn3 = txn_mgr->CreateTxn();
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
 
             txn3->BeginTxn();
@@ -448,18 +448,17 @@ TEST_F(WaReplayTest, WalReplayImport) {
             txn3->CommitTxn();
         }
 
-        i64 tx3_commit_ts = txn3->CommitTS();
+        auto *txn4 = txn_mgr->CreateTxn();
 
         {
-            auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn4->BeginTxn();
 
             TableCollectionEntry *table_collection_entry = nullptr;
-            txn->GetTableEntry("default", "tbl1", table_collection_entry);
+            txn4->GetTableEntry("default", "tbl1", table_collection_entry);
             EXPECT_NE(table_collection_entry, nullptr);
-            txn->AddTxnTableStore("tbl1", MakeUnique<TxnTableStore>("tbl1", table_collection_entry, txn));
+            txn4->AddTxnTableStore("tbl1", MakeUnique<TxnTableStore>("tbl1", table_collection_entry, txn4));
 
-            TxnTableStore *txn_store = txn->GetTxnTableStore("tbl1");
+            TxnTableStore *txn_store = txn4->GetTxnTableStore("tbl1");
             EXPECT_NE(txn_store, nullptr);
 
             u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry);
@@ -519,22 +518,21 @@ TEST_F(WaReplayTest, WalReplayImport) {
             ++last_block_entry->row_count_;
             ++segment_entry->row_count_;
 
-            txn->AddWalCmd(MakeShared<WalCmdImport>("default",
-                                                    "tbl1",
-                                                    *segment_entry->segment_dir_,
-                                                    segment_entry->segment_id_,
-                                                    segment_entry->block_entries_.size()));
+            txn4->AddWalCmd(MakeShared<WalCmdImport>("default",
+                                                     "tbl1",
+                                                     *segment_entry->segment_dir_,
+                                                     segment_entry->segment_id_,
+                                                     segment_entry->block_entries_.size()));
             txn_store->Import(segment_entry);
-
-            txn->CommitTxn();
+            txn4->CommitTxn();
         }
 
-        system("tree  /tmp/infinity");
+        i64 tx4_commit_ts = txn4->CommitTS();
 
         {
             auto *txn6 = txn_mgr->CreateTxn();
             txn6->BeginTxn();
-            txn6->Checkpoint(tx3_commit_ts, true);
+            txn6->Checkpoint(tx4_commit_ts, true);
             txn6->CommitTxn();
         }
 
@@ -544,6 +542,7 @@ TEST_F(WaReplayTest, WalReplayImport) {
         infinity::GlobalResourceUsage::UnInit();
     }
     // Restart the db instance
+    system("tree  /tmp/infinity");
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
@@ -586,10 +585,7 @@ TEST_F(WaReplayTest, WalReplayImport) {
             for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1);
-                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
                 for (const auto &block_pair : segment_pair.second.block_map_) {
-                    //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
 
                     EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);

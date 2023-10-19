@@ -313,12 +313,15 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
 int64_t WalManager::ReplayWalFile() {
     // if the wal directory does not exist, just return 0.
     if (!fs::exists(wal_path_)) {
+        storage_->InitNewCatalog();
         return 0;
     }
     // if the wal file is empty, just return 0.
     if (fs::file_size(wal_path_) == 0) {
+        storage_->InitNewCatalog();
         return 0;
     }
+
     // if the wal file is not empty, we will replay the wal file.
     // 1. First , we will get all wal files store to wal_list_.
     // wal_list_ is a vector of string, each string is a wal file path.
@@ -354,6 +357,8 @@ int64_t WalManager::ReplayWalFile() {
         return num_a > num_b;
     });
 
+    LOG_INFO("Start Wal Replay")
+
     // log the wal files.
     for (const auto &wal_file : wal_list_) {
         LOG_INFO("List wal file: {}", wal_file.c_str());
@@ -372,7 +377,7 @@ int64_t WalManager::ReplayWalFile() {
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
             replay_entries.push_back(wal_entry);
-            if (wal_entry->IsCheckPoint()) {
+            if (wal_entry->IsFullCheckPoint()) {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
                 LOG_INFO("Checkpoint max commit ts: {}", max_commit_ts);
                 LOG_INFO("Catalog Path: {}", catalog_path);
@@ -386,10 +391,14 @@ int64_t WalManager::ReplayWalFile() {
         LOG_INFO("Phase 2: by the max commit ts, find the entries to replay")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
-            if (wal_entry->commit_ts > max_commit_ts && !wal_entry->IsCheckPoint()) {
+            if (wal_entry->commit_ts > max_commit_ts) {
                 replay_entries.push_back(wal_entry);
             }
         }
+    }
+
+    if (storage_->catalog() == nullptr) {
+        storage_->InitNewCatalog();
     }
 
     // phase 3: replay the entries
@@ -564,10 +573,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(), id, 0, segment_entry->column_count_, storage_->buffer_manager());
         block_entry->max_row_ts_ = commit_ts;
         block_entry->min_row_ts_ = commit_ts;
-        Vector<TxnTimeStamp> &created = block_entry->block_version_->created_;
-        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
-            created[i] = commit_ts;
-        }
+        block_entry->block_version_->created_.push_back({commit_ts, block_entry->row_count_});
         segment_entry->block_entries_.emplace_back(std::move(block_entry));
     }
 }

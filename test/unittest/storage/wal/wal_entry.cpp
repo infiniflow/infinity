@@ -84,7 +84,7 @@ void MockWalFile() {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(i64(1), std::string("catalog")));
+        entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
         entry->commit_ts = 3;
         i32 expect_size = entry->GetSizeInBytes();
         std::vector<char> buf(expect_size);
@@ -223,7 +223,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
         }
     }
-    EXPECT_EQ(max_commit_ts, 1);
-    EXPECT_EQ(catalog_path, "catalog");
-    EXPECT_EQ(replay_entries.size(), 2);
+    EXPECT_EQ(max_commit_ts, 123);
+    EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
+    EXPECT_EQ(replay_entries.size(), 1);
 }

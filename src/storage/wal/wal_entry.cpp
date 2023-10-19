@@ -359,6 +359,15 @@ bool WalEntry::IsCheckPoint() const {
     return false;
 }
 
+bool WalEntry::IsFullCheckPoint() const {
+    for (const auto &cmd : cmds) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT && dynamic_cast<const WalCmdCheckpoint *>(cmd.get())->is_full_checkpoint_) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void WalEntryIterator::Init() {
     std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {

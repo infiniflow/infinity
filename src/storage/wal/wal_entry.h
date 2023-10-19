@@ -233,15 +233,12 @@ struct WalCmdDelete : public WalCmd {
 struct WalCmdCheckpoint : public WalCmd {
     WalCmdCheckpoint(int64_t max_commit_ts, bool is_full_checkpoint, String catalog_path)
         : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path) {}
-    virtual WalCommandType GetType() { return WalCommandType::CHECKPOINT; }
+    virtual WalCommandType GetType() override { return WalCommandType::CHECKPOINT; }
 
-    virtual bool operator==(const WalCmd &other) const;
+    virtual bool operator==(const WalCmd &other) const override;
 
-    virtual int32_t GetSizeInBytes() const;
+    virtual int32_t GetSizeInBytes() const override;
 
-    WalCommandType GetType() override { return WalCommandType::CHECKPOINT; }
-    bool operator==(const WalCmd &other) const override;
-    [[nodiscard]] i32 GetSizeInBytes() const override;
     void WriteAdv(char *&buf) const override;
 
     int64_t max_commit_ts_;
@@ -278,6 +275,8 @@ struct WalEntry : WalEntryHeader {
     [[nodiscard]] Pair<i64, String> GetCheckpointInfo() const;
 
     [[nodiscard]] bool IsCheckPoint() const;
+
+    bool IsFullCheckPoint() const;
 };
 
 class WalEntryIterator {

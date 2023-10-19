@@ -33,6 +33,7 @@ public:
     static bool CatalogDirExists(const String &dir);
 
     void AttachCatalog(const String &catalog_path);
+    void InitNewCatalog();
 
 private:
     static void InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr);
@@ -43,6 +44,7 @@ private:
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
+    bool exist_catalog_{false};
 };
 
 } // namespace infinity
