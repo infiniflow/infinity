@@ -145,7 +145,7 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_;
     // WalManager notify the  commit bottom half is done
-    std::mutex m;
+    Mutex m;
     std::condition_variable cv;
     bool done_bottom_{false};
 

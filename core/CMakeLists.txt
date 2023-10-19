@@ -43,6 +43,31 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        function_cpp
+        CONFIGURE_DEPENDS
+        function/*.cpp
+)
+
+file(GLOB_RECURSE
+        function_cppm
+        CONFIGURE_DEPENDS
+        function/*.cppm
+)
+
+file(GLOB_RECURSE
+        expression_cpp
+        CONFIGURE_DEPENDS
+        expression/*.cpp
+)
+
+file(GLOB_RECURSE
+        expression_cppm
+        CONFIGURE_DEPENDS
+        expression/*.cppm
+)
+
+
+file(GLOB_RECURSE
         planner_cpp
         CONFIGURE_DEPENDS
         planner/*.cpp
@@ -104,6 +129,8 @@ add_executable(infinity
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
+        ${function_cpp}
+        ${expression_cpp}
 )
 
 target_sources(infinity
@@ -117,6 +144,8 @@ target_sources(infinity
         ${scheduler_cppm}
         ${storage_cppm}
         ${parser_cppm}
+        ${function_cppm}
+        ${expression_cppm}
 )
 
 target_link_libraries(infinity
@@ -169,6 +198,7 @@ add_executable(unit_test
         ${ut_storage_cpp}
         ${ut_main_cpp}
         ${ut_parser_cpp}
+        ${ut_function_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
         ${infinity_cpp}
@@ -176,6 +206,8 @@ add_executable(unit_test
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
+        ${expression_cpp}
+        ${function_cpp}
 #        ${planner_test_src}
 #        ${storage_test_src}
 #        ${parser_test_src}
@@ -210,6 +242,8 @@ target_sources(unit_test
         ${scheduler_cppm}
         ${storage_cppm}
         ${parser_cppm}
+        ${function_cppm}
+        ${expression_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -113,13 +113,18 @@ export using DDLType = DDLType;
 export using ConflictType = ConflictType;
 export using ConstraintType = ConstraintType;
 export using KnnDistanceType = KnnDistanceType;
+export using TableRefType = TableRefType;
+export using ExplainType = ExplainType;
+export using FlushType = FlushType;
+export using EmbeddingDataType = EmbeddingDataType;
 
 export using CreateTableInfo = CreateTableInfo;
 export using CreateIndexInfo = CreateIndexInfo;
 export using DropIndexInfo = DropIndexInfo;
 export using DropTableInfo = DropTableInfo;
+export using CreateViewInfo = CreateViewInfo;
 
-export using TableRefType = TableRefType;
+export using BaseTableReference = BaseTableReference;
 export using TableReference = TableReference;
 export using JoinReference = JoinReference;
 export using CrossProductReference = CrossProductReference;
@@ -133,17 +138,25 @@ export using BaseStatement = BaseStatement;
 export using CreateStatement = CreateStatement;
 export using SelectStatement = SelectStatement;
 export using UpdateStatement = UpdateStatement;
+export using DeleteStatement = DeleteStatement;
 export using InsertStatement = InsertStatement;
 export using DropStatement = DropStatement;
 export using ShowStatement = ShowStatement;
 export using CopyStatement = CopyStatement;
+export using PrepareStatement = PrepareStatement;
+export using ExecuteStatement = ExecuteStatement;
+export using FlushStatement = FlushStatement;
+export using AlterStatement = AlterStatement;
+export using ExplainStatement = ExplainStatement;
 
 export using ParsedExprType = ParsedExprType;
 export using OrderType = OrderType;
 export using LiteralType = LiteralType;
 export using SubqueryType = SubqueryType;
 export using JoinType = JoinType;
+export using KnnDistanceType = KnnDistanceType;
 
+export using ParsedExpr = ParsedExpr;
 export using ColumnExpr = ColumnExpr;
 export using ConstantExpr = ConstantExpr;
 export using FunctionExpr = FunctionExpr;
@@ -155,8 +168,21 @@ export using WhenThen = WhenThen;
 export using CastExpr = CastExpr;
 export using WithExpr = WithExpr;
 export using UpdateExpr = UpdateExpr;
+export using InExpr = InExpr;
 
 export using ColumnDef = ColumnDef;
+
+export inline std::string ConflictType2Str(ConflictType type) {
+    return ConflictTypeToStr(type);
+}
+
+export inline std::string OrderBy2Str(OrderType type) {
+    return ToString(type);
+}
+
+export inline std::string JoinType2Str(JoinType type) {
+    return ToString(type);
+}
 
 //export template <typename T>
 //T ReadBuf(char *const buf);

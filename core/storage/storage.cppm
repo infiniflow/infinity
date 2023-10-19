@@ -4,7 +4,9 @@
 
 module;
 
+import stl;
 import config;
+import new_catalog;
 
 export module storage;
 
@@ -13,8 +15,8 @@ namespace infinity {
 export class Storage {
 public:
     explicit Storage(const Config *config_ptr);
-//
-//    [[nodiscard]] inline NewCatalog *catalog() noexcept { return new_catalog_.get(); }
+
+    [[nodiscard]] inline NewCatalog *catalog() noexcept { return new_catalog_.get(); }
 //
 //    [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 //
@@ -31,7 +33,7 @@ public:
 //
 private:
     const Config *config_ptr_{};
-//    UniquePtr<NewCatalog> new_catalog_{};
+    UniquePtr<NewCatalog> new_catalog_{};
 //    UniquePtr<BufferManager> buffer_mgr_{};
 //    UniquePtr<TxnManager> txn_mgr_{};
 //    UniquePtr<WalManager> wal_mgr_{};

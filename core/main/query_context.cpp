@@ -12,6 +12,9 @@ import fragment_scheduler;
 import storage;
 import resource_manager;
 import txn;
+import parser;
+import infinity_assert;
+import infinity_exception;
 
 module query_context;
 
@@ -78,16 +81,16 @@ void QueryContext::Init(Session *session_ptr,
 }
 
 QueryResult QueryContext::Query(const String &query) {
-#if 0
+
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
 
     parser->Parse(query, parsed_result);
 
     if (parsed_result->IsError()) {
-        ParserError(parsed_result->error_message_)
+        Error<ParserException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
     }
-
+#if 0
     LogicalPlanner logical_planner(this);
     Optimizer optimizer(this);
     PhysicalPlanner physical_planner(this);

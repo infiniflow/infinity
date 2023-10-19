@@ -130,7 +130,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
         SendQueryResponse(result);
     }
 
-//    pg_handler_->send_ready_for_query();
+    pg_handler_->send_ready_for_query();
 }
 
 void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {

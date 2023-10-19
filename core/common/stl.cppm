@@ -22,6 +22,7 @@ module;
 #include <vector>
 #include <sstream>
 #include <filesystem>
+#include <typeinfo>
 
 export module stl;
 
@@ -76,6 +77,10 @@ export {
     void ToUpper(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
 
     void ToLower(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
+
+    inline void StringToLower(String &str) {
+        std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
+    }
 
     const char *FromChars(const char *first, const char *last, unsigned long &value) {
         auto res = std::from_chars(first, last, value);
@@ -242,6 +247,9 @@ export {
     constexpr ptr_t ptr_inf = std::numeric_limits<ptr_t>::infinity();
     constexpr u64* u64_ptr_inf = std::numeric_limits<u64*>::infinity();
 
+    template<typename T>
+    using Atomic = std::atomic<T>;
+
     // Smart ptr
 
     template <typename T>
@@ -329,6 +337,7 @@ export {
 
     // Dir
     using Path = std::filesystem::path;
+    using DirEntry = std::filesystem::directory_entry;
 
     inline Vector<String> GetFilesFromDir(const String& path) {
         Vector<String> result;
@@ -337,6 +346,30 @@ export {
         }
         return result;
     }
+
+    // typeid
+//    using TypeID = std::typeid();
+
+    // std::function
+    template<typename T>
+    using StdFunction = std::function<T>;
+
+    // SharedPtr
+    template<typename T>
+    using EnableSharedFromThis = std::enable_shared_from_this<T>;
+
+    // static ptr cast
+    template<typename _Tp, typename _Up>
+    inline std::shared_ptr<_Tp>
+    StaticPtrCast(std::shared_ptr<_Up>&& __r) noexcept
+    {
+        using _Sp = std::shared_ptr<_Tp>;
+        return _Sp(std::move(__r),
+                   static_cast<typename _Sp::element_type*>(__r.get()));
+    }
+
+    using Mutex = std::mutex;
+
 }
 
 } // namespace infinity
