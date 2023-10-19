@@ -66,9 +66,10 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             break;
         }
         case WalCommandType::CHECKPOINT: {
-            auto max_commit_ts = ReadBufAdv<int64_t>(ptr);
+            int64_t max_commit_ts = ReadBufAdv<int64_t>(ptr);
+            bool is_full_checkpoint = ReadBufAdv<int8_t>(ptr);
             String catalog_path = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path);
             break;
         }
         case WalCommandType::CREATE_INDEX: {
@@ -140,7 +141,7 @@ bool WalCmdDelete::operator==(const WalCmd &other) const {
 
 bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
-    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
+    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
 }
 
 i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
@@ -178,7 +179,9 @@ i32 WalCmdDelete::GetSizeInBytes() const {
            row_ids.size() * sizeof(RowID);
 }
 
-i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(int64_t) + sizeof(i32) + this->catalog_path_.size(); }
+int32_t WalCmdCheckpoint::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(int64_t) + sizeof(int8_t) + sizeof(int32_t) + this->catalog_path_.size();
+}
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
@@ -245,6 +248,7 @@ void WalCmdDelete::WriteAdv(char *&buf) const {
 void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CHECKPOINT);
     WriteBufAdv(buf, this->max_commit_ts_);
+    WriteBufAdv(buf, int8_t(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
 }
 

@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "storage/common/table_collection_detail.h"
 #include "storage/meta/entry/base_entry.h"
 #include "storage/meta/entry/table_collection_entry.h"
-#include "storage/common/table_collection_detail.h"
 #include "storage/meta/table_collection_meta.h"
 
 namespace infinity {
@@ -51,6 +51,8 @@ public:
     static nlohmann::json Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
+
+    virtual void MergeFrom(BaseEntry &other);
 
 public:
     RWMutex rw_locker_{};

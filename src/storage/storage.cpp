@@ -35,6 +35,7 @@ void Storage::Init() {
     } else {
         // load catalog file.
         i64 start_time_stamp = wal_mgr_->ReplayWalFile();
+        new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry->path().string(), buffer_mgr_.get());
         txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                           buffer_mgr_.get(),
                                           std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),

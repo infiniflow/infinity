@@ -269,11 +269,10 @@ SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableCollect
     segment_entry->row_count_ = segment_entry_json["row_count"];
 
     if (segment_entry_json.contains("block_entries")) {
-        SizeT block_count = segment_entry_json["block_entries"].size();
-        segment_entry->block_entries_.reserve(block_count);
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
-            segment_entry->block_entries_.emplace_back(std::move(block_entry));
+            segment_entry->block_entries_.reserve(block_entry->block_id_ + 1);
+            segment_entry->block_entries_[block_entry->block_id_] = std::move(block_entry);
         }
     }
     if (segment_entry_json.contains("index_entries")) {
@@ -294,6 +293,40 @@ SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u
         segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
+}
+
+void SegmentEntry::MergeFrom(BaseEntry &other) {
+    auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
+    StorageAssert(segment_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
+    // No locking here since only the load stage needs MergeFrom.
+    StorageAssert(*this->segment_dir_ == *segment_entry2->segment_dir_, "SegmentEntry::MergeFrom requires segment_dir_ match");
+    StorageAssert(this->segment_id_ == segment_entry2->segment_id_, "SegmentEntry::MergeFrom requires segment_id_ match");
+    StorageAssert(this->column_count_ == segment_entry2->column_count_, "SegmentEntry::MergeFrom requires column_count_ match");
+    StorageAssert(this->row_capacity_ == segment_entry2->row_capacity_, "SegmentEntry::MergeFrom requires row_capacity_ match");
+    StorageAssert(this->min_row_ts_ == segment_entry2->min_row_ts_, "SegmentEntry::MergeFrom requires min_row_ts_ match");
+    StorageAssert(*this->index_dir_ == *segment_entry2->index_dir_, "SegmentEntry::MergeFrom requires index_dir_ match");
+
+    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
+    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
+    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
+
+    int block_count = std::min(this->block_entries_.size(), segment_entry2->block_entries_.size());
+    for (int i = 0; i < block_count; i++) {
+        auto &block_entry1 = this->block_entries_[i];
+        auto &block_entry2 = this->block_entries_[i];
+        if (block_entry1 == nullptr)
+            block_entry1 = block_entry2;
+        else if (block_entry2 != nullptr)
+            block_entry1->MergeFrom(*block_entry2);
+    }
+
+    for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
+        if (this->index_entry_map_.find(index_name) == this->index_entry_map_.end()) {
+            this->index_entry_map_.emplace(index_name, index_entry);
+        } else {
+            this->index_entry_map_[index_name]->MergeFrom(*index_entry);
+        }
+    }
 }
 
 } // namespace infinity
