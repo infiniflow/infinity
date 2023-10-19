@@ -76,6 +76,10 @@ static String WalCommandTypeToString(WalCommandType type) {
             return "DELETE";
         case WalCommandType::CHECKPOINT:
             return "CHECKPOINT";
+        case WalCommandType::CREATE_INDEX:
+            return "CREATE_INDEX";
+        case WalCommandType::DROP_INDEX:
+            return "DROP_INDEX";
         default:
             StorageError("Not supported wal command type");
     }

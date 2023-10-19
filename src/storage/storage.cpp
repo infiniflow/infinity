@@ -30,7 +30,7 @@ void Storage::Init() {
     // Replay wal file wrap init catalog
     auto start_time_stamp = wal_mgr_->ReplayWalFile();
 
-    // Construct txn
+    // Construct txn manager
     if (!exist_catalog_) {
         // No catalog file at all
         txn_mgr_ =
@@ -103,20 +103,15 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
 
 void Storage::AttachCatalog(const String &catalog_path) {
     LocalFileSystem fs;
-
     String catalog_dir = *config_ptr_->data_dir() + "/" + String(CATALOG_FILE_DIR);
     Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(catalog_dir);
     SharedPtr<DirEntry> match;
 
     const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
     for (const auto &dir_entry_ptr : dir_array) {
-
         if (dir_entry_ptr->path().c_str() == catalog_path) {
-
             String current_file_name = dir_entry_ptr->path().filename();
-
             if (dir_entry_ptr->is_regular_file() && std::regex_match(current_file_name, catalog_file_regex)) {
-                LOG_TRACE("Attach file name: {}", dir_entry_ptr->path().c_str());
                 // match the catalog path
                 match = dir_entry_ptr;
                 break;

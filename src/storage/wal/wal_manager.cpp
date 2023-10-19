@@ -259,7 +259,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     fs::path old_file_path = fs::path(wal_path_);
 
     String new_file_path = old_file_path.string() + '.' + std::to_string(max_commit_ts);
-    LOG_INFO("WAL NEW PATH: {}", new_file_path.c_str());
+    LOG_INFO("Wal Swap to new path: {}", new_file_path.c_str());
 
     // Rename the current wal file to a new one.
     fs::rename(wal_path_, new_file_path);
@@ -267,7 +267,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
-        throw StorageException("Failed to open wal file: " + wal_path_);
+        StorageError("Wal Swap: Failed to open wal file");
     }
 }
 
@@ -322,17 +322,13 @@ int64_t WalManager::ReplayWalFile() {
         return 0;
     }
 
-    // if the wal file is not empty, we will replay the wal file.
-    // 1. First , we will get all wal files store to wal_list_.
-    // wal_list_ is a vector of string, each string is a wal file path.
-    // wal_list_ is sorted by the suffix of the wal file path.
-    // e.g. wal_list_ = {wal.log.1, wal.log.2, wal.log.3}
-    LOG_INFO("Wal path: {}", wal_path_.c_str());
     for (const auto &entry : fs::directory_iterator(fs::path(wal_path_).parent_path())) {
         if (entry.is_regular_file()) {
             wal_list_.push_back(entry.path().string());
         }
     }
+
+    // e.g. wal_list_ = {wal.log , wal.log.100 , wal.log.50}
     std::sort(wal_list_.begin(), wal_list_.end(), [](const std::string &a, const std::string &b) {
         auto get_lastNumber = [](const std::string &s) {
             auto pos = s.find_last_of('.');
@@ -358,10 +354,9 @@ int64_t WalManager::ReplayWalFile() {
     });
 
     LOG_INFO("Start Wal Replay")
-
     // log the wal files.
     for (const auto &wal_file : wal_list_) {
-        LOG_INFO("List wal file: {}", wal_file.c_str());
+        LOG_TRACE("List wal file: {}", wal_file.c_str());
     }
     LOG_INFO("List wal file size: {}", wal_list_.size());
     i64 max_commit_ts = 0;
@@ -373,14 +368,14 @@ int64_t WalManager::ReplayWalFile() {
         iterator.Init();
 
         // phase 1: find the max commit ts and catalog path
-        LOG_INFO("Phase 1: find the max commit ts and catalog path")
+        LOG_INFO("Replay phase 1: find the max commit ts and catalog path")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
             replay_entries.push_back(wal_entry);
             if (wal_entry->IsFullCheckPoint()) {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-                LOG_INFO("Checkpoint max commit ts: {}", max_commit_ts);
-                LOG_INFO("Catalog Path: {}", catalog_path);
+                LOG_TRACE("Find checkpoint max commit ts: {}", max_commit_ts);
+                LOG_TRACE("Find catalog path: {}", catalog_path);
                 // attach the catalog path to the storage.
                 storage_->AttachCatalog(catalog_path);
                 break;
@@ -388,7 +383,7 @@ int64_t WalManager::ReplayWalFile() {
         }
 
         // phase 2: by the max commit ts, find the entries to replay
-        LOG_INFO("Phase 2: by the max commit ts, find the entries to replay")
+        LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay")
         while (iterator.Next()) {
             auto wal_entry = iterator.GetEntry();
             if (wal_entry->commit_ts > max_commit_ts) {
@@ -397,12 +392,14 @@ int64_t WalManager::ReplayWalFile() {
         }
     }
 
+    // Note: Init a new catalog when not found any checkpoint wal entry
+    // Indicates that the system has not done checkpoint in the previous.
     if (storage_->catalog() == nullptr) {
         storage_->InitNewCatalog();
     }
 
     // phase 3: replay the entries
-    LOG_INFO("Phase 3: replay the entries")
+    LOG_INFO("Replay phase 3: replay the entries")
     std::reverse(replay_entries.begin(), replay_entries.end());
     i64 last_commit_ts = 0;
     for (const auto &entry : replay_entries) {
@@ -444,10 +441,8 @@ void WalManager::RecycleWalFile() {
     LOG_INFO("WalManager::Checkpoint end to gc wal files");
 }
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
-    LOG_INFO("Wal entry commit ts: {}", entry.commit_ts);
     for (const auto &cmd : entry.cmds) {
-        LOG_INFO("  Wal cmd: {}", WalCommandTypeToString(cmd->GetType()).c_str());
-        // switch by cmds type
+        LOG_TRACE("Replay wal cmd: {}, commit ts: {}", WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts);
         switch (cmd->GetType()) {
             case WalCommandType::CREATE_DATABASE:
                 WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id, entry.commit_ts);
@@ -532,6 +527,7 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i
     }
     result.entry_->Commit(commit_ts);
 }
+
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name_, txn_id, commit_ts);
     if (!db_entry_result.Success()) {
@@ -549,9 +545,11 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     }
     result.entry_->Commit(commit_ts);
 }
+
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
     NotImplementError("WalCmdDropIndex Replay Not implemented");
 }
+
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) {
     // Segment entry
     auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts);
@@ -573,7 +571,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(), id, 0, segment_entry->column_count_, storage_->buffer_manager());
         block_entry->max_row_ts_ = commit_ts;
         block_entry->min_row_ts_ = commit_ts;
-        block_entry->block_version_->created_.push_back({commit_ts, block_entry->row_count_});
+        block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
         segment_entry->block_entries_.emplace_back(std::move(block_entry));
     }
 }
