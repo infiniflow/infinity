@@ -16,11 +16,10 @@
 #include "infinity.h"
 #include "main/session.h"
 #include "parser/sql_parser.h"
+#include "planner/bind_context.h"
 #include "planner/logical_planner.h"
 #include "planner/optimizer.h"
-#include "planner/bind_context.h"
 #include "storage/data_block.h"
-
 
 #include <sstream>
 #include <utility>
@@ -105,7 +104,10 @@ QueryResult QueryContext::Query(const String &query) {
         try {
             this->CreateTxn();
             this->BeginTxn();
-            LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}", session_ptr_->txn_->TxnID(), session_ptr_->txn_->BeginTS(), statement->ToString()));
+            LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+                                 session_ptr_->txn_->TxnID(),
+                                 session_ptr_->txn_->BeginTS(),
+                                 statement->ToString()));
 
             // Build unoptimized logical plan for each SQL statement.
             SharedPtr<BindContext> bind_context;

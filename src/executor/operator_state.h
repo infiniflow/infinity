@@ -37,7 +37,7 @@ struct InputState {
     inline explicit InputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    DataBlock *input_data_block_{nullptr};
+    DataBlock *input_data_block_{nullptr}; // this is pointed to the previous operator output
     bool *input_complete_ptr_{nullptr};
     i64 received_data_count_{0};
     i64 total_data_count_{0};
@@ -111,6 +111,8 @@ struct KnnScanOutputState : public OutputState {
 // Merge Knn
 struct MergeKnnInputState : public InputState {
     inline explicit MergeKnnInputState() : InputState(PhysicalOperatorType::kMergeKnn) {}
+
+    SizeT knn_scan_n_{};
 };
 
 struct MergeKnnOutputState : public OutputState {

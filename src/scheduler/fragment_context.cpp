@@ -25,6 +25,9 @@
 
 namespace infinity {
 
+// Init and connect the input and output state for the given operator
+// Connect the sink to the last operator output
+// Connect the source to the first operator input
 template <typename InputStateType, typename OutputStateType>
 void BuildSerialTaskStateTemplate(Vector<PhysicalOperator *> &fragment_operators,
                                   Vector<UniquePtr<FragmentTask>> &tasks,
@@ -52,10 +55,8 @@ void BuildSerialTaskStateTemplate(Vector<PhysicalOperator *> &fragment_operators
         // Set first operator input as the output of source operator
         SourceState *source_state = task_ptr->source_state_.get();
         source_state->SetNextState(current_operator_input_state);
-    }
-
-    if (operator_id > 0 && operator_id < operator_count) {
-        OutputState *prev_operator_output_state = task_ptr->operator_output_state_[operator_id - 1].get();
+    } else {
+        OutputState *prev_operator_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
         current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
         //        current_operator_input_state->input_data_block_ = prev_operator_output_state->data_block_.get();
     }
@@ -113,9 +114,7 @@ void BuildParallelTaskStateTemplate(Vector<PhysicalOperator *> &fragment_operato
             // Set first operator input as the output of source operator
             SourceState *source_state = tasks[task_id]->source_state_.get();
             source_state->SetNextState(current_operator_input_state);
-        }
-
-        if (operator_id >= 0 && operator_id < operator_count - 1) {
+        } else {
             OutputState *prev_operator_output_state = task_ptr->operator_output_state_[operator_id + 1].get();
             current_operator_input_state->ConnectToPrevOutputOpState(prev_operator_output_state);
             //            current_operator_input_state->input_data_block_ = prev_output_state->data_block_.get();
@@ -248,6 +247,9 @@ void BuildParallelTaskStateTemplate<KnnScanInputState, KnnScanOutputState>(Vecto
 
             Vector<SizeT> knn_column_ids = {column_expr->binding().column_idx};
             ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_knn_scan->limit_expression_.get());
+            if (limit_expr == nullptr) {
+                SchedulerError("No limit in KNN select is not supported now");
+            }
             i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
             knn_scan_input_state->knn_scan_function_data_ = MakeShared<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
@@ -408,12 +410,11 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                 break;
             }
             case PhysicalOperatorType::kMergeKnn: {
-                BuildParallelTaskStateTemplate<MergeKnnInputState, MergeKnnOutputState>(fragment_operators,
-                                                                                        tasks,
-                                                                                        operator_id,
-                                                                                        operator_count,
-                                                                                        parent_context,
-                                                                                        real_parallel_size);
+                BuildSerialTaskStateTemplate<MergeKnnInputState, MergeKnnOutputState>(fragment_operators,
+                                                                                      tasks,
+                                                                                      operator_id,
+                                                                                      operator_count,
+                                                                                      parent_context);
                 break;
             }
             case PhysicalOperatorType::kFilter: {
@@ -661,6 +662,7 @@ PhysicalSink *FragmentContext::GetSinkOperator() const { return fragment_ptr_->G
 
 PhysicalSource *FragmentContext::GetSourceOperator() const { return fragment_ptr_->GetSourceNode(); }
 
+// Allocate tasks for the fragment and determine the sink and source
 void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     i64 parallel_count = cpu_count;
     PhysicalOperator *first_operator = this->GetOperators().back();

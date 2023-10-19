@@ -5,8 +5,8 @@
 #pragma once
 
 #include "executor/physical_operator.h"
-#include "storage/common/global_block_id.h"
 #include "parser/statement/select_statement.h"
+#include "storage/common/global_block_id.h"
 
 namespace infinity {
 
@@ -71,6 +71,7 @@ public:
     u64 knn_table_index_{};
 
 private:
+    template <typename T>
     void ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state);
 };
 

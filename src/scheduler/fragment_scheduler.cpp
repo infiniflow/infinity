@@ -3,11 +3,11 @@
 //
 
 #include "fragment_scheduler.h"
+#include "common/utility/infinity_assert.h"
 #include "common/utility/threadutil.h"
 #include "fragment_task.h"
 #include "main/config.h"
 #include "main/logger.h"
-#include "common/utility/infinity_assert.h"
 #include <random>
 
 namespace infinity {
@@ -83,6 +83,11 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
     //    Set the queue of parent fragment task.
     Vector<FragmentTask *> tasks;
     FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
+
+    for (const auto &task : tasks) {
+        // task->source_state_.
+        // for (const auto &operator )
+    }
 
     LOG_TRACE("Create {} tasks", tasks.size());
 
@@ -173,7 +178,7 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
                 local_task_list.erase(task_iter++);
             } else {
                 if (task_ptr->Ready()) {
-                    local_task_list.erase(task_iter++);
+                    local_task_list.erase(task_iter++); // alternatively: task_iter = local_task_list.erase(task_iter);
                     local_ready_queue.push_back(task_ptr);
                 } else {
                     ++task_iter;
