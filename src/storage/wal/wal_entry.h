@@ -186,8 +186,9 @@ struct WalCmdDropIndex : public WalCmd {
 };
 
 struct WalCmdImport : public WalCmd {
-    WalCmdImport(String db_name_, String table_name_, String segment_dir_)
-        : db_name(std::move(db_name_)), table_name(std::move(table_name_)), segment_dir(std::move(segment_dir_)) {}
+    WalCmdImport(String db_name_, String table_name_, String segment_dir_, i32 segment_id_, i32 block_entries_size_)
+        : db_name(std::move(db_name_)), table_name(std::move(table_name_)), segment_dir(std::move(segment_dir_)), segment_id(segment_id_),
+          block_entries_size(block_entries_size_) {}
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const override;
@@ -197,6 +198,8 @@ struct WalCmdImport : public WalCmd {
     String db_name;
     String table_name;
     String segment_dir;
+    i32 segment_id;
+    i32 block_entries_size;
 };
 
 struct WalCmdAppend : public WalCmd {

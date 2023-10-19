@@ -23,7 +23,10 @@ nlohmann::json SegmentVersion::Serialize(SegmentVersion *segment_version){NotImp
 UniquePtr<SegmentVersion> SegmentVersion::Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr){
     NotImplementError("Segment version deserialize")}
 
-SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry,
+                                                          u64 segment_id,
+                                                          BufferManager *buffer_mgr,
+                                                          bool is_new) {
 
     SharedPtr<SegmentEntry> new_entry = MakeShared<SegmentEntry>(table_entry);
     new_entry->row_count_ = 0;
@@ -36,7 +39,7 @@ SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionE
     new_entry->column_count_ = table_ptr->columns_.size();
 
     new_entry->segment_dir_ = SegmentEntry::DetermineSegFilename(*table_entry->table_entry_dir_, segment_id);
-    if (new_entry->block_entries_.empty()) {
+    if (new_entry->block_entries_.empty() && is_new) {
         new_entry->block_entries_.emplace_back(
             MakeUnique<BlockEntry>(new_entry.get(), new_entry->block_entries_.size(), 0, new_entry->column_count_, buffer_mgr));
     }

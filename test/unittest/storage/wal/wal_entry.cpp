@@ -50,7 +50,7 @@ void MockWalFile() {
         auto entry = MakeShared<WalEntry>();
         entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
         entry->cmds.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
-        entry->cmds.push_back(MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+        entry->cmds.push_back(MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -130,7 +130,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0"));
+    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3));
 
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
                                            Vector<String>{"col1", "col2"},
@@ -223,7 +223,6 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
         }
     }
-
     EXPECT_EQ(max_commit_ts, 1);
     EXPECT_EQ(catalog_path, "catalog");
     EXPECT_EQ(replay_entries.size(), 2);

@@ -41,7 +41,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir);
+            i32 segment_id = ReadBufAdv<i32>(ptr);
+            i32 block_entries_size = ReadBufAdv<i32>(ptr);
+            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir, segment_id, block_entries_size);
             break;
         }
         case WalCommandType::APPEND: {
@@ -110,7 +112,8 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
-    if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir)
+    if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir ||
+        segment_id != other_cmd->segment_id || block_entries_size != other_cmd->block_entries_size)
         return false;
     return true;
 }
@@ -163,7 +166,7 @@ int32_t WalCmdDropIndex::GetSizeInBytes() const {
 
 i32 WalCmdImport::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
-           this->segment_dir.size();
+           this->segment_dir.size() + sizeof(i32) + sizeof(i32);
 }
 
 i32 WalCmdAppend::GetSizeInBytes() const {
@@ -218,6 +221,8 @@ void WalCmdImport::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
     WriteBufAdv(buf, this->segment_dir);
+    WriteBufAdv(buf, this->segment_id);
+    WriteBufAdv(buf, this->block_entries_size);
 }
 
 void WalCmdAppend::WriteAdv(char *&buf) const {

@@ -5,6 +5,7 @@
 #include "wal_manager.h"
 #include "common/utility/exception.h"
 #include "main/logger.h"
+#include "storage/meta/entry/segment_entry.h"
 #include "storage/storage.h"
 #include <algorithm>
 #include <exception>
@@ -542,7 +543,34 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
     NotImplementError("WalCmdDropIndex Replay Not implemented");
 }
-void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) { NotImplementError("WalCmdImport Replay Not implemented"); }
+void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) {
+    // Segment entry
+    auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        StorageError("Wal Replay: Get database failed");
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto table_entry_result = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
+    if (!table_entry_result.Success()) {
+        StorageError("Wal Replay: Get table failed");
+    }
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+
+    // get the segment entries id
+    auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry, cmd.segment_id, storage_->buffer_manager(), false);
+    segment_entry->min_row_ts_ = commit_ts;
+    segment_entry->max_row_ts_ = commit_ts;
+    for (int id = 0; id < cmd.block_entries_size; ++id) {
+        auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(), id, 0, segment_entry->column_count_, storage_->buffer_manager());
+        block_entry->max_row_ts_ = commit_ts;
+        block_entry->min_row_ts_ = commit_ts;
+        Vector<TxnTimeStamp> &created = block_entry->block_version_->created_;
+        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
+            created[i] = commit_ts;
+        }
+        segment_entry->block_entries_.emplace_back(std::move(block_entry));
+    }
+}
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) { NotImplementError("WalCmdDelete Replay Not implemented"); }
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts);
