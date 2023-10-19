@@ -32,6 +32,8 @@ public:
 
     static bool CatalogDirExists(const String &dir);
 
+    void AttachCatalog(const String &catalog_path);
+
 private:
     static void InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr);
 

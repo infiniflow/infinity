@@ -16,7 +16,7 @@ void Storage::Init() {
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
 
     // Check the data dir to get latest catalog file.
-    String catalog_dir = *config_ptr_->data_dir() + "/catalog";
+    String catalog_dir = std::string(*config_ptr_->data_dir()) + "/" + std::string(CATALOG_FILE_DIR);
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -27,16 +27,13 @@ void Storage::Init() {
                                       config_ptr_->delta_checkpoint_interval_wal_bytes());
 
     // Construct txn manager
-    SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
-    if (catalog_file_entry == nullptr) {
+    if (!CatalogDirExists(catalog_dir)) {
         // No catalog file at all
         new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
         txn_mgr_ =
             MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
     } else {
         // load catalog file.
-
-        new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
         i64 start_time_stamp = wal_mgr_->ReplayWalFile();
         txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                           buffer_mgr_.get(),
@@ -97,12 +94,24 @@ bool Storage::CatalogDirExists(const String &dir) {
     if (!fs.Exists(dir)) {
         fs.CreateDirectory(dir);
         return false;
-    }
-    if (fs.ListDirectory(dir).empty()) {
+    } else if (fs.ListDirectory(dir).empty()) {
+        return false;
+    } else {
+        Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(dir);
+        int64_t latest_version_number = -1;
+        const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
+        for (const auto &dir_entry_ptr : dir_array) {
+            LOG_TRACE("Candidate file name: {}", dir_entry_ptr->path().c_str());
+            if (dir_entry_ptr->is_regular_file()) {
+                String current_file_name = dir_entry_ptr->path().filename();
+                // Only check if full json file exists.
+                if (std::regex_match(current_file_name, catalog_file_regex)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
-
-    return true;
 }
 
 void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
@@ -114,6 +123,34 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     if (create_res.err_ != nullptr) {
         StorageError(*create_res.err_);
     }
+}
+
+void Storage::AttachCatalog(const String &catalog_path) {
+    LocalFileSystem fs;
+
+    String catalog_dir = *config_ptr_->data_dir() + "/" + String(CATALOG_FILE_DIR);
+    Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(catalog_dir);
+    SharedPtr<DirEntry> match;
+
+    const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
+    for (const auto &dir_entry_ptr : dir_array) {
+
+        if (dir_entry_ptr->path().c_str() == catalog_path) {
+
+            String current_file_name = dir_entry_ptr->path().filename();
+
+            if (dir_entry_ptr->is_regular_file() && std::regex_match(current_file_name, catalog_file_regex)) {
+                LOG_TRACE("Attach file name: {}", dir_entry_ptr->path().c_str());
+                // match the catalog path
+                match = dir_entry_ptr;
+                break;
+            }
+        }
+    }
+    if (match == nullptr) {
+        LOG_INFO("Cannot find catalog file: {}", catalog_path.c_str());
+    }
+    new_catalog_ = NewCatalog::LoadFromFile(match, buffer_mgr_.get());
 }
 
 } // namespace infinity

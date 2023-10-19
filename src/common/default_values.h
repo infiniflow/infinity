@@ -40,6 +40,7 @@ constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
 constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
 constexpr StringView WAL_FILE_TEMP_FILE = "wal.log";
 constexpr StringView WAL_FILE_PREFIX = "wal.log.";
+constexpr StringView CATALOG_FILE_DIR = "catalog";
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
 } // namespace infinity
