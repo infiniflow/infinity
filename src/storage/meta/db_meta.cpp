@@ -252,4 +252,11 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
     return res;
 }
 
+void DBMeta::MergeFrom(DBMeta &other) {
+    // No locking here since only the load stage needs MergeFrom.
+    StorageAssert(*this->db_name_ == *other.db_name_, "DBMeta::MergeFrom requires db_name_ match");
+    StorageAssert(*this->data_dir_ == *other.data_dir_, "DBMeta::MergeFrom requires db_dir_ match");
+    MergeLists(this->entry_list_, other.entry_list_);
+}
+
 } // namespace infinity

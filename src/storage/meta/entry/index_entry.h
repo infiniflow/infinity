@@ -39,6 +39,8 @@ public:
 
     static SharedPtr<IndexEntry> Deserialize(const nlohmann::json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
+    void MergeFrom(BaseEntry &other);
+
 private:
     static inline String IndexFileName(const String &index_name) { return index_name + ".idx"; }
 

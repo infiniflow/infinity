@@ -48,6 +48,8 @@ public:
 
     static UniquePtr<TableCollectionMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 
+    void MergeFrom(TableCollectionMeta &other);
+
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> table_collection_name_{};

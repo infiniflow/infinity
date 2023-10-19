@@ -575,7 +575,6 @@ void Txn::CommitTxnBottom() {
     for (auto *index_def_entry : txn_indexes_) {
         index_def_entry->Commit(commit_ts);
     }
-
     LOG_TRACE("Txn: {} is committed.", txn_id_);
 
     // Notify the top half
@@ -625,14 +624,7 @@ void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds.push_back(c
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
-    String file_name = "META_" + std::to_string(max_commit_ts);
-    if (is_full_checkpoint)
-        file_name += ".full.json";
-    else
-        file_name += ".delta.json";
-    String catalog_path = dir_name + "/" + file_name;
-    LOG_TRACE("Checkpoint: Going to store META as file {}/{}", dir_name, file_name);
-    NewCatalog::SaveAsFile(catalog_, max_commit_ts, dir_name, file_name, is_full_checkpoint);
-    wal_entry_->cmds.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, catalog_path));
+    std::string catalog_path = NewCatalog::SaveAsFile(catalog_, dir_name, max_commit_ts, is_full_checkpoint);
+    wal_entry_->cmds.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path));
 }
 } // namespace infinity
