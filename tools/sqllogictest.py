@@ -6,8 +6,7 @@ from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 
 
-def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
-    # create dest_dir if it doesn't exist
+def copy_file(dest_dir, src_dir):
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
 
@@ -17,6 +16,11 @@ def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
             file_path = os.path.join(root, file)
             shutil.copy(file_path, dest_dir)
             print("copied file: " + file_path)
+
+
+def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
+    # create dest_dir if it doesn't exist
+    copy_file(dest_dir, src_dir)
 
     print(sqllogictest_rs_path)
 
@@ -68,6 +72,9 @@ def main():
                         type=str, default=test_dir, dest='test')
     parser.add_argument('-d', '--dest', help='path of dest directory',
                         type=str, default=dest_dir, dest='dest')
+
+    parser.add_argument('-c', '--copy', help='just copy file',
+                        type=str, default=copy_file(dest_dir, src_dir), dest='copy')
 
     args = parser.parse_args()
 

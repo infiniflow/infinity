@@ -141,6 +141,9 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
 
         row_idx++;
         if (row_idx == vector_n) {
+            for (auto &block_entry : segment_entry->block_entries_) {
+                BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+            }
             txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                     table_name,
                                                     *segment_entry->segment_dir_,
@@ -150,6 +153,9 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
             break;
         }
         if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+            for (auto &block_entry : segment_entry->block_entries_) {
+                BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+            }
             txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                     table_name,
                                                     *segment_entry->segment_dir_,
@@ -212,6 +218,9 @@ void PhysicalImport::ImportCSVHelper(QueryContext *query_context, ParserContext 
     zsv_finish(parser_context.parser_);
     // flush the last segment entry
     if (parser_context.segment_entry_->row_count_ > 0) {
+        for (auto &block_entry : parser_context.segment_entry_->block_entries_) {
+            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+        }
         parser_context.txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                                 table_name,
                                                                 *parser_context.segment_entry_->segment_dir_,
@@ -397,6 +406,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // we have already used all space of the segment
     if (SegmentEntry::Room(segment_entry.get()) <= 0) {
         // add to txn_store
+        for (auto &block_entry : segment_entry->block_entries_) {
+            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+        }
         txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                 table_name,
                                                 *segment_entry->segment_dir_,

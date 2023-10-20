@@ -34,7 +34,8 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     deleted_.clear();
     std::ifstream ifs(version_path);
     if (!ifs.is_open()) {
-        throw StorageException("Failed to open block_version file: " + version_path);
+        LOG_WARN("Failed to open block_version file: {}", version_path);
+        return;
     }
     int buf_len = fs::file_size(version_path);
     Vector<char> buf(buf_len);
@@ -154,6 +155,17 @@ void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
     block_entry->max_row_ts_ = std::max(block_entry->max_row_ts_, commit_ts);
 }
 
+void BlockEntry::FlushData(BlockEntry *block_entry, int64_t checkpoint_row_count) {
+    for (auto &column_data : block_entry->columns_) {
+        column_data->Flush(column_data.get(), checkpoint_row_count);
+        LOG_TRACE("ColumnData {} is flushed", column_data->column_id_);
+    }
+}
+
+void BlockEntry::FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version) {
+    checkpoint_version.SaveToFile(*block_entry->base_dir_ + "/version");
+}
+
 void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
     LOG_TRACE("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
     StorageAssert(checkpoint_ts >= block_entry->checkpoint_ts_, "BlockEntry checkpoint_ts skew!");
@@ -191,12 +203,8 @@ void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
         }
     }
 
-    checkpoint_version.SaveToFile(*block_entry->base_dir_ + "/version");
-    for (auto &column_data : block_entry->columns_) {
-        column_data->Flush(column_data.get(), checkpoint_row_count);
-        LOG_TRACE("ColumnData {} is flushed", column_data->column_id_);
-    }
-
+    FlushVersion(block_entry, checkpoint_version);
+    FlushData(block_entry, checkpoint_row_count);
     block_entry->checkpoint_ts_ = checkpoint_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;
     LOG_TRACE("Segment: {}, Block {} is flushed", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
@@ -237,6 +245,10 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
     block_entry->block_version_->LoadFromFile(*block_entry->base_dir_ + "/version");
+    if (block_entry->block_version_->created_.empty()) {
+        block_entry->block_version_->created_.push_back({block_entry->max_row_ts_, block_entry->row_count_});
+        FlushVersion(block_entry.get(), *block_entry->block_version_);
+    }
 
     return block_entry;
 }

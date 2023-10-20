@@ -269,6 +269,7 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     for (auto &block_entry : segment->block_entries_) {
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
+        block_entry->checkpoint_ts_ = commit_ts;
         block_entry->block_version_->created_.push_back({commit_ts, block_entry->row_count_});
     }
 
