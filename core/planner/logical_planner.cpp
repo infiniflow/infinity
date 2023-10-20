@@ -34,14 +34,18 @@ import logical_drop_collection;
 import logical_drop_schema;
 import logical_drop_index;
 import logical_drop_view;
+import logical_show;
 import logical_flush;
 import logical_export;
 import logical_import;
 import logical_explain;
+import explain_logical_plan;
+import explain_ast;
 
 import local_file_system;
 import parser;
 import index_def;
+import ivfflat_index_def;
 
 module logical_planner;
 
@@ -394,7 +398,6 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
 }
 
 void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
@@ -438,7 +441,6 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -626,7 +628,6 @@ void LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindC
 }
 
 void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     switch (statement->show_type_) {
         case ShowStmtType::kTables:
         case ShowStmtType::kCollections: {
@@ -638,14 +639,13 @@ void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindCon
         case ShowStmtType::kColumns: {
             return BuildShowColumns(statement, bind_context_ptr);
         }
-        default:
-            PlannerError("Unexpected show statement type.");
+        default: {
+            Error<PlannerException>("Unexpected show statement type.", __FILE_NAME__, __LINE__);
+        }
     }
-#endif
 }
 
 void LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowColumn,
                                                                   statement->schema_name_,
@@ -653,11 +653,9 @@ void LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<
                                                                   bind_context_ptr->GenerateTableIndex());
 
     this->logical_plan_ = logical_show;
-#endif
 }
 
 void LogicalPlanner::BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowTables,
@@ -668,11 +666,9 @@ void LogicalPlanner::BuildShowTables(const ShowStatement *statement, SharedPtr<B
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_show, bind_context_ptr);
     this->logical_plan_ = logical_show;
-#endif
 }
 
 void LogicalPlanner::BuildShowViews(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowViews,
@@ -680,7 +676,6 @@ void LogicalPlanner::BuildShowViews(const ShowStatement *statement, SharedPtr<Bi
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-#endif
 }
 
 void LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -698,28 +693,21 @@ void LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindC
 }
 
 void LogicalPlanner::BuildFlushData(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kData);
     this->logical_plan_ = logical_flush;
-#endif
 }
 
 void LogicalPlanner::BuildFlushLog(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kLog);
     this->logical_plan_ = logical_flush;
-#endif
 }
 
 void LogicalPlanner::BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kBuffer);
     this->logical_plan_ = logical_flush;
-#endif
 }
 
 void LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
 
     SharedPtr<LogicalExplain> explain_node = MakeShared<LogicalExplain>(bind_context_ptr->GetNewLogicalNodeId(), statement->type_);
@@ -727,7 +715,7 @@ void LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr<B
     switch (statement->type_) {
         case ExplainType::kAst: {
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            Statement::Explain(statement->statement_, texts_ptr);
+            ExplainAST::Explain(statement->statement_, texts_ptr);
             explain_node->SetText(texts_ptr);
             break;
         }
@@ -745,7 +733,6 @@ void LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr<B
     }
 
     this->logical_plan_ = explain_node;
-#endif
 }
 
 } // namespace infinity

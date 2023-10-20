@@ -8,7 +8,7 @@ import parser;
 export module ivfflat_index_def;
 
 namespace infinity {
-class IVFFlatIndexDef : public IndexDef {
+export class IVFFlatIndexDef : public IndexDef {
   public:
     inline explicit IVFFlatIndexDef() {}
 

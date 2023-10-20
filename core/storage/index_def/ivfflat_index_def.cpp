@@ -1,5 +1,7 @@
 module;
 
+#include <memory>
+
 import stl;
 import index_def;
 import parser;
@@ -11,7 +13,6 @@ module ivfflat_index_def;
 
 namespace infinity {
 SharedPtr<IndexDef> IVFFlatIndexDef::Make(IndexDefCommon common, const Vector<InitParameter *> &index_para_list) {
-#if 0
     auto ptr = MakeShared<IVFFlatIndexDef>();
 
     ptr->common_ = Move(common);
@@ -27,8 +28,7 @@ SharedPtr<IndexDef> IVFFlatIndexDef::Make(IndexDefCommon common, const Vector<In
     if (ptr->centroids_count_ == 0 || ptr->metric_type_ == MetricType::kInvalid) {
         Error<StorageException>("Invalid index parameters", __FILE_NAME__, __LINE__);
     }
-    return ptr;
-#endif
+    return std::static_pointer_cast<IndexDef>(ptr);
 }
 
 String IVFFlatIndexDef::ToString() const {
