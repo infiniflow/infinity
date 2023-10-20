@@ -185,7 +185,8 @@ BufferManager::AllocateBufferHandle(const SharedPtr<String> &file_dir, const Sha
     // `buffer_handle` here is newly constructed if `full_name` is not in buffer_map, or the existing one.
     const auto &[iter, insert_ok] = buffer_map_.emplace(*full_name, this);
     if (!insert_ok) {
-        StorageError("A buffer handle with same full_name existed");
+        LOG_WARN("Buffer handle already exists. Get original one.");
+        return &iter->second;
     }
 
     auto &buffer_handle = iter->second;

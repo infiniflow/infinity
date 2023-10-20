@@ -95,9 +95,12 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     }
 }
 
-void Storage::AttachCatalog(const String &catalog_path) {
-    LOG_INFO("Attach catalog file: {}", catalog_path.c_str());
-    new_catalog_ = NewCatalog::LoadFromFile(catalog_path, buffer_mgr_.get());
+void Storage::AttachCatalog(const Vector<String> &catalog_files) {
+    LOG_INFO("Attach catalogs from {} files", catalog_files.size());
+    for (const auto &catalog_file : catalog_files) {
+        LOG_TRACE("Catalog file: {}", catalog_file.c_str());
+    }
+    new_catalog_ = NewCatalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
     exist_catalog_ = true;
 }
 

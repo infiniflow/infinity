@@ -44,7 +44,7 @@ SharedPtr<TableDef> MockTableDesc2() {
     return MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
 }
 
-void MockWalFile() {
+void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
 
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
         auto entry = MakeShared<WalEntry>();
@@ -74,7 +74,7 @@ void MockWalFile() {
         EXPECT_EQ(actual_size, expect_size);
 
         fs::create_directories("/tmp/infinity/wal");
-        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
@@ -94,7 +94,7 @@ void MockWalFile() {
         EXPECT_EQ(actual_size, expect_size);
 
         fs::create_directories("/tmp/infinity/wal");
-        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
@@ -114,7 +114,7 @@ void MockWalFile() {
         EXPECT_EQ(actual_size, expect_size);
 
         fs::create_directories("/tmp/infinity/wal");
-        auto ofs = std::ofstream("/tmp/infinity/wal/wal.log", std::ios::app | std::ios::binary);
+        auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
@@ -191,6 +191,64 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     int64_t max_commit_ts = 0;
     String catalog_path;
     WalEntryIterator iterator(wal_file_path);
+    iterator.Init();
+
+    // phase 1: find the max commit ts and catalog path
+    while (iterator.Next()) {
+        auto wal_entry = iterator.GetEntry();
+
+        if (!wal_entry->IsCheckPoint()) {
+            replay_entries.push_back(wal_entry);
+        } else {
+            std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+            Println("Checkpoint Max Commit Ts: {}", fmt::to_string(max_commit_ts));
+            Println("Catalog Path: {}", catalog_path);
+            break;
+        }
+    }
+
+    // phase 2: by the max commit ts, find the entries to replay
+    while (iterator.Next()) {
+        auto wal_entry = iterator.GetEntry();
+        if (wal_entry->commit_ts > max_commit_ts) {
+            replay_entries.push_back(wal_entry);
+        }
+    }
+
+    // phase 3: replay the entries
+    Println("Start to replay the entries", "");
+    for (const auto &entry : replay_entries) {
+        Println("WAL ENTRY COMMIT TS:", fmt::to_string(entry->commit_ts));
+        for (const auto &cmd : entry->cmds) {
+            Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
+        }
+    }
+    EXPECT_EQ(max_commit_ts, 123);
+    EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
+    EXPECT_EQ(replay_entries.size(), 1);
+}
+
+TEST_F(WalEntryTest, WalListIterator) {
+    using namespace infinity;
+    MockWalFile();
+    MockWalFile("/tmp/infinity/wal/wal2.log");
+
+    WalListIterator iterator1({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
+    iterator1.Init();
+
+    iterator1.Init();
+    while (iterator1.Next()) {
+        auto wal_entry = iterator1.GetEntry();
+        Println("WAL ENTRY COMMIT TS:", fmt::to_string(wal_entry->commit_ts));
+        for (const auto &cmd : wal_entry->cmds) {
+            Println("  WAL CMD: ", WalCommandTypeToString(cmd->GetType()));
+        }
+    }
+
+    Vector<SharedPtr<WalEntry>> replay_entries;
+    int64_t max_commit_ts = 0;
+    String catalog_path;
+    WalListIterator iterator({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
     iterator.Init();
 
     // phase 1: find the max commit ts and catalog path

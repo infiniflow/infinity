@@ -44,7 +44,7 @@ class WalCmdDelete;
 class WalManager {
 public:
     WalManager(Storage *storage,
-               const std::string &wal_path,
+               std::string wal_path,
                u64 wal_size_threshold,
                u64 full_checkpoint_interval_sec,
                u64 delta_checkpoint_interval_sec,
@@ -108,7 +108,7 @@ private:
     std::thread flush_thread_;
     std::thread checkpoint_thread_;
 
-    // TxnManager and Fush thread access following members
+    // TxnManager and Flush thread access following members
     std::mutex mutex_;
     std::deque<std::shared_ptr<WalEntry>> que_;
 

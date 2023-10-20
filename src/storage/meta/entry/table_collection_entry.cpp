@@ -391,6 +391,7 @@ TableCollectionEntry::Deserialize(const nlohmann::json &table_entry_json, TableC
         MakeUnique<TableCollectionEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
+    table_entry->table_entry_dir_ = table_entry_dir;
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
