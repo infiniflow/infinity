@@ -47,7 +47,7 @@ TEST_F(DBTxnTest, test1) {
 
     // Txn2: Drop db1, OK
     EntryResult drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);
-    ;
+
     EXPECT_NE(drop_db_res.entry_, nullptr);
     EXPECT_EQ(drop_db_res.err_, nullptr);
 
@@ -68,7 +68,7 @@ TEST_F(DBTxnTest, test1) {
 
     // Txn3: Drop db1, NOT OK
     drop_db_res = new_txn->DropDatabase("db1", ConflictType::kError);
-    ;
+
     EXPECT_EQ(drop_db_res.entry_, nullptr);
 
     // Txn3: Commit, OK
@@ -106,7 +106,7 @@ TEST_F(DBTxnTest, test20) {
 
     // Txn2: Drop db1, OK
     create1_res = new_txn->DropDatabase("db1", ConflictType::kError);
-    ;
+
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK
@@ -161,7 +161,7 @@ TEST_F(DBTxnTest, test2) {
 
     // Txn1: Drop db1, OK
     dropped_res = new_txn->DropDatabase("db1", ConflictType::kError);
-    ;
+
     EXPECT_EQ(create1_res.entry_, dropped_res.entry_);
 
     // Txn1: Get db1, NOT OK
@@ -403,7 +403,7 @@ TEST_F(DBTxnTest, test7) {
 
     // Txn1: Drop db1, OK
     dropped1_res = new_txn1->DropDatabase("db1", ConflictType::kError);
-    ;
+
     EXPECT_NE(dropped1_res.entry_, nullptr);
 
     // Txn2: Create db1, OK

@@ -317,7 +317,6 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
     HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
     if (byte_size_str.empty()) {
         return MakeShared<String>("No byte size is given");
-        ;
     }
 
     u64 factor;

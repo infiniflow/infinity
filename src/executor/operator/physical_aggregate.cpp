@@ -3,8 +3,8 @@
 //
 
 #include "executor/operator/physical_aggregate.h"
-#include "storage/table.h"
 #include "storage/data_block.h"
+#include "storage/table.h"
 
 #include "common/utility/utility.h"
 #include "expression/base_expression.h"

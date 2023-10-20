@@ -9,15 +9,15 @@
 namespace infinity {
 
 ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
-    ExecutorAssert(nbytes > 0, "Attempt to allocate zero size memory.") if (current_chunk_idx_ == std::numeric_limits<u64>::max()) {
+    ExecutorAssert(nbytes > 0, "Attempt to allocate zero size memory.");
+    if (current_chunk_idx_ == std::numeric_limits<u64>::max()) {
         // First chunk
         while (current_chunk_size_ < nbytes) {
             current_chunk_size_ *= 2;
         }
         chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
         current_chunk_idx_ = 0;
-    }
-    else {
+    } else {
         if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
             // Current chunk can't afford size of nbytes object
             while (current_chunk_size_ < nbytes) {

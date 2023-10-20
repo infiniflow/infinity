@@ -514,7 +514,7 @@ bool Bitmap::HasSetData(uint32_t begin_index, uint32_t end_index) const {
     } else {
         if (rem_begin != 0 || rem_end != SLOT_SIZE_BIT_MASK) {
             uint32_t mask = ((BITMAPOPMASK[rem_begin] - 1) | BITMAPOPMASK[rem_begin]) - (BITMAPOPMASK[rem_end] - 1);
-            ;
+
             if (data_[quot_begin] & mask) {
                 return true;
             }

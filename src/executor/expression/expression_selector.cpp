@@ -2,12 +2,12 @@
 // Created by jinhai on 23-3-12.
 //
 
-#include "expression/base_expression.h"
 #include "executor/expression/expression_selector.h"
-#include "executor/expression/expression_evaluator.h"
-#include "common/column_vector/selection.h"
 #include "common/column_vector/bitmask.h"
 #include "common/column_vector/column_vector.h"
+#include "common/column_vector/selection.h"
+#include "executor/expression/expression_evaluator.h"
+#include "expression/base_expression.h"
 #include "storage/data_block.h"
 
 namespace infinity {
@@ -39,9 +39,9 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
                                 SharedPtr<Selection> &output_false_select) {
     if (count == 0)
         return; // All data are false;
-    ExecutorAssert(output_true_select != nullptr || output_false_select != nullptr, "No output select column vector is given")
-        ExecutorAssert(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression")
-            Select(expr, state, count, output_true_select);
+    ExecutorAssert(output_true_select != nullptr || output_false_select != nullptr, "No output select column vector is given");
+    ExecutorAssert(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression");
+    Select(expr, state, count, output_true_select);
 }
 
 void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
@@ -87,7 +87,7 @@ void ExpressionSelector::Select(const u8 *__restrict bool_column,
                     }
                 } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
-                    ;
+
                 } else {
                     SizeT original_start = start_index;
                     while (start_index < end_index) {

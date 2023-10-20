@@ -198,7 +198,6 @@ void PhysicalImport::ImportCSVHelper(QueryContext *query_context, ParserContext 
     parser_context.parser_ = zsv_new(&opts);
     enum zsv_status csv_parser_status;
     while ((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
-        ;
     }
 
     zsv_finish(parser_context.parser_);

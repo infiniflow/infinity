@@ -23,7 +23,7 @@ inline void LessFunction::Run(VarcharT left, VarcharT right, bool &result) {
             return;
         }
     } else if (right.IsInlined()) {
-        ;
+
     } else {
         // Both left and right are not inline
         u16 min_len = std::min(right.length, left.length);

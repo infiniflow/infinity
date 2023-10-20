@@ -23,7 +23,7 @@ inline void EqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
             return;
         }
     } else if (right.IsInlined()) {
-        ;
+
     } else {
         // Both left and right are not inline
         if (left.length == right.length) {

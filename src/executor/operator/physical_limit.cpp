@@ -23,9 +23,9 @@ void PhysicalLimit::Execute(QueryContext *query_context) {
     ExecutorAssert(limit_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
 
     i64 limit = (std::static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
-    ExecutorAssert(limit > 0, "Limit should be larger than 0")
+    ExecutorAssert(limit > 0, "Limit should be larger than 0");
 
-        i64 offset = 0;
+    i64 offset = 0;
     if (offset_expr_ != nullptr) {
         ExecutorAssert(offset_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
         offset = (std::static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;

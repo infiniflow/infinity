@@ -3,7 +3,6 @@
 //
 
 #include "expression_evaluator.h"
-#include "expression_state.h"
 #include "expression/aggregate_expression.h"
 #include "expression/base_expression.h"
 #include "expression/case_expression.h"
@@ -13,6 +12,7 @@
 #include "expression/in_expression.h"
 #include "expression/reference_expression.h"
 #include "expression/value_expression.h"
+#include "expression_state.h"
 
 namespace infinity {
 
@@ -45,7 +45,8 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
 void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    ExecutorAssert(!in_aggregate_, "Recursive execute aggregate function!") in_aggregate_ = true;
+    ExecutorAssert(!in_aggregate_, "Recursive execute aggregate function!");
+    in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
     SharedPtr<BaseExpression> &child_expr = expr->arguments()[0];
     // Create output chunk.
