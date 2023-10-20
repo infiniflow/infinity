@@ -497,7 +497,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(statement->type_, StatementType::kCreate);
         auto create_statement = static_cast<CreateStatement *>(statement);
         EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kInvalid);
+        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
 
         auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
         EXPECT_EQ(create_index_info->index_name_, "");
