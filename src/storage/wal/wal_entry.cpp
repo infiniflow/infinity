@@ -5,15 +5,15 @@
 #include "parser/definition/table_def.h"
 #include "storage/data_block.h"
 
-#include <cstdint>
 #include <cstring>
+#include <fstream>
 
 namespace infinity {
 
-SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
+SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
+    char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
-    WalCommandType cmd_type = ReadBufAdv<WalCommandType>(ptr);
+    auto cmd_type = ReadBufAdv<WalCommandType>(ptr);
     switch (cmd_type) {
         case WalCommandType::CREATE_DATABASE: {
             String db_name = ReadBufAdv<String>(ptr);
@@ -41,7 +41,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir);
+            i32 segment_id = ReadBufAdv<i32>(ptr);
+            i32 block_entries_size = ReadBufAdv<i32>(ptr);
+            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir, segment_id, block_entries_size);
             break;
         }
         case WalCommandType::APPEND: {
@@ -54,10 +56,10 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
         case WalCommandType::DELETE: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            int32_t cnt = ReadBufAdv<int32_t>(ptr);
+            i32 cnt = ReadBufAdv<i32>(ptr);
             Vector<RowID> row_ids;
-            for (int32_t i = 0; i < cnt; ++i) {
-                RowID row_id = ReadBufAdv<RowID>(ptr);
+            for (i32 i = 0; i < cnt; ++i) {
+                auto row_id = ReadBufAdv<RowID>(ptr);
                 row_ids.push_back(row_id);
             }
             cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
@@ -87,8 +89,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, int32_t maxbytes) {
         default:
             StorageError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
-    maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes >= 0, "ptr goes out of range when reading WalCmd");
+    max_bytes = ptr_end - ptr;
+    StorageAssert(max_bytes >= 0, "ptr goes out of range when reading WalCmd");
     return cmd;
 }
 
@@ -111,7 +113,8 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
-    if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir)
+    if (other_cmd == nullptr || db_name != other_cmd->db_name || table_name != other_cmd->table_name || segment_dir != other_cmd->segment_dir ||
+        segment_id != other_cmd->segment_id || block_entries_size != other_cmd->block_entries_size)
         return false;
     return true;
 }
@@ -141,21 +144,20 @@ bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
 }
 
-int32_t WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size(); }
+i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
 
-int32_t WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size(); }
+i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
 
-int32_t WalCmdCreateTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + this->table_def->GetSizeInBytes();
+i32 WalCmdCreateTable::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + this->table_def->GetSizeInBytes();
 }
 
-int32_t WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name_.size() + sizeof(int32_t) + this->table_name_.size() +
-           this->index_def_->GetSizeInBytes();
+i32 WalCmdCreateIndex::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + this->index_def_->GetSizeInBytes();
 }
 
-int32_t WalCmdDropTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size();
+i32 WalCmdDropTable::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size();
 }
 
 int32_t WalCmdDropIndex::GetSizeInBytes() const {
@@ -163,17 +165,17 @@ int32_t WalCmdDropIndex::GetSizeInBytes() const {
            this->index_name_.size();
 }
 
-int32_t WalCmdImport::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size() + sizeof(int32_t) +
-           this->segment_dir.size();
+i32 WalCmdImport::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
+           this->segment_dir.size() + sizeof(i32) + sizeof(i32);
 }
 
-int32_t WalCmdAppend::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size() + block->GetSizeInBytes();
+i32 WalCmdAppend::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + block->GetSizeInBytes();
 }
 
-int32_t WalCmdDelete::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(int32_t) + this->db_name.size() + sizeof(int32_t) + this->table_name.size() + sizeof(int32_t) +
+i32 WalCmdDelete::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
            row_ids.size() * sizeof(RowID);
 }
 
@@ -222,6 +224,8 @@ void WalCmdImport::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
     WriteBufAdv(buf, this->segment_dir);
+    WriteBufAdv(buf, this->segment_id);
+    WriteBufAdv(buf, this->block_entries_size);
 }
 
 void WalCmdAppend::WriteAdv(char *&buf) const {
@@ -235,7 +239,7 @@ void WalCmdDelete::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DELETE);
     WriteBufAdv(buf, this->db_name);
     WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, static_cast<int32_t>(this->row_ids.size()));
+    WriteBufAdv(buf, static_cast<i32>(this->row_ids.size()));
     for (const auto &row_id : this->row_ids) {
         WriteBufAdv(buf, row_id);
     }
@@ -248,11 +252,12 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->catalog_path_);
 }
 
+
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id != other.txn_id || this->commit_ts != other.commit_ts || this->cmds.size() != other.cmds.size()) {
         return false;
     }
-    for (int32_t i = 0; i < this->cmds.size(); i++) {
+    for (i32 i = 0; i < this->cmds.size(); i++) {
         const SharedPtr<WalCmd> &cmd1 = this->cmds[i];
         const SharedPtr<WalCmd> &cmd2 = other.cmds[i];
         if (cmd1 == nullptr || cmd2 == nullptr || (*cmd1).operator!=(*cmd2)) {
@@ -264,69 +269,133 @@ bool WalEntry::operator==(const WalEntry &other) const {
 
 bool WalEntry::operator!=(const WalEntry &other) const { return !operator==(other); }
 
-int32_t WalEntry::GetSizeInBytes() const {
-    int32_t size = sizeof(WalEntryHeader) + sizeof(int32_t);
+i32 WalEntry::GetSizeInBytes() const {
+    i32 size = sizeof(WalEntryHeader) + sizeof(i32);
     for (const auto &cmd : cmds) {
         size += cmd->GetSizeInBytes();
     }
-    size += sizeof(int32_t); // pad
+    size += sizeof(i32); // pad
     return size;
 }
 
+/**
+ * An entry is serialized as follows:
+ * - WalEntryHeader
+ *   - size
+ *   - checksum
+ *   - txn_id
+ *   - commit_ts
+ * - number of WalCmd
+ *   - (repeated) WalCmd
+ * - 4 bytes pad
+ * @param ptr
+ */
+
 void WalEntry::WriteAdv(char *&ptr) const {
-    // An entry is serialized as follows:
-    // - WalEntryHeader
-    // - number of WalCmd
-    // - (repeated) WalCmd
-    // - 4 bytes pad
     char *const saved_ptr = ptr;
     memcpy(ptr, this, sizeof(WalEntryHeader));
     ptr += sizeof(WalEntryHeader);
-    WriteBufAdv(ptr, static_cast<int32_t>(cmds.size()));
+    WriteBufAdv(ptr, static_cast<i32>(cmds.size()));
     for (const auto &cmd : cmds) {
         cmd->WriteAdv(ptr);
     }
-    int32_t size = ptr - saved_ptr + sizeof(int32_t);
+    i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
-    WalEntryHeader *header = (WalEntryHeader *)saved_ptr;
+    auto *header = (WalEntryHeader *)saved_ptr;
     header->size = size;
     header->checksum = 0;
     // CRC32IEEE is equivalent to boost::crc_32_type on
     // little-endian machine.
     header->checksum = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
-    return;
 }
 
-SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, int32_t maxbytes) {
-    char *const ptr_end = ptr + maxbytes;
-    StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
+SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
+    char *const ptr_end = ptr + max_bytes;
+    StorageAssert(max_bytes > 0, "ptr goes out of range when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
-    WalEntryHeader *header = (WalEntryHeader *)ptr;
+    auto *header = (WalEntryHeader *)ptr;
     entry->size = header->size;
     entry->checksum = header->checksum;
     entry->txn_id = header->txn_id;
     entry->commit_ts = header->commit_ts;
-    int32_t size2 = *(int32_t *)(ptr + entry->size - sizeof(int32_t));
+    i32 size2 = *(i32 *)(ptr + entry->size - sizeof(i32));
     if (entry->size != size2) {
         return nullptr;
     }
     header->checksum = 0;
-    uint32_t checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size);
+    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size);
     if (entry->checksum != checksum2) {
         return nullptr;
     }
     ptr += sizeof(WalEntryHeader);
-    int32_t cnt = ReadBufAdv<int32_t>(ptr);
+    i32 cnt = ReadBufAdv<i32>(ptr);
     for (size_t i = 0; i < cnt; i++) {
-        maxbytes = ptr_end - ptr;
-        StorageAssert(maxbytes > 0, "ptr goes out of range when reading WalEntry");
-        SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, maxbytes);
+        max_bytes = ptr_end - ptr;
+        StorageAssert(max_bytes > 0, "ptr goes out of range when reading WalEntry");
+        SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds.push_back(cmd);
     }
-    ptr += sizeof(int32_t);
-    maxbytes = ptr_end - ptr;
-    StorageAssert(maxbytes >= 0, "ptr goes out of range when reading WalEntry");
+    ptr += sizeof(i32);
+    max_bytes = ptr_end - ptr;
+    StorageAssert(max_bytes >= 0, "ptr goes out of range when reading WalEntry");
     return entry;
 }
+
+Pair<i64, String> WalEntry::GetCheckpointInfo() const {
+    for (const auto &cmd : cmds) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
+            return {checkpoint_cmd->max_commit_ts_, checkpoint_cmd->catalog_path_};
+        }
+    }
+    return {-1, ""};
+}
+bool WalEntry::IsCheckPoint() const {
+    for (const auto &cmd : cmds) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool WalEntry::IsFullCheckPoint() const {
+    for (const auto &cmd : cmds) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT && dynamic_cast<const WalCmdCheckpoint *>(cmd.get())->is_full_checkpoint_) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void WalEntryIterator::Init() {
+    std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
+    if (!ifs.is_open()) {
+        StorageError("Wal open failed");
+    }
+    wal_size_ = ifs.tellg();
+    Vector<char> buf(wal_size_);
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(buf.data(), wal_size_);
+    ifs.close();
+    ptr_ = buf.data() + wal_size_;
+    while (ptr_ > buf.data()) {
+        i32 entry_size;
+        memcpy(&entry_size, ptr_ - sizeof(i32), sizeof(entry_size));
+        ptr_ = ptr_ - entry_size;
+        auto entry = WalEntry::ReadAdv(ptr_, entry_size);
+        ptr_ = ptr_ - entry_size;
+        entries_.push_back(entry);
+    }
+}
+
+bool WalEntryIterator::Next() {
+    if (entry_index_ < entries_.size()) {
+        return true;
+    }
+    return false;
+}
+
+SharedPtr<WalEntry> WalEntryIterator::GetEntry() { return entries_[entry_index_++]; }
 
 } // namespace infinity

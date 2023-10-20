@@ -132,6 +132,10 @@ public:
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
+    void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
+
+    void SetTxnCommitting(TxnTimeStamp commit_ts) { txn_context_.SetTxnCommitting(commit_ts); }
+
     void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
 
     TxnTableStore *GetTxnTableStore(const String &table_name);
@@ -140,7 +144,6 @@ public:
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-private:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
 private:

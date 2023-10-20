@@ -71,6 +71,10 @@ public:
 
     static void Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts);
 
+    static void FlushData(BlockEntry *block_entry, int64_t checkpoint_row_count);
+
+    static void FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version);
+
     inline static BlockColumnEntry *GetColumnDataByID(BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
 
     static nlohmann::json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);

@@ -3,10 +3,6 @@
 //
 
 #include "txn.h"
-//
-// Created by jinhai on 23-6-4.
-//
-
 #include "parser/definition/table_def.h"
 #include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
@@ -17,7 +13,6 @@
 #include "storage/meta/meta_state.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
-#include "txn.h"
 
 namespace infinity {
 
@@ -332,7 +327,7 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
         return {nullptr, MakeUnique<String>("Invalid database type")};
     }
 
-    auto *table_entry = static_cast<TableCollectionEntry *>(res.entry_);
+    auto *table_entry = dynamic_cast<TableCollectionEntry *>(res.entry_);
     txn_tables_.insert(table_entry);
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
     return res;
@@ -547,6 +542,7 @@ void Txn::CommitTxn() {
 }
 
 void Txn::CommitTxnBottom() {
+
     // prepare to commit txn local data into table
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
@@ -555,10 +551,12 @@ void Txn::CommitTxnBottom() {
 
     txn_context_.SetTxnCommitted();
 
+    // Commit the prepared data
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
         table_local_store->Commit();
     }
+
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
     // Commit databases to memory catalog

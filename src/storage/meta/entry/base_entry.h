@@ -60,11 +60,11 @@ struct EntryResult {
     BaseEntry *entry_;
     UniquePtr<String> err_;
 
-    bool Success() { return err_ == nullptr; }
+    [[nodiscard]] bool Success() const { return err_ == nullptr; }
 
-    bool Fail() { return err_ != nullptr; }
+    [[nodiscard]] bool Fail() const { return err_ != nullptr; }
 
-    String ToString() {
+    [[nodiscard]] String ToString() const {
         if (err_ == nullptr) {
             return "Success";
         }
