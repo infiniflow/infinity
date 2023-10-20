@@ -11,6 +11,10 @@ import logger;
 import infinity_assert;
 import infinity_exception;
 import third_party;
+import bound_cast_func;
+import cast_function;
+import column_vector;
+import default_values;
 
 module value;
 
@@ -1068,7 +1072,7 @@ void Value::Reset() {
     }
     type_.Reset();
 }
-#if 0
+
 bool Value::TryCastAs(const DataType &target_type, Value &new_value) const {
     BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
     SharedPtr<ColumnVector> source_ptr = MakeShared<ColumnVector>(MakeShared<DataType>(this->type_));
@@ -1090,28 +1094,29 @@ String Value::ToString() const {
             return value_.boolean ? "true" : "false";
         }
         case kTinyInt: {
-            return std::to_string(value_.tiny_int);
+            return ToStr(value_.tiny_int);
         }
         case kSmallInt: {
-            return std::to_string(value_.small_int);
+            return ToStr(value_.small_int);
         }
         case kInteger: {
-            return std::to_string(value_.integer);
+            return ToStr(value_.integer);
         }
         case kBigInt: {
-            return std::to_string(value_.big_int);
+            return ToStr(value_.big_int);
         }
         case kHugeInt: {
             return value_.huge_int.ToString();
         }
         case kFloat: {
-            return std::to_string(value_.float32);
+            return ToStr(value_.float32);
         }
         case kDouble: {
-            return std::to_string(value_.float64);
+            return ToStr(value_.float64);
         }
         case kDecimal: {
-            NotImplementError("Decimal") break;
+            Error<NotImplementException>("Decimal", __FILE_NAME__, __LINE__);
+            break;
         }
         case kVarchar: {
             return value_.varchar.ToString();
@@ -1120,61 +1125,77 @@ String Value::ToString() const {
             return value_.date.ToString();
         }
         case kTime: {
-            NotImplementError("Time") break;
+            Error<NotImplementException>("Time", __FILE_NAME__, __LINE__);
+            break;
         }
         case kDateTime: {
-            NotImplementError("DateTime") break;
+            Error<NotImplementException>("DateTime", __FILE_NAME__, __LINE__);
+            break;
         }
         case kTimestamp: {
-            NotImplementError("Timestamp") break;
+            Error<NotImplementException>("Timestamp", __FILE_NAME__, __LINE__);
+            break;
         }
         case kInterval: {
             return value_.interval.ToString();
         }
         case kArray: {
-            NotImplementError("Array") break;
+            Error<NotImplementException>("Array", __FILE_NAME__, __LINE__);
+            break;
         }
         case kTuple: {
-            NotImplementError("Tuple") break;
+            Error<NotImplementException>("Tuple", __FILE_NAME__, __LINE__);
+            break;
         }
         case kPoint: {
-            NotImplementError("Point") break;
+            Error<NotImplementException>("Point", __FILE_NAME__, __LINE__);
+            break;
         }
         case kLine: {
-            NotImplementError("Line") break;
+            Error<NotImplementException>("Line", __FILE_NAME__, __LINE__);
+            break;
         }
         case kLineSeg: {
-            NotImplementError("Line Seg") break;
+            Error<NotImplementException>("Line Seg", __FILE_NAME__, __LINE__);
+            break;
         }
         case kBox: {
-            NotImplementError("Box") break;
+            Error<NotImplementException>("Box", __FILE_NAME__, __LINE__);
+            break;
         }
         case kPath: {
-            NotImplementError("Path") break;
+            Error<NotImplementException>("Path", __FILE_NAME__, __LINE__);
+            break;
         }
         case kPolygon: {
-            NotImplementError("Polygon") break;
+            Error<NotImplementException>("Polygon", __FILE_NAME__, __LINE__);
+            break;
         }
         case kCircle: {
-            NotImplementError("Circle") break;
+            Error<NotImplementException>("Circle", __FILE_NAME__, __LINE__);
+            break;
         }
         case kBitmap: {
-            NotImplementError("Bitmap") break;
+            Error<NotImplementException>("Bitmap", __FILE_NAME__, __LINE__);
+            break;
         }
         case kUuid: {
-            NotImplementError("Uuid") break;
+            Error<NotImplementException>("Uuid", __FILE_NAME__, __LINE__);
+            break;
         }
         case kBlob: {
             return value_.blob.ToString();
         }
         case kEmbedding: {
-            NotImplementError("Embedding") break;
+            Error<NotImplementException>("Embedding", __FILE_NAME__, __LINE__);
+            break;
         }
         case kRowID: {
             return value_.row.ToString();
         }
         case kMixed: {
-            NotImplementError("Mixed") break;
+            Error<NotImplementException>("Embedding", __FILE_NAME__, __LINE__);
+            break;
         }
         case kNull:
             break;
@@ -1183,7 +1204,6 @@ String Value::ToString() const {
         case kInvalid:
             break;
     }
-    TypeError("Unexpected error.")
+    Error<TypeException>("Unexpected error.", __FILE_NAME__, __LINE__);
 }
-#endif
 } // namespace infinity

@@ -15,6 +15,8 @@ import buffer_manager;
 import segment_entry;
 import index_def;
 import block_index;
+import data_access_state;
+import db_entry;
 
 module table_collection_entry;
 

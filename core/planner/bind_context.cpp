@@ -13,6 +13,8 @@ import infinity_exception;
 import base_expression;
 import column_expression;
 import column_identifer;
+import table_collection_entry;
+import block_index;
 
 module bind_context;
 

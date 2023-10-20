@@ -5,6 +5,9 @@
 module;
 
 import stl;
+import parser;
+import block_index;
+import table_collection_entry;
 import infinity_assert;
 import infinity_exception;
 

@@ -8,12 +8,13 @@ import base_expression;
 import bound_select_statement;
 import parser;
 import stl;
+import column_expression;
 
 export module subquery_expression;
 
 namespace infinity {
 
-class ColumnExpression;
+//class ColumnExpression;
 
 export class SubqueryExpression : public BaseExpression {
 public:

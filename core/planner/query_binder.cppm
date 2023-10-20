@@ -7,17 +7,23 @@ module;
 import logical_node;
 import stl;
 import parser;
+import query_context;
+import bound_select_statement;
+import bind_context;
+import table_ref;
+import binding;
+import bind_alias_proxy;
 
 export module query_binder;
 
 namespace infinity {
 
-class QueryContext;
-class BindContext;
-class BoundSelectStatement;
-class TableRef;
-class Binding;
-class BindAliasProxy;
+//class QueryContext;
+//class BindContext;
+//class BoundSelectStatement;
+//class TableRef;
+//class Binding;
+//class BindAliasProxy;
 
 export class QueryBinder : public EnableSharedFromThis<QueryBinder> {
 public:

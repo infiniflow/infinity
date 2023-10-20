@@ -13,8 +13,19 @@ import third_party;
 import expression_type;
 import logical_node_type;
 import logical_node;
-
 import logical_aggregate;
+
+import aggregate_expression;
+import between_expression;
+import case_expression;
+import cast_expression;
+import column_expression;
+import function_expression;
+import value_expression;
+import in_expression;
+import subquery_expression;
+import knn_expression;
+import conjunction_expression;
 
 module logical_node_visitor;
 

@@ -6,7 +6,7 @@ module;
 
 import stl;
 import parser;
-import txn;
+//import txn;
 import buffer_manager;
 import third_party;
 import table_collection_type;
@@ -14,20 +14,22 @@ import index_def;
 import base_entry;
 import segment_entry;
 import block_index;
+import table_collection_meta;
+import data_access_state;
 
 export module table_collection_entry;
 
 namespace infinity {
 
 class DBEntry;
-class TableCollectionMeta;
+//class TableCollectionMeta;
 //class BufferManager;
-//class Txn;
+class Txn;
 //class BlockIndex;
 //class ColumnDef;
-class DeleteState;
-class ScanState;
-class AppendState;
+//class DeleteState;
+//class ScanState;
+//class AppendState;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:

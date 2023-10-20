@@ -13,12 +13,13 @@ import logger;
 import default_values;
 import third_party;
 import txn_state;
+import txn_manager;
+import buffer_manager;
+import db_entry;
 
 module table_collection_meta;
 
 namespace infinity {
-
-class TxnManager;
 
 /**
  * @brief Create a new table entry.

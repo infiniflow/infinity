@@ -39,7 +39,7 @@ enum class WalCommandType : i8 {
     CHECKPOINT = 99,
 };
 
-struct WalCmd {
+export struct WalCmd {
     virtual ~WalCmd() = default;
 
     virtual WalCommandType GetType() = 0;
@@ -54,7 +54,7 @@ struct WalCmd {
     static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 maxbytes);
 };
 
-struct WalCmdCreateDatabase : public WalCmd {
+export struct WalCmdCreateDatabase : public WalCmd {
     WalCmdCreateDatabase(const String &db_name_) : db_name(db_name_) {}
     virtual WalCommandType GetType() { return WalCommandType::CREATE_DATABASE; }
     virtual bool operator==(const WalCmd &other) const {
@@ -69,7 +69,7 @@ struct WalCmdCreateDatabase : public WalCmd {
     String db_name;
 };
 
-struct WalCmdDropDatabase : public WalCmd {
+export struct WalCmdDropDatabase : public WalCmd {
     WalCmdDropDatabase(const String &db_name_) : db_name(db_name_) {}
     virtual WalCommandType GetType() { return WalCommandType::DROP_DATABASE; }
     virtual bool operator==(const WalCmd &other) const {
@@ -84,7 +84,7 @@ struct WalCmdDropDatabase : public WalCmd {
     String db_name;
 };
 
-struct WalCmdCreateTable : public WalCmd {
+export struct WalCmdCreateTable : public WalCmd {
     WalCmdCreateTable(const String &db_name_, const SharedPtr<TableDef> &table_def_) : db_name(db_name_), table_def(table_def_) {}
     virtual WalCommandType GetType() { return WalCommandType::CREATE_TABLE; }
 
@@ -98,7 +98,7 @@ struct WalCmdCreateTable : public WalCmd {
     SharedPtr<TableDef> table_def;
 };
 
-struct WalCmdDropTable : public WalCmd {
+export struct WalCmdDropTable : public WalCmd {
     WalCmdDropTable(const String &db_name_, const String &table_name_) : db_name(db_name_), table_name(table_name_) {}
     virtual WalCommandType GetType() { return WalCommandType::DROP_TABLE; }
     virtual bool operator==(const WalCmd &other) const {
@@ -114,7 +114,7 @@ struct WalCmdDropTable : public WalCmd {
     String table_name;
 };
 
-struct WalCmdImport : public WalCmd {
+export struct WalCmdImport : public WalCmd {
     WalCmdImport(const String &db_name_, const String &table_name_, const String &segment_dir_)
         : db_name(db_name_), table_name(table_name_), segment_dir(segment_dir_) {}
     virtual WalCommandType GetType() { return WalCommandType::IMPORT; }
@@ -126,7 +126,7 @@ struct WalCmdImport : public WalCmd {
     String segment_dir;
 };
 
-struct WalCmdAppend : public WalCmd {
+export struct WalCmdAppend : public WalCmd {
     WalCmdAppend(const String &db_name_, const String &table_name_, const SharedPtr<DataBlock> &block_)
         : db_name(db_name_), table_name(table_name_), block(block_) {}
     virtual WalCommandType GetType() { return WalCommandType::APPEND; }
@@ -142,7 +142,7 @@ struct WalCmdAppend : public WalCmd {
     SharedPtr<DataBlock> block;
 };
 
-struct WalCmdDelete : public WalCmd {
+export struct WalCmdDelete : public WalCmd {
     WalCmdDelete(const String &db_name_, const String &table_name_, const Vector<RowT> &row_ids_)
         : db_name(db_name_), table_name(table_name_), row_ids(row_ids_) {}
     virtual WalCommandType GetType() { return WalCommandType::DELETE; }
@@ -158,7 +158,7 @@ struct WalCmdDelete : public WalCmd {
     Vector<RowT> row_ids;
 };
 
-struct WalCmdCheckpoint : public WalCmd {
+export struct WalCmdCheckpoint : public WalCmd {
     WalCmdCheckpoint(i64 max_commit_ts_, String catalog_path) : max_commit_ts_(max_commit_ts_), catalog_path_(catalog_path) {}
     virtual WalCommandType GetType() { return WalCommandType::CHECKPOINT; }
 

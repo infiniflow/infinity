@@ -15,7 +15,8 @@ import query_context;
 import binding;
 import table_collection_entry;
 import bound_select_statement;
-
+import table_ref;
+import bind_alias_proxy;
 
 module query_binder;
 namespace infinity {

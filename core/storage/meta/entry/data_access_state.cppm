@@ -50,7 +50,7 @@ export struct DeleteState {
     HashMap<u64, Vector<u64>> rows_;
 };
 
-struct GetState {};
+export struct GetState {};
 
 export enum class ScanStateType {
     kTableScan,
@@ -58,12 +58,12 @@ export enum class ScanStateType {
     kAnnScan,
 };
 
-enum class ScanLocation {
+export enum class ScanLocation {
     kLocal,
     kGlobal,
 };
 
-struct ScanState {
+export struct ScanState {
     void *txn_table_store_{};
     void *table_entry_{};
     ScanLocation scan_location_{ScanLocation::kLocal};

@@ -8,16 +8,19 @@ import stl;
 import third_party;
 import block_entry;
 import buffer_manager;
-import table_collection_entry;
 import default_values;
 import data_block;
 import txn;
 import data_access_state;
 import index_def;
+import table_collection_entry;
+import base_entry;
 
 module segment_entry;
 
 namespace infinity {
+
+SegmentEntry::SegmentEntry(const TableCollectionEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry,
                                                           u64 txn_id,

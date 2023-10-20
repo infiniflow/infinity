@@ -16,7 +16,7 @@ export module order_binder;
 
 namespace infinity {
 
-class OrderBinder : public ExpressionBinder {
+export class OrderBinder : public ExpressionBinder {
 public:
     static void PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<BindContext> &bind_context_ptr);
 

@@ -5,6 +5,8 @@
 module;
 
 import bound_statement;
+import logical_knn_scan;
+import base_expression;
 import stl;
 import bind_context;
 import logical_node;
@@ -16,9 +18,9 @@ export module bound_select_statement;
 
 namespace infinity {
 
-class LogicalKnnScan;
+//class LogicalKnnScan;
 //class QueryContext;
-class BaseExpression;
+//class BaseExpression;
 
 export struct BoundSelectStatement final: public BoundStatement {
 public:

@@ -10,14 +10,16 @@ import stl;
 import parser;
 import third_party;
 import table_collection_type;
+import txn_manager;
+import buffer_manager;
 
 export module table_collection_meta;
 
 namespace infinity {
 
-class TxnManager;
+//class TxnManager;
 class DBEntry;
-class BufferManager;
+//class BufferManager;
 
 export struct TableCollectionMeta {
 public:

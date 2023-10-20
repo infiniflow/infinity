@@ -9,8 +9,7 @@ import stl;
 import query_context;
 import bind_context;
 import table_ref;
-
-module bound_select_statement;
+import base_expression;
 
 import logical_node;
 import logical_node_type;
@@ -36,6 +35,8 @@ import logical_join;
 import logical_show;
 import logical_export;
 import logical_import;
+
+module bound_select_statement;
 
 namespace infinity {
 

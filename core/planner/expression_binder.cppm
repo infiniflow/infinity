@@ -8,14 +8,17 @@ import stl;
 import parser;
 import function;
 import bind_context;
+import base_expression;
+import query_context;
+import subquery_expression;
 
 export module expression_binder;
 
 namespace infinity {
 
-class BaseExpression;
-class SubqueryExpression;
-class QueryContext;
+//class BaseExpression;
+//class SubqueryExpression;
+//class QueryContext;
 
 struct ExprBindResult {
     SharedPtr<BaseExpression> bound_expression_ptr_{};
@@ -64,7 +67,7 @@ public:
 
     //    SharedPtr<PlanBuilder> plan_builder_ptr_;
 protected:
-    QueryContext *query_context_;
+    QueryContext *query_context_{};
 };
 
 } // namespace infinity

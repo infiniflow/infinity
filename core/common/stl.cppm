@@ -4,10 +4,12 @@ module;
 #include "ctpl_stl.h"
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <list>
 #include <map>
@@ -15,14 +17,13 @@ module;
 #include <optional>
 #include <set>
 #include <shared_mutex>
+#include <sstream>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <sstream>
-#include <filesystem>
-#include <typeinfo>
 
 export module stl;
 
@@ -75,10 +76,12 @@ export {
     }
 
     void ToUpper(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
+    int ToUpper(int c) { return ::toupper(c); }
 
     void ToLower(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
+    int ToLower(int c) { return ::tolower(c); }
 
-    inline void StringToLower(String &str) {
+    inline void StringToLower(String & str) {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
     }
 
@@ -185,6 +188,15 @@ export {
     // stoi
     inline int StrToInt(const std::string &str, size_t *idx = 0, int base = 10) { return std::stoi(str, idx, base); }
 
+    // StrToL
+    inline long StrToL(const char *__restrict nptr, char **__restrict endptr, int base) { return std::strtol(nptr, endptr, base); }
+
+    // StrToF
+    inline float StrToF(const char *__restrict nptr, char **__restrict endptr) { return std::strtof(nptr, endptr); }
+
+    // StrToD
+    inline double StrToD(const char *__restrict nptr, char **__restrict endptr) { return std::strtod(nptr, endptr); }
+
     // Primitives
 
     using i8 = int8_t;
@@ -223,6 +235,15 @@ export {
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
 
+    constexpr u64 u64_min = std::numeric_limits<u64>::min();
+    constexpr i64 i64_min = std::numeric_limits<i64>::min();
+    constexpr u32 u32_min = std::numeric_limits<u32>::min();
+    constexpr i32 i32_min = std::numeric_limits<i32>::min();
+    constexpr i16 i16_min = std::numeric_limits<i16>::min();
+    constexpr u16 u16_min = std::numeric_limits<u16>::min();
+    constexpr u16 i8_min = std::numeric_limits<i8>::min();
+    constexpr u16 u8_min = std::numeric_limits<u8>::min();
+
     constexpr u64 u64_max = std::numeric_limits<u64>::max();
     constexpr i64 i64_max = std::numeric_limits<i64>::max();
     constexpr u32 u32_max = std::numeric_limits<u32>::max();
@@ -245,9 +266,9 @@ export {
     constexpr u16 u8_inf = std::numeric_limits<u8>::infinity();
 
     constexpr ptr_t ptr_inf = std::numeric_limits<ptr_t>::infinity();
-    constexpr u64* u64_ptr_inf = std::numeric_limits<u64*>::infinity();
+    constexpr u64 *u64_ptr_inf = std::numeric_limits<u64 *>::infinity();
 
-    template<typename T>
+    template <typename T>
     using Atomic = std::atomic<T>;
 
     // Smart ptr
@@ -308,6 +329,7 @@ export {
 
     // Memcpy
     void *Memcpy(void *__restrict dest, const void *__restrict src, size_t n) { return memcpy(dest, src, n); }
+    void *Memset(void *__restrict dest, int value, size_t n) { return memset(dest, value, n); }
 
     // Memcmp
     int Memcmp(const void *__restrict s1, const void *__restrict s2, size_t n) { return memcmp(s1, s2, n); }
@@ -320,56 +342,61 @@ export {
     concept IsTrivial = std::is_trivial_v<T>;
 
     // Mutex
-    template<typename T>
+    template <typename T>
     using SharedLock = std::shared_lock<T>;
 
-    template<typename T>
+    template <typename T>
     using UniqueLock = std::unique_lock<T>;
+
+    template <typename T>
+    using LockGuard = std::lock_guard<T>;
+
+    constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
+
+    using CondVar = std::condition_variable;
 
     // Stringstream
     using StringStream = std::basic_stringstream<char>;
 
     // Endl;
-    template<typename _CharT, typename _Traits>
-    inline std::basic_ostream<_CharT, _Traits>&
-    Endl(std::basic_ostream<_CharT, _Traits>& __os)
-    { return std::flush(__os.put(__os.widen('\n'))); }
+    template <typename _CharT, typename _Traits>
+    inline std::basic_ostream<_CharT, _Traits> &Endl(std::basic_ostream<_CharT, _Traits> & __os) {
+        return std::flush(__os.put(__os.widen('\n')));
+    }
 
     // Dir
     using Path = std::filesystem::path;
     using DirEntry = std::filesystem::directory_entry;
 
-    inline Vector<String> GetFilesFromDir(const String& path) {
+    inline Vector<String> GetFilesFromDir(const String &path) {
         Vector<String> result;
-        for (auto& i : std::filesystem::directory_iterator(path)) {
+        for (auto &i : std::filesystem::directory_iterator(path)) {
             result.emplace_back(i.path().string());
         }
         return result;
     }
 
     // typeid
-//    using TypeID = std::typeid();
+    //    using TypeID = std::typeid();
 
     // std::function
-    template<typename T>
+    template <typename T>
     using StdFunction = std::function<T>;
 
     // SharedPtr
-    template<typename T>
+    template <typename T>
     using EnableSharedFromThis = std::enable_shared_from_this<T>;
 
     // static ptr cast
-    template<typename _Tp, typename _Up>
-    inline std::shared_ptr<_Tp>
-    StaticPtrCast(std::shared_ptr<_Up>&& __r) noexcept
-    {
+    template <typename _Tp, typename _Up>
+    inline std::shared_ptr<_Tp> StaticPtrCast(std::shared_ptr<_Up> && __r) noexcept {
         using _Sp = std::shared_ptr<_Tp>;
-        return _Sp(std::move(__r),
-                   static_cast<typename _Sp::element_type*>(__r.get()));
+        return _Sp(std::move(__r), static_cast<typename _Sp::element_type *>(__r.get()));
     }
 
     using Mutex = std::mutex;
 
+    float NearByInt(float __x) { return __builtin_nearbyintf(__x); }
 }
 
 } // namespace infinity

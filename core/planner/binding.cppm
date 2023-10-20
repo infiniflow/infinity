@@ -5,14 +5,17 @@
 module;
 
 import stl;
+import parser;
+import block_index;
+import table_collection_entry;
 
 export module binding;
 
 namespace infinity {
 
-class TableCollectionEntry;
-class BlockIndex;
-class DataType;
+//class TableCollectionEntry;
+//class BlockIndex;
+//class DataType;
 
 export enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 

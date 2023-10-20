@@ -4,6 +4,20 @@
 module;
 
 import stl;
+import base_entry;
+import parser;
+import table_collection_detail;
+//import table_collection_entry;
+import table_def;
+import index_def;
+import data_block;
+import meta_state;
+import data_access_state;
+import buffer_manager;
+import txn_state;
+import txn_context;
+import wal_entry;
+import txn_store;
 
 export module txn;
 
@@ -22,9 +36,14 @@ struct ScanParam {
     const Vector<ColumnID> &column_ids_{};
 };
 
+class TxnManager;
+class NewCatalog;
+class TableCollectionEntry;
+class DBEntry;
+
 export class Txn {
 public:
-#if 0
+
     explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
 
     void BeginTxn();
@@ -146,7 +165,7 @@ private:
     SharedPtr<WalEntry> wal_entry_;
     // WalManager notify the  commit bottom half is done
     Mutex m;
-    std::condition_variable cv;
+    CondVar cv;
     bool done_bottom_{false};
 
     // Txn Manager
@@ -155,7 +174,6 @@ private:
     bool is_checkpoint_{false};
     // Checkpoint max commit ts only for checkpoint
     TxnTimeStamp max_commit_ts_{};
-#endif
 };
 
 } // namespace infinity

@@ -5,24 +5,37 @@
 module;
 
 import stl;
+import base_expression;
+import logical_node;
+import aggregate_expression;
+import between_expression;
+import case_expression;
+import cast_expression;
+import column_expression;
+import function_expression;
+import value_expression;
+import in_expression;
+import subquery_expression;
+import knn_expression;
+import conjunction_expression;
 
 export module logical_node_visitor;
 
 namespace infinity {
 
-class LogicalNode;
-class BaseExpression;
-class AggregateExpression;
-class BetweenExpression;
-class CaseExpression;
-class CastExpression;
-class ColumnExpression;
-class ConjunctionExpression;
-class FunctionExpression;
-class ValueExpression;
-class InExpression;
-class SubqueryExpression;
-class KnnExpression;
+//class LogicalNode;
+//class BaseExpression;
+//class AggregateExpression;
+//class BetweenExpression;
+//class CaseExpression;
+//class CastExpression;
+//class ColumnExpression;
+//class ConjunctionExpression;
+//class FunctionExpression;
+//class ValueExpression;
+//class InExpression;
+//class SubqueryExpression;
+//class KnnExpression;
 
 export class LogicalNodeVisitor {
 public:

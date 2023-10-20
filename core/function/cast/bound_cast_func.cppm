@@ -12,14 +12,14 @@ namespace infinity {
 
 class ColumnVector;
 
-struct CastParameters {
+export struct CastParameters {
     bool strict{false};
 };
 
 using cast_function_t = bool (*)(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &result, SizeT count, CastParameters &parameters);
 
 export struct BoundCastFunc {
-    explicit BoundCastFunc(cast_function_t func) : function(func){};
+    explicit inline BoundCastFunc(cast_function_t func) : function(func){};
 
     cast_function_t function = nullptr;
 };

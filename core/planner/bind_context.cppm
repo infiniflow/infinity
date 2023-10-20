@@ -12,17 +12,22 @@ import infinity_assert;
 import infinity_exception;
 import column_expression;
 import column_identifer;
+import binding;
+import base_expression;
+import block_index;
+import table_collection_entry;
 
 export module bind_context;
 
 namespace infinity {
 
-class Table;
-class Binding;
+//class Table;
+//class Binding;
 class ExpressionBinder;
-class BaseExpression;
-class TableCollectionEntry;
-class BlockIndex;
+//class BaseExpression;
+//class TableCollectionEntry;
+//class BlockIndex;
+
 //class ColumnExpression;
 //class ColumnIdentifier;
 

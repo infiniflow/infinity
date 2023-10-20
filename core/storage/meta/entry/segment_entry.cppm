@@ -29,7 +29,7 @@ class TableCollectionEntry;
 //class AppendState;
 
 
-enum DataSegmentStatus : i8 {
+export enum DataSegmentStatus : i8 {
     kSegmentOpen,
     kSegmentClosed,
     kSegmentFlushing,
@@ -37,7 +37,7 @@ enum DataSegmentStatus : i8 {
 
 export struct SegmentEntry : public BaseEntry {
 public:
-    explicit SegmentEntry(const TableCollectionEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
+    explicit SegmentEntry(const TableCollectionEntry *table_entry);
 
     RWMutex rw_locker_{};
 
