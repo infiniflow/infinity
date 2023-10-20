@@ -19,7 +19,7 @@ class TableCollectionEntry;
 
 export class LogicalInsert : public LogicalNode {
 public:
-    explicit
+    explicit inline
     LogicalInsert(u64 node_id, TableCollectionEntry *table_collection_ptr, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
         : LogicalNode(node_id, LogicalNodeType::kInsert), table_collection_entry_(table_collection_ptr), table_index_(table_index),
           value_list_(Move(value_list)){};

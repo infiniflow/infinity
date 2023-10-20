@@ -388,10 +388,12 @@ export {
     using EnableSharedFromThis = std::enable_shared_from_this<T>;
 
     // static ptr cast
-    template <typename _Tp, typename _Up>
-    inline std::shared_ptr<_Tp> StaticPtrCast(std::shared_ptr<_Up> && __r) noexcept {
-        using _Sp = std::shared_ptr<_Tp>;
-        return _Sp(std::move(__r), static_cast<typename _Sp::element_type *>(__r.get()));
+    template<typename _Tp, typename _Tp1, std::_Lock_policy _Lp>
+    inline std::__shared_ptr<_Tp, _Lp>
+    StaticPointCast(const std::__shared_ptr<_Tp1, _Lp>& __r) noexcept
+    {
+        using _Sp = std::__shared_ptr<_Tp, _Lp>;
+        return _Sp(__r, static_cast<typename _Sp::element_type*>(__r.get()));
     }
 
     using Mutex = std::mutex;

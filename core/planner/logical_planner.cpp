@@ -7,13 +7,47 @@ module;
 import stl;
 import parser;
 import bind_context;
+import infinity_assert;
+import infinity_exception;
+import query_binder;
+import bound_select_statement;
+import insert_binder;
+import logical_insert;
+import logical_node;
+import cast_expression;
+import cast_function;
+import bound_cast_func;
+import base_expression;
+import base_entry;
+import txn;
+import table_collection_entry;
+import table_collection_type;
+import third_party;
+import table_def;
+import logical_create_table;
+import logical_create_collection;
+import logical_create_schema;
+import logical_create_view;
+import logical_create_index;
+import logical_drop_table;
+import logical_drop_collection;
+import logical_drop_schema;
+import logical_drop_index;
+import logical_drop_view;
+import logical_flush;
+import logical_export;
+import logical_import;
+import logical_explain;
+
+import local_file_system;
+import parser;
+import index_def;
 
 module logical_planner;
 
 namespace infinity {
 
 void LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     if (bind_context_ptr.get() == nullptr) {
         bind_context_ptr = BindContext::Make(nullptr);
     }
@@ -71,33 +105,27 @@ void LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext
             break;
         }
         case StatementType::kInvalidStmt: {
-            PlannerError("Invalid statement type.");
+            Error<PlannerException>("Invalid statement type.", __FILE_NAME__, __LINE__);
             break;
         }
     }
-#endif
 }
 
 void LogicalPlanner::BuildSelect(const SelectStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
-#endif
 }
 
 void LogicalPlanner::BuildInsert(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     if (statement->select_ == nullptr) {
         return BuildInsertValue(statement, bind_context_ptr);
     } else {
         return BuildInsertSelect(statement, bind_context_ptr);
     }
-#endif
 }
 
 void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     bind_context_ptr->expression_binder_ = MakeShared<InsertBinder>(query_context_ptr_);
 
     // Get schema name
@@ -106,27 +134,32 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
 
     // Get table name
     if (table_name.empty()) {
-        PlannerError("Insert statement missing table table_name.");
+        Error<PlannerException>("Insert statement missing table table_name.", __FILE_NAME__, __LINE__);
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
     EntryResult result = txn->GetTableByName(schema_name, table_name);
-    if (result.err_ != nullptr) {
-        PlannerError(*result.err_);
+    if (result.err_.get() != nullptr) {
+        Error<PlannerException>(*result.err_, __FILE_NAME__, __LINE__);
     }
 
     TableCollectionEntry *table_entry = static_cast<TableCollectionEntry *>(result.entry_);
 
     if (table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
-        PlannerError("Currently, collection isn't supported.");
+        Error<PlannerException>("Currently, collection isn't supported.", __FILE_NAME__, __LINE__);
     }
 
     // Create value list
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
-    value_list_array.reserve(statement->values_->size());
-    for (const auto *parsed_expr_list : *statement->values_) {
+    SizeT value_count = statement->values_->size();
+    for (SizeT idx = 0; idx < value_count; ++idx) {
+        const auto *parsed_expr_list = statement->values_->at(idx);
+
+        SizeT expr_count = parsed_expr_list->size();
         Vector<SharedPtr<BaseExpression>> value_list;
-        for (const auto *parsed_expr : *parsed_expr_list) {
+        value_list.reserve(expr_count);
+        for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
+            const auto *parsed_expr = parsed_expr_list->at(expr_idx);
             SharedPtr<BaseExpression> value_expr =
                 bind_context_ptr->expression_binder_->BuildExpression(*parsed_expr, bind_context_ptr.get(), 0, true);
             value_list.emplace_back(value_expr);
@@ -136,10 +169,15 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
 
     // Rearrange the inserted value to match the table.
     // SELECT INTO TABLE (c, a) VALUES (1, 2); => SELECT INTO TABLE (a, b, c) VALUES( 2, NULL, 1);
-    for (auto &value_list : value_list_array) {
+    SizeT value_list_count = value_list_array.size();
+    for (SizeT idx = 0; idx < value_list_count; ++idx) {
+        auto &value_list = value_list_array[idx];
         if (statement->columns_ != nullptr) {
             SizeT statement_column_count = statement->columns_->size();
-            PlannerAssert(statement_column_count == value_list.size(), "INSERT: Target column count and input column count mismatch");
+            Assert<PlannerException>(statement_column_count == value_list.size(),
+                                     "INSERT: Target column count and input column count mismatch",
+                                     __FILE_NAME__,
+                                     __LINE__);
 
             //        Value null_value = Value::MakeNullData();
             //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
@@ -149,9 +187,9 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
-            SizeT column_idx = 0;
-            for (const auto &column_name : *statement->columns_) {
-                // Get table index from the inserted value column name;
+            SizeT column_count = statement->columns_->size();
+            for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
+                const auto &column_name = statement->columns_->at(column_idx);
                 SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
                 const SharedPtr<DataType> &table_column_type = table_entry->columns_[table_column_id]->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
@@ -170,17 +208,18 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
                         rewrite_value_list[column_idx] = value_list[column_idx];
                     }
                 }
-                ++column_idx;
             }
 
             value_list = rewrite_value_list;
         } else {
             SizeT table_column_count = table_entry->columns_.size();
             if (value_list.size() != table_column_count) {
-                PlannerError(fmt::format("INSERT: Table column count ({}) and "
-                                         "input value count mismatch ({})",
-                                         table_column_count,
-                                         value_list.size()));
+                Error<PlannerException>(Format("INSERT: Table column count ({}) and "
+                                               "input value count mismatch ({})",
+                                               table_column_count,
+                                               value_list.size()),
+                                        __FILE_NAME__,
+                                        __LINE__);
             }
 
             // Create value list with table column size and null value
@@ -214,29 +253,21 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
     //    this->AppendOperator(logical_insert, bind_context_ptr);
 
     this->logical_plan_ = logical_insert;
-#endif
 }
 
 void LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    PlannerError("Inserting select isn't supported.");
-#endif
+    Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    PlannerError("Update isn't supported.");
-#endif
+    Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    PlannerError("Update isn't supported.");
-#endif
+    Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             BuildCreateTable(statement, bind_context_ptr);
@@ -259,14 +290,12 @@ void LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<Bin
             break;
         }
         default: {
-            PlannerError("Creating type isn't supported");
+            Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 void LogicalPlanner::BuildCreateTable(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *create_table_info = (CreateTableInfo *)statement->create_info_.get();
 
     // Check if columns is given.
@@ -301,11 +330,9 @@ void LogicalPlanner::BuildCreateTable(const CreateStatement *statement, SharedPt
     this->logical_plan_ = logical_create_table_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *create_collection_info = (CreateCollectionInfo *)statement->create_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_collection_info->schema_name_);
@@ -320,11 +347,9 @@ void LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, Sha
     this->logical_plan_ = logical_create_collection_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *create_schema_info = (CreateSchemaInfo *)statement->create_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);
@@ -335,12 +360,10 @@ void LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedP
     this->logical_plan_ = logical_create_schema_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    SharedPtr<CreateViewInfo> create_view_info = std::static_pointer_cast<CreateViewInfo>(statement->create_info_);
+    CreateViewInfo* create_view_info = (CreateViewInfo*)(statement->create_info_.get());
 
     // Check if columns is given.
     SharedPtr<Vector<String>> columns_ptr;
@@ -355,17 +378,19 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
         columns_ptr = bound_statement_ptr->names_ptr_;
     } else {
         // Specify the view column
-        PlannerAssert(column_count == bound_statement_ptr->names_ptr_->size(), "Create view column count isn't matched.") columns_ptr =
-            MakeShared<Vector<String>>(*(create_view_info->view_columns_));
+        Assert<PlannerException>(column_count == bound_statement_ptr->names_ptr_->size(),
+                                 "Create view column count isn't matched.",
+                                 __FILE_NAME__,
+                                 __LINE__);
+        columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
 
     SharedPtr<LogicalNode> logical_create_view_operator =
-        LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(), columns_ptr, bound_statement_ptr->types_ptr_, create_view_info);
+        LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(), columns_ptr, bound_statement_ptr->types_ptr_, statement->create_info_);
 
     this->logical_plan_ = logical_create_view_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -375,34 +400,35 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
     if (create_index_info->column_names_->size() != 1) {
-        NotImplementError("Creating index only support single column now.");
+        Error<NotImplementException>("Creating index only support single column now.", __FILE_NAME__, __LINE__);
     }
 
     Vector<String> column_names(*create_index_info->column_names_);
-    String index_name = std::move(create_index_info->index_name_);
+    String index_name = Move(create_index_info->index_name_);
     IndexMethod method_type = IndexMethod::kInvalid;
-    if (create_index_info->method_type_ == "IVFFlat") {
+    if (IsEqual(create_index_info->method_type_, "IVFFlat")) {
         method_type = IndexMethod::kIVFFlat;
-    } else if (create_index_info->method_type_ == "IVFSQ8") {
+    } else if (IsEqual(create_index_info->method_type_, "IVFSQ8")) {
         method_type = IndexMethod::kIVFSQ8;
-    } else if (create_index_info->method_type_ == "HNSW") {
+    } else if (IsEqual(create_index_info->method_type_, "HNSW")) {
         method_type = IndexMethod::kHnsw;
     } else {
         PlannerException("Invalid index method type.");
     }
-    auto index_def_common = IndexDefCommon(std::move(index_name), std::move(method_type), std::move(column_names));
+    auto index_def_common = IndexDefCommon(Move(index_name), Move(method_type), Move(column_names));
 
     SharedPtr<IndexDef> index_def_ptr = nullptr;
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
-            index_def_ptr = IVFFlatIndexDef::Make(std::move(index_def_common), *create_index_info->index_para_list_);
+            index_def_ptr = IVFFlatIndexDef::Make(Move(index_def_common), *create_index_info->index_para_list_);
             break;
         }
         case IndexMethod::kInvalid: {
-            PlannerError("Invalid index method type.");
+            Error<PlannerException>("Invalid index method type.", __FILE_NAME__, __LINE__);
+            break;
         }
         default: {
-            NotImplementException("Not implemented");
+            Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
         }
     }
 
@@ -416,7 +442,6 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
 }
 
 void LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             BuildDropTable(statement, bind_context_ptr);
@@ -439,14 +464,12 @@ void LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindCon
             break;
         }
         case DDLType::kInvalid: {
-            PlannerError("Invalid drop statement type.");
+            Error<PlannerException>("Invalid drop statement type.", __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 void LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *drop_table_info = (DropTableInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr{nullptr};
@@ -463,11 +486,9 @@ void LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<Bi
     this->logical_plan_ = logical_drop_table;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildDropCollection(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *drop_collection_info = (DropCollectionInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr{nullptr};
@@ -485,11 +506,9 @@ void LogicalPlanner::BuildDropCollection(const DropStatement *statement, SharedP
     this->logical_plan_ = logical_drop_collection;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
@@ -500,11 +519,9 @@ void LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<B
     this->logical_plan_ = logical_drop_schema;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *drop_index_info = (DropIndexInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_index_info->schema_name_);
@@ -516,11 +533,9 @@ void LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<Bi
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     auto *drop_view_info = (DropViewInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_view_info->schema_name_);
@@ -532,19 +547,14 @@ void LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<Bin
     this->logical_plan_ = logical_drop_view;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-#endif
 }
 
 void LogicalPlanner::BuildPrepare(const PrepareStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    PlannerError("Prepare statement isn't supported.");
-#endif
+    Error<PlannerException>("Prepare statement isn't supported.", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildExecute(const ExecuteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    PlannerError("Execute statement isn't supported.");
-#endif
+    Error<PlannerException>("Execute statement isn't supported.", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildCopy(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -558,12 +568,11 @@ void LogicalPlanner::BuildCopy(const CopyStatement *statement, SharedPtr<BindCon
 }
 
 void LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
     EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (result.err_ != nullptr) {
-        PlannerError(*result.err_);
+    if (result.err_.get() != nullptr) {
+        Error<PlannerException>(*result.err_, __FILE_NAME__, __LINE__);
     }
 
     // Check the file existence
@@ -571,7 +580,7 @@ void LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindC
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        PlannerError("File: " + statement->file_path_ + " doesn't exist.");
+        Error<PlannerException>(Format("File: {} doesn't exist.", statement->file_path_), __FILE_NAME__, __LINE__);
     }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -583,16 +592,14 @@ void LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindC
                                                                       statement->copy_file_type_);
 
     this->logical_plan_ = logical_export;
-#endif
 }
 
 void LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
     EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
     if (result.entry_ == nullptr) {
-        PlannerError(*result.err_);
+        Error<PlannerException>(*result.err_, __FILE_NAME__, __LINE__);
     }
     auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
 
@@ -601,7 +608,7 @@ void LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindC
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        PlannerError("File: " + statement->file_path_ + " doesn't exist.");
+        Error<PlannerException>(Format("File: {} doesn't exist.", statement->file_path_), __FILE_NAME__, __LINE__);
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -612,13 +619,10 @@ void LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindC
                                                                       statement->copy_file_type_);
 
     this->logical_plan_ = logical_import;
-#endif
 }
 
 void LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-#if 0
-    NotImplementError("BuildAlter")
-#endif
+    Error<PlannerException>("Alter statement isn't supported.", __FILE_NAME__, __LINE__);
 }
 
 void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {

@@ -118,11 +118,20 @@ export using ExplainType = ExplainType;
 export using FlushType = FlushType;
 export using EmbeddingDataType = EmbeddingDataType;
 
+export using ExtraDDLInfo = ExtraDDLInfo;
 export using CreateTableInfo = CreateTableInfo;
 export using CreateIndexInfo = CreateIndexInfo;
+export using CreateViewInfo = CreateViewInfo;
+export using CreateCollectionInfo = CreateCollectionInfo;
+export using CreateSchemaInfo = CreateSchemaInfo;
+
 export using DropIndexInfo = DropIndexInfo;
 export using DropTableInfo = DropTableInfo;
-export using CreateViewInfo = CreateViewInfo;
+export using DropCollectionInfo = DropCollectionInfo;
+export using DropSchemaInfo = DropSchemaInfo;
+export using DropViewInfo = DropViewInfo;
+
+export using InitParameter = InitParameter;
 
 export using BaseTableReference = BaseTableReference;
 export using TableReference = TableReference;

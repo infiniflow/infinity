@@ -10,14 +10,14 @@ export module index_def;
 
 namespace infinity {
 
-enum class IndexMethod {
+export enum class IndexMethod {
     kIVFFlat,
     kIVFSQ8,
     kHnsw,
     kInvalid,
 };
 
-enum class MetricType {
+export enum class MetricType {
     kMerticInnerProduct,
     kMerticL2,
     kInvalid,
@@ -25,9 +25,9 @@ enum class MetricType {
 
 IndexMethod StringToIndexMethod(const String &str);
 
-MetricType StringToMetricType(const String &str);
+export MetricType StringToMetricType(const String &str);
 
-struct IndexDefCommon {
+export struct IndexDefCommon {
     String index_name_{};
     IndexMethod method_type_{IndexMethod::kInvalid};
     Vector<String> column_names_{};
@@ -49,6 +49,8 @@ struct IndexDefCommon {
 
 export class IndexDef {
 public:
+    inline IndexDef() = default;
+
     virtual ~IndexDef() = default;
 
     virtual String ToString() const = 0;

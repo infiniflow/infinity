@@ -15,7 +15,7 @@ export module insert_binder;
 
 namespace infinity {
 
-class InsertBinder final : public ExpressionBinder {
+export class InsertBinder final : public ExpressionBinder {
 public:
     explicit InsertBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 
