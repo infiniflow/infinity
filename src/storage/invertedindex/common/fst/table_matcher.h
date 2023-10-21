@@ -25,6 +25,7 @@
 #include <algorithm>
 
 #include "automaton.h"
+#include "bits_utils.h"
 #include "string_types.h"
 
 namespace fst {
@@ -220,27 +221,12 @@ private:
         return size_t(std::distance(start_labels_.begin(), it.base())) - 1;
     }
 
-    template <unsigned Bit, typename T>
-    inline constexpr void set_bit(T &value) noexcept {
-        value |= (T(1) << (Bit));
-    }
-
-    template <typename T>
-    inline constexpr uint32_t bits_required() noexcept {
-        return sizeof(T) * 8U;
-    }
-
-    template <typename T>
-    inline constexpr bool check_bit(T value, size_t bit) noexcept {
-        return (value & (T(1) << bit)) != 0;
-    }
-
     //    template <typename F, bool MatchInput, bool ByteLabel>
     std::vector<typename F::Arc::Label> GetStartLabels(const F &fst) {
         using Label = typename F::Arc::Label;
 
         if constexpr (ByteLabel) {
-            size_t bits[256 / bits_required<size_t>()]{};
+            size_t bits[256 / BitsRequired<size_t>()]{};
 
             for (StateIterator<F> siter(fst); !siter.Done(); siter.Next()) {
                 const auto state = siter.Value();
@@ -249,8 +235,8 @@ private:
                     RangeLabel range{MatchInput ? arc.ilabel : arc.olabel};
                     range.max += decltype(range.max)(range.max < std::numeric_limits<char>::max());
 
-                    set_bit(bits[range.min / bits_required<size_t>()], range.min % bits_required<size_t>());
-                    set_bit(bits[range.max / bits_required<size_t>()], range.max % bits_required<size_t>());
+                    SetBit(bits[range.min / BitsRequired<size_t>()], range.min % BitsRequired<size_t>());
+                    SetBit(bits[range.max / BitsRequired<size_t>()], range.max % BitsRequired<size_t>());
                 }
             }
 
@@ -264,13 +250,13 @@ private:
             Label offset = 0;
 
             std::for_each(std::begin(bits), std::end(bits), [this, &offset, &begin](size_t word) {
-                for (size_t j = 0; j < bits_required<size_t>(); ++j) {
-                    if (check_bit(word, j)) {
+                for (size_t j = 0; j < BitsRequired<size_t>(); ++j) {
+                    if (CheckBit(word, j)) {
                         *begin = offset + static_cast<Label>(j);
                         ++begin;
                     }
                 }
-                offset += bits_required<size_t>();
+                offset += BitsRequired<size_t>();
             });
 
             return labels;

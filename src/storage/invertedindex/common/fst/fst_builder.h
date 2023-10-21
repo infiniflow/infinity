@@ -22,9 +22,11 @@
 
 #pragma once
 
+#include <fst/vector-fst.h>
+
 #include "states_map.h"
 #include "string_types.h"
-#include <fst/vector-fst.h>
+#include "string_weight.h"
 
 #include <functional>
 #include <string>
@@ -50,7 +52,7 @@ class FSTBuilder {
 public:
     typedef Fst fst_t;
     typedef Char char_t;
-    typedef std::basic_string_view<char_t> key_t;
+    typedef basic_string_view<char_t> key_t;
     typedef Stats stats_t;
     typedef typename fst_t::Weight weight_t;
     typedef typename fst_t::Arc arc_t;
@@ -152,7 +154,7 @@ public:
             auto &root = states_[0];
 
             if (!root.arcs.empty() || !root.final) {
-                start = states_map_.insert(root, fst_);
+                start = states_map_.Insert(root, fst_);
             }
         }
 
@@ -181,7 +183,7 @@ public:
         stats_(weight_t::One());
 
         states_.clear();
-        states_map_.reset();
+        states_map_.Reset();
         last_ = {};
         start_out_ = weight_t{};
     }
@@ -244,7 +246,7 @@ private:
 
     struct StateHash {
         template <typename SizeT>
-        inline void HashCombine(SizeT &seed, SizeT value) {
+        inline void HashCombine(SizeT &seed, SizeT value) const noexcept {
             std::hash<SizeT> hasher;
             seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
@@ -253,9 +255,9 @@ private:
             size_t hash = 0;
 
             for (auto &a : s.arcs) {
-                HashCombine(hash, a.label);
-                HashCombine(hash, a.id);
-                HashCombine(hash, a.out.Hash());
+                HashCombine<size_t>(hash, a.label);
+                HashCombine<size_t>(hash, a.id);
+                HashCombine<size_t>(hash, a.out.Hash());
             }
 
             return hash;
@@ -266,9 +268,9 @@ private:
 
             for (fst::ArcIterator<fst_t> it(fst, id); !it.Done(); it.Next()) {
                 const arc_t &a = it.Value();
-                HashCombine(hash, a.ilabel);
-                HashCombine(hash, a.nextstate);
-                HashCombine(hash, a.weight.Hash());
+                HashCombine<size_t>(hash, a.ilabel);
+                HashCombine<size_t>(hash, a.nextstate);
+                HashCombine<size_t>(hash, a.weight.Hash());
             }
 
             return hash;
@@ -319,7 +321,7 @@ private:
             State &p = states_[i - 1];
 
             assert(!p.arcs.empty());
-            p.arcs.back().id = s.arcs.empty() && s.final ? FSTBuilder::final : states_map_.insert(s, fst_);
+            p.arcs.back().id = s.arcs.empty() && s.final ? FSTBuilder::final : states_map_.Insert(s, fst_);
 
             s.clear();
         }

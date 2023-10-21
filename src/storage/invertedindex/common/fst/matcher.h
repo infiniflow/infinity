@@ -32,7 +32,7 @@ namespace fst {
 // from having to check for and discard the unwanted implicit matches
 // themselves.
 template <class MatcherImpl>
-class ExplicitMatcher final : public MatcherBase<typename MatcherImpl::FST::Arc> {
+class ExplicitMatcherExt final : public MatcherBase<typename MatcherImpl::FST::Arc> {
 public:
     typedef typename MatcherImpl::FST FST;
     typedef typename FST::Arc Arc;
@@ -41,13 +41,13 @@ public:
     typedef typename Arc::Weight Weight;
 
     template <typename... Args>
-    explicit ExplicitMatcher(Args &&...args)
+    explicit ExplicitMatcherExt(Args &&...args)
         : matcher_(std::forward<Args>(args)...), match_type_(matcher_.Type(false)) // read type without checks
     {}
 
-    ExplicitMatcher(const ExplicitMatcher &rhs, bool safe = false) : matcher_(rhs.matcher_, safe), match_type_(rhs.match_type_) {}
+    ExplicitMatcherExt(const ExplicitMatcherExt &rhs, bool safe = false) : matcher_(rhs.matcher_, safe), match_type_(rhs.match_type_) {}
 
-    ExplicitMatcher *Copy(bool safe = false) const final { return new ExplicitMatcher(*this, safe); }
+    ExplicitMatcherExt *Copy(bool safe = false) const final { return new ExplicitMatcherExt(*this, safe); }
 
     MatchType Type(bool test) const final { return matcher_.Type(test); }
 

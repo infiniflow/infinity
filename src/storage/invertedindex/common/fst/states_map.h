@@ -60,7 +60,7 @@ public:
                 ++count_;
 
                 if (count_ > 2 * states_.size() / 3) {
-                    rehash(fst);
+                    Rehash(fst);
                 }
 
                 return id;

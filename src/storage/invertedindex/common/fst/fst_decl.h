@@ -23,13 +23,13 @@ class ImmutableFst;
 
 namespace infinity {
 using byte_type = uint8_t;
-using byte_weight = fst::StringLeftWeight<byte_type>;
-using byte_arc = fst::ArcTpl<byte_weight>;
-using vector_byte_fst = fst::VectorFst<byte_arc, fst::VectorState<byte_arc, std::allocator<byte_arc>>>;
+using ByteWeight = fst::StringLeftWeight<byte_type>;
+using ByteArc = fst::ArcTpl<ByteWeight>;
+using VectorByteFST = fst::VectorFst<ByteArc, fst::VectorState<ByteArc, std::allocator<ByteArc>>>;
 
-using byte_ref_weight = fst::StringRefWeight<byte_type>;
-using byte_ref_arc = fst::ILabelArc<byte_ref_weight, int32_t>;
-using immutable_byte_fst = fst::ImmutableFst<byte_ref_arc>;
+using ByteRefWeight = fst::StringRefWeight<byte_type>;
+using ByteRefArc = fst::ILabelArc<ByteRefWeight, int32_t>;
+using ImmutableByteFST = fst::ImmutableFst<ByteRefArc>;
 
 template <typename Key, typename Weight, typename Stats>
 class FSTBuilder;

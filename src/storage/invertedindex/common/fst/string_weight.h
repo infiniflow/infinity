@@ -309,7 +309,7 @@ inline StringLeftWeight<Label> DivideLeft(const StringLeftWeight<Label> &lhs, co
         return Weight();
     }
 
-    assert(std::infinity::basic_string_view<Label>(lhs).starts_with(rhs));
+    assert(::infinity::basic_string_view<Label>(lhs).starts_with(rhs));
 
     return Weight(lhs.begin() + rhs.Size(), lhs.end());
 }
