@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

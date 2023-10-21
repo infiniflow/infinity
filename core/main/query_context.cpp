@@ -5,6 +5,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import session;
 import config;
@@ -16,6 +18,8 @@ import parser;
 import infinity_assert;
 import infinity_exception;
 import logical_planner;
+import logical_node_type;
+import data_block;
 
 module query_context;
 
@@ -23,7 +27,6 @@ module query_context;
 namespace infinity {
 
 String QueryResult::ToString() const {
-#if 0
     std::stringstream ss;
 
     switch (root_operator_type_) {
@@ -63,7 +66,6 @@ String QueryResult::ToString() const {
     }
 
     return ss.str();
-#endif
 }
 
 void QueryContext::Init(Session *session_ptr,

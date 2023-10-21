@@ -20,7 +20,7 @@ class BufferManager;
 
 class Txn;
 
-struct ViewEntry : public BaseEntry {
+export struct ViewEntry : public BaseEntry {
 public:
     explicit ViewEntry(const SharedPtr<String> &base_dir,
                        SharedPtr<CreateViewInfo> create_view_info,

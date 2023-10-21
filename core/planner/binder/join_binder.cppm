@@ -15,7 +15,7 @@ export module join_binder;
 
 namespace infinity {
 
-class JoinBinder final : public ExpressionBinder {
+export class JoinBinder final : public ExpressionBinder {
 public:
     explicit JoinBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 

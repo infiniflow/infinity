@@ -31,7 +31,7 @@ class ExpressionBinder;
 //class ColumnExpression;
 //class ColumnIdentifier;
 
-struct CommonTableExpressionInfo {
+export struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement *select_stmt, HashSet<String> masked_name_set)
         : alias_(Move(alias)), select_statement_(select_stmt), masked_name_set_(Move(masked_name_set)) {}
 

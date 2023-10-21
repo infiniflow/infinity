@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

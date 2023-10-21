@@ -7,12 +7,12 @@ module;
 import stl;
 import parser;
 import table_ref;
+import bound_statement;
 
 export module subquery_table_ref;
 
 namespace infinity {
 
-class BoundStatement;
 export class SubqueryTableRef : public TableRef {
 public:
     explicit SubqueryTableRef(SharedPtr<BoundStatement> subquery_node, u64 table_index, String alias)

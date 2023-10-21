@@ -4,17 +4,27 @@
 
 module;
 
+import stl;
+import base_entry;
+import parser;
+import buffer_handle;
+import outline_info;
+import column_buffer;
+import column_vector;
+import buffer_manager;
+import third_party;
+
 export module segment_column_entry;
-#if 0
+
 namespace infinity {
 
-class BufferManager;
+// class BufferManager;
 
 class SegmentEntry;
 
-class ColumnVector;
+// class ColumnVector;
 
-struct SegmentColumnEntry : public BaseEntry {
+export struct SegmentColumnEntry : public BaseEntry {
 public:
     explicit SegmentColumnEntry(const SegmentEntry *segment_entry) : BaseEntry(EntryType::kSegmentColumn), segment_entry_(segment_entry) {}
 
@@ -48,12 +58,11 @@ public:
 
     static void Flush(SegmentColumnEntry *column_data_entry, SizeT row_count);
 
-    static nlohmann::json Serialize(const SegmentColumnEntry *column_data_entry);
+    static Json Serialize(const SegmentColumnEntry *column_data_entry);
 
-    static SharedPtr<SegmentColumnEntry> Deserialize(const nlohmann::json &column_data_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentColumnEntry> Deserialize(const Json &column_data_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
-    static SharedPtr<String> OutlineFilename(SizeT file_idx) { return MakeShared<String>("out_" + std::to_string(file_idx)); }
+    static SharedPtr<String> OutlineFilename(SizeT file_idx) { return MakeShared<String>(Format("out_{}", file_idx)); }
 };
 
 } // namespace infinity
-#endif

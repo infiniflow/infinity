@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

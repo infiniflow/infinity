@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

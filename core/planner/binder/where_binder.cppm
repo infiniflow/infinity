@@ -11,12 +11,11 @@ import function;
 import bind_context;
 import expression_binder;
 import query_context;
+import bind_alias_proxy;
 
 export module where_binder;
 
 namespace infinity {
-
-class BindAliasProxy;
 
 export class WhereBinder final : public ExpressionBinder {
 public:

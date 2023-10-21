@@ -14,9 +14,9 @@ export module table_scan;
 
 namespace infinity {
 
-void RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterTableScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
-class TableScanFunction : public TableFunction {
+export class TableScanFunction : public TableFunction {
 public:
     static SharedPtr<TableScanFunction> Make(NewCatalog *catalog, const String &func_name);
 

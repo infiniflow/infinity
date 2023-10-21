@@ -10,12 +10,11 @@ import base_expression;
 import bind_context;
 import expression_binder;
 import query_context;
+import bind_alias_proxy;
 
 export module having_binder;
 
 namespace infinity {
-
-class BindAliasProxy;
 
 export class HavingBinder final : public ExpressionBinder {
 public:

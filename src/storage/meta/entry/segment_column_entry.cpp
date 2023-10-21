@@ -2,14 +2,13 @@
 // Created by jinhai on 23-8-12.
 //
 
-#include "segment_column_entry.h"
+module;
 
-#include "common/column_vector/column_vector.h"
+import stl;
+import parser;
+import segment_entry;
 
-#include "common/types/data_type.h"
-#include "common/types/varchar_layout.h"
-#include "storage/meta/entry/segment_entry.h"
-#include "storage/buffer/buffer_manager.h"
+module segment_column_entry;
 
 namespace infinity {
 

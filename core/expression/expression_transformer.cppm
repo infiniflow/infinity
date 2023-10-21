@@ -15,7 +15,7 @@ namespace infinity {
 enum class VisitControlType { kInvalid, kVisit, kNotVisit };
 
 // Transform expr_a AND expr_b AND expr_c into expressions array: [expr_a, expr_b, expr_c].
-Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType conjunction_type);
+export Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType conjunction_type);
 
 export SharedPtr<BaseExpression> ComposeExpressionWithDelimiter(const Vector<SharedPtr<BaseExpression>> &expressions, ConjunctionType conjunction_type);
 

@@ -178,6 +178,7 @@ export using CastExpr = CastExpr;
 export using WithExpr = WithExpr;
 export using UpdateExpr = UpdateExpr;
 export using InExpr = InExpr;
+export using OrderByExpr = OrderByExpr;
 
 export using ColumnDef = ColumnDef;
 

@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

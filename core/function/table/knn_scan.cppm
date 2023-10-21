@@ -14,7 +14,7 @@ export module knn_scan;
 
 namespace infinity {
 
-void RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterKnnScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 export class KnnScanFunction : public TableFunction {
 public:

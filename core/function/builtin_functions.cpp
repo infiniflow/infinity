@@ -13,6 +13,32 @@ import max;
 import min;
 import sum;
 
+import add;
+import abs;
+import and_func;
+import divide;
+import equals;
+import extract;
+import greater;
+import greater_equals;
+import inequals;
+import less;
+import less_equals;
+import like;
+import minus;
+import modulo;
+import multiply;
+import not_func;
+import or_func;
+import plus;
+import pow;
+import substring;
+import substract;
+
+import table_scan;
+import seq_scan;
+import knn_scan;
+
 module builtin_functions;
 
 namespace infinity {
@@ -36,7 +62,6 @@ void BuiltinFunctions::RegisterAggregateFunction() {
 
 void BuiltinFunctions::RegisterScalarFunction() {
     // Insert the function set into catalog
-#if 0
     // Arithmetic functions
     RegisterAddFunction(catalog_ptr_);
     RegisterSubtractFunction(catalog_ptr_);
@@ -70,15 +95,12 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // string functions
     RegisterSubstringFunction(catalog_ptr_);
-#endif
 }
 
 void BuiltinFunctions::RegisterTableFunction() {
-#if 0
     RegisterSeqScanFunction(catalog_ptr_);
     RegisterTableScanFunction(catalog_ptr_);
     RegisterKnnScanFunction(catalog_ptr_);
-#endif
 }
 
 } // namespace infinity

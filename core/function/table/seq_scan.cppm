@@ -17,7 +17,7 @@ export module seq_scan;
 
 namespace infinity {
 
-void RegisterSeqScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterSeqScanFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 class SeqScanFunctionData : public TableFunctionData {
 public:

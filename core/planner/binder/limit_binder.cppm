@@ -15,7 +15,7 @@ export module limit_binder;
 
 namespace infinity {
 
-class LimitBinder final : public ExpressionBinder {
+export class LimitBinder final : public ExpressionBinder {
 public:
     explicit LimitBinder(QueryContext *query_context) : ExpressionBinder(query_context) {}
 

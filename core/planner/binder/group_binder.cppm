@@ -12,14 +12,13 @@ import bind_context;
 import expression_binder;
 import query_context;
 import function;
+import bind_alias_proxy;
 
 export module group_binder;
 
 namespace infinity {
 
-class BindAliasProxy;
-
-class GroupBinder : public ExpressionBinder {
+export class GroupBinder : public ExpressionBinder {
 public:
     i64 group_by_expr_index{-1};
 

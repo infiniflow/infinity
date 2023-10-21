@@ -8,30 +8,27 @@ import infinity_exception;
 import infinity_assert;
 import varchar_layout;
 import parser;
+import segment_column_entry;
+import object_handle;
 
 module column_buffer;
 
 namespace infinity {
 
 ColumnBuffer::ColumnBuffer(BufferHandle *buffer_handle, BufferManager *buffer_mgr, bool is_outline) : inline_col_(buffer_handle) {
-#if 0
     if (is_outline) {
         outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr);
     }
-#endif
 }
 
 const ptr_t ColumnBuffer::GetAll() {
-#if 0
     if (outline_buffer_.get() == nullptr) {
         return inline_col_.GetData();
     }
     Error<TypeException>("Cannot get all data of an outline column", __FILE_NAME__, __LINE__);
-#endif
 }
 
 Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
-#if 0
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column", __FILE_NAME__, __LINE__);
     auto varchar_layout = reinterpret_cast<VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
@@ -47,7 +44,6 @@ Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     }
     ptr_t ptr = outline_buffer_->outline_ele_.GetData() + long_info.file_offset_;
     return {ptr, varchar_layout->length_};
-#endif
 }
 
 Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
