@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

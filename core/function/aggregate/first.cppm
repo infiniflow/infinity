@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

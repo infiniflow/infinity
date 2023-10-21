@@ -6,6 +6,12 @@ module;
 
 import stl;
 import new_catalog;
+import avg;
+import count;
+import first;
+import max;
+import min;
+import sum;
 
 module builtin_functions;
 
@@ -20,14 +26,12 @@ void BuiltinFunctions::Init() {
 }
 
 void BuiltinFunctions::RegisterAggregateFunction() {
-#if 0
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
     RegisterFirstFunction(catalog_ptr_);
     RegisterMaxFunction(catalog_ptr_);
     RegisterMinFunction(catalog_ptr_);
     RegisterSumFunction(catalog_ptr_);
-#endif
 }
 
 void BuiltinFunctions::RegisterScalarFunction() {

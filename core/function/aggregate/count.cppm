@@ -12,6 +12,6 @@ namespace infinity {
 
 class NewCatalog;
 
-void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }
