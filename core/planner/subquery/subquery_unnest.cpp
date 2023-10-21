@@ -4,6 +4,8 @@
 
 module;
 
+#include <memory>
+
 import stl;
 import parser;
 import base_expression;
@@ -11,20 +13,35 @@ import query_context;
 import logical_node;
 import bind_context;
 import expression_type;
+import value;
+import dependent_join_flattener;
 
 import subquery_expression;
 import value_expression;
 import function_expression;
+import aggregate_expression;
+import cast_expression;
+import in_expression;
 
 import logical_join;
 import logical_limit;
+import logical_aggregate;
+import logical_cross_product;
 
 import function_set;
 import scalar_function;
+import scalar_function_set;
+import aggregate_function_set;
+import aggregate_function;
+import cast_function;
+import bound_cast_func;
+import cast_table;
 
 import new_catalog;
 import column_binding;
 import third_party;
+import infinity_assert;
+import infinity_exception;
 
 module subquery_unnest;
 
@@ -45,7 +62,6 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpressio
                                                          SharedPtr<LogicalNode> &root,
                                                          QueryContext *query_context,
                                                          const SharedPtr<BindContext> &bind_context) {
-#if 0
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
     auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
 
@@ -59,7 +75,6 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpressio
     // 3. If the subquery also has another subquery nested, we need to resolve it recursively.
 
     return result;
-#endif
 }
 
 SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression *expr_ptr,
@@ -67,7 +82,6 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
                                                              SharedPtr<LogicalNode> &subquery_plan,
                                                              QueryContext *query_context,
                                                              const SharedPtr<BindContext> &bind_context) {
-#if 0
     switch (expr_ptr->subquery_type_) {
 
         case SubqueryType::kScalar: {
@@ -125,11 +139,11 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             //     |-> Aggregate( count(*) as count_start)
             //         |-> Limit (1)
             //             |-> right plan tree
-            PlannerError("Plan EXISTS uncorrelated subquery");
+            Error<PlannerException>("Plan EXISTS uncorrelated subquery", __FILE_NAME__, __LINE__);
             break;
         }
         case SubqueryType::kNotExists: {
-            PlannerError("Plan not EXISTS uncorrelated subquery");
+            Error<PlannerException>("Plan not EXISTS uncorrelated subquery", __FILE_NAME__, __LINE__);
             break;
         }
         case SubqueryType::kNotIn:
@@ -180,14 +194,13 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             return result;
         }
         case SubqueryType::kAny:
-            PlannerError("Plan ANY uncorrelated subquery");
+            Error<PlannerException>("Plan ANY uncorrelated subquery", __FILE_NAME__, __LINE__);
             break;
-        default:
-            PlannerError("Unknown subquery type.");
+        default: {
+            Error<PlannerException>("Unknown subquery type.", __FILE_NAME__, __LINE__);
+        }
     }
-
-    PlannerError("Not implement to unnest uncorrelated subquery.");
-#endif
+    Error<PlannerException>("Not implement to unnest uncorrelated subquery.", __FILE_NAME__, __LINE__);
 }
 
 SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *expr_ptr,
@@ -195,17 +208,16 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
                                                            SharedPtr<LogicalNode> &subquery_plan,
                                                            QueryContext *query_context,
                                                            const SharedPtr<BindContext> &bind_context) {
-#if 0
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
-    PlannerAssert(!correlated_columns.empty(), "No correlated column");
+    Assert<PlannerException>(!correlated_columns.empty(), "No correlated column", __FILE_NAME__, __LINE__);
 
     // Valid the correlated columns are from one table.
     SizeT column_count = correlated_columns.size();
     SizeT table_index = correlated_columns[0]->binding().table_idx;
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (table_index != correlated_columns[idx]->binding().table_idx) {
-            PlannerError("Correlated columns can be only from one table, now.")
+            Error<PlannerException>("Correlated columns can be only from one table, now.", __FILE_NAME__, __LINE__);
         }
     }
 
@@ -363,11 +375,10 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             return result;
         }
         case SubqueryType::kAny: {
-            NotImplementError("Unnest correlated any subquery.");
+            Error<PlannerException>("Unnest correlated any subquery.", __FILE_NAME__, __LINE__);
         }
     }
-    PlannerError("Unreachable")
-#endif
+    Error<PlannerException>("Unreachable", __FILE_NAME__, __LINE__);
 }
 
 void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
@@ -375,7 +386,7 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
                                             const Vector<SharedPtr<ColumnExpression>> &correlated_columns,
                                             const Vector<ColumnBinding> &subplan_column_bindings,
                                             SizeT correlated_base_index) {
-#if 0
+
     NewCatalog *catalog = query_context->storage()->catalog();
     SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
     SizeT column_count = correlated_columns.size();
@@ -383,7 +394,9 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            PlannerError(Format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()))
+            Error<PlannerException>(Format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()),
+                                    __FILE_NAME__,
+                                    __LINE__);
         }
 
         // Generate new correlated column expression
@@ -407,7 +420,6 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function, function_arguments);
         join_conditions.emplace_back(function_expr_ptr);
     }
-#endif
 }
 
 } // namespace infinity

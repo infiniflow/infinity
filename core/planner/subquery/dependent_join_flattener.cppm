@@ -14,7 +14,7 @@ export module dependent_join_flattener;
 
 namespace infinity {
 
-class DependentJoinFlattener {
+export class DependentJoinFlattener {
 public:
     explicit DependentJoinFlattener(const SharedPtr<BindContext> &bind_context_ptr, QueryContext *query_context)
         : bind_context_ptr_(bind_context_ptr), query_context_(query_context) {}
