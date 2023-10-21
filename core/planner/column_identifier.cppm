@@ -6,12 +6,11 @@ module;
 
 import stl;
 import parser;
+import query_context;
 
 export module column_identifer;
 
 namespace infinity {
-
-class QueryContext;
 
 export struct ColumnIdentifier {
 public:

@@ -9,6 +9,7 @@ import parser;
 import infinity_assert;
 import infinity_exception;
 import third_party;
+import query_context;
 
 module column_identifer;
 

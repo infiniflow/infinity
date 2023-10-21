@@ -3,6 +3,9 @@
 //
 module;
 
+#include <sstream>
+#include "magic_enum.hpp"
+
 import stl;
 import third_party;
 import infinity_assert;
@@ -117,31 +120,27 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 }
 
 String QueryProfiler::ToString() const {
-    String result;
-    return result;
-//    std::stringstream ss;
-//    constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
-//
-//    double cost_sum = 0;
-//    for (SizeT idx = 0; idx < profilers_count; ++idx) {
-//        const BaseProfiler &profiler = profilers_[idx];
-//        cost_sum += static_cast<double>(profiler.Elapsed());
-//    }
-//
-//    ss.setf(std::ios_base::fixed, std::ios_base::floatfield);
-//    ss.setf(std::ios_base::showpoint);
-//    ss.precision(2);
-//    for (SizeT idx = 0; idx < profilers_count; ++idx) {
-//        const BaseProfiler &profiler = profilers_[idx];
-//        ss << profiler.name() << ": " << profiler.ElapsedToString() << "(" << static_cast<double>(profiler.Elapsed() * 100) / cost_sum << "%)"
-//           << std::endl;
-//        if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kOptimizer) {
-//            ss << optimizer_.ToString(4) << std::endl;
-//        }
-//    }
-//    return ss.str();
+    std::stringstream ss;
+    constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
+
+    double cost_sum = 0;
+    for (SizeT idx = 0; idx < profilers_count; ++idx) {
+        const BaseProfiler &profiler = profilers_[idx];
+        cost_sum += static_cast<double>(profiler.Elapsed());
+    }
+
+    ss.setf(std::ios_base::fixed, std::ios_base::floatfield);
+    ss.setf(std::ios_base::showpoint);
+    ss.precision(2);
+    for (SizeT idx = 0; idx < profilers_count; ++idx) {
+        const BaseProfiler &profiler = profilers_[idx];
+        ss << profiler.name() << ": " << profiler.ElapsedToString() << "(" << static_cast<double>(profiler.Elapsed() * 100) / cost_sum << "%)"
+           << std::endl;
+        if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kOptimizer) {
+            ss << optimizer_.ToString(4) << std::endl;
+        }
+    }
+    return ss.str();
 }
-#if 0
-#endif
 
 } // namespace infinity

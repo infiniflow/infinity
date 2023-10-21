@@ -47,7 +47,6 @@ Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
 }
 
 Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
-#if 0
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column", __FILE_NAME__, __LINE__);
     auto varchar_layout = reinterpret_cast<VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
@@ -56,11 +55,9 @@ Pair<const ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
     }
     ptr_t ptr = varchar_layout->u.long_info_.prefix_.data();
     return {ptr, VarcharT::PREFIX_LENGTH};
-#endif
 }
 
 ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
-#if 0
     if (data_type.Plain()) {
         return inline_col_.GetData() + data_type.Size() * row_idx;
     } else {
@@ -81,7 +78,6 @@ ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
                 break;
         }
     }
-#endif
     return nullptr;
 }
 
