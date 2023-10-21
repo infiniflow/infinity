@@ -4,14 +4,34 @@
 
 module;
 
+#include <string>
+#include <filesystem>
+#include <functional>
+#include <regex>
+
+import base_entry;
 import config;
+import stl;
+import buffer_manager;
+import default_values;
+import wal_manager;
+import new_catalog;
+import txn_manager;
+import builtin_functions;
+import local_file_system;
+import third_party;
+import logger;
+import parser;
+import txn;
+import infinity_exception;
+import infinity_assert;
 
 module storage;
 
 namespace infinity {
 
 Storage::Storage(const Config* config_ptr) : config_ptr_(config_ptr) {}
-#if 0
+
 void
 Storage::Init() {
     // Construct buffer manager
@@ -86,7 +106,7 @@ Storage::GetLatestCatalog(const String& dir) {
     int64_t latest_version_number = -1;
     const std::regex catalog_file_regex("META_[0-9]+\\.json");
     for(const auto& dir_entry_ptr: dir_array) {
-        LOG_TRACE("Candidate file name: {}", dir_entry_ptr->path().c_str());
+        LOG_TRACE(Format("Candidate file name: {}", dir_entry_ptr->path().c_str()));
         if(dir_entry_ptr->is_regular_file()) {
             String current_file_name = dir_entry_ptr->path().filename();
             if(std::regex_match(current_file_name, catalog_file_regex)) {
@@ -110,8 +130,7 @@ Storage::InitCatalog(NewCatalog* catalog, TxnManager* txn_mgr) {
     create_res = new_txn->CreateDatabase("default", ConflictType::kError);
     new_txn->CommitTxn();
     if(create_res.err_ != nullptr) {
-        StorageError(*create_res.err_);
+        Error<StorageException>(*create_res.err_, __FILE_NAME__, __LINE__);
     }
 }
-#endif
 }

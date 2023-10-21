@@ -33,7 +33,7 @@ namespace infinity {
 //class LogicalNode;
 
 
-class LogicalPlanner {
+export class LogicalPlanner {
 public:
     explicit LogicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
         names_ptr_ = MakeShared<Vector<String>>();

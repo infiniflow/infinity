@@ -63,6 +63,8 @@ export {
     template <typename T>
     using Optional = std::optional<T>;
 
+    using StdOfStream = std::ofstream;
+
     // String
 
     using String = std::basic_string<char>;

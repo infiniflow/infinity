@@ -16,17 +16,17 @@ namespace infinity {
 
 using PutWalEntryFn = StdFunction<void(SharedPtr<WalEntry>)>;
 
-//class WalEntry;
-//class BufferManager;
+// class WalEntry;
+// class BufferManager;
 class NewCatalog;
 
 export class TxnManager {
 public:
-    explicit TxnManager(NewCatalog *catalog,
-                        BufferManager *buffer_mgr,
-                        PutWalEntryFn put_wal_entry_fn,
-                        u64 start_txn_id = 0,
-                        TxnTimeStamp start_ts = 0)
+    inline explicit TxnManager(NewCatalog *catalog,
+                               BufferManager *buffer_mgr,
+                               PutWalEntryFn put_wal_entry_fn,
+                               u64 start_txn_id = 0,
+                               TxnTimeStamp start_ts = 0)
         : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(true) {}
 
     ~TxnManager() { Stop(); }

@@ -13,6 +13,9 @@ import infinity_exception;
 import parser;
 import data_block;
 import bitmask;
+import unary_operator;
+import binary_operator;
+import ternary_operator;
 
 export module scalar_function;
 
@@ -196,7 +199,6 @@ public:
     // Unary function without any failure.
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 1, "Unary function: input column count isn't one.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -204,13 +206,11 @@ public:
                                                                                        input.row_count(),
                                                                                        nullptr,
                                                                                        true);
-#endif
     }
 
     // Unary function with some failures such as overflow.
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 1, "Unary function: input column count isn't one.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -218,13 +218,11 @@ public:
                                                                                     input.row_count(),
                                                                                     nullptr,
                                                                                     true);
-#endif
     }
 
     // Unary function result is varlen without any failure.
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 1, "Unary function: input column count isn't one.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -233,13 +231,11 @@ public:
                                                                                                input.row_count(),
                                                                                                &function_data,
                                                                                                true);
-#endif
     }
 
     // Unary function result is varlen with some failures such as overflow.
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 1, "Unary function: input column count isn't one.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -248,13 +244,11 @@ public:
                                                                                             input.row_count(),
                                                                                             &function_data,
                                                                                             true);
-#endif
     }
 
     // Binary function without any failure.
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 2, "Binary function: input column count isn't two.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -263,13 +257,11 @@ public:
                                                                                                    input.row_count(),
                                                                                                    nullptr,
                                                                                                    true);
-#endif
     }
 
     // Binary function with some failures such as overflow.
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 2, "Binary function: input column count isn't two.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -278,13 +270,11 @@ public:
                                                                                                 input.row_count(),
                                                                                                 nullptr,
                                                                                                 true);
-#endif
     }
 
     // Binary function result is varlen without any failure.
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 2, "Binary function: input column count isn't two.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -294,13 +284,11 @@ public:
                                                                                                            input.row_count(),
                                                                                                            &function_data,
                                                                                                            true);
-#endif
     }
 
     // Binary function result is varlen with some failures such as overflow.
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 2, "Binary function: input column count isn't two.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -310,13 +298,11 @@ public:
                                                                                                         input.row_count(),
                                                                                                         &function_data,
                                                                                                         true);
-#endif
     }
 
     // Ternary function without any failure.
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 3, "Ternary function: input column count isn't three.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -326,13 +312,11 @@ public:
                                                                                                                   input.row_count(),
                                                                                                                   nullptr,
                                                                                                                   true);
-#endif
     }
 
     // Ternary function with some failures such as overflow.
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 3, "Ternary function: input column count isn't three.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -342,13 +326,11 @@ public:
                                                                                                                input.row_count(),
                                                                                                                nullptr,
                                                                                                                true);
-#endif
     }
 
     // Ternary function result is varlen without any failure.
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 3, "Ternary function: input column count isn't three.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -359,13 +341,11 @@ public:
                                                                                                                           input.row_count(),
                                                                                                                           &function_data,
                                                                                                                           true);
-#endif
     }
 
     // Ternary function result is varlen with some failures such as overflow.
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
-#if 0
         Assert<ExecutorException>(input.column_count() == 3, "Ternary function: input column count isn't three.", __FILE_NAME__, __LINE__);
         Assert<ExecutorException>(input.Finalized(), "Input data block is finalized", __FILE_NAME__, __LINE__);
         ScalarFunctionData function_data(output.get());
@@ -376,7 +356,6 @@ public:
                                                                                                                        input.row_count(),
                                                                                                                        &function_data,
                                                                                                                        true);
-#endif
     }
 };
 } // namespace infinity

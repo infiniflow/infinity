@@ -15,6 +15,7 @@ import txn;
 import parser;
 import infinity_assert;
 import infinity_exception;
+import logical_planner;
 
 module query_context;
 
@@ -90,8 +91,8 @@ QueryResult QueryContext::Query(const String &query) {
     if (parsed_result->IsError()) {
         Error<ParserException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
     }
-#if 0
     LogicalPlanner logical_planner(this);
+#if 0
     Optimizer optimizer(this);
     PhysicalPlanner physical_planner(this);
     FragmentBuilder fragment_builder(this);
@@ -141,13 +142,11 @@ QueryResult QueryContext::Query(const String &query) {
 }
 
 void QueryContext::CreateTxn() {
-#if 0
     if (session_ptr_->txn_ == nullptr) {
         session_ptr_->txn_ = storage_->txn_manager()->CreateTxn();
     }
-#endif
 }
-#if 0
+
 void QueryContext::BeginTxn() { session_ptr_->txn_->BeginTxn(); }
 
 void QueryContext::CommitTxn() {
@@ -159,7 +158,6 @@ void QueryContext::RollbackTxn() {
     session_ptr_->txn_->RollbackTxn();
     session_ptr_->txn_ = nullptr;
 }
-#endif
 
 Txn *QueryContext::GetTxn() const { return session_ptr_->txn_; }
 
