@@ -10,13 +10,12 @@ import function_data;
 import column_vector;
 import infinity_assert;
 import infinity_exception;
+import base_expression;
 import parser;
 
 export module aggregate_function;
 
 namespace infinity {
-
-class BaseExpression;
 
 using AggregateInitializeFuncType = StdFunction<void(ptr_t)>;
 using AggregateUpdateFuncType = StdFunction<void(ptr_t, const SharedPtr<ColumnVector> &)>;
@@ -98,8 +97,8 @@ public:
     SizeT state_size_{};
 };
 
-template <typename AggregateState, typename InputType, typename ResultType>
-static inline AggregateFunction UnaryAggregate(const String &name, const DataType &input_type, const DataType &return_type) {
+export template <typename AggregateState, typename InputType, typename ResultType>
+inline AggregateFunction UnaryAggregate(const String &name, const DataType &input_type, const DataType &return_type) {
     return AggregateFunction(name,
                              input_type,
                              return_type,

@@ -16,12 +16,14 @@ import bitmask;
 import unary_operator;
 import binary_operator;
 import ternary_operator;
+import base_expression;
+import null_value;
 
 export module scalar_function;
 
 namespace infinity {
 
-class BaseExpression;
+//class BaseExpression;
 
 struct ScalarFunctionData {
     explicit ScalarFunctionData(ColumnVector *column_vector_ptr) : column_vector_ptr_(column_vector_ptr) {}

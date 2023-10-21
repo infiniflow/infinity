@@ -246,8 +246,8 @@ export {
     constexpr i32 i32_min = std::numeric_limits<i32>::min();
     constexpr i16 i16_min = std::numeric_limits<i16>::min();
     constexpr u16 u16_min = std::numeric_limits<u16>::min();
-    constexpr u16 i8_min = std::numeric_limits<i8>::min();
-    constexpr u16 u8_min = std::numeric_limits<u8>::min();
+    constexpr i8 i8_min = std::numeric_limits<i8>::min();
+    constexpr u8 u8_min = std::numeric_limits<u8>::min();
 
     constexpr u64 u64_max = std::numeric_limits<u64>::max();
     constexpr i64 i64_max = std::numeric_limits<i64>::max();
@@ -255,11 +255,15 @@ export {
     constexpr i32 i32_max = std::numeric_limits<i32>::max();
     constexpr i16 i16_max = std::numeric_limits<i16>::max();
     constexpr u16 u16_max = std::numeric_limits<u16>::max();
-    constexpr u16 i8_max = std::numeric_limits<i8>::max();
-    constexpr u16 u8_max = std::numeric_limits<u8>::max();
+    constexpr i8 i8_max = std::numeric_limits<i8>::max();
+    constexpr u8 u8_max = std::numeric_limits<u8>::max();
 
     constexpr f32 f32_inf = std::numeric_limits<f32>::infinity();
+    constexpr f32 f32_min = std::numeric_limits<f32>::min();
+    constexpr f32 f32_max = std::numeric_limits<f32>::max();
     constexpr f64 f64_inf = std::numeric_limits<f64>::infinity();
+    constexpr f64 f64_min = std::numeric_limits<f64>::min();
+    constexpr f64 f64_max = std::numeric_limits<f64>::max();
 
     constexpr u64 u64_inf = std::numeric_limits<u64>::infinity();
     constexpr i64 i64_inf = std::numeric_limits<i64>::infinity();
@@ -267,8 +271,8 @@ export {
     constexpr i32 i32_inf = std::numeric_limits<i32>::infinity();
     constexpr i16 i16_inf = std::numeric_limits<i16>::infinity();
     constexpr u16 u16_inf = std::numeric_limits<u16>::infinity();
-    constexpr u16 i8_inf = std::numeric_limits<i8>::infinity();
-    constexpr u16 u8_inf = std::numeric_limits<u8>::infinity();
+    constexpr i8 i8_inf = std::numeric_limits<i8>::infinity();
+    constexpr u8 u8_inf = std::numeric_limits<u8>::infinity();
 
     constexpr ptr_t ptr_inf = std::numeric_limits<ptr_t>::infinity();
     constexpr u64 *u64_ptr_inf = std::numeric_limits<u64 *>::infinity();

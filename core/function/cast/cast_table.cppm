@@ -12,7 +12,7 @@ export module cast_table;
 
 namespace infinity {
 
-class CastTable : public Singleton<CastTable> {
+export class CastTable : public Singleton<CastTable> {
 public:
     CastTable();
 

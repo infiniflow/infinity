@@ -152,8 +152,6 @@ private:
     std::shared_ptr<TypeInfo> type_info_{nullptr};
     // Static method
 public:
-//    static int64_t CastRule(const DataType &from, const DataType &to);
-
     template <typename T>
     static std::string TypeToString();
 

@@ -4,11 +4,11 @@
 
 module;
 
-import stl;
+#include <sstream>
+
 import base_expression;
 import infinity_assert;
 import infinity_exception;
-import third_party;
 
 module aggregate_function;
 
@@ -20,8 +20,15 @@ void AggregateFunction::CastArgumentTypes(BaseExpression &input_arguments) {
     Error<PlannerException>("Not implemented: need to cast the argument types", __FILE_NAME__, __LINE__);
 }
 
-String AggregateFunction::ToString() const {
-    String res = Format("{}({})->{}", name_, argument_type_.ToString(), return_type().ToString());
+std::string AggregateFunction::ToString() const {
+
+    std::stringstream ss;
+    ss << name_;
+    ss << "(";
+    ss << argument_type_.ToString();
+    ss << ")->" << return_type_.ToString();
+
+    return ss.str();
 }
 
 } // namespace infinity

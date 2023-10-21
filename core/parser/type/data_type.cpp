@@ -107,8 +107,6 @@ size_t DataType::Size() const {
     return LogicalTypeWidth(type_);
 }
 
-//int64_t DataType::CastRule(const DataType &from, const DataType &to) { return CastTable::instance().GetCastCost(from.type_, to.type_); }
-
 void DataType::MaxDataType(const DataType &right) {
     if (*this == right) {
         return;
