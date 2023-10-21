@@ -6,6 +6,7 @@
 
 #include "common/default_values.h"
 #include "common/types/alias/smart_ptr.h"
+#include <list>
 
 namespace infinity {
 
@@ -33,6 +34,7 @@ struct BaseEntry {
     }
 
     virtual ~BaseEntry() = default;
+    virtual void MergeFrom(BaseEntry &other) {}
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
@@ -58,16 +60,19 @@ struct EntryResult {
     BaseEntry *entry_;
     UniquePtr<String> err_;
 
-    bool Success() { return err_ == nullptr; }
+    [[nodiscard]] bool Success() const { return err_ == nullptr; }
 
-    bool Fail() { return err_ != nullptr; }
+    [[nodiscard]] bool Fail() const { return err_ != nullptr; }
 
-    String ToString() {
+    [[nodiscard]] String ToString() const {
         if (err_ == nullptr) {
             return "Success";
         }
         return *err_.get();
     }
 };
+
+// Merge two reverse-ordered list inplace.
+void MergeLists(std::list<std::unique_ptr<BaseEntry>> &list1, std::list<std::unique_ptr<BaseEntry>> &list2);
 
 } // namespace infinity

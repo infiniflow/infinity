@@ -53,7 +53,6 @@ public:
 
     TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
-    TxnTimeStamp checkpoint_ts_{0};
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
@@ -63,7 +62,8 @@ public:
     HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
-    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry>
+    MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr, bool is_new = true);
 
     static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
@@ -101,6 +101,8 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
     static int Room(SegmentEntry *segment_entry);
+
+    void MergeFrom(infinity::BaseEntry &other) override;
 
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);

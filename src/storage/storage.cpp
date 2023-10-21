@@ -16,7 +16,7 @@ void Storage::Init() {
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
 
     // Check the data dir to get latest catalog file.
-    String catalog_dir = *config_ptr_->data_dir() + "/catalog";
+    String catalog_dir = std::string(*config_ptr_->data_dir()) + "/" + std::string(CATALOG_FILE_DIR);
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -25,25 +25,17 @@ void Storage::Init() {
                                       config_ptr_->full_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_wal_bytes());
-    auto start_time_stamp = wal_mgr_->ReplayWalFile();
 
+    // Must init catalog before txn manager.
+    // Replay wal file wrap init catalog
+    auto start_time_stamp = wal_mgr_->ReplayWalFile();
+    start_time_stamp = (!exist_catalog_) ? 1 : start_time_stamp + 1;
     // Construct txn manager
-    // TODO:xuanwei if replay wal file, should not create new catalog. must load from wal file. if no wal file, should create new catalog.
-    SharedPtr<DirEntry> catalog_file_entry = GetLatestCatalog(catalog_dir);
-    if (catalog_file_entry == nullptr) {
-        // No catalog file at all
-        new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
-        txn_mgr_ =
-            MakeUnique<TxnManager>(new_catalog_.get(), buffer_mgr_.get(), std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1));
-    } else {
-        // load catalog file.
-        new_catalog_ = NewCatalog::LoadFromFile(catalog_file_entry, buffer_mgr_.get());
-        txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
-                                          buffer_mgr_.get(),
-                                          std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
-                                          0,
-                                          start_time_stamp + 1);
-    }
+    txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
+                                      buffer_mgr_.get(),
+                                      std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
+                                      0,
+                                      start_time_stamp);
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
@@ -101,6 +93,23 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     if (create_res.err_ != nullptr) {
         StorageError(*create_res.err_);
     }
+}
+
+void Storage::AttachCatalog(const String &catalog_path) {
+    LOG_INFO("Attach catalog file: {}", catalog_path.c_str());
+    new_catalog_ = NewCatalog::LoadFromFile(catalog_path, buffer_mgr_.get());
+    exist_catalog_ = true;
+}
+
+void Storage::InitNewCatalog() {
+    LOG_INFO("Init new catalog");
+    String catalog_dir = std::string(*config_ptr_->data_dir()) + "/" + std::string(CATALOG_FILE_DIR);
+    LocalFileSystem fs;
+    if (!fs.Exists(catalog_dir)) {
+        fs.CreateDirectory(catalog_dir);
+    }
+    new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
+    exist_catalog_ = false;
 }
 
 } // namespace infinity

@@ -7,6 +7,7 @@
 #include "function/table_function.h"
 #include "main/logger.h"
 #include "storage/io/local_file_system.h"
+#include <regex>
 
 namespace infinity {
 
@@ -188,20 +189,43 @@ nlohmann::json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commi
     return json_res;
 }
 
-UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr) {
+UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const std::vector<std::string> &catalog_paths, BufferManager *buffer_mgr) {
+    UniquePtr<NewCatalog> catalog1 = nullptr;
+    CatalogAssert(!catalog_paths.empty(), "Catalog paths is empty")
+        // Load the latest full checkpoint.
+        LOG_INFO("Load base catalog1 from: {}", catalog_paths[0]);
+    catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+
+    // Load catalogs delta checkpoints and merge.
+    for (int i = 1; i < catalog_paths.size(); i++) {
+        LOG_INFO("Load delta catalog1 from: {}", catalog_paths[i]);
+        UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
+        catalog1->MergeFrom(*catalog2);
+    }
+    return catalog1;
+}
+
+void NewCatalog::MergeFrom(NewCatalog &other) {
+    // Merge databases.
+    for (auto &[db_name, db_meta2] : other.databases_) {
+        auto it = this->databases_.find(db_name);
+        if (it == this->databases_.end()) {
+            this->databases_.emplace(db_name, std::move(db_meta2));
+        } else {
+            it->second->MergeFrom(*db_meta2.get());
+        }
+    }
+}
+
+UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const std::string &catalog_path, BufferManager *buffer_mgr) {
     UniquePtr<NewCatalog> catalog = nullptr;
-    String filename = dir_entry->path();
-
-    LOG_INFO("Load catalog from: {}", filename);
-
     LocalFileSystem fs;
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(filename, FileFlags::READ_FLAG, FileLockType::kReadLock);
-
-    SizeT file_size = dir_entry->file_size();
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        StorageError(fmt::format("Catalog file {}, read error.", filename));
+        StorageError(fmt::format("Catalog file {}, read error.", catalog_path));
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
@@ -224,11 +248,7 @@ void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *
     }
 }
 
-void NewCatalog::SaveAsFile(NewCatalog *catalog_ptr,
-                            TxnTimeStamp max_commit_ts,
-                            const String &dir,
-                            const String &file_name,
-                            bool is_full_checkpoint) {
+std::string NewCatalog::SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json catalog_json = Serialize(catalog_ptr, max_commit_ts, is_full_checkpoint);
     String catalog_str = catalog_json.dump();
 
@@ -239,6 +259,11 @@ void NewCatalog::SaveAsFile(NewCatalog *catalog_ptr,
         fs.CreateDirectory(dir);
     }
 
+    String file_name = "META_" + std::to_string(max_commit_ts);
+    if (is_full_checkpoint)
+        file_name += ".full.json";
+    else
+        file_name += ".delta.json";
     String file_path = dir + '/' + file_name;
 
     u8 fileflags = FileFlags::WRITE_FLAG;
@@ -257,6 +282,7 @@ void NewCatalog::SaveAsFile(NewCatalog *catalog_ptr,
     catalog_file_handler->Close();
 
     LOG_INFO("Saved catalog to: {}", file_path);
+    return file_path;
 }
 
 } // namespace infinity

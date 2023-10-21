@@ -5,7 +5,6 @@
 #pragma once
 
 #include "json.hpp"
-#include "storage/io/file_system_type.h"
 #include "storage/meta/db_meta.h"
 #include "storage/meta/entry/base_entry.h"
 
@@ -83,9 +82,13 @@ public:
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
-    static UniquePtr<NewCatalog> LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr);
+    static UniquePtr<NewCatalog> LoadFromFiles(const std::vector<std::string> &catalog_paths, BufferManager *buffer_mgr);
 
-    static void SaveAsFile(NewCatalog *catalog_ptr, TxnTimeStamp max_commit_ts, const String &dir, const String &file_name, bool is_full_checkpoint);
+    static UniquePtr<NewCatalog> LoadFromFile(const std::string &catalog_path, BufferManager *buffer_mgr);
+
+    static std::string SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+    void MergeFrom(NewCatalog &other);
 
 public:
     SharedPtr<String> current_dir_{nullptr};

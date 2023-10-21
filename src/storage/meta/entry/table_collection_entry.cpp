@@ -269,10 +269,8 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     for (auto &block_entry : segment->block_entries_) {
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
-        Vector<TxnTimeStamp> &created = block_entry->block_version_->created_;
-        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
-            created[i] = commit_ts;
-        }
+        block_entry->checkpoint_ts_ = commit_ts;
+        block_entry->block_version_->created_.push_back({commit_ts, block_entry->row_count_});
     }
 
     std::unique_lock<RWMutex> rw_locker(table_entry->rw_locker_);
@@ -419,6 +417,25 @@ u64 TableCollectionEntry::GetColumnIdByName(const String &column_name) {
         StorageError(fmt::format("No column name: {}", column_name))
     }
     return it->second;
+}
+
+void TableCollectionEntry::MergeFrom(BaseEntry &other) {
+    auto table_entry2 = dynamic_cast<TableCollectionEntry *>(&other);
+    StorageAssert(table_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
+    // No locking here since only the load stage needs MergeFrom.
+    StorageAssert(*this->table_collection_name_ == *table_entry2->table_collection_name_, "DBEntry::MergeFrom requires table_collection_name_ match");
+    StorageAssert(*this->table_entry_dir_ == *table_entry2->table_entry_dir_, "DBEntry::MergeFrom requires table_entry_dir_ match");
+    StorageAssert(this->table_collection_type_ == table_entry2->table_collection_type_, "DBEntry::MergeFrom requires table_entry_dir_ match");
+
+    this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
+    for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
+        auto it = this->segments_.find(seg_id);
+        if (it == this->segments_.end()) {
+            this->segments_.emplace(seg_id, sgement_entry2);
+        } else {
+            it->second->MergeFrom(*sgement_entry2.get());
+        }
+    }
 }
 
 } // namespace infinity

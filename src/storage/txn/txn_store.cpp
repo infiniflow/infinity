@@ -120,8 +120,7 @@ void TxnTableStore::PrepareCommit() {
 /**
  * @brief Call for really commit the data to disk.
  */
-void TxnTableStore::Commit() {
-    Txn *txn_ptr = (Txn *)txn_;
+void TxnTableStore::Commit() const {
     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
 }
 
