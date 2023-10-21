@@ -8,6 +8,7 @@ import stl;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
+import knn_expression;
 import parser;
 
 module logical_knn_scan;
@@ -33,31 +34,39 @@ Vector<ColumnBinding> LogicalKnnScan::GetColumnBindings() const {
 }
 
 SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
-#if 0
+
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
 
-    for (const auto &column_name : *base_table_ref_->column_names_) {
+    SizeT column_count = base_table_ref_->column_names_->size();
+    result_names->reserve(column_count);
+    for(SizeT col_idx; col_idx < column_count; ++ col_idx) {
+        const auto& column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
 
-    for (const auto &knn_expr : knn_expressions_) {
+    SizeT expr_count = knn_expressions_.size();
+    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
+        const auto& knn_expr = knn_expressions_[expr_idx];
         result_names->emplace_back(knn_expr->Name());
     }
 
     result_names->emplace_back("_row_id");
     return result_names;
-#endif
+
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
-#if 0
     Vector<SharedPtr<DataType>> result_types = *base_table_ref_->column_types_;
-    for (const auto &knn_expr : knn_expressions_) {
+    SizeT expr_count = knn_expressions_.size();
+    result_types.reserve(result_types.size() + expr_count);
+
+    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
+        const auto &knn_expr = knn_expressions_[expr_idx];
         result_types.emplace_back(MakeShared<DataType>(knn_expr->Type()));
     }
+
     result_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
-#endif
 }
 
 TableCollectionEntry *LogicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }

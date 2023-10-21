@@ -18,7 +18,7 @@ class BaseExpression;
 
 export class LogicalLimit : public LogicalNode {
 public:
-    explicit LogicalLimit(u64 node_id, SharedPtr<BaseExpression> limit_expression, SharedPtr<BaseExpression> offset_expression)
+    inline explicit LogicalLimit(u64 node_id, SharedPtr<BaseExpression> limit_expression, SharedPtr<BaseExpression> offset_expression)
         : LogicalNode(node_id, LogicalNodeType::kLimit), limit_expression_(Move(limit_expression)),
           offset_expression_(Move(offset_expression)) {}
 

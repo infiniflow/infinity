@@ -12,7 +12,7 @@ export module cross_product_table_ref;
 
 namespace infinity {
 
-class CrossProductTableRef : public TableRef {
+export class CrossProductTableRef : public TableRef {
 public:
     explicit CrossProductTableRef(String alias) : TableRef(TableRefType::kCrossProduct, alias) {}
 

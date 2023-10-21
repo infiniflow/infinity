@@ -12,7 +12,7 @@ export module conjunction_expression;
 
 namespace infinity {
 
-enum class ConjunctionType {
+export enum class ConjunctionType {
     kInvalid,
     kAnd,
     kOr,

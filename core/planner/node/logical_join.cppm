@@ -9,12 +9,12 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import base_expression;
 
 export module logical_join;
 
 namespace infinity {
 
-class BaseExpression;
 export class LogicalJoin : public LogicalNode {
 public:
     explicit LogicalJoin(u64 node_id,

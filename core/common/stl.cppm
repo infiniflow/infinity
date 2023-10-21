@@ -45,6 +45,9 @@ export {
     template <typename T>
     using List = std::list<T>;
 
+    template <typename T>
+    using Queue = std::queue<T>;
+
     template <typename S, typename T>
     using Map = std::map<S, T>;
 

@@ -8,19 +8,21 @@ import stl;
 import function;
 import function_data;
 import parser;
+//import query_context;
+import data_block;
 
 export module table_function;
 
 namespace infinity {
 
 class QueryContext;
-class DataBlock;
+//class DataBlock;
 
-class TableFunctionData : public FunctionData {
+export class TableFunctionData : public FunctionData {
 public:
 };
 
-using TableFunctionType = StdFunction<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
+export using TableFunctionType = StdFunction<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
 
 export class TableFunction : public Function {
 public:

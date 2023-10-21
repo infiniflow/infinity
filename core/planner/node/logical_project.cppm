@@ -19,7 +19,7 @@ class BaseExpression;
 
 export class LogicalProject : public LogicalNode {
 public:
-    LogicalProject(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
+    inline LogicalProject(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
         : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(Move(expressions)), table_index_(projection_index) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;

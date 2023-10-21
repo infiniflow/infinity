@@ -18,7 +18,7 @@ class BaseExpression;
 class SubqueryExpression;
 class ColumnExpression;
 
-class SubqueryUnnest {
+export class SubqueryUnnest {
 public:
     static void UnnestSubqueries(SharedPtr<BaseExpression> &expr_ptr,
                                  SharedPtr<LogicalNode> &root,

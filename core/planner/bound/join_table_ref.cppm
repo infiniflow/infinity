@@ -15,7 +15,7 @@ namespace infinity {
 
 class BindContext;
 
-class JoinTableRef : public TableRef {
+export class JoinTableRef : public TableRef {
 public:
     explicit JoinTableRef(String alias) : TableRef(TableRefType::kJoin, Move(alias)) {}
 

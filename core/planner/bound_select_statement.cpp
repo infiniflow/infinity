@@ -4,12 +4,16 @@
 
 module;
 
+#include <memory>
+
 import logical_node;
 import stl;
 import query_context;
 import bind_context;
 import table_ref;
 import base_expression;
+import conjunction_expression;
+import subquery_expression;
 
 import logical_node;
 import logical_node_type;
@@ -35,13 +39,27 @@ import logical_join;
 import logical_show;
 import logical_export;
 import logical_import;
+import logical_dummy_scan;
+
+import subquery_unnest;
+
+import infinity_assert;
+import infinity_exception;
+import expression_transformer;
+import expression_type;
+import knn_scan;
+
+import parser;
+import base_table_ref;
+import subquery_table_ref;
+import cross_product_table_ref;
+import join_table_ref;
 
 module bound_select_statement;
 
 namespace infinity {
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
-#if 0
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     if (bind_context->knn_exprs_.empty()) {
         // Non-knn case
@@ -75,7 +93,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!order_by_expressions_.empty()) {
-            PlannerAssert(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
+            Assert<PlannerException>(order_by_expressions_.size() == order_by_types_.size(),
+                                     "Unknown error on order by expression",
+                                     __FILE_NAME__,
+                                     __LINE__);
             SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
             sort->set_left_node(root);
             root = sort;
@@ -101,7 +122,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         // Knn case
         SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, query_context, bind_context);
         if (bind_context_->knn_orders_.size() != 1) {
-            PlannerError("Knn Scan need order by clause which should have only one expression")
+            Error<PlannerException>("Knn Scan need order by clause which should have only one expression", __FILE_NAME__, __LINE__);
         }
 
         knn_scan->order_by_type_ = bind_context_->knn_orders_[0];
@@ -119,21 +140,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         return root;
     }
-#endif
 }
 
 SharedPtr<LogicalKnnScan>
 BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
-    if (table_ref == nullptr) {
-        PlannerError("Attempt to do KNN scan without table")
+    if (table_ref.get() == nullptr) {
+        Error<PlannerException>("Attempt to do KNN scan without table", __FILE_NAME__, __LINE__);
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            PlannerError("KNN is not supported on CROSS PRODUCT relation, now.")
+            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.", __FILE_NAME__, __LINE__);
+            break;
         }
         case TableRefType::kJoin: {
-            PlannerError("KNN is not supported on JOIN relation, now.")
+            Error<PlannerException>("KNN is not supported on JOIN relation, now.", __FILE_NAME__, __LINE__);
         }
         case TableRefType::kTable: {
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
@@ -148,18 +168,17 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryC
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            PlannerError("KNN is not supported on a SUBQUERY, now.")
+            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.", __FILE_NAME__, __LINE__);
+            break;
         }
         default: {
-            PlannerError("Unexpected table type")
+            Error<PlannerException>("Unexpected table type", __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
     if (table_ref) {
         switch (table_ref->type_) {
             case TableRefType::kTable: {
@@ -177,42 +196,37 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
             case TableRefType::kDummy: {
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
-            default:
-                PlannerError("Unknown table reference type.");
+            default: {
+                Error<PlannerException>("Unknown table reference type.", __FILE_NAME__, __LINE__);
+            }
         }
     } else {
         // No FROM-Clause, only select constant expression.
     }
 
     return nullptr;
-#endif
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
     // SharedPtr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
 
     SharedPtr<LogicalTableScan> table_scan_node = MakeShared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
     return table_scan_node;
-#endif
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
     // SharedPtr<SubqueryTableRef> subquery_table_ref
     auto subquery_table_ref = std::static_pointer_cast<SubqueryTableRef>(table_ref);
     SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(query_context);
     return subquery;
-#endif
 }
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(SharedPtr<TableRef> &table_ref,
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
-#if 0
     // SharedPtr<CrossProductTableRef> cross_product_table_ref
     auto cross_product_table_ref = std::static_pointer_cast<CrossProductTableRef>(table_ref);
 
@@ -224,12 +238,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(SharedPtr<Ta
     String alias("cross_product" + ToStr(logical_node_id));
     SharedPtr<LogicalCrossProduct> logical_cross_product_node = MakeShared<LogicalCrossProduct>(logical_node_id, alias, left_node, right_node);
     return logical_cross_product_node;
-#endif
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
     // SharedPtr<JoinTableRef> join_table_ref
     auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
 
@@ -242,24 +254,20 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContex
     SharedPtr<LogicalJoin> logical_join_node =
         MakeShared<LogicalJoin>(logical_node_id, join_table_ref->join_type_, alias, join_table_ref->on_conditions_, left_node, right_node);
     return logical_join_node;
-#endif
 }
 
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-#if 0
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     String alias("DummyTable" + ToStr(logical_node_id));
     SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());
     return dummy_scan_node;
-#endif
 }
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> &root,
                                                          Vector<SharedPtr<BaseExpression>> &conditions,
                                                          QueryContext *query_context,
                                                          const SharedPtr<BindContext> &bind_context) {
-#if 0
     for (auto &cond : conditions) {
         // 1. Go through all the expression to find subquery
         //        VisitExpression(cond,
@@ -276,14 +284,12 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> 
     auto filter = MakeShared<LogicalFilter>(bind_context->GetNewLogicalNodeId(), filter_expr);
 
     return filter;
-#endif
 }
 
 void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
                                          SharedPtr<BaseExpression> &condition,
                                          QueryContext *query_context,
                                          const SharedPtr<BindContext> &bind_context) {
-#if 0
     if (condition.get() == nullptr) {
         return;
     }
@@ -293,18 +299,16 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            PlannerError("Nested subquery detected")
+            Error<PlannerException>("Nested subquery detected", __FILE_NAME__, __LINE__);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }
-#endif
 }
 
 SharedPtr<BaseExpression> BoundSelectStatement::UnnestSubquery(SharedPtr<LogicalNode> &root,
                                                                SharedPtr<BaseExpression> &condition,
                                                                QueryContext *query_context,
                                                                const SharedPtr<BindContext> &bind_context) {
-#if 0
     building_subquery_ = true;
     SubqueryExpression *subquery_expr_ptr = (SubqueryExpression *)condition.get();
     SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);
@@ -326,7 +330,6 @@ SharedPtr<BaseExpression> BoundSelectStatement::UnnestSubquery(SharedPtr<Logical
     }
     building_subquery_ = false;
     return return_expr;
-#endif
 }
 
 } // namespace infinity

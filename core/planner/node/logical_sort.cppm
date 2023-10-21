@@ -18,7 +18,7 @@ class BaseExpression;
 
 export class LogicalSort : public LogicalNode {
 public:
-    LogicalSort(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
+    inline LogicalSort(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
         : LogicalNode(node_id, LogicalNodeType::kSort), expressions_(Move(expressions)), order_by_types_(Move(order_by_types)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
