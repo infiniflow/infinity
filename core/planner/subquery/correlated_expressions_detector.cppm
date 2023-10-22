@@ -15,7 +15,7 @@ export module corrlated_expr_detector;
 
 namespace infinity {
 
-class CorrelatedExpressionsDetector final : public LogicalNodeVisitor {
+export class CorrelatedExpressionsDetector final : public LogicalNodeVisitor {
 public:
     explicit CorrelatedExpressionsDetector(const Vector<SharedPtr<ColumnExpression>> &correlated_column_exprs)
         : correlated_column_exprs_(correlated_column_exprs) {}

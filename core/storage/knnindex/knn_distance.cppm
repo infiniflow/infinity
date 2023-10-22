@@ -25,7 +25,7 @@ export enum class KnnDistanceAlgoType {
     kKnnFlatL2BlasReservoir,
 };
 
-class KnnDistanceBase {
+export class KnnDistanceBase {
 public:
     explicit KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type, i64 query_count, i64 dimension, i64 topk)
         : algo_type_(type), elem_type_(elem_type), query_count_(query_count), dimension_(dimension), top_k_(topk) {}

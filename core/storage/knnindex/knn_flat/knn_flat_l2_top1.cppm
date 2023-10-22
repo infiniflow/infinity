@@ -19,7 +19,7 @@ export module knn_flat_l2_top1;
 
 namespace infinity {
 
-template <typename DistType>
+export template <typename DistType>
 class KnnFlatL2Top1 final : public KnnDistance<DistType> {
 
     using SingleBestResultHandler = SingleBestResultHandler<FaissCMax<DistType, RowID>>;

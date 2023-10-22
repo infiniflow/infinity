@@ -24,8 +24,6 @@ class ColumnVectorDecimalTest : public BaseTest {
     }
 };
 
-#if 0
-
 TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     using namespace infinity;
     LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
@@ -316,4 +314,3 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(src_idx));
     }
 }
-#endif

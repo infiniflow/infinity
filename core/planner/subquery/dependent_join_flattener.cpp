@@ -3,6 +3,8 @@
 //
 module;
 
+#include <memory>
+
 import stl;
 import parser;
 import logical_node;
@@ -14,6 +16,7 @@ import logical_aggregate;
 import logical_join;
 import logical_table_scan;
 import logical_cross_product;
+import logical_project;
 
 import function_expression;
 import base_expression;
@@ -25,13 +28,16 @@ import base_table_ref;
 import new_catalog;
 import function_set;
 import scalar_function;
+import scalar_function_set;
+import table_scan;
+import corrlated_expr_detector;
+import rewrite_correlated_expression;
 
 module dependent_join_flattener;
 
 namespace infinity {
 
 bool DependentJoinFlattener::DetectCorrelatedExpressions(const SharedPtr<LogicalNode> &logical_node) {
-#if 0
     CorrelatedExpressionsDetector detector(bind_context_ptr_->correlated_column_exprs_);
 
     detector.VisitNode(*logical_node);
@@ -52,7 +58,6 @@ bool DependentJoinFlattener::DetectCorrelatedExpressions(const SharedPtr<Logical
 
     operator2correlated_expression_map_[logical_node->node_id()] = is_correlated;
     return is_correlated;
-#endif
 }
 
 SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoin(const SharedPtr<LogicalNode> &logical_node) {
@@ -60,7 +65,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoin(const SharedPtr
 }
 
 SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode> &subquery_plan) {
-#if 0
     // 1. Validates if the logical node was checked in operator2correlated_expression_map_ before.
     if (!operator2correlated_expression_map_.contains(subquery_plan->node_id())) {
         Error<PlannerException>(Format("Logical node {} wasn't detected before.", subquery_plan->node_id()), __FILE_NAME__, __LINE__);
@@ -106,11 +110,11 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kExcept:
         case LogicalNodeType::kUnion:
         case LogicalNodeType::kIntersect: {
-            PlannerError("Can't push down through set operation node");
+            Error<PlannerException>("Can't push down through set operation node.", __FILE_NAME__, __LINE__);
             break;
         }
         case LogicalNodeType::kJoin: {
-            PlannerError("Can't push down through join node");
+            Error<PlannerException>("Can't push down through join node.", __FILE_NAME__, __LINE__);
             break;
         }
         case LogicalNodeType::kCrossProduct: {
@@ -268,11 +272,9 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         }
     }
     Error<PlannerException>("Unreachable", __FILE_NAME__, __LINE__);
-#endif
 }
 
 SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode> &subquery_plan) {
-#if 0
     const Vector<SharedPtr<ColumnExpression>> &correlated_columns = bind_context_ptr_->correlated_column_exprs_;
 
     // Get the correlated column and generate table scan
@@ -301,7 +303,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
 
     const Binding *table_binding_ptr = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
     if (table_binding_ptr == nullptr) {
-        Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name(), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()), __FILE_NAME__, __LINE__);
     }
 
     NewCatalog *catalog = query_context_->storage()->catalog();
@@ -330,7 +332,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     this->correlated_expression_offset_ = subquery_plan->GetOutputNames()->size();
 
     return cross_product_node;
-#endif
 }
 
 } // namespace infinity

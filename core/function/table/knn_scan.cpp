@@ -11,19 +11,30 @@ import data_block;
 import table_function;
 import query_context;
 import new_catalog;
+import knn_scan_data;
+import block_index;
+import global_block_id;
+import infinity_assert;
+import infinity_exception;
+import block_entry;
+import column_buffer;
+import block_column_entry;
+import parser;
+import knn_distance;
+import third_party;
+import logger;
 
 module knn_scan;
 
 namespace infinity {
 
 void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_data_ptr, DataBlock &output) {
-#if 0
     auto *knn_scan_function_data_ptr = static_cast<KnnScanFunctionData *>(table_function_data_ptr);
     const BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if (knn_column_ids.size() != 1) {
-        ExecutorError("More than one knn column")
+        Error<ExecutorException>("More than one knn column", __FILE_NAME__, __LINE__);
     }
 
     SizeT knn_column_id = knn_column_ids[0];
@@ -40,31 +51,13 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     switch (knn_scan_function_data_ptr->knn_distance_type_) {
 
         case KnnDistanceType::kInvalid: {
-            SchedulerError("Invalid Knn distance type")
+            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
         }
         case KnnDistanceType::kL2: {
             switch (knn_scan_function_data_ptr->elem_type_) {
                 case EmbeddingDataType::kElemFloat: {
 
                     KnnDistance<f32> *knn_flat_l2 = nullptr;
-
-                    if (knn_scan_function_data_ptr->query_embedding_count_ < faiss::distance_compute_blas_threshold) {
-                        if (knn_scan_function_data_ptr->topk_ == 1) {
-                            knn_flat_l2 = static_cast<KnnFlatL2Top1<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else if (knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
-                            knn_flat_l2 = static_cast<KnnFlatL2<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else {
-                            knn_flat_l2 = static_cast<KnnFlatL2Reservoir<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        }
-                    } else {
-                        if (knn_scan_function_data_ptr->topk_ == 1) {
-                            knn_flat_l2 = static_cast<KnnFlatL2Top1Blas<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else if (knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
-                            knn_flat_l2 = static_cast<KnnFlatL2Blas<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else {
-                            knn_flat_l2 = static_cast<KnnFlatL2BlasReservoir<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        }
-                    }
 
                     knn_flat_l2->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
 
@@ -79,11 +72,11 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
-                                          row_id[id].segment_id_,
-                                          row_id[id].block_id_,
-                                          row_id[id].block_offset_,
-                                          top_distance[id]);
+                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                                 row_id[id].segment_id_,
+                                                 row_id[id].block_id_,
+                                                 row_id[id].block_offset_,
+                                                 top_distance[id]));
                             }
                         }
                     }
@@ -208,33 +201,19 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    ExecutorError("Invalid element data type")
+                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
                 }
             }
             break;
         }
         case KnnDistanceType::kCosine: {
-            SchedulerError("Not implemented Cosine")
+            Error<ExecutorException>("Not implemented Cosine", __FILE_NAME__, __LINE__);
         }
         case KnnDistanceType::kInnerProduct: {
             switch (knn_scan_function_data_ptr->elem_type_) {
                 case EmbeddingDataType::kElemFloat: {
 
                     KnnDistance<f32> *knn_flat_ip = nullptr;
-
-                    if (knn_scan_function_data_ptr->query_embedding_count_ < faiss::distance_compute_blas_threshold) {
-                        if (knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
-                            knn_flat_ip = static_cast<KnnFlatIP<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else {
-                            knn_flat_ip = static_cast<KnnFlatIPReservoir<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        }
-                    } else {
-                        if (knn_scan_function_data_ptr->topk_ < faiss::distance_compute_min_k_reservoir) {
-                            knn_flat_ip = static_cast<KnnFlatIPBlas<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        } else {
-                            knn_flat_ip = static_cast<KnnFlatIPBlasReservoir<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-                        }
-                    }
 
                     knn_flat_ip->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
 
@@ -249,11 +228,11 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE("Row offset: {}: {}: {}, distance {}",
-                                          row_id[id].segment_id_,
-                                          row_id[id].block_id_,
-                                          row_id[id].block_offset_,
-                                          top_distance[id]);
+                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                                 row_id[id].segment_id_,
+                                                 row_id[id].block_id_,
+                                                 row_id[id].block_offset_,
+                                                 top_distance[id]));
                             }
                         }
                     }
@@ -378,20 +357,19 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    ExecutorError("Invalid element data type")
+                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
                 }
             }
             break;
         }
         case KnnDistanceType::kHamming: {
-            SchedulerError("Not implemented Hamming")
+            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
         }
     }
 
     if (block_ids_idx == block_ids->size() - 1) {
         // Last segment, Get the result according to the topk row.
     }
-#endif
 #if 0
     SizeT& read_offset = knn_scan_function_data_ptr->current_read_offset_;
 

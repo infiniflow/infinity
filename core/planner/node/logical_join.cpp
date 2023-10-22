@@ -4,6 +4,9 @@
 
 module;
 
+#include <vector>
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
@@ -38,7 +41,6 @@ Vector<ColumnBinding> LogicalJoin::GetColumnBindings() const {
 }
 
 SharedPtr<Vector<String>> LogicalJoin::GetOutputNames() const {
-#if 0
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SharedPtr<Vector<String>> left_output_names = left_node_->GetOutputNames();
     SharedPtr<Vector<String>> right_output_names = right_node_->GetOutputNames();
@@ -52,12 +54,9 @@ SharedPtr<Vector<String>> LogicalJoin::GetOutputNames() const {
     }
 
     return result;
-
-#endif
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalJoin::GetOutputTypes() const {
-#if 0
     SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
     SharedPtr<Vector<SharedPtr<DataType>>> left_output_names = left_node_->GetOutputTypes();
     SharedPtr<Vector<SharedPtr<DataType>>> right_output_names = right_node_->GetOutputTypes();
@@ -71,22 +70,21 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalJoin::GetOutputTypes() const {
     }
 
     return result;
-#endif
 }
 
 String LogicalJoin::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << infinity::ToString(join_type_) << " on ";
-//    for (auto &condition : conditions_) {
-//        ss << condition->Name() << " ";
-//    }
-//    space += arrow_str.size();
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << JoinType2Str(join_type_) << " on ";
+    for (auto &condition : conditions_) {
+        ss << condition->Name() << " ";
+    }
+    space += arrow_str.size();
+    return ss.str();
 }
 
 } // namespace infinity

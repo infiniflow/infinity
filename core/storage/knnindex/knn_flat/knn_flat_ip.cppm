@@ -19,7 +19,7 @@ export module knn_flat_ip;
 
 namespace infinity {
 
-template <typename DistType>
+export template <typename DistType>
 class KnnFlatIP final : public KnnDistance<DistType> {
 
     using HeapResultHandler = NewHeapResultHandler<FaissCMin<DistType, RowID>>;

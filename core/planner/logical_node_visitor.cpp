@@ -4,6 +4,9 @@
 
 module;
 
+#include <vector>
+#include <memory>
+
 import stl;
 import base_expression;
 import logical_node_type;
@@ -14,6 +17,12 @@ import expression_type;
 import logical_node_type;
 import logical_node;
 import logical_aggregate;
+import logical_join;
+import logical_limit;
+import logical_filter;
+import logical_project;
+import logical_sort;
+import logical_insert;
 
 import aggregate_expression;
 import between_expression;
@@ -26,6 +35,7 @@ import in_expression;
 import subquery_expression;
 import knn_expression;
 import conjunction_expression;
+import logger;
 
 module logical_node_visitor;
 
@@ -41,7 +51,6 @@ void LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
 }
 
 void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
-#if 0
     switch (op.operator_type()) {
         case LogicalNodeType::kAggregate: {
             auto &node = (LogicalAggregate &)op;
@@ -98,14 +107,12 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
             break;
         }
         default: {
-            LOG_TRACE("Visit logical node: {}", op.name());
+            LOG_TRACE(Format("Visit logical node: {}", op.name()));
         }
     }
-#endif
 }
 
 void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) {
-#if 0
     SharedPtr<BaseExpression> result;
     switch (expression->type()) {
 
@@ -232,11 +239,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             Error<PlannerException>(Format("Unexpected expression type: {}", expression->Name()), __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expression) {
-#if 0
     switch (expression->type()) {
 
         case ExpressionType::kAggregate: {
@@ -335,7 +340,6 @@ void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expr
             break;
         }
     }
-#endif
 }
 
 SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const AggregateExpression* expression) { return nullptr; }

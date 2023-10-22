@@ -20,7 +20,7 @@ export module knn_flat_l2_reservoir;
 
 namespace infinity {
 
-template <typename DistType>
+export template <typename DistType>
 class KnnFlatL2Reservoir final : public KnnDistance<DistType> {
 
     using ReservoirResultHandler = NewReservoirResultHandler<FaissCMax<float, RowID>>;

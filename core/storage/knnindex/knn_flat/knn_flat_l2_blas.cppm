@@ -35,7 +35,7 @@ export module knn_flat_l2_blas;
 
 namespace infinity {
 
-template <typename DistType>
+export template <typename DistType>
 class KnnFlatL2Blas final : public KnnDistance<DistType> {
 
     using HeapResultHandler = NewHeapResultHandler<FaissCMax<DistType, RowID>>;

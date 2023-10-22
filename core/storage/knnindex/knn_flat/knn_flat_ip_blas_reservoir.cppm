@@ -34,7 +34,7 @@ export module knn_flat_ip_blas_reservoir;
 
 namespace infinity {
 
-template <typename DistType>
+export template <typename DistType>
 class KnnFlatIPBlasReservoir final : public KnnDistance<DistType> {
 
     using ReservoirResultHandler = NewReservoirResultHandler<FaissCMin<float, RowID>>;

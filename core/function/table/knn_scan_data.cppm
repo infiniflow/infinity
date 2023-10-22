@@ -8,6 +8,7 @@ import stl;
 import table_function;
 import parser;
 import global_block_id;
+import knn_distance;
 
 export module knn_scan_data;
 
@@ -15,7 +16,7 @@ namespace infinity {
 
 class BlockIndex;
 
-class KnnScanFunctionData : public TableFunctionData {
+export class KnnScanFunctionData : public TableFunctionData {
 public:
     KnnScanFunctionData(BlockIndex *block_index,
                         const SharedPtr<Vector<GlobalBlockID>> &global_block_ids,
@@ -43,9 +44,7 @@ public:
     KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
 
     i64 current_block_ids_idx_{0};
-#if 0
     UniquePtr<KnnDistanceBase> knn_distance_{nullptr};
-#endif
 public:
     void Init();
 };

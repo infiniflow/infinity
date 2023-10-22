@@ -18,7 +18,7 @@ namespace infinity {
 
 class BindContext;
 
-class RewriteCorrelatedExpressions : public LogicalNodeVisitor {
+export class RewriteCorrelatedExpressions : public LogicalNodeVisitor {
 public:
     explicit RewriteCorrelatedExpressions(const SharedPtr<BindContext> &bind_context_ptr, ColumnBinding base_binding)
         : bind_context_ptr_(bind_context_ptr), base_binding_(base_binding) {}

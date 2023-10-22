@@ -23,7 +23,7 @@ class ColumnVectorMixedTest : public BaseTest {
     void TearDown() override {
     }
 };
-#if 0
+
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     using namespace infinity;
     LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
@@ -4824,4 +4824,3 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
         }
     }
 }
-#endif
