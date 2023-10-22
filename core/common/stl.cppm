@@ -99,6 +99,16 @@ export {
         }
     }
 
+    template<typename T>
+    inline const T& Min(const T& a, const T& b) {
+        return std::min(a, b);
+    }
+
+    template<typename T>
+    inline const T& Max(const T& a, const T& b) {
+    return std::max(a, b);
+    }
+
     // ToStr()
 
     _GLIBCXX_NODISCARD
@@ -408,6 +418,10 @@ export {
     using Mutex = std::mutex;
 
     float NearByInt(float __x) { return __builtin_nearbyintf(__x); }
+
+    float HugeValf() {
+        return HUGE_VALF;
+    }
 }
 
 } // namespace infinity

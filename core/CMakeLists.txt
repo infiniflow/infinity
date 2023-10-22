@@ -151,6 +151,7 @@ target_sources(infinity
 target_link_libraries(infinity
         sql_parser
         faiss
+        onnxruntime_mlas
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -162,6 +163,8 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magi
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+
+target_compile_options(infinity PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 ### unit test
 
@@ -227,6 +230,7 @@ target_link_libraries(unit_test
         gmock_main
         sql_parser
         faiss
+        onnxruntime_mlas
 )
 
 #add_executable(unittest

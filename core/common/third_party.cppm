@@ -16,6 +16,7 @@ module;
 #include "concurrentqueue.h"
 
 #include "faiss/Index.h"
+#include "faiss/utils/distances.h"
 
 export module third_party;
 
@@ -136,5 +137,18 @@ using ConcurrentQueue = moodycamel::ConcurrentQueue<T>;
 
 // Faiss
 export using FaissIndex = faiss::Index;
+
+export inline float fvec_inner_product(const float* x, const float* y, size_t d) {
+    return faiss::fvec_inner_product(x, y, d);
+}
+
+export inline float fvec_L2sqr(const float* x, const float* y, size_t d) {
+    return faiss::fvec_L2sqr(x, y, d);
+}
+
+export constexpr int faiss_distance_compute_blas_threshold = 20;
+export constexpr int faiss_distance_compute_blas_query_bs = 4096;
+export constexpr int faiss_distance_compute_blas_database_bs = 1024;
+export constexpr int faiss_distance_compute_min_k_reservoir = 100;
 
 } // namespace infinity
