@@ -4,6 +4,8 @@
 
 module;
 
+#include <algorithm>
+
 import base_entry;
 import stl;
 import table_collection_entry;
@@ -16,6 +18,9 @@ import txn_state;
 import txn_manager;
 import buffer_manager;
 import db_entry;
+import third_party;
+import infinity_assert;
+import infinity_exception;
 
 module table_collection_meta;
 
@@ -40,7 +45,7 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                                                 u64 txn_id,
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr) {
-#if 0
+
     TableCollectionEntry *res = nullptr;
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     const String &table_collection_name = *table_collection_name_ptr;
@@ -62,7 +67,7 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
         res = table_entry.get();
         table_meta->entry_list_.emplace_front(Move(table_entry));
 
-        LOG_TRACE("New table entry is added: {}.", table_collection_name);
+        LOG_TRACE(Format("New table entry is added: {}.", table_collection_name));
         return {res, nullptr};
     } else {
         // Already have a table entry, check if the table entry is valid here.
@@ -99,12 +104,12 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                     return {res, nullptr};
                 } else {
                     // Duplicated table
-                    LOG_TRACE("Duplicated table: {}.", table_collection_name)
+                    LOG_TRACE(Format("Duplicated table: {}.", table_collection_name));
                     return {nullptr, MakeUnique<String>("Duplicated table.")};
                 }
             } else {
                 // Write-Write conflict
-                LOG_TRACE("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name)
+                LOG_TRACE(Format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
                 return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
@@ -128,18 +133,18 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                             table_meta->entry_list_.emplace_front(Move(table_entry));
                             return {res, nullptr};
                         } else {
-                            LOG_TRACE("Create a duplicated table {}.", table_collection_name)
+                            LOG_TRACE(Format("Create a duplicated table {}.", table_collection_name));
                             return {nullptr, MakeUnique<String>("Create a duplicated name table.")};
                         }
                     } else {
-                        LOG_TRACE("Write-write conflict: There is a uncommitted transaction.")
+                        LOG_TRACE(Format("Write-write conflict: There is a uncommitted transaction."));
                         return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
                     }
                 }
                 case TxnState::kCommitting:
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
-                    LOG_TRACE("Write-write conflict: There is a committing/committed table which is later than current transaction.")
+                    LOG_TRACE(Format("Write-write conflict: There is a committing/committed table which is later than current transaction."));
                     return {
                         nullptr,
                         MakeUnique<String>("Write-write conflict: There is a committing/committed table which is later than current transaction.")};
@@ -162,13 +167,12 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                     return {res, nullptr};
                 }
                 default: {
-                    LOG_TRACE("Invalid table entry txn state")
+                    LOG_TRACE("Invalid table entry txn state");
                     return {nullptr, MakeUnique<String>("Invalid table entry txn state.")};
                 }
             }
         }
     }
-#endif
 }
 
 EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
@@ -177,18 +181,17 @@ EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
                                               TxnManager *txn_mgr,
                                               const String &table_name,
                                               ConflictType conflict_type) {
-#if 0
     TableCollectionEntry *res = nullptr;
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
-        LOG_TRACE("Empty table entry list.")
+        LOG_TRACE("Empty table entry list.");
         return {nullptr, MakeUnique<String>("Empty table entry list.")};
     }
 
     BaseEntry *header_base_entry = table_meta->entry_list_.front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         //            rw_locker_.unlock();
-        LOG_TRACE("No valid table entry.")
+        LOG_TRACE("No valid table entry.");
         return {nullptr, MakeUnique<String>("No valid table entry.")};
     }
 
@@ -199,10 +202,10 @@ EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
             // No conflict
             if (header_table_entry->deleted_) {
                 if (conflict_type == ConflictType::kIgnore) {
-                    LOG_TRACE("Ignore drop a not existed table entry {}", table_name);
+                    LOG_TRACE(Format("Ignore drop a not existed table entry {}", table_name));
                     return {nullptr, nullptr};
                 }
-                LOG_TRACE("Table was dropped before.")
+                LOG_TRACE("Table was dropped before.");
                 return {nullptr, MakeUnique<String>("Table was dropped before.")};
             }
 
@@ -221,7 +224,7 @@ EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
             return {res, nullptr};
         } else {
             // Write-Write conflict
-            LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.");
+            LOG_TRACE(Format("Write-write conflict: There is a committed database which is later than current transaction."));
             return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
         }
     } else {
@@ -234,18 +237,16 @@ EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
             return {res, nullptr};
         } else {
             // Not same txn, issue WW conflict
-            LOG_TRACE("Write-write conflict: There is another uncommitted table entry.")
+            LOG_TRACE(Format("Write-write conflict: There is another uncommitted table entry."));
             return {nullptr, MakeUnique<String>("Write-write conflict: There is another uncommitted table entry.")};
         }
     }
-#endif
 }
 
 void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr) {
-#if 0
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
-        LOG_TRACE("Empty table entry list.")
+        LOG_TRACE("Empty table entry list.");
         return;
     }
 
@@ -254,7 +255,6 @@ void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 tx
     });
 
     table_meta->entry_list_.erase(removed_iter, table_meta->entry_list_.end());
-#endif
 }
 
 /**
@@ -270,16 +270,15 @@ void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 tx
  * @return EntryResult
  */
 EntryResult TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts) {
-#if 0
     SharedLock<RWMutex> r_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
-        LOG_TRACE("Empty table entry list.")
+        LOG_TRACE("Empty table entry list.");
         return {nullptr, MakeUnique<String>("Empty table entry list.")};
     }
 
     for (const auto &table_entry : table_meta->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("No valid table entry.")
+            LOG_TRACE("No valid table entry.");
             return {nullptr, MakeUnique<String>("No valid table entry.")};
         }
 
@@ -301,9 +300,8 @@ EntryResult TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 t
             }
         }
     }
-    LOG_TRACE("No table entry found.")
+    LOG_TRACE("No table entry found.");
     return {nullptr, MakeUnique<String>("No table entry found.")};
-#endif
 }
 
 SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta) {
@@ -316,7 +314,6 @@ SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta)
 }
 
 Json TableCollectionMeta::Serialize(const TableCollectionMeta *table_meta) {
-#if 0
     Json json_res;
 
     json_res["db_entry_dir"] = *table_meta->db_entry_dir_;
@@ -326,14 +323,13 @@ Json TableCollectionMeta::Serialize(const TableCollectionMeta *table_meta) {
         if (entry->entry_type_ == EntryType::kTable) {
             json_res["entries"].emplace_back(TableCollectionEntry::Serialize((TableCollectionEntry *)entry.get()));
         } else if (entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("Skip dummy type entry during serialize table {} meta", *table_meta->table_collection_name_);
+            LOG_TRACE(Format("Skip dummy type entry during serialize table {} meta", *table_meta->table_collection_name_));
         } else {
-            StorageError("Unexpected entry type");
+            Error<StorageException>("Unexpected entry type", __FILE_NAME__, __LINE__);
         }
     }
 
     return json_res;
-#endif
 }
 
 /**
@@ -349,12 +345,11 @@ Json TableCollectionMeta::Serialize(const TableCollectionMeta *table_meta) {
  * @return UniquePtr<TableCollectionMeta>
  */
 UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
-#if 0
     Json json_res;
 
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
-    LOG_TRACE("load table {}", *table_name);
+    LOG_TRACE(Format("load table {}", *table_name));
     UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(db_entry_dir, table_name, db_entry);
     if (table_meta_json.contains("entries")) {
         for (const auto &table_entry_json : table_meta_json["entries"]) {
@@ -367,7 +362,6 @@ UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &tabl
     res->entry_list_.emplace_back(Move(dummy_entry));
 
     return res;
-#endif
 }
 
 } // namespace infinity

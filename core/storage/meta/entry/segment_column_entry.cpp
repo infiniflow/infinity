@@ -4,9 +4,27 @@
 
 module;
 
+#include <vector>
+#include <memory>
+
+import stl;
+import parser;
+import buffer_manager;
+import outline_info;
+import column_buffer;
+import column_vector;
+import object_handle;
+import varchar_layout;
+import third_party;
+import logger;
+import segment_entry;
+import infinity_assert;
+import infinity_exception;
+import buffer_handle;
+import default_values;
+
 module segment_column_entry;
 
-#if 0
 namespace infinity {
 
 SharedPtr<SegmentColumnEntry> SegmentColumnEntry::MakeNewColumnDataEntry(const SegmentEntry *segment_entry,
@@ -47,7 +65,7 @@ void SegmentColumnEntry::Append(SegmentColumnEntry *column_data_entry,
                                 SizeT column_start_offset,
                                 SizeT row_n) {
     if (column_data_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle")
+        Error<StorageException>("Not initialize buffer handle", __FILE_NAME__, __LINE__);
     }
     ptr_t src_ptr = column_vector->data() + block_start_offset * column_vector->data_type_size_;
     SizeT data_size = row_n * column_vector->data_type_size_;
@@ -70,7 +88,7 @@ void SegmentColumnEntry::AppendRaw(SegmentColumnEntry *column_data_entry, SizeT 
         case kFloat:
         case kDouble:
         case kEmbedding: {
-            memcpy(dst_ptr, src_p, data_size);
+            Memcpy(dst_ptr, src_p, data_size);
             break;
         }
         case kVarchar: {
@@ -83,7 +101,7 @@ void SegmentColumnEntry::AppendRaw(SegmentColumnEntry *column_data_entry, SizeT 
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length;
-                    memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
+                    Memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = column_data_entry->outline_info_.get();
@@ -99,10 +117,10 @@ void SegmentColumnEntry::AppendRaw(SegmentColumnEntry *column_data_entry, SizeT 
                     ptr_t dst_ptr = out_object_handle.GetData() + current_buffer_offset;
                     SizeT data_size = varchar_type->length;
                     ptr_t src_ptr = varchar_type->ptr;
-                    memcpy(dst_ptr, src_ptr, data_size);
+                    Memcpy(dst_ptr, src_ptr, data_size);
 
                     varchar_layout->length_ = varchar_type->length;
-                    memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
+                    Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
                     long_info.file_idx_ = outline_info->next_file_idx - 1;
                     long_info.file_offset_ = current_buffer_offset;
                     current_buffer_offset += varchar_type->length;
@@ -113,10 +131,10 @@ void SegmentColumnEntry::AppendRaw(SegmentColumnEntry *column_data_entry, SizeT 
         case kNull:
         case kMissing:
         case kInvalid: {
-            StorageError("AppendRaw: Error type.")
+            Error<StorageException>("AppendRaw: Error type.", __FILE_NAME__, __LINE__);
         }
         default: {
-            NotImplementError("AppendRaw: Not implement the type.")
+            Error<StorageException>("AppendRaw: Not implement the type.", __FILE_NAME__, __LINE__);
         }
     }
 }
@@ -172,19 +190,19 @@ void SegmentColumnEntry::Flush(SegmentColumnEntry *column_data_entry, SizeT row_
         case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR("{} isn't supported", column_data_entry->column_type_->ToString())
-            NotImplementError("Not supported now in append data in column")
+            LOG_ERROR(Format("{} isn't supported", column_data_entry->column_type_->ToString()));
+            Error<StorageException>("Not supported now in append data in column.", __FILE_NAME__, __LINE__);
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Invalid data type {}", column_data_entry->column_type_->ToString())
-            StorageError("Invalid data type")
+            LOG_ERROR(Format("Invalid data type {}", column_data_entry->column_type_->ToString()));
+            Error<StorageException>("Invalid data type.", __FILE_NAME__, __LINE__);
         }
     }
 }
 
-nlohmann::json SegmentColumnEntry::Serialize(const SegmentColumnEntry *column_data_entry) {
-    nlohmann::json json_res;
+Json SegmentColumnEntry::Serialize(const SegmentColumnEntry *column_data_entry) {
+    Json json_res;
     json_res["column_type"] = column_data_entry->column_type_->Serialize();
     json_res["base_dir"] = *column_data_entry->base_dir_;
     json_res["file_name"] = *column_data_entry->file_name_;
@@ -202,7 +220,7 @@ nlohmann::json SegmentColumnEntry::Serialize(const SegmentColumnEntry *column_da
 }
 
 SharedPtr<SegmentColumnEntry>
-SegmentColumnEntry::Deserialize(const nlohmann::json &column_data_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+SegmentColumnEntry::Deserialize(const Json &column_data_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     SharedPtr<SegmentColumnEntry> column_data_entry = MakeShared<SegmentColumnEntry>(segment_entry);
     column_data_entry->column_type_ = DataType::Deserialize(column_data_json["column_type"]);
     column_data_entry->base_dir_ = MakeShared<String>(column_data_json["base_dir"]);
@@ -225,4 +243,3 @@ SegmentColumnEntry::Deserialize(const nlohmann::json &column_data_json, SegmentE
     return column_data_entry;
 }
 } // namespace infinity
-#endif

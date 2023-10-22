@@ -4,6 +4,8 @@
 
 module;
 
+#include <memory>
+
 import stl;
 import base_entry;
 import segment_entry;
@@ -11,6 +13,8 @@ import default_values;
 import block_column_entry;
 import logger;
 import third_party;
+import defer_op;
+import local_file_system;
 
 module block_entry;
 
@@ -29,7 +33,6 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, i16 block_id, u64 colu
 }
 
 i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows) {
-#if 0
     block_entry->rw_locker_.lock();
     DeferFn defer_fn([&]() { block_entry->rw_locker_.unlock(); });
 
@@ -46,11 +49,11 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *inp
                                  input_offset,
                                  actual_copied);
 
-        LOG_TRACE("Segment: {}, Block: {}, Column: {} is appended with {} rows",
-                  block_entry->segment_entry_->segment_id_,
-                  block_entry->block_id_,
-                  column_id,
-                  actual_copied)
+        LOG_TRACE(Format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
+                         block_entry->segment_entry_->segment_id_,
+                         block_entry->block_id_,
+                         column_id,
+                         actual_copied));
     }
 
     for (SizeT i = 0; i < actual_copied; ++i) {
@@ -59,11 +62,9 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *inp
 
     block_entry->row_count_ += actual_copied;
     return actual_copied;
-#endif
 }
 
 void BlockEntry::CommitAppend(BlockEntry *block_entry, u64 committing_txn_id) {
-#if 0
     block_entry->rw_locker_.lock();
     DeferFn defer_fn([&]() { block_entry->rw_locker_.unlock(); });
 
@@ -87,33 +88,27 @@ void BlockEntry::CommitAppend(BlockEntry *block_entry, u64 committing_txn_id) {
         block_entry->start_ts_ = committing_txn_id;
         block_entry->txn_ptr_ = nullptr;
     }
-#endif
 }
 
 void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr, u64 start_row_in_segment, u64 row_count) {
-#if 0
     u64 start_offset = start_row_in_segment - block_entry->start_row_;
     u64 end_offset = start_offset + row_count;
     Vector<au64> &deleted_vector = block_entry->block_version_->deleted_;
     for (SizeT i = start_offset; i < end_offset; ++i) {
         deleted_vector[i] = txn_ptr->CommitTS();
     }
-#endif
 }
 
 bool BlockEntry::PrepareFlush(BlockEntry *block_entry) {
-#if 0
     BlockEntryStatus expected = BlockEntryStatus::kBlockOpen;
     return block_entry->status_.compare_exchange_strong(expected, BlockEntryStatus::kBlockFlushing, std::memory_order_seq_cst);
-#endif
 }
 
 bool BlockEntry::Flush(BlockEntry *block_entry) {
-#if 0
-    LOG_TRACE("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
+    LOG_TRACE(Format("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
     for (SizeT column_id = 0; const auto &column_data : block_entry->columns_) {
         column_data->Flush(column_data.get(), block_entry->row_count_);
-        LOG_TRACE("ColumnData: {} is flushed", column_id);
+        LOG_TRACE(Format("ColumnData: {} is flushed", column_id));
         ++column_id;
     }
 
@@ -122,14 +117,12 @@ bool BlockEntry::Flush(BlockEntry *block_entry) {
         LOG_WARN("Data block is expected as flushing status");
         return false;
     }
-    LOG_TRACE("Segment: {}, Block: {} is being flushed", block_entry->segment_entry_->segment_id_, block_entry->block_id_);
+    LOG_TRACE(Format("Segment: {}, Block: {} is being flushed", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
 
     return true;
-#endif
 }
 
 Json BlockEntry::Serialize(const BlockEntry *block_entry) {
-#if 0
     Json json_res;
 
     json_res["start_row"] = block_entry->start_row_;
@@ -143,11 +136,9 @@ Json BlockEntry::Serialize(const BlockEntry *block_entry) {
     json_res["min_row_ts"] = block_entry->min_row_ts_.load();
     json_res["max_row_ts"] = block_entry->max_row_ts_.load();
     return json_res;
-#endif
 }
 
 UniquePtr<BlockEntry> BlockEntry::Deserialize(const Json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
-#if 0
     u64 block_id = block_entry_json["block_id"];
     SizeT start_row = block_entry_json["start_row"];
     UniquePtr<BlockEntry> block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0, start_row, buffer_mgr);
@@ -162,19 +153,16 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const Json &block_entry_json, Segm
     }
 
     return block_entry;
-#endif
 }
 
 bool BlockEntry::IsFull(BlockEntry *block_entry) { return block_entry->row_count_ >= block_entry->row_capacity_; }
 
 SharedPtr<String> BlockEntry::DetermineFilename(const String &parent_dir, u64 block_id) {
-#if 0
     LocalFileSystem fs;
     SharedPtr<String> base_dir;
     base_dir = MakeShared<String>(parent_dir + '/' + "blk_" + std::to_string(block_id));
     fs.CreateDirectoryNoExp(*base_dir);
     return base_dir;
-#endif
 }
 
 } // namespace infinity

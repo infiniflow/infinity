@@ -15,7 +15,7 @@ namespace {
 String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 }
 
-inline String RandomString(SizeT len, u32 seed) {
+String RandomString(SizeT len, u32 seed) {
     srand(seed);
     String ret(len, '\0');
     for (SizeT i = 0; i < len; i++) {

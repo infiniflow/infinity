@@ -41,40 +41,6 @@ public:
 
     static Vector<DBEntry *> Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts);
 
-#if 0
-
-    void
-    CreateTable(String schema_name, const SharedPtr<Table>& table_def, ConflictType conflict_type);
-
-    void
-    DeleteTable(String schema_name, String table_name, ConflictType conflict_type);
-
-    void
-    CreateCollection(String schema_name, String collection_name, ConflictType conflict_type);
-
-    void
-    DeleteCollection(String schema_name, String collection_name, ConflictType conflict_type);
-
-    Vector<SharedPtr<BaseTable>>
-    GetTables(String schema_name);
-
-    // View related methods
-    SharedPtr<View>
-    GetViewByName(String schema_name, String view_name);
-
-    SharedPtr<View>
-    GetViewByNameNoExcept(String schema_name, String view_name) noexcept;
-
-    void
-    CreateView(String schema_name, const SharedPtr<View>& view, ConflictType conflict_type);
-
-    void
-    DeleteView(String schema_name, String view_name, ConflictType conflict_type);
-
-    Vector<SharedPtr<View>>
-    GetViews(String schema_name);
-#endif
-
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
 

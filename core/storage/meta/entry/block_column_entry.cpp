@@ -4,6 +4,8 @@
 
 module;
 
+#include <string>
+
 import stl;
 import buffer_manager;
 import block_entry;
@@ -16,13 +18,18 @@ import column_vector;
 import object_handle;
 import default_values;
 import third_party;
+import table_collection_entry;
+import infinity_assert;
+import infinity_exception;
+import segment_column_entry;
+import varchar_layout;
+import logger;
 
 module block_column_entry;
 
 namespace infinity {
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager) {
-#if 0
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir_);
 
     block_column_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
@@ -41,7 +48,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const Bloc
     }
 
     return block_column_entry;
-#endif
 }
 
 ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entry, BufferManager *buffer_manager) {
@@ -60,9 +66,8 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
                               ColumnVector *input_column_vector,
                               offset_t input_offset,
                               SizeT append_rows) {
-#if 0
     if (column_entry->buffer_handle_ == nullptr) {
-        StorageError("Not initialize buffer handle")
+        Error<StorageException>("Not initialize buffer handle", __FILE_NAME__, __LINE__);
     }
     SizeT data_type_size = input_column_vector->data_type_size_;
 
@@ -70,11 +75,9 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
     SizeT data_size = append_rows * data_type_size;
     SizeT dst_offset = column_entry_offset * data_type_size;
     BlockColumnEntry::AppendRaw(column_entry, dst_offset, src_ptr, data_size);
-#endif
 }
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
-#if 0
     CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
     ptr_t dst_p = object_handle.GetData() + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
@@ -131,17 +134,15 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
         case kNull:
         case kMissing:
         case kInvalid: {
-            StorageError("AppendRaw: Error type.")
+            Error<StorageException>("AppendRaw: Error type.", __FILE_NAME__, __LINE__);
         }
         default: {
-            NotImplementError("AppendRaw: Not implement the type.")
+            Error<NotImplementException>("AppendRaw: Not implement the type.", __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_count) {
-#if 0
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
         case kBoolean:
@@ -193,16 +194,15 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR("{} isn't supported", column_type->ToString())
-            NotImplementError("Not supported now in append data in column")
+            LOG_ERROR(Format("{} isn't supported", column_type->ToString()));
+            Error<NotImplementException>("Invalid data type.", __FILE_NAME__, __LINE__);
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR("Invalid data type {}", column_type->ToString())
-            StorageError("Invalid data type")
+            LOG_ERROR(Format("Invalid data type {}", column_type->ToString()));
+            Error<StorageException>("Invalid data type.", __FILE_NAME__, __LINE__);
         }
     }
-#endif
 }
 
 Json BlockColumnEntry::Serialize(const BlockColumnEntry *block_column_entry) {

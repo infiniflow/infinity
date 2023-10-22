@@ -4,6 +4,8 @@
 
 module;
 
+#include <vector>
+
 import stl;
 import parser;
 import base_entry;
@@ -17,6 +19,11 @@ import index_def;
 import block_index;
 import data_access_state;
 import db_entry;
+import logger;
+import txn_store;
+import infinity_assert;
+import infinity_exception;
+import ivfflat_index_def;
 
 module table_collection_entry;
 
@@ -29,8 +36,7 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
                                            TableCollectionMeta *table_collection_meta,
                                            u64 txn_id,
                                            TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable),
-      table_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
+    : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
       table_collection_name_(Move(table_collection_name)), columns_(columns), table_collection_type_(table_collection_type),
       table_collection_meta_(table_collection_meta) {
     SizeT column_count = columns.size();
@@ -43,7 +49,6 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
-#if 0
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     Txn *transaction_ptr = (Txn *)txn_ptr;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
@@ -83,70 +88,55 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         SegmentEntry::AppendData(table_entry->unsealed_segment_, txn_ptr, append_state_ptr, buffer_mgr);
-        LOG_TRACE("Segment is appended with {} rows", append_state_ptr->current_count_ - current_row);
+        LOG_TRACE(Format("Segment is appended with {} rows", append_state_ptr->current_count_ - current_row));
     }
-#endif
 }
 
 UniquePtr<String>
 TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
-#if 0
-    NotImplementError("TableCollectionEntry::Delete");
+    Error<NotImplementException>("TableCollectionEntry::Delete", __FILE_NAME__, __LINE__);
     return nullptr;
-
-#endif
 }
 
 UniquePtr<String> TableCollectionEntry::InitScan(TableCollectionEntry *table_entry, Txn *txn_ptr, ScanState &scan_state, BufferManager *buffer_mgr) {
-#if 0
-    NotImplementError("TableCollectionEntry::InitScan");
+    Error<NotImplementException>("TableCollectionEntry::InitScan", __FILE_NAME__, __LINE__);
     return nullptr;
-#endif
 }
 
 UniquePtr<String>
 TableCollectionEntry::Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, const ScanState &scan_state, BufferManager *buffer_mgr) {
-#if 0
-    NotImplementError("TableCollectionEntry::Scan");
+    Error<NotImplementException>("TableCollectionEntry::Scan", __FILE_NAME__, __LINE__);
     return nullptr;
-#endif
 }
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry,
                                         Txn *txn_ptr,
                                         const AppendState *append_state_ptr,
                                         BufferManager *buffer_mgr) {
-#if 0
     for (const auto &range : append_state_ptr->append_ranges_) {
-        LOG_TRACE("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_);
+        LOG_TRACE(
+            Format("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_));
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_id_, range.row_count_);
     }
-#endif
 }
 
 void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store) {
-#if 0
     auto *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    NotImplementError("Not implemented");
-#endif
+    Error<NotImplementException>("TableCollectionEntry::RollbackAppend", __FILE_NAME__, __LINE__);
 }
 
 UniquePtr<String>
 TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr) {
-#if 0
-    NotImplementError("TableCollectionEntry::CommitDelete");
+    Error<NotImplementException>("TableCollectionEntry::CommitDelete", __FILE_NAME__, __LINE__);
     return nullptr;
-#endif
 }
 
 UniquePtr<String>
 TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr) {
-#if 0
-    NotImplementError("TableCollectionEntry::RollbackDelete");
+    Error<NotImplementException>("TableCollectionEntry::RollbackDelete", __FILE_NAME__, __LINE__);
     return nullptr;
-#endif
 }
 
 UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry *table_entry,
@@ -154,7 +144,6 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
                                                             SharedPtr<SegmentEntry> segment,
                                                             AppendState &append_state,
                                                             BufferManager *buffer_mgr) {
-#if 0
     for (const auto &block_entry : segment->block_entries_) {
         append_state.append_ranges_.emplace_back(segment->segment_id_, block_entry->block_id_, 0, block_entry->row_count_);
     }
@@ -162,11 +151,9 @@ UniquePtr<String> TableCollectionEntry::ImportAppendSegment(TableCollectionEntry
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);
     table_entry->segments_.emplace(segment->segment_id_, Move(segment));
     return nullptr;
-#endif
 }
 
 EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<IndexDef> index_def) {
-#if 0
     const String &column_name = index_def->column_names()[0];
     u64 column_id = table_entry->GetColumnIdByName(column_name);
     ColumnDef &column_def = *table_entry->columns_[column_id];
@@ -174,12 +161,12 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         case IndexMethod::kIVFFlat: {
             auto &column_def = *table_entry->columns_[column_id];
             if (column_def.column_type_->type() != LogicalType::kEmbedding) {
-                StorageError("IVFFlat index should created on Embedding type column")
+                Error<NotImplementException>("IVFFlat index should created on Embedding type column", __FILE_NAME__, __LINE__);
             }
             auto type_info = column_def.column_type_->type_info().get();
             auto embedding_info = (EmbeddingInfo *)type_info;
             if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-                StorageError("IVFFlat index should created on float embedding type column")
+                Error<NotImplementException>("IVFFlat index should created on float embedding type column", __FILE_NAME__, __LINE__);
             }
             for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
                 SegmentEntry::CreateIndexEmbedding(segment_entry.get(), txn_ptr, *index_def, column_id, embedding_info->Dimension());
@@ -187,13 +174,12 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
             break;
         }
         default: {
-            NotImplementException("Not implemented.");
+            Error<NotImplementException>("TableCollectionEntry::CreateIndex", __FILE_NAME__, __LINE__);
         }
     }
     // TODO shenyushi: change meta data
     // table_entry->indexes_.emplace(index_def->index_name(), index_def);
     return {.entry_ = nullptr, .err_ = nullptr};
-#endif
 }
 
 SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u64 id) {
@@ -224,7 +210,6 @@ SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *
 }
 
 Json TableCollectionEntry::Serialize(const TableCollectionEntry *table_entry) {
-#if 0
     Json json_res;
 
     json_res["table_entry_dir"] = *table_entry->table_entry_dir_;
@@ -260,12 +245,10 @@ Json TableCollectionEntry::Serialize(const TableCollectionEntry *table_entry) {
     }
 
     return json_res;
-#endif
 }
 
 UniquePtr<TableCollectionEntry>
 TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr) {
-#if 0
     Json json_res;
 
     SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
@@ -329,17 +312,14 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     }
 
     return table_entry;
-#endif
 }
 
 u64 TableCollectionEntry::GetColumnIdByName(const String &column_name) {
-#if 0
     auto it = name2id_.find(column_name);
     if (it == name2id_.end()) {
-        StorageError(Format("No column name: {}", column_name))
+        Error<NotImplementException>(Format("No column name: {}", column_name), __FILE_NAME__, __LINE__);
     }
     return it->second;
-#endif
 }
 
 } // namespace infinity

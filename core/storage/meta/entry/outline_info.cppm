@@ -20,7 +20,7 @@ export struct OutlineInfo {
 
     SizeT next_file_idx{};
 
-    OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
+    inline explicit OutlineInfo(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr) {}
 };
 
 } // namespace infinity

@@ -4,6 +4,10 @@
 
 module;
 
+#include "faiss/IndexIVFFlat.h"
+#include "faiss/IndexFlat.h"
+#include "faiss/index_io.h"
+
 import stl;
 import third_party;
 import block_entry;
@@ -15,6 +19,14 @@ import data_access_state;
 import index_def;
 import table_collection_entry;
 import base_entry;
+import infinity_assert;
+import infinity_exception;
+import defer_op;
+import ivfflat_index_def;
+import object_handle;
+import logger;
+import local_file_system;
+import random;
 
 module segment_entry;
 
@@ -61,9 +73,8 @@ SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionE
 }
 
 void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr) {
-#if 0
     if (segment_entry->status_ != DataSegmentStatus::kSegmentOpen) {
-        StorageError("Attempt to append data into Non-Open status data segment");
+        Error<StorageException>("Attempt to append data into Non-Open status data segment", __FILE_NAME__, __LINE__);
     }
 
     segment_entry->rw_locker_.lock();
@@ -112,17 +123,13 @@ void SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendS
         append_state_ptr->current_block_++;
         append_state_ptr->current_block_offset_ = 0;
     }
-#endif
 }
 
 void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id) {
-#if 0
-    NotImplementError("Not implemented")
-#endif
+    Error<NotImplementException>("SegmentEntry::CreateIndexScalar", __FILE_NAME__, __LINE__);
 }
 
 void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension) {
-#if 0
     switch (index_def.method_type()) {
         case IndexMethod::kIVFFlat: {
             auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
@@ -168,11 +175,9 @@ void SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_pt
             NotImplementException("Index method type is not supported");
         }
     }
-#endif
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count) {
-#if 0
     u64 committing_txn_id = txn_ptr->TxnID();
 
     if (segment_entry->min_row_ts_ == MAX_TXN_ID) {
@@ -192,22 +197,19 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
     }
 
     BlockEntry::CommitAppend(segment_entry->block_entries_[block_id].get(), committing_txn_id);
-#endif
 }
 
 void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count) {
+    Error<NotImplementException>("SegmentEntry::CommitDelete", __FILE_NAME__, __LINE__);
 }
 
 bool SegmentEntry::PrepareFlush(SegmentEntry *segment_entry) {
-#if 0
     DataSegmentStatus expected = DataSegmentStatus::kSegmentOpen;
     return segment_entry->status_.compare_exchange_strong(expected, DataSegmentStatus::kSegmentFlushing, std::memory_order_seq_cst);
-#endif
 }
 
 bool SegmentEntry::Flush(SegmentEntry *segment_entry) {
-#if 0
-    LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
+    LOG_TRACE(Format("DataSegment: {} is being flushed", segment_entry->segment_id_));
     for (const auto &block_entry : segment_entry->block_entries_) {
 
         bool flushed = BlockEntry::Flush(block_entry.get());
@@ -216,7 +218,7 @@ bool SegmentEntry::Flush(SegmentEntry *segment_entry) {
             // TODO(xuanwei): delta checkpoint
             continue;
         }
-        LOG_TRACE("Segment: {}, Block: {} is flushed", segment_entry->segment_id_, block_entry->block_id_);
+        LOG_TRACE(Format("Segment: {}, Block: {} is flushed", segment_entry->segment_id_, block_entry->block_id_));
     }
 
     auto expected = DataSegmentStatus::kSegmentFlushing;
@@ -224,10 +226,9 @@ bool SegmentEntry::Flush(SegmentEntry *segment_entry) {
         LOG_WARN("Data segment is expected as flushing status");
         return false;
     }
-    LOG_TRACE("DataSegment: {} is being flushed", segment_entry->segment_id_);
+    LOG_TRACE(Format("DataSegment: {} is being flushed", segment_entry->segment_id_));
 
     return true;
-#endif
 }
 
 u64 SegmentEntry::GetBlockIDByRowID(SizeT row_id) {
@@ -253,7 +254,6 @@ BlockEntry *SegmentEntry::GetBlockEntryByID(const SegmentEntry *segment_entry, u
 }
 
 Json SegmentEntry::Serialize(const SegmentEntry *segment_entry) {
-#if 0
     Json json_res;
 
     json_res["segment_dir"] = *segment_entry->segment_dir_;
@@ -276,7 +276,6 @@ Json SegmentEntry::Serialize(const SegmentEntry *segment_entry) {
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry.get()));
     }
     return json_res;
-#endif
 }
 
 SharedPtr<SegmentEntry>
@@ -313,7 +312,6 @@ SegmentEntry::Deserialize(const Json &segment_entry_json, TableCollectionEntry *
 }
 
 SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u64 seg_id) {
-#if 0
     u32 seed = time(nullptr);
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
@@ -321,13 +319,10 @@ SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u
         segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
-#endif
 }
 
 SharedPtr<String> SegmentEntry::DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id) {
-#if 0
     // TODO shenyushi 3
     return MakeShared<String>(parent_dir + '/' + index_name + '_' + ToStr(seg_id));
-#endif
 }
 } // namespace infinity

@@ -131,6 +131,7 @@ add_executable(infinity
         ${storage_cpp}
         ${function_cpp}
         ${expression_cpp}
+        ${common_cpp}
 )
 
 target_sources(infinity
@@ -214,6 +215,7 @@ add_executable(unit_test
         ${storage_cpp}
         ${expression_cpp}
         ${function_cpp}
+        ${common_cpp}
 #        ${planner_test_src}
 #        ${storage_test_src}
 #        ${parser_test_src}

@@ -23,7 +23,7 @@ namespace infinity {
 
 export class DBEntry : public BaseEntry {
 public:
-    explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
+    inline explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
         : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
           db_name_(Move(db_name)) {
         begin_ts_ = begin_ts;

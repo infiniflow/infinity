@@ -12,6 +12,7 @@ import third_party;
 import table_collection_type;
 import txn_manager;
 import buffer_manager;
+//import db_entry;
 
 export module table_collection_meta;
 
@@ -23,7 +24,7 @@ class DBEntry;
 
 export struct TableCollectionMeta {
 public:
-    explicit TableCollectionMeta(const SharedPtr<String> &db_entry_dir, SharedPtr<String> name, DBEntry *db_entry)
+    inline explicit TableCollectionMeta(const SharedPtr<String> &db_entry_dir, SharedPtr<String> name, DBEntry *db_entry)
         : db_entry_dir_(db_entry_dir), table_collection_name_(Move(name)), db_entry_(db_entry) {}
 
 public:

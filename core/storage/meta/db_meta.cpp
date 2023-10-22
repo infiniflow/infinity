@@ -4,6 +4,8 @@
 
 module;
 
+#include <algorithm>
+
 import base_entry;
 import stl;
 import db_entry;
@@ -12,6 +14,8 @@ import logger;
 import third_party;
 import buffer_manager;
 import txn_state;
+import infinity_assert;
+import infinity_exception;
 
 module db_meta;
 
@@ -167,7 +171,6 @@ EntryResult DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin
 }
 
 void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
-#if 0
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.");
@@ -178,7 +181,6 @@ void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
         std::remove_if(db_meta->entry_list_.begin(), db_meta->entry_list_.end(), [&](auto &entry) -> bool { return entry->txn_id_ == txn_id; });
 
     db_meta->entry_list_.erase(removed_iter, db_meta->entry_list_.end());
-#endif
 }
 
 EntryResult DBMeta::GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts) {
@@ -229,7 +231,6 @@ SharedPtr<String> DBMeta::ToString(DBMeta *db_meta) {
 }
 
 Json DBMeta::Serialize(const DBMeta *db_meta) {
-#if 0
     Json json_res;
 
     json_res["data_dir"] = *db_meta->data_dir_;
@@ -241,11 +242,10 @@ Json DBMeta::Serialize(const DBMeta *db_meta) {
         } else if (base_entry->entry_type_ == EntryType::kDummy) {
             ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
         } else {
-            StorageError("Unexpected entry type");
+            Error<StorageException>("Unexpected entry type", __FILE_NAME__, __LINE__);
         }
     }
     return json_res;
-#endif
 }
 
 UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr) {

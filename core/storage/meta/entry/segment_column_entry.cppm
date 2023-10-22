@@ -26,7 +26,7 @@ class SegmentEntry;
 
 export struct SegmentColumnEntry : public BaseEntry {
 public:
-    explicit SegmentColumnEntry(const SegmentEntry *segment_entry) : BaseEntry(EntryType::kSegmentColumn), segment_entry_(segment_entry) {}
+    inline explicit SegmentColumnEntry(const SegmentEntry *segment_entry) : BaseEntry(EntryType::kSegmentColumn), segment_entry_(segment_entry) {}
 
     const SegmentEntry *segment_entry_{nullptr};
     SharedPtr<DataType> column_type_{};
