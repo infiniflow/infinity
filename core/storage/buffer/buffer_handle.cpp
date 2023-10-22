@@ -4,25 +4,33 @@
 
 module;
 
+#include <memory>
+#include <string>
+
 import stl;
 import buffer_manager;
 import logger;
 import third_party;
+import local_file_system;
+import file_system_type;
+import logger;
+import third_party;
+import defer_op;
+import infinity_assert;
+import infinity_exception;
+import buffer_task;
 
 module buffer_handle;
 
 namespace infinity {
 
 BufferHandle::BufferHandle(void *buf_mgr) : buffer_mgr_(buf_mgr) {
-#if 0
     BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     reader_processor_ = buffer_mgr->reader_.get();
     writer_processor_ = buffer_mgr->writer_.get();
-#endif
 }
 
 ptr_t BufferHandle::LoadData() {
-#if 0
     BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     {
         UniqueLock<RWMutex> w_locker(rw_locker_);
@@ -54,7 +62,7 @@ ptr_t BufferHandle::LoadData() {
                         file_path = *current_dir_ + '/' + *file_name_;
                     }
 
-                    LOG_TRACE("Read data from spilled file from: {}", file_path);
+                    LOG_TRACE(Format("Read data from spilled file from: {}", file_path));
                     // Rename the temp file on disk into _temp_filename
                     data_ = MakeUnique<char[]>(buffer_size_);
                     reference_count_ = 1;
@@ -118,26 +126,28 @@ ptr_t BufferHandle::LoadData() {
                             SizeT file_size = fs.GetFileSize(*file_handler_);
 
                             if (file_size < sizeof(u64) * 3) {
-                                StorageError(Format("Incorrect file length {}.", file_size));
+                                Error<StorageException>(Format("Incorrect file length {}.", file_size), __FILE_NAME__, __LINE__);
                             }
 
                             // file header:
                             u64 magic_number{0};
                             i64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
                             if (nbytes != sizeof(magic_number)) {
-                                StorageError(Format("Read magic number which length isn't {}.", nbytes));
+                                Error<StorageException>(Format("Read magic number which length isn't {}.", nbytes), __FILE_NAME__, __LINE__);
                             }
 
                             if (magic_number != 0x00dd3344) {
-                                StorageError(Format("Incorrect file header magic number: {}.", magic_number));
+                                Error<StorageException>(Format("Incorrect file header magic number: {}.", magic_number), __FILE_NAME__, __LINE__);
                             }
 
                             nbytes = fs.Read(*file_handler_, &buffer_size_, sizeof(buffer_size_));
                             if (nbytes != sizeof(buffer_size_)) {
-                                StorageError(Format("Incorrect buffer length field size: {}", sizeof(buffer_size_)));
+                                Error<StorageException>(Format("Incorrect buffer length field size: {}", sizeof(buffer_size_)),
+                                                        __FILE_NAME__,
+                                                        __LINE__);
                             }
 
-                            LOG_TRACE("Read file: {} which size: {}", file_path, buffer_size_);
+                            LOG_TRACE(Format("Read file: {} which size: {}", file_path, buffer_size_));
                             // Need buffer size space
                             UniquePtr<String> err_msg = buffer_mgr->Free(buffer_size_); // This won't introduce deadlock
                             if (err_msg != nullptr) {
@@ -149,18 +159,22 @@ ptr_t BufferHandle::LoadData() {
                             data_ = MakeUnique<char[]>(buffer_size_);
                             nbytes = fs.Read(*file_handler_, data_.get(), buffer_size_);
                             if (nbytes != buffer_size_) {
-                                StorageError(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
+                                Error<StorageException>(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes),
+                                                        __FILE_NAME__,
+                                                        __LINE__);
                             }
 
                             if (file_size != buffer_size_ + 3 * sizeof(u64)) {
-                                StorageError(Format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
+                                Error<StorageException>(Format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)),
+                                                        __FILE_NAME__,
+                                                        __LINE__);
                             }
 
                             u64 checksum{};
                             // file footer: checksum
                             nbytes = fs.Read(*file_handler_, &checksum, sizeof(checksum));
                             if (nbytes != sizeof(checksum)) {
-                                StorageError(Format("Incorrect file checksum length: {}.", nbytes));
+                                Error<StorageException>(Format("Incorrect file checksum length: {}.", nbytes), __FILE_NAME__, __LINE__);
                             }
                         }
 
@@ -186,7 +200,7 @@ ptr_t BufferHandle::LoadData() {
                             file_path = *current_dir_ + '/' + *file_name_;
                         }
 
-                        LOG_TRACE("Read extra block: {}", file_path);
+                        LOG_TRACE(Format("Read extra block: {}", file_path));
                         data_ = MakeUnique<char[]>(buffer_size_);
                         reference_count_ = 1;
                         res = data_.get();
@@ -208,11 +222,9 @@ ptr_t BufferHandle::LoadData() {
     }
 
     LOG_ERROR("Reach unexpected position");
-#endif
 }
 
 void BufferHandle::UnloadData() {
-#if 0
     UniqueLock<RWMutex> w_locker(rw_locker_);
     if (reference_count_ > 0) {
         --reference_count_;
@@ -223,7 +235,6 @@ void BufferHandle::UnloadData() {
         buffer_mgr->PushGCQueue(this);
         status_ = BufferStatus::kUnloaded;
     }
-#endif
 }
 
 void BufferHandle::AddRefCount() {
@@ -232,7 +243,6 @@ void BufferHandle::AddRefCount() {
 }
 
 void BufferHandle::FreeData() {
-#if 0
     UniqueLock<RWMutex> w_locker(rw_locker_);
     if (reference_count_ == 0) {
         if (status_ != BufferStatus::kUnloaded) {
@@ -249,7 +259,7 @@ void BufferHandle::FreeData() {
                 file_path = *current_dir_ + '/' + *file_name_;
             }
 
-            LOG_TRACE("Spill current buffer into {}", file_path);
+            LOG_TRACE(Format("Spill current buffer into {}", file_path));
             status_ = BufferStatus::kSpilled;
         } else {
             status_ = BufferStatus::kFreed;
@@ -258,11 +268,9 @@ void BufferHandle::FreeData() {
         data_ = nullptr;
         buffer_mgr->current_memory_size_ -= buffer_size_;
     }
-#endif
 }
 
 UniquePtr<String> BufferHandle::SetSealing() {
-#if 0
     BufferManager *buffer_mgr = (BufferManager *)buffer_mgr_;
     UniqueLock<RWMutex> w_locker(rw_locker_);
     if (buffer_type_ != BufferType::kTempFile) {
@@ -323,11 +331,9 @@ UniquePtr<String> BufferHandle::SetSealing() {
             break;
     }
     return nullptr;
-#endif
 }
 
 String BufferHandle::GetFilename() const {
-#if 0
     SharedPtr<String> root_dir{};
     if (buffer_type_ == BufferType::kTempFile) {
         root_dir = temp_dir_;
@@ -339,7 +345,6 @@ String BufferHandle::GetFilename() const {
     } else {
         return *root_dir + '/' + *current_dir_ + '/' + *file_name_;
     }
-#endif
 }
 
 void BufferHandle::UpdateToFileType() {
@@ -353,7 +358,6 @@ void BufferHandle::UpdateToFileType() {
 }
 
 void BufferHandle::ReadFile() {
-#if 0
     // File structure:
     // - header: magic number
     // - header: buffer size
@@ -377,57 +381,53 @@ void BufferHandle::ReadFile() {
     SizeT file_size = fs.GetFileSize(*file_handler_);
 
     if (file_size < sizeof(u64) * 3) {
-        StorageError(Format("Incorrect file length {}.", file_size));
+        Error<StorageException>(Format("Incorrect file length {}.", file_size), __FILE_NAME__, __LINE__);
     }
 
     // file header:
     u64 magic_number{0};
     i64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
     if (nbytes != sizeof(magic_number)) {
-        StorageError(Format("Read magic number which length isn't {}.", nbytes));
+        Error<StorageException>(Format("Read magic number which length isn't {}.", nbytes), __FILE_NAME__, __LINE__);
     }
 
     if (magic_number != 0x00dd3344) {
-        StorageError(Format("Incorrect file header magic number: {}.", magic_number));
+        Error<StorageException>(Format("Incorrect file header magic number: {}.", magic_number), __FILE_NAME__, __LINE__);
     }
 
     u64 buffer_length{};
     nbytes = fs.Read(*file_handler_, &buffer_length, sizeof(buffer_length));
     if (nbytes != sizeof(buffer_length)) {
-        StorageError(Format("Unmatched buffer length: {} / {}", nbytes, buffer_length));
+        Error<StorageException>(Format("Unmatched buffer length: {} / {}", nbytes, buffer_length), __FILE_NAME__, __LINE__);
     }
 
     // file body
     data_ = MakeUnique<char[]>(buffer_length);
     nbytes = fs.Read(*file_handler_, data_.get(), buffer_length);
     if (nbytes != buffer_length) {
-        StorageError(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_length, nbytes));
+        Error<StorageException>(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_length, nbytes), __FILE_NAME__, __LINE__);
     }
 
     if (file_size != buffer_length + 3 * sizeof(u64)) {
-        StorageError(Format("File size: {} isn't matched with {}.", file_size, buffer_length + 3 * sizeof(u64)));
+        Error<StorageException>(Format("File size: {} isn't matched with {}.", file_size, buffer_length + 3 * sizeof(u64)), __FILE_NAME__, __LINE__);
     }
 
     u64 checksum{};
     // file footer: checksum
     nbytes = fs.Read(*file_handler_, &checksum, sizeof(checksum));
     if (nbytes != sizeof(checksum)) {
-        StorageError(Format("Incorrect file checksum length: {}.", nbytes));
+        Error<StorageException>(Format("Incorrect file checksum length: {}.", nbytes), __FILE_NAME__, __LINE__);
     }
-#endif
 }
 
 void BufferHandle::CloseFile() {
-#if 0
     LocalFileSystem fs;
     fs.Close(*file_handler_);
-#endif
 }
 
 void BufferHandle::WriteFile(SizeT buffer_length) {
-#if 0
     if (data_ == nullptr) {
-        StorageError("No data will be written.")
+        Error<StorageException>("No data will be written.", __FILE_NAME__, __LINE__);
     }
 
     // File structure:
@@ -453,7 +453,7 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
     if (fs.Exists(to_write_file)) {
         String err_msg = Format("File {} was already been created before.", to_write_file);
         LOG_ERROR(err_msg);
-        StorageError(err_msg);
+        Error<StorageException>(err_msg, __FILE_NAME__, __LINE__);
     }
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(to_write_file, flags, FileLockType::kWriteLock);
@@ -469,33 +469,30 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
     u64 magic_number = 0x00dd3344;
     i64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));
     if (nbytes != sizeof(magic_number)) {
-        StorageError(Format("Write magic number which length is {}.", nbytes));
+        Error<StorageException>(Format("Write magic number which length is {}.", nbytes), __FILE_NAME__, __LINE__);
     }
 
     nbytes = fs.Write(*file_handler_, &buffer_length, sizeof(buffer_length));
     if (nbytes != sizeof(buffer_length)) {
-        StorageError(Format("Write buffer length field which length is {}.", nbytes));
+        Error<StorageException>(Format("Write buffer length field which length is {}.", nbytes), __FILE_NAME__, __LINE__);
     }
 
     nbytes = fs.Write(*file_handler_, data_.get(), buffer_length);
     if (nbytes != buffer_length) {
-        StorageError(Format("Expect to write buffer with size: {}, but {} bytes is written", buffer_length, nbytes));
+        Error<StorageException>(Format("Expect to write buffer with size: {}, but {} bytes is written", buffer_length, nbytes), __FILE_NAME__, __LINE__);
     }
 
     u64 checksum{};
     nbytes = fs.Write(*file_handler_, &checksum, sizeof(checksum));
     if (nbytes != sizeof(checksum)) {
-        StorageError(Format("Write buffer length field which length is {}.", nbytes));
+        Error<StorageException>(Format("Write buffer length field which length is {}.", nbytes), __FILE_NAME__, __LINE__);
     }
     prepare_success = true; // Not run defer_fn
-#endif
 }
 
 void BufferHandle::SyncFile() {
-#if 0
     LocalFileSystem fs;
     fs.SyncFile(*file_handler_);
-#endif
 }
 
 } // namespace infinity

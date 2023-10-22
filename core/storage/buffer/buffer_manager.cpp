@@ -4,12 +4,18 @@
 
 module;
 
+#include "concurrentqueue.h"
+
 import stl;
 import buffer_handle;
 import logger;
 import third_party;
 import infinity_assert;
 import infinity_exception;
+import default_values;
+import async_batch_processor;
+import buffer_task;
+import local_file_system;
 
 module buffer_manager;
 
@@ -19,7 +25,6 @@ BufferManager::BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, Shared
     : mem_limit_(mem_limit), base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)) {}
 
 void BufferManager::Init() {
-#if 0
     reader_ =
         MakeUnique<AsyncBatchProcessor>(DEFAULT_READER_PREPARE_QUEUE_SIZE, DEFAULT_READER_COMMIT_QUEUE_SIZE, BufferIO::OnPrepare, BufferIO::OnCommit);
 
@@ -33,8 +38,9 @@ void BufferManager::Init() {
     if (!fs.Exists(*temp_dir_)) {
         fs.CreateDirectory(*temp_dir_);
     }
-#endif
 }
+
+void BufferManager::PushGCQueue(BufferHandle *buffer_handle) { queue_.enqueue(buffer_handle); }
 
 BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, BufferType buffer_type) {
     SharedPtr<String> full_name{};
@@ -215,13 +221,12 @@ BufferManager::AllocateBufferHandle(const SharedPtr<String> &file_dir, const Sha
 }
 
 UniquePtr<String> BufferManager::Free(SizeT need_memory_size) {
-#if 0
     while (current_memory_size_ + need_memory_size >= mem_limit_) {
         // Need to GC
         BufferHandle *dequeued_buffer_handle;
         if (queue_.try_dequeue(dequeued_buffer_handle)) {
             if (dequeued_buffer_handle == nullptr) {
-                StorageError("Null buffer handle");
+                Error<StorageException>("Null buffer handle", __FILE_NAME__, __LINE__);
             } else {
                 dequeued_buffer_handle->FreeData();
             }
@@ -231,7 +236,6 @@ UniquePtr<String> BufferManager::Free(SizeT need_memory_size) {
             return err_msg;
         }
     }
-#endif
     return nullptr;
 }
 

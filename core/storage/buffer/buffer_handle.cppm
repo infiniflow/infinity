@@ -6,12 +6,12 @@ module;
 
 import stl;
 import parser;
+import file_system;
+import async_batch_processor;
 
 export module buffer_handle;
 
 namespace infinity {
-
-class AsyncBatchProcessor;
 
 export enum class BufferType {
     kTempFile,
@@ -85,7 +85,7 @@ public:
     void SyncFile();
 
 private:
-//    UniquePtr<FileHandler> file_handler_{nullptr};
+    UniquePtr<FileHandler> file_handler_{nullptr};
 
 public:
     RWMutex rw_locker_{};

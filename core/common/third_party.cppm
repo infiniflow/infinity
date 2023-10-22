@@ -13,6 +13,10 @@ module;
 
 #include "magic_enum.hpp"
 
+#include "concurrentqueue.h"
+
+#include "faiss/Index.h"
+
 export module third_party;
 
 namespace infinity {
@@ -124,5 +128,13 @@ constexpr auto EnumInteger(E value) noexcept -> magic_enum::detail::enable_if_t<
 
 // Json Parser
 export using Json = nlohmann::json;
+
+// ConcurrentQueue
+
+export template<typename T>
+using ConcurrentQueue = moodycamel::ConcurrentQueue<T>;
+
+// Faiss
+export using FaissIndex = faiss::Index;
 
 } // namespace infinity

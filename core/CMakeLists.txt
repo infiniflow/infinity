@@ -150,6 +150,7 @@ target_sources(infinity
 
 target_link_libraries(infinity
         sql_parser
+        faiss
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -159,6 +160,8 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 
 ### unit test
 
@@ -223,6 +226,7 @@ target_link_libraries(unit_test
         gmock
         gmock_main
         sql_parser
+        faiss
 )
 
 #add_executable(unittest
@@ -254,4 +258,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tom
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 

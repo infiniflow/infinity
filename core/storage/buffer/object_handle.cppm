@@ -3,6 +3,7 @@ module;
 
 import buffer_handle;
 import stl;
+import third_party;
 
 export module object_handle;
 
@@ -50,9 +51,9 @@ public:
 
     [[nodiscard]] ptr_t GetData();
 };
-#if 0
+
 export class IndexObjectHandle : public ObjectHandle {
-//    faiss::Index *index_{};
+    FaissIndex *index_{};
 
 public:
     explicit IndexObjectHandle(BufferHandle *buffer_handle);
@@ -65,7 +66,7 @@ public:
 
     IndexObjectHandle &operator=(IndexObjectHandle &&other);
 
-//    [[nodiscard]] faiss::Index *GetIndex();
+    [[nodiscard]] FaissIndex *GetIndex();
 };
-#endif
+
 } // namespace infinity

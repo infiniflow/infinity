@@ -1,5 +1,8 @@
 module;
 
+#include "faiss/impl/io.h"
+#include "faiss/index_io.h"
+
 import buffer_handle;
 import stl;
 
@@ -71,7 +74,6 @@ ptr_t CommonObjectHandle::GetData() {
 }
 
 //---------------------------------------------------------------------------------------------
-#if 0
 IndexObjectHandle::IndexObjectHandle(BufferHandle *buffer_handle) : ObjectHandle(buffer_handle) {}
 
 IndexObjectHandle::IndexObjectHandle(IndexObjectHandle &&other) : ObjectHandle(Move(other)), index_(other.index_) { other.index_ = nullptr; }
@@ -96,7 +98,7 @@ struct BufferIOReader : faiss::IOReader {
         }
         char *dst_ptr = (char *)ptr;
         read_n = std::min(read_n, buffer_size_ - rp_);
-        memcpy(dst_ptr, ptr_ + rp_, read_n);
+        Memcpy(dst_ptr, ptr_ + rp_, read_n);
         rp_ += read_n;
         return read_n / size;
     }
@@ -115,5 +117,5 @@ faiss::Index *IndexObjectHandle::GetIndex() {
     }
     return index_;
 }
-#endif
+
 } // namespace infinity

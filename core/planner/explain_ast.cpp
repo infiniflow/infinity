@@ -4,6 +4,8 @@
 
 module;
 
+#include <string>
+
 import stl;
 import parser;
 import infinity_assert;
@@ -14,7 +16,6 @@ module explain_ast;
 namespace infinity {
 
 void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<SharedPtr<String>>> &stmt_string, i64 intent_size) {
-#if 0
     switch (statement->Type()) {
         case StatementType::kSelect: {
             BuildSelect((SelectStatement *)statement, stmt_string, intent_size);
@@ -58,15 +59,14 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
             Error<PlannerException>("Unexpected statement type", __FILE_NAME__, __LINE__);
         }
     }
-#endif
     return;
 }
-#if 0
+
 void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            PlannerError("Invalid DDL type.")
+            Error<PlannerException>("Invalid DDL type.", __FILE_NAME__, __LINE__);
         }
         case DDLType::kSchema: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
@@ -75,7 +75,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -88,13 +88,13 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             String column_names = String(intent_size, ' ') + "columns: (";
 
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
-                PlannerError("Table definition without any columns");
+                Error<PlannerException>("Table definition without any columns", __FILE_NAME__, __LINE__);
             }
 
             for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -124,7 +124,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -147,7 +147,7 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
     String values = String(intent_size, ' ') + "values: ";
     SizeT value_count = insert_statement->values_->size();
     if (value_count == 0) {
-        PlannerError("Insert value list is empty");
+        Error<PlannerException>("Insert value list is empty", __FILE_NAME__, __LINE__);
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
         if (idx != 0)
@@ -170,7 +170,7 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
 void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            PlannerError("Invalid DDL type.")
+            Error<PlannerException>("Invalid DDL type.", __FILE_NAME__, __LINE__);
         }
         case DDLType::kSchema: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
@@ -179,7 +179,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -192,7 +192,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -205,7 +205,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -219,10 +219,10 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
 }
 
 void ExplainAST::BuildSelect(const SelectStatement *select_statement,
-                            SharedPtr<Vector<SharedPtr<String>>> &result,
-                            i64 intent_size,
-                            SharedPtr<String> alias_ptr) {
-    if (alias_ptr != nullptr) {
+                             SharedPtr<Vector<SharedPtr<String>>> &result,
+                             i64 intent_size,
+                             SharedPtr<String> alias_ptr) {
+    if (alias_ptr.get() != nullptr) {
         String select_str = String(intent_size, ' ') + "SELECT AS " + *alias_ptr;
         result->emplace_back(MakeShared<String>(select_str));
     } else {
@@ -252,7 +252,7 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
-            PlannerError("No select list");
+            Error<PlannerException>("No select list", __FILE_NAME__, __LINE__);
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->select_list_->at(idx);
@@ -353,7 +353,10 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             auto *cross_product_ref = (CrossProductReference *)base_table_ref;
             if (cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
-                PlannerAssert(cross_product_ref->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
+                Assert<PlannerException>(cross_product_ref->alias_->column_alias_array_ == nullptr,
+                                         "Table reference has columns alias",
+                                         __FILE_NAME__,
+                                         __LINE__);
             } else {
                 from_str += ": ";
             }
@@ -371,7 +374,10 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             from_str = String(intent_size, ' ') + "table join on: " + join_reference->condition_->ToString();
             if (join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
-                PlannerAssert(join_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
+                Assert<PlannerException>(join_reference->alias_->column_alias_array_ == nullptr,
+                                         "Table reference has columns alias",
+                                         __FILE_NAME__,
+                                         __LINE__);
             }
             result->emplace_back(MakeShared<String>(from_str));
 
@@ -389,7 +395,10 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             from_str += table_reference->table_name_;
             if (table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
-                PlannerAssert(table_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
+                Assert<PlannerException>(table_reference->alias_->column_alias_array_ == nullptr,
+                                         "Table reference has columns alias",
+                                         __FILE_NAME__,
+                                         __LINE__);
             }
             result->emplace_back(MakeShared<String>(from_str));
             break;
@@ -399,7 +408,10 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             auto *subquery_reference = (SubqueryReference *)base_table_ref;
             if (subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
-                PlannerAssert(subquery_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
+                Assert<PlannerException>(subquery_reference->alias_->column_alias_array_ == nullptr,
+                                         "Table reference has columns alias",
+                                         __FILE_NAME__,
+                                         __LINE__);
             } else {
                 from_str += ": ";
             }
@@ -428,11 +440,11 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
         case ShowStmtType::kCollections: {
-            NotImplementError("Show collections");
+            Error<PlannerException>("Show collections", __FILE_NAME__, __LINE__);
             break;
         }
         case ShowStmtType::kViews: {
-            NotImplementError("Show views");
+            Error<PlannerException>("Show views", __FILE_NAME__, __LINE__);
             break;
         }
         case ShowStmtType::kTables: {
@@ -501,5 +513,4 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         }
     }
 }
-#endif
 } // namespace infinity
