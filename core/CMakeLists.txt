@@ -177,7 +177,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magi
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 
 target_compile_options(infinity PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
@@ -283,3 +283,5 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
+
+target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
