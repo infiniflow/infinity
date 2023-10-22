@@ -8,12 +8,11 @@ import stl;
 import function_data;
 import table_function;
 import global_block_id;
+import block_index;
 
 export module table_scan_function_data;
 
 namespace infinity {
-
-class BlockIndex;
 
 export class TableScanFunctionData : public TableFunctionData {
 public:

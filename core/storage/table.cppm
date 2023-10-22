@@ -17,7 +17,7 @@ export module table;
 
 namespace infinity {
 
-enum class TableType {
+export enum class TableType {
     kInvalid,
     kDataTable,
     kIntermediate,

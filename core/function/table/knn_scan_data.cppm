@@ -9,12 +9,11 @@ import table_function;
 import parser;
 import global_block_id;
 import knn_distance;
+import block_index;
 
 export module knn_scan_data;
 
 namespace infinity {
-
-class BlockIndex;
 
 export class KnnScanFunctionData : public TableFunctionData {
 public:

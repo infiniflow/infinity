@@ -14,9 +14,11 @@ module;
 #include "magic_enum.hpp"
 
 #include "concurrentqueue.h"
+#include "blockingconcurrentqueue.h"
 
 #include "faiss/Index.h"
 #include "faiss/utils/distances.h"
+#include "zsv/common.h"
 
 export module third_party;
 
@@ -135,6 +137,9 @@ export using Json = nlohmann::json;
 export template<typename T>
 using ConcurrentQueue = moodycamel::ConcurrentQueue<T>;
 
+export template<typename T>
+using BlockingConcurrentQueue = moodycamel::BlockingConcurrentQueue<T>;
+
 // Faiss
 export using FaissIndex = faiss::Index;
 
@@ -150,5 +155,9 @@ export constexpr int faiss_distance_compute_blas_threshold = 20;
 export constexpr int faiss_distance_compute_blas_query_bs = 4096;
 export constexpr int faiss_distance_compute_blas_database_bs = 1024;
 export constexpr int faiss_distance_compute_min_k_reservoir = 100;
+
+
+// zsv
+export using ZsvParser = zsv_parser;
 
 } // namespace infinity

@@ -6,7 +6,7 @@ file(GLOB_RECURSE
         src/zsv.c
         src/zsv_internal.c)
 
-#set_source_files_properties(${zsv_src} PROPERTIES LANGUAGE CXX)
+set_source_files_properties(${zsv_src} PROPERTIES LANGUAGE CXX)
 
 add_library(zsv_parser STATIC
             ${zsv_src})

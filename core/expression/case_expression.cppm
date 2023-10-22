@@ -12,7 +12,7 @@ export module case_expression;
 
 namespace infinity {
 
-struct CaseCheck {
+export struct CaseCheck {
     CaseCheck(SharedPtr<BaseExpression> when_expr, SharedPtr<BaseExpression> then_expr)
         : when_expr_(Move(when_expr)), then_expr_(Move(then_expr)) {}
 

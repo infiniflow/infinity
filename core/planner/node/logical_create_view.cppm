@@ -19,7 +19,7 @@ public:
     static inline SharedPtr<LogicalCreateView> Make(u64 node_id,
                                                     const SharedPtr<Vector<String>> &names_ptr,
                                                     const SharedPtr<Vector<SharedPtr<DataType>>> &types_ptr,
-                                                    const SharedPtr<ExtraDDLInfo> &create_view_info) {
+                                                    const SharedPtr<CreateViewInfo> &create_view_info) {
         return MakeShared<LogicalCreateView>(node_id, names_ptr, types_ptr, create_view_info);
     }
 
@@ -27,7 +27,7 @@ public:
     LogicalCreateView(u64 node_id,
                       SharedPtr<Vector<String>> names_ptr,
                       SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
-                      SharedPtr<ExtraDDLInfo> create_view_info)
+                      SharedPtr<CreateViewInfo> create_view_info)
         : LogicalNode(node_id, LogicalNodeType::kCreateView), names_ptr_(Move(names_ptr)), types_ptr_(Move(types_ptr)),
           create_view_info_(Move(create_view_info)) {}
 
@@ -45,12 +45,12 @@ public:
 
     [[nodiscard]] inline const SharedPtr<Vector<SharedPtr<DataType>>> &types_ptr() const { return types_ptr_; }
 
-    [[nodiscard]] inline const CreateViewInfo *create_view_info() const { return (CreateViewInfo *)(create_view_info_.get()); }
+    [[nodiscard]] const SharedPtr<CreateViewInfo> create_view_info() const;
 
 private:
     SharedPtr<Vector<String>> names_ptr_{};
     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
-    SharedPtr<ExtraDDLInfo> create_view_info_{nullptr};
+    SharedPtr<CreateViewInfo> create_view_info_{nullptr};
 };
 
 } // namespace infinity

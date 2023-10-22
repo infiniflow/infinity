@@ -194,6 +194,10 @@ export inline std::string JoinType2Str(JoinType type) {
     return ToString(type);
 }
 
+export inline std::string ConstrainType2String(ConstraintType type) {
+    return ConstrainTypeToString(type);
+}
+
 //export template <typename T>
 //T ReadBuf(char *const buf);
 //

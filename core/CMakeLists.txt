@@ -66,6 +66,17 @@ file(GLOB_RECURSE
         expression/*.cppm
 )
 
+file(GLOB_RECURSE
+        executor_cpp
+        CONFIGURE_DEPENDS
+        executor/*.cpp
+)
+
+file(GLOB_RECURSE
+        executor_cppm
+        CONFIGURE_DEPENDS
+        executor/*.cppm
+)
 
 file(GLOB_RECURSE
         planner_cpp
@@ -131,6 +142,7 @@ add_executable(infinity
         ${storage_cpp}
         ${function_cpp}
         ${expression_cpp}
+        ${executor_cpp}
         ${common_cpp}
 )
 
@@ -147,6 +159,7 @@ target_sources(infinity
         ${parser_cppm}
         ${function_cppm}
         ${expression_cppm}
+        ${executor_cppm}
 )
 
 target_link_libraries(infinity
@@ -164,6 +177,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magi
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv")
 
 target_compile_options(infinity PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
@@ -216,6 +230,7 @@ add_executable(unit_test
         ${expression_cpp}
         ${function_cpp}
         ${common_cpp}
+        ${executor_cpp}
 #        ${planner_test_src}
 #        ${storage_test_src}
 #        ${parser_test_src}
@@ -254,6 +269,7 @@ target_sources(unit_test
         ${parser_cppm}
         ${function_cppm}
         ${expression_cppm}
+        ${executor_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -266,4 +282,4 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlo
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
-
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")

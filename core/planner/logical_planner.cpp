@@ -4,6 +4,8 @@
 
 module;
 
+#include <memory>
+
 import stl;
 import parser;
 import bind_context;
@@ -367,7 +369,7 @@ void LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedP
 }
 
 void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    CreateViewInfo* create_view_info = (CreateViewInfo*)(statement->create_info_.get());
+    CreateViewInfo *create_view_info = (CreateViewInfo *)(statement->create_info_.get());
 
     // Check if columns is given.
     SharedPtr<Vector<String>> columns_ptr;
@@ -389,8 +391,10 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
         columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
 
-    SharedPtr<LogicalNode> logical_create_view_operator =
-        LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(), columns_ptr, bound_statement_ptr->types_ptr_, statement->create_info_);
+    SharedPtr<LogicalNode> logical_create_view_operator = LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                                  columns_ptr,
+                                                                                  bound_statement_ptr->types_ptr_,
+                                                                                  std::static_pointer_cast<CreateViewInfo>(statement->create_info_));
 
     this->logical_plan_ = logical_create_view_operator;
     this->names_ptr_->emplace_back("OK");

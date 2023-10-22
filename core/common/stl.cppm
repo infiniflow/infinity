@@ -69,6 +69,8 @@ export {
 
     using String = std::basic_string<char>;
 
+    using StringView = std::string_view;
+
     inline bool IsEqual(const String &s1, const String &s2) { return s1 == s2; }
 
     inline bool IsEqual(const String &s1, const char *s2) { return s1 == s2; }

@@ -10,6 +10,6 @@ export module utility;
 
 namespace infinity {
 
-SizeT NextPowerOfTwo(SizeT input);
+export SizeT NextPowerOfTwo(SizeT input);
 
 }
