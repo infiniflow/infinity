@@ -8,32 +8,10 @@
 #include <fst/connect.h>
 #include <fst/test-properties.h>
 
+#include "automaton_decl.h"
 #include "fst_utils.h"
 
 namespace fst {
-
-template <class Arc, class Allocator>
-class VectorState;
-
-template <class Arc, class State>
-class VectorFst;
-
-template <typename F, size_t CacheSize, bool MatchInput, bool ByteLabel>
-class TableMatcher;
-
-class BooleanWeight;
-
-struct RangeLabel;
-
-template <typename W>
-struct Transition;
-
-template <typename W>
-using AutomatonState = VectorState<Transition<W>, std::allocator<Transition<W>>>;
-
-template <typename W>
-using Automaton = VectorFst<Transition<W>, AutomatonState<W>>;
-
 class BooleanWeight {
 public:
     using ReverseWeight = BooleanWeight;
@@ -353,3 +331,4 @@ std::uint64_t ComputeProperties(const Fst<Transition<W>> &fst, std::uint64_t mas
 #include <fst/vector-fst.h>
 // clang-format on
 #include <fst/matcher.h>
+
