@@ -9,7 +9,7 @@ import stl;
 import config;
 import session;
 import resource_manager;
-import fragment_scheduler;
+//import fragment_scheduler;
 import profiler;
 import storage;
 import txn;
@@ -22,7 +22,7 @@ namespace infinity {
 //class Session;
 //class Storage;
 //class ResourceManager;
-//class FragmentScheduler;
+class FragmentScheduler;
 //class QueryProfiler;
 //class Table;
 //class Txn;

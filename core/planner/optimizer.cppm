@@ -14,7 +14,7 @@ class OptimizerRule;
 class LogicalNode;
 class QueryContext;
 
-class Optimizer {
+export class Optimizer {
 public:
     explicit Optimizer(QueryContext *query_context_ptr);
 

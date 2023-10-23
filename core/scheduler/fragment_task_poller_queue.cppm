@@ -5,16 +5,15 @@
 module;
 
 import stl;
+import fragment_task;
 
 export module fragment_task_poller_queue;
 
 namespace infinity {
 
-class FragmentTask;
-
-class FragmentTaskPollerQueue {
+export class FragmentTaskPollerQueue {
 public:
-    explicit FragmentTaskPollerQueue(SizeT capacity = 1024) : capacity_(capacity) {}
+    explicit inline FragmentTaskPollerQueue(SizeT capacity = 1024) : capacity_(capacity) {}
 
     void Enqueue(FragmentTask *task_ptr) {
         UniqueLock<Mutex> lock(queue_mutex_);

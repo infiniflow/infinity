@@ -436,7 +436,7 @@ RowT Value::GetValue() const {
 
 template <>
 MixedT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kRowID, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kMixed, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
     return value_.mixed_value;
 }
 

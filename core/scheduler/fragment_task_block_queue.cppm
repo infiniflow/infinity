@@ -12,11 +12,10 @@ export module fragment_task_block_queue;
 
 namespace infinity {
 
-struct FragmentTaskBlockQueue {
+export struct FragmentTaskBlockQueue {
     void Enqueue(FragmentTask *task);
 
-    template <class It>
-    void EnqueueBulk(It iter, SizeT count);
+    void EnqueueBulk(Vector<FragmentTask *>::iterator iter, SizeT count);
 
     void Dequeue(FragmentTask *&task);
 

@@ -4,7 +4,22 @@
 
 module;
 
+#include <sched.h>
+#include <vector>
+
+import stl;
 import config;
+import infinity_assert;
+import infinity_exception;
+import fragment_task_block_queue;
+import fragment_task_poller_queue;
+import threadutil;
+import fragment_task;
+import logger;
+import third_party;
+import query_context;
+import plan_fragment;
+import fragment_context;
 
 module fragment_scheduler;
 
@@ -17,14 +32,13 @@ FragmentScheduler::FragmentScheduler(const Config *config_ptr) { Init(config_ptr
 FragmentScheduler::~FragmentScheduler() { UnInit(); }
 
 void FragmentScheduler::Init(const Config *config_ptr) {
-#if 0
     u64 total_cpu_count = config_ptr->total_cpu_number();
     for (u64 i = 0; i < total_cpu_count; ++i) {
         cpu_set_.emplace(i);
     }
 
     if (cpu_set_.empty()) {
-        SchedulerError("No cpu is used in scheduler")
+        Error<SchedulerException>("No cpu is used in scheduler", __FILE_NAME__, __LINE__);
     }
 
     for (i64 cpu_id : cpu_set_) {
@@ -35,8 +49,8 @@ void FragmentScheduler::Init(const Config *config_ptr) {
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id);
 
-        worker_queues_.emplace(cpu_id, std::move(worker_queue));
-        workers.emplace(cpu_id, std::move(worker_thread));
+        worker_queues_.emplace(cpu_id, Move(worker_queue));
+        workers.emplace(cpu_id, Move(worker_thread));
     }
 
     // Start coordinator
@@ -50,11 +64,9 @@ void FragmentScheduler::Init(const Config *config_ptr) {
     ThreadUtil::pin(*poller_, 0);
 
     initialized_ = true;
-#endif
 }
 
 void FragmentScheduler::UnInit() {
-#if 0
     initialized_ = false;
     UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
     poller_queue_->Enqueue(terminate_task.get());
@@ -64,14 +76,12 @@ void FragmentScheduler::UnInit() {
         worker_queues_[cpu_id]->Enqueue(terminate_task.get());
         workers[cpu_id]->join();
     }
-#endif
 }
 
-#if 0
 void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
     //    NotImplementError("Not implement FragmentScheduler::BuildFragmentTasks");
     if (plan_fragment == nullptr) {
-        SchedulerError("Empty plan fragment")
+        Error<SchedulerException>("Empty plan fragment", __FILE_NAME__, __LINE__);
     }
 
     //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
@@ -87,7 +97,7 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
     Vector<FragmentTask *> tasks;
     FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
 
-    LOG_TRACE("Create {} tasks", tasks.size());
+    LOG_TRACE(Format("Create {} tasks", tasks.size()));
 
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task);
@@ -96,7 +106,7 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
 
 void FragmentScheduler::ScheduleTask(FragmentTask *task) {
     if (!initialized_) {
-        SchedulerError("Scheduler isn't initialized")
+        Error<SchedulerException>("Scheduler isn't initialized", __FILE_NAME__, __LINE__);
     }
     poller_queue_->Enqueue(task);
 }
@@ -141,12 +151,12 @@ void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worke
     while (running) {
         task_queue->Dequeue(fragment_task);
         if (fragment_task == nullptr) {
-            LOG_ERROR("worker {}: null task", worker_id);
+            LOG_ERROR(Format("worker {}: null task", worker_id));
             continue;
         }
 
         if (fragment_task->IsTerminator()) {
-            LOG_TRACE("Terminator fragment task on worker: {}", worker_id);
+            LOG_TRACE(Format("Terminator fragment task on worker: {}", worker_id));
             running = false;
             continue;
         }
@@ -211,11 +221,10 @@ void FragmentScheduler::SubmitTask(FragmentTask *fragment_task) { poller_queue_-
 
 bool FragmentScheduler::DispatchTask(i64 worker_id, FragmentTask *fragment_task) {
     if (!worker_queues_.contains(worker_id)) {
-        LOG_ERROR("Can't use CPU {} to run task", worker_id);
+        LOG_ERROR(Format("Can't use CPU {} to run task", worker_id));
         return false;
     }
     worker_queues_[worker_id]->Enqueue(fragment_task);
     return true;
 }
-#endif
 } // namespace infinity

@@ -213,6 +213,12 @@ file(GLOB_RECURSE
         unit_test/main/*.cpp
 )
 
+file(GLOB_RECURSE
+        ut_thirdparty_cpp
+        CONFIGURE_DEPENDS
+        unit_test/third_party/*.cpp
+)
+
 add_executable(unit_test
         ${ut_test_main_cpp}
         ${ut_common_cpp}
@@ -220,6 +226,7 @@ add_executable(unit_test
         ${ut_main_cpp}
         ${ut_parser_cpp}
         ${ut_function_cpp}
+        ${ut_thirdparty_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
         ${infinity_cpp}

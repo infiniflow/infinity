@@ -6,10 +6,18 @@ module;
 
 import config;
 import stl;
+//import query_context;
+//import plan_fragment;
+import fragment_task;
+import fragment_task_block_queue;
+import fragment_task_poller_queue;
 
 export module fragment_scheduler;
 
 namespace infinity {
+
+class QueryContext;
+class PlanFragment;
 
 export class FragmentScheduler {
 public:
@@ -21,35 +29,35 @@ public:
 
     void UnInit();
 
-//    void Schedule(QueryContext *query_context, PlanFragment *plan_fragment);
-//
-//private:
-//    void ScheduleTask(FragmentTask *task);
-//
-//    void CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id);
-//
-//    void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
-//
-//    void PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 cpu_id);
-//
-//    void SubmitTask(FragmentTask *fragment_task);
-//
-//    bool DispatchTask(i64 worker_id, FragmentTask *task);
-//
-//private:
-//    bool initialized_{false};
-//
-//    HashSet<i64> cpu_set_{};
-//    Vector<i64> cpu_array_{};
-//
-//    HashMap<i64, UniquePtr<FragmentTaskBlockQueue>> worker_queues_{};
-//    HashMap<i64, UniquePtr<Thread>> workers{};
-//
-//    UniquePtr<FragmentTaskBlockQueue> ready_queue_{};
-//    UniquePtr<Thread> coordinator_{};
-//
-//    UniquePtr<FragmentTaskPollerQueue> poller_queue_{};
-//    UniquePtr<Thread> poller_{};
+    void Schedule(QueryContext *query_context, PlanFragment *plan_fragment);
+
+private:
+    void ScheduleTask(FragmentTask *task);
+
+    void CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id);
+
+    void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
+
+    void PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 cpu_id);
+
+    void SubmitTask(FragmentTask *fragment_task);
+
+    bool DispatchTask(i64 worker_id, FragmentTask *task);
+
+private:
+    bool initialized_{false};
+
+    HashSet<i64> cpu_set_{};
+    Vector<i64> cpu_array_{};
+
+    HashMap<i64, UniquePtr<FragmentTaskBlockQueue>> worker_queues_{};
+    HashMap<i64, UniquePtr<Thread>> workers{};
+
+    UniquePtr<FragmentTaskBlockQueue> ready_queue_{};
+    UniquePtr<Thread> coordinator_{};
+
+    UniquePtr<FragmentTaskPollerQueue> poller_queue_{};
+    UniquePtr<Thread> poller_{};
 
     i64 current_cpu_id_{};
 };

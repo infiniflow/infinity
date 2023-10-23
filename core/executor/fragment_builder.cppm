@@ -20,7 +20,7 @@ export module fragment_builder;
 
 namespace infinity {
 
-class FragmentBuilder {
+export class FragmentBuilder {
 public:
     explicit FragmentBuilder(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
 

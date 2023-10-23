@@ -13,7 +13,7 @@ namespace infinity {
 
 class QueryContext;
 
-class PhysicalPlanner {
+export class PhysicalPlanner {
 public:
     explicit PhysicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
 

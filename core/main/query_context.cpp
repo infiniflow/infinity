@@ -20,6 +20,12 @@ import infinity_exception;
 import logical_planner;
 import logical_node_type;
 import data_block;
+import optimizer;
+import physical_planner;
+import fragment_builder;
+import bind_context;
+import logical_node;
+import physical_operator;
 
 module query_context;
 
@@ -94,12 +100,11 @@ QueryResult QueryContext::Query(const String &query) {
         Error<ParserException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
     }
     LogicalPlanner logical_planner(this);
-#if 0
     Optimizer optimizer(this);
     PhysicalPlanner physical_planner(this);
     FragmentBuilder fragment_builder(this);
 
-    PlannerAssert(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
+    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.", __FILE_NAME__, __LINE__);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResult query_result;
         try {
@@ -139,8 +144,7 @@ QueryResult QueryContext::Query(const String &query) {
         return query_result;
     }
 
-    NetworkError("Not reachable");
-#endif
+    Error<NetworkException>("Not reachable", __FILE_NAME__, __LINE__);
 }
 
 void QueryContext::CreateTxn() {
