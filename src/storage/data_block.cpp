@@ -37,6 +37,21 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
     this->Finalize();
 }
 
+SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
+    auto data_block = DataBlock::Make();
+    SizeT capacity = input->row_count();
+    if (capacity) {
+        // because size of bitmap in datablock need to be power of 2
+        if (__builtin_popcount(capacity) > 1) {
+            capacity = 1 << (sizeof(SizeT) * 8 - __builtin_clz(capacity));
+        }
+        data_block->Init(input, 0, capacity);
+        data_block->row_count_ = input->row_count();
+    }
+    input->Reset();
+    return data_block;
+}
+
 void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
     StorageAssert(!initialized, "Data block was initialized before.");
     if (types.empty()) {
@@ -155,14 +170,12 @@ void DataBlock::UnionWith(const SharedPtr<DataBlock> &other) {
     column_vectors.insert(column_vectors.end(), other->column_vectors.begin(), other->column_vectors.end());
 }
 
-void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) {
-    AppendWith(other.get());
-}
+void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) { AppendWith(other.get()); }
 
 void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
         StorageError(
-                fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+            fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
         StorageError(fmt::format("Attempt append block with row count {} into block with row count {}, "

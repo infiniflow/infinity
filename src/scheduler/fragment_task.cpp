@@ -39,9 +39,6 @@ void FragmentTask::OnExecute(i64 worker_id) {
             operator_refs[op_idx]->Execute(fragment_context->query_context(),
                                            operator_input_state_[op_idx].get(),
                                            operator_output_state_[op_idx].get());
-            if (!operator_output_state_[op_idx]->Complete()) {
-                return;
-            }
         }
     } catch (const std::exception &e) {
         err_msg = MakeUnique<String>(e.what());
