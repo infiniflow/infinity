@@ -6,6 +6,7 @@
 
 #include "common/types/alias/containers.h"
 #include "common/types/alias/smart_ptr.h"
+#include "function/table/merge_knn_data.h"
 #include "physical_operator_type.h"
 #include "scheduler/fragment_data_queue.h"
 #include "storage/common/global_block_id.h"
@@ -15,6 +16,7 @@ namespace infinity {
 class DataBlock;
 class TableScanFunctionData;
 class KnnScanFunctionData;
+class SingleResultHandler;
 class TableDef;
 class ColumnDef;
 class DataType;
@@ -112,7 +114,7 @@ struct KnnScanOutputState : public OutputState {
 struct MergeKnnInputState : public InputState {
     inline explicit MergeKnnInputState() : InputState(PhysicalOperatorType::kMergeKnn) {}
 
-    SizeT knn_scan_n_{};
+    SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
 
 struct MergeKnnOutputState : public OutputState {

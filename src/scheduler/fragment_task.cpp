@@ -3,9 +3,9 @@
 //
 
 #include "fragment_task.h"
-#include "fragment_context.h"
-#include "executor/operator/physical_source.h"
 #include "executor/operator/physical_sink.h"
+#include "executor/operator/physical_source.h"
+#include "fragment_context.h"
 #include "main/logger.h"
 
 namespace infinity {
@@ -39,6 +39,9 @@ void FragmentTask::OnExecute(i64 worker_id) {
             operator_refs[op_idx]->Execute(fragment_context->query_context(),
                                            operator_input_state_[op_idx].get(),
                                            operator_output_state_[op_idx].get());
+            if (!operator_output_state_[op_idx]->Complete()) {
+                return;
+            }
         }
     } catch (const std::exception &e) {
         err_msg = MakeUnique<String>(e.what());
@@ -61,7 +64,10 @@ bool FragmentTask::Ready() const {
 bool FragmentTask::Complete() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-    if (sink_state_->prev_output_state_->Complete() && sink_op->sink_type() == SinkType::kResult) {
+    if (!sink_state_->prev_output_state_->Complete()) {
+        return false;
+    }
+    if (sink_op->sink_type() == SinkType::kResult) {
         fragment_context->Complete();
     }
     return true;

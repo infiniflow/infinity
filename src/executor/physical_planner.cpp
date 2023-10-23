@@ -545,6 +545,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                                                           logical_knn_scan->knn_table_index_);
 
     return MakeShared<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
+                                        logical_knn_scan->base_table_ref_,
                                         knn_scan_op,
                                         logical_knn_scan->GetOutputNames(),
                                         logical_knn_scan->GetOutputTypes(),

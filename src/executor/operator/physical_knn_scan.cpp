@@ -114,6 +114,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
             i64 result_count = std::min(knn_flat->TotalBaseCount(), knn_flat->TopK());
 
             for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
+                // Bug here? id = top_idx? 
                 SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
                 LOG_TRACE("Row offset: {}: {}: {}, distance {}",
                           row_id[id].segment_id_,

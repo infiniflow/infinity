@@ -35,6 +35,7 @@ void PhysicalProject::Execute(QueryContext *query_context, InputState *input_sta
 
     // FIXME: need to handle statement like: SELECT 1;
 
+    // TODO shenyushi: Why reset the output. The output is pointed to input.
     project_output_state->data_block_->Reset();
 
     // Loop aggregate expression

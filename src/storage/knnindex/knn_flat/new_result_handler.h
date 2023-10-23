@@ -5,6 +5,7 @@
 #pragma once
 
 #include "common/types/alias/containers.h"
+#include "common/types/complex/row_id.h"
 #include "new_heap.h"
 #include "new_partitioning.h"
 
