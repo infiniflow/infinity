@@ -18,8 +18,8 @@ export module integer_cast;
 
 namespace infinity {
 
-struct IntegerTryCastToFixlen;
-struct IntegerTryCastToVarlen;
+export struct IntegerTryCastToFixlen;
+export struct IntegerTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &target) {

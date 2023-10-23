@@ -4,6 +4,8 @@
 
 module;
 
+#include <cmath>
+
 import parser;
 import stl;
 import bound_cast_func;
@@ -18,8 +20,8 @@ export module float_cast;
 
 namespace infinity {
 
-struct FloatTryCastToFixlen;
-struct FloatTryCastToVarlen;
+export struct FloatTryCastToFixlen;
+export struct FloatTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
@@ -107,7 +109,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, IntegerT &target) {
     if (!(source >= -2147483648.0f && source < 2147483648.0f)) {
         return false;
     }
-    target = NearByInt(source);
+    target = std::nearbyint(source);
     if (source > 0 && target < 0) {
         return false;
     }
@@ -119,7 +121,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
     if (source < -9223372036854775808.0f || source > 9223372036854775807.0f) {
         return false;
     }
-    target = NearByInt(source);
+    target = std::nearbyint(source);
     return true;
 }
 
@@ -189,7 +191,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, IntegerT &target) {
     if (source < -2147483648.0f || source > 2147483647.0f) {
         return false;
     }
-    target = NearByInt(source);
+    target = std::nearbyint(source);
     return true;
 }
 
@@ -198,7 +200,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
     if (!(source >= -9223372036854775808.0f && source < 9223372036854775808.0f)) {
         return false;
     }
-    target = NearByInt(source);
+    target = std::nearbyint(source);
     if (source > 0 && target < 0) {
         return false;
     }

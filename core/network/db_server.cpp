@@ -4,6 +4,8 @@
 
 module;
 
+#include <thread>
+
 module db_server;
 import infinity;
 import stl;
@@ -51,14 +53,15 @@ void DBServer::Run() {
 }
 
 void DBServer::Shutdown() {
-//    while (running_connection_count_ > 0) {
-//        // Running connection exists.
-//        std::this_thread::yield();
-//    }
-//
-//    io_service_.stop();
-//    initialized = false;
-//    acceptor_ptr_->close();
+    while (running_connection_count_ > 0) {
+        // Running connection exists.
+        std::this_thread::yield();
+    }
+
+    io_service_.stop();
+    initialized = false;
+    acceptor_ptr_->close();
+    infinity::Infinity::instance().UnInit();
 }
 
 void DBServer::CreateConnection() {

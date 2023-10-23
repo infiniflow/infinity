@@ -17,10 +17,13 @@ export module bool_cast;
 
 namespace infinity {
 
-struct TryCastBoolean {
+export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType input, TargetType &target) {
-        FunctionError("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
+        Error<FunctionException>("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " +
+                                     DataType::TypeToString<TargetType>(),
+                                 __FILE_NAME__,
+                                 __LINE__);
     }
 };
 

@@ -17,10 +17,10 @@ export module timestamp_cast;
 
 namespace infinity {
 
-struct TimestampTryCastToFixlen;
-struct TimestampTryCastToVarlen;
+export struct TimestampTryCastToFixlen;
+export struct TimestampTryCastToVarlen;
 
-inline static BoundCastFunc BindTimestampCast(DataType &target) {
+export inline BoundCastFunc BindTimestampCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<TimestampT, DateT, TimestampTryCastToFixlen>);

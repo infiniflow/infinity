@@ -18,9 +18,9 @@ export module blob_cast;
 
 namespace infinity {
 
-struct BlobTryCastToVarlen;
+export struct BlobTryCastToVarlen;
 
-inline static BoundCastFunc BindBlobCast(DataType &target) {
+export inline BoundCastFunc BindBlobCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BlobT, VarcharT, BlobTryCastToVarlen>);

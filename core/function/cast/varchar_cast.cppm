@@ -18,9 +18,9 @@ export module varchar_cast;
 
 namespace infinity {
 
-struct TryCastVarchar;
-struct TryCastVarcharToChar;
-struct TryCastVarcharToVarchar;
+export struct TryCastVarchar;
+export struct TryCastVarcharToChar;
+export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     Assert<TypeException>(source.type() == LogicalType::kVarchar,

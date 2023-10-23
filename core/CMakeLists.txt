@@ -226,6 +226,19 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_planner_cpp
+        CONFIGURE_DEPENDS
+        unit_test/planner/*.cpp
+)
+
+file(GLOB_RECURSE
+        ut_function_cpp
+        CONFIGURE_DEPENDS
+        unit_test/function/*.cpp
+)
+
+
+file(GLOB_RECURSE
         ut_thirdparty_cpp
         CONFIGURE_DEPENDS
         unit_test/third_party/*.cpp
@@ -247,6 +260,8 @@ add_executable(unit_test
         ${ut_thirdparty_cpp}
         ${ut_executor_cpp}
         ${ut_test_helper_cpp}
+        ${ut_planner_cpp}
+        ${ut_function_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
         ${infinity_cpp}

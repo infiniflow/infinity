@@ -17,9 +17,9 @@ export module time_cast;
 
 namespace infinity {
 
-struct TimeTryCastToVarlen;
+export struct TimeTryCastToVarlen;
 
-inline static BoundCastFunc BindTimeCast(DataType &target) {
+export inline BoundCastFunc BindTimeCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<TimeT, VarcharT, TimeTryCastToVarlen>);

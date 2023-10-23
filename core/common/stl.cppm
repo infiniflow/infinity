@@ -419,8 +419,6 @@ export {
 
     using Mutex = std::mutex;
 
-    float NearByInt(float __x) { return __builtin_nearbyintf(__x); }
-
     float HugeValf() {
         return HUGE_VALF;
     }

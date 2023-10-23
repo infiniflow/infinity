@@ -19,9 +19,9 @@ export module interval_cast;
 
 namespace infinity {
 
-struct IntervalTryCastToVarlen;
+export struct IntervalTryCastToVarlen;
 
-inline static BoundCastFunc BindTimeCast(DataType &target) {
+export inline BoundCastFunc BindTimeCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<IntervalT, VarcharT, IntervalTryCastToVarlen>);

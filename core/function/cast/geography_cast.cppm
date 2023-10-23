@@ -18,10 +18,10 @@ export module geography_cast;
 
 namespace infinity {
 
-struct GeographyTryCastToVarlen;
+export struct GeographyTryCastToVarlen;
 
-template <class SourceType>
-static inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target) {
+export template <class SourceType>
+inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target) {
     Assert<FunctionException>(source.type() != target.type(),
                               Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()),
                               __FILE_NAME__,
