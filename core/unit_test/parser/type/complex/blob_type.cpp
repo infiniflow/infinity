@@ -11,18 +11,19 @@ import third_party;
 import parser;
 import logger;
 import stl;
+import infinity;
 
 class BlobTypeTest : public BaseTest {
     void SetUp() override {
         infinity::GlobalResourceUsage::Init();
-//        std::shared_ptr<std::string> config_path = nullptr;
-//        infinity::Infinity::instance().Init(config_path);
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void TearDown() override {
-//        infinity::Infinity::instance().UnInit();
-//        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-//        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::Infinity::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
     }
 };
@@ -34,7 +35,6 @@ TEST_F(BlobTypeTest, blob1) {
     constexpr i64 SIZE = 27;
 
     auto blob_ptr = new char[SIZE]{0};
-    GlobalResourceUsage::IncrRawMemCount();
 
     for (i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
@@ -86,7 +86,6 @@ TEST_F(BlobTypeTest, blob1) {
 
     // Move from ptr;
     blob_ptr = new char[SIZE]{0};
-    GlobalResourceUsage::IncrRawMemCount();
 
     for (i64 i = 0; i < SIZE; ++i) {
         blob_ptr[i] = 'a' + static_cast<char_t>(i);
