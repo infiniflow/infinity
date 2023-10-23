@@ -59,6 +59,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 #find_package(Boost REQUIRED)
 
 add_subdirectory(src)
+add_subdirectory(core)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # set parameters for unit test coverage
@@ -67,6 +68,7 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile the unit test
 add_subdirectory(test/unittest)
+#add_subdirectory(core/unit_test)
 
 # Compile benchmark
 add_subdirectory(benchmark)

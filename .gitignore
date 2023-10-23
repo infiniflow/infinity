@@ -52,6 +52,7 @@ build
 
 # ignore compilation configure file
 src/bin/compilation_config.h
+core/bin/compilation_config.cppm
 
 # log file
 *.log

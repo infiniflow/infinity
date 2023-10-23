@@ -1,0 +1,57 @@
+//
+// Created by JinHai on 2022/9/5.
+//
+
+module;
+
+import stl;
+
+export module compilation_config;
+
+#define VERSION_MAJOR @infinity_VERSION_MAJOR@
+#define VERSION_MINOR @infinity_VERSION_MINOR@
+#define VERSION_PATCH @infinity_VERSION_PATCH@
+
+#define BUILD_TIME @CURRENT_SYS_TIME@
+#define GIT_BRANCH_NAME "@GIT_BRANCH_NAME@"
+#define GIT_COMMIT_ID "@GIT_COMMIT_ID@"
+#define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+
+#define TEST_DATA_PATH "@TEST_DATA_PATH@"
+#define CSV_DATA_PATH "@CSV_DATA_PATH@"
+
+namespace infinity {
+
+export i32 version_major() {
+    return VERSION_MAJOR;
+}
+
+export i32 version_minor() {
+    return VERSION_MINOR;
+}
+
+export i32 version_patch() {
+    return VERSION_PATCH;
+}
+
+export char* current_system_time() {
+    return (char*)BUILD_TIME;
+}
+
+export char* build_type() {
+    return (char*)BUILD_TYPE;
+}
+
+export char* git_branch_name() {
+    return (char*)GIT_BRANCH_NAME;
+}
+
+export char* git_commit_id() {
+    return (char*)GIT_COMMIT_ID;
+}
+
+export char* test_data_path() {
+    return (char*)TEST_DATA_PATH;
+}
+
+}

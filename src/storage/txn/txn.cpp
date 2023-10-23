@@ -3,12 +3,12 @@
 //
 
 #include "txn.h"
-#include "storage/meta/meta_state.h"
+#include "storage/buffer/buffer_manager.h"
 #include "storage/meta/catalog.h"
+#include "storage/meta/meta_state.h"
 #include "storage/table_def.h"
 #include "storage/txn/txn_manager.h"
 #include "storage/txn/txn_store.h"
-#include "storage/buffer/buffer_manager.h"
 
 namespace infinity {
 
@@ -324,9 +324,9 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     if (err_msg != nullptr) {
         return {nullptr, std::move(err_msg)};
     }
-    NotImplementError("Not implemented")
+    NotImplementError("Not implemented");
 
-        auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
+    auto res = TableCollectionEntry::CreateIndex(table_entry, nullptr, std::move(index_def));
     // TODO shenyushi 4: add wal entry
     return res;
 }
