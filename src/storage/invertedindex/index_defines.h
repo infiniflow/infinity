@@ -49,6 +49,8 @@ typedef uint32_t field_len_t;
 constexpr optionflag_t OPTION_FLAG_ALL = of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
 constexpr optionflag_t NO_TERM_FREQUENCY = of_doc_payload | of_term_payload;
 constexpr optionflag_t OPTION_FLAG_NONE = of_none;
+constexpr docid_t INVALID_DOCID = -1;
+constexpr pos_t INVALID_POSITION = std::numeric_limits<pos_t>::max();
 constexpr uint32_t MAX_DOC_PER_RECORD = 128;
 constexpr uint32_t MAX_DOC_PER_RECORD_BIT_NUM = 7;
 constexpr uint32_t MAX_DOC_PER_BITMAP_BLOCK = 256;
