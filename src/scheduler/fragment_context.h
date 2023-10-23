@@ -8,6 +8,7 @@
 //#include "executor/operator/physical_source.h"
 //#include "executor/physical_operator.h"
 //#include "main/query_context.h"
+#include "executor/operator/physical_sink.h"
 #include "scheduler/fragment_task.h"
 
 #include "common/types/alias/primitives.h"
@@ -50,12 +51,15 @@ public:
 
     virtual ~FragmentContext() = default;
 
-    inline void IncreaseTask() {
-        //        std::unique_lock<RWMutex> w_locker(rw_locker_);
-    }
+    inline void IncreaseTask() { task_n_.fetch_add(1); }
 
     inline void FinishTask() {
-        //        std::unique_lock<RWMutex> w_locker(rw_locker_);
+        u64 unfinished_task = task_n_.fetch_sub(1);
+        auto sink_op = GetSinkOperator();
+
+        if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
+            Complete();
+        }
     }
 
     Vector<PhysicalOperator *> &GetOperators();
@@ -89,6 +93,8 @@ protected:
     virtual SharedPtr<Table> GetResultInternal() = 0;
 
 protected:
+    au64 task_n_{0};
+
     std::mutex locker_{};
     std::condition_variable cv_{};
 

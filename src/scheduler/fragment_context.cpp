@@ -309,6 +309,7 @@ void SetMergeKnnState(MergeKnnInputState &input_state,
     input_state.merge_knn_function_data_->total_parallel_n_ = real_parallel_count;
 }
 
+// Set the state after child is finished.
 void SetTaskState(InputState &input_state, PhysicalOperator *physical_op, const Vector<UniquePtr<PlanFragment>> &children_context) {
     switch (physical_op->operator_type()) {
         case PhysicalOperatorType::kMergeKnn: {
@@ -317,6 +318,7 @@ void SetTaskState(InputState &input_state, PhysicalOperator *physical_op, const 
             SetMergeKnnState(merge_knn_input, physical_merge_knn, children_context);
             break;
         }
+        // TODO: add other operator like kMergeAgg
         default: {
             break;
         }
@@ -490,6 +492,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             std::unique_lock<std::mutex> locker(locker_);
             tasks_.reserve(parallel_count);
             tasks_.emplace_back(MakeUnique<FragmentTask>(this, 0, operator_count));
+            IncreaseTask();
             break;
         }
         case FragmentType::kParallelMaterialize:
@@ -498,6 +501,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             tasks_.reserve(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_.emplace_back(MakeUnique<FragmentTask>(this, task_id, operator_count));
+                IncreaseTask();
             }
             break;
         }

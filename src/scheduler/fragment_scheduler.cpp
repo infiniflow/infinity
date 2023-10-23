@@ -149,8 +149,10 @@ void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worke
         }
 
         fragment_task->OnExecute(worker_id);
-        if (!fragment_task->Complete()) {
+        if (!fragment_task->IsComplete()) {
             ScheduleTask(fragment_task);
+        } else {
+            fragment_task->TryCompleteFragment();
         }
     }
     //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
