@@ -208,6 +208,18 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        ut_executor_cpp
+        CONFIGURE_DEPENDS
+        unit_test/executor/*.cpp
+)
+
+file(GLOB_RECURSE
+        ut_test_helper_cpp
+        CONFIGURE_DEPENDS
+        unit_test/test_helper/*.cpp
+)
+
+file(GLOB_RECURSE
         ut_main_cpp
         CONFIGURE_DEPENDS
         unit_test/main/*.cpp
@@ -219,6 +231,12 @@ file(GLOB_RECURSE
         unit_test/third_party/*.cpp
 )
 
+file(GLOB_RECURSE
+        sql_runner_cppm
+        CONFIGURE_DEPENDS
+        unit_test/test_helper/sql_runner.cppm
+)
+
 add_executable(unit_test
         ${ut_test_main_cpp}
         ${ut_common_cpp}
@@ -227,6 +245,8 @@ add_executable(unit_test
         ${ut_parser_cpp}
         ${ut_function_cpp}
         ${ut_thirdparty_cpp}
+        ${ut_executor_cpp}
+        ${ut_test_helper_cpp}
 #        ${executor_test_src}
 #        ${function_test_src}
         ${infinity_cpp}
@@ -277,6 +297,7 @@ target_sources(unit_test
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
+        ${sql_runner_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
