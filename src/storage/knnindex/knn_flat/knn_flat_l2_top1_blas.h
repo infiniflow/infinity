@@ -17,7 +17,7 @@ class KnnFlatL2Top1Blas final : public KnnDistance<DistType> {
 
 public:
     explicit KnnFlatL2Top1Blas(const DistType *queries, i64 query_count, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1Blas, elem_data_type, query_count, 1, dimension), queries_(queries) {
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1Blas, elem_data_type, query_count, dimension, 1), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->query_count_, RowID());
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->query_count_);

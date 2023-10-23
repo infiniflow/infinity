@@ -74,7 +74,9 @@ public:
 
     [[nodiscard]] bool Ready() const;
 
-    [[nodiscard]] bool Complete() const;
+    [[nodiscard]] bool IsComplete() const;
+
+    void TryCompleteFragment();
 
 public:
     std::atomic<FragmentTaskState> state_{FragmentTaskState::kReady};

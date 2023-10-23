@@ -7,6 +7,7 @@
 #include "executor/operator_state.h"
 #include "parser/statement/extra/create_table_info.h"
 #include "spdlog/fmt/fmt.h"
+#include "storage/data_block.h"
 
 namespace infinity {
 
@@ -61,15 +62,17 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
             if (explain_output_state->data_block_ == nullptr) {
                 ExecutorError("Empty explain output")
             }
-            materialize_sink_state->data_block_array_.emplace_back(explain_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kProjection: {
-            ProjectionOutputState *projection_output_state = static_cast<ProjectionOutputState *>(task_output_state);
-            if (projection_output_state->data_block_ == nullptr) {
+            ProjectionOutputState *projection_end_idxoutput_state = static_cast<ProjectionOutputState *>(task_output_state);
+            if (task_output_state->data_block_ == nullptr) {
                 ExecutorError("Empty projection output")
             }
-            materialize_sink_state->data_block_array_.emplace_back(projection_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
@@ -77,7 +80,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
             if (knn_output_state->data_block_ == nullptr) {
                 ExecutorError("Empty knn scan output")
             }
-            materialize_sink_state->data_block_array_.emplace_back(knn_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         default: {
@@ -257,11 +261,13 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MessageSinkState *message_si
 }
 
 void PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState *message_sink_state, OutputState *task_output_state) {
+
     switch (task_output_state->operator_type_) {
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOutputState *knn_output_state = static_cast<KnnScanOutputState *>(task_output_state);
             SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-            fragment_data->data_block_ = knn_output_state->data_block_;
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            fragment_data->data_block_ = new_data_block;
             fragment_data->data_count_ = 1;
             fragment_data->data_idx_ = 1;
             for (const auto &next_fragment_queue : message_sink_state->fragment_data_queues_) {

@@ -46,6 +46,8 @@ void PhysicalFilter::Execute(QueryContext *query_context, InputState *input_stat
                                             filter_input_state->input_data_block_->row_count());
 
     LOG_TRACE("{} rows after filter", selected_count);
+
+    output_state->SetComplete();
     return;
 }
 
