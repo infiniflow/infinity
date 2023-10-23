@@ -1,11 +1,11 @@
 //
 // Created by xwg on 23-9-6.
 //
+#include "test_helper/sql_runner.h"
+
 #include "infinity_test.h"
 #include "parser/definition/table_def.h"
 #include "storage/table.h"
-#include "test_helper/sql_runner.h"
-#include "test_helper/sql_runner.h"
 
 class FragmentTest : public InfinityTest {};
 

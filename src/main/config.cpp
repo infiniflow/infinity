@@ -8,6 +8,7 @@
 #include "toml.hpp"
 #include "common/types/alias/containers.h"
 #include <boost/asio/ip/impl/address.ipp>
+#include <charconv>
 #include <iostream>
 
 namespace infinity {

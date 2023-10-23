@@ -159,6 +159,8 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
+
 #set_property(TARGET infinity_core PROPERTY CXX_INCLUDE_WHAT_YOU_USE /usr/bin/iwyu)
 
 add_executable(infinity_main
@@ -178,6 +180,7 @@ target_link_libraries(
         gfortran
         fastpfor
         newpfor
+        openfst
         zsv_parser
 
         ${EXTERNAL_LIBS}

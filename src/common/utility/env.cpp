@@ -1,7 +1,8 @@
 #include "env.h"
 
 #if defined(__APPLE__)
-
+#include <type_traits>
+        
 #define RETRY_ON_EINTR(err, expr)                                                                                                                    \
     do {                                                                                                                                             \
         static_assert(std::is_signed<decltype(err)>::value, #err " must be a signed integer");                                                       \
