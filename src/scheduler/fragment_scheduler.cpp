@@ -84,11 +84,6 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
     Vector<FragmentTask *> tasks;
     FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
 
-    for (const auto &task : tasks) {
-        // task->source_state_.
-        // for (const auto &operator )
-    }
-
     LOG_TRACE("Create {} tasks", tasks.size());
 
     for (const auto &fragment_task : tasks) {
