@@ -66,7 +66,6 @@ void MakeKnnScanState(UniquePtr<InputState> &input_state,
         SchedulerError("Currently, we only support one knn column scenario");
     }
     KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_knn_scan->knn_expressions_[0].get());
-    SchedulerAssert(knn_expr->arguments().size() == 1, "Expect one expression");
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
 
     Vector<SizeT> knn_column_ids = {column_expr->binding().column_idx};
@@ -99,9 +98,9 @@ void MakeMergeKnnState(UniquePtr<InputState> &input_state,
                        UniquePtr<OutputState> &output_state,
                        PhysicalMergeKnn *physical_merge_knn,
                        FragmentTask *task) {
-    if (physical_merge_knn->knn_expressions_.size() != 1) {
-        SchedulerError("Currently, we only support one knn column scenario");
-    }
+    // if (physical_merge_knn->knn_expressions_.size() != 1) {
+    //     SchedulerError("Currently, we only support one knn column scenario");
+    // }
     KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_merge_knn->knn_expressions_[0].get());
 
     ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_merge_knn->limit_expression_.get());

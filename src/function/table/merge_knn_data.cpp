@@ -1,8 +1,7 @@
 #include "merge_knn_data.h"
 #include "common/types/alias/primitives.h"
 #include "common/utility/infinity_assert.h"
-#include "storage/knnindex/merge_knn_max.h"
-#include "storage/knnindex/merge_knn_min.h"
+#include "storage/knnindex/merge_knn.h"
 
 namespace infinity {
 
@@ -28,7 +27,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
     }
 }
 
-template <typename DistType>
+template <typename DataType>
 void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
@@ -36,16 +35,18 @@ void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceTy
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeShared<MergeKnnMax<DistType>>(query_count, topk);
+            auto merge_knn_max = MakeShared<MergeKnn<f32, faiss::CMax>>(query_count, topk);
             merge_knn_max->Begin();
             merge_knn_base_ = std::move(merge_knn_max);
+            heap_type_ = MergeKnnHeapType::kMaxHeap;
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeShared<MergeKnnMin<DistType>>(query_count, topk);
+            auto merge_knn_min = MakeShared<MergeKnn<f32, faiss::CMin>>(query_count, topk);
             merge_knn_min->Begin();
             merge_knn_base_ = std::move(merge_knn_min);
+            heap_type_ = MergeKnnHeapType::kMinHeap;
             break;
         }
     }

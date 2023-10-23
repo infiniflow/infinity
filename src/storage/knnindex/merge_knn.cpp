@@ -1,9 +1,9 @@
-#include "merge_knn_min.h"
+#include "merge_knn.h"
 #include "common/utility/infinity_assert.h"
 
 namespace infinity {
-template <typename DistType>
-void MergeKnnMin<DistType>::Search(const DistType *dist, const RowID *row_ids, int count) {
+template <typename DistType, template <typename, typename> typename C>
+void MergeKnn<DistType, C>::Search(const DistType *dist, const RowID *row_ids, int count) {
     this->total_count_ += count;
     for (int64_t i = 0; i < this->query_count_; i++) {
         const DistType *d = dist + i * count;
@@ -14,9 +14,8 @@ void MergeKnnMin<DistType>::Search(const DistType *dist, const RowID *row_ids, i
     }
 }
 
-template <typename DistType>
-void MergeKnnMin<DistType>::Begin() {
-    // Why this must be used explicitly here?
+template <typename DistType, template <typename, typename> typename C>
+void MergeKnn<DistType, C>::Begin() {
     if (this->begin_ || this->query_count_ == 0) {
         return;
     }
@@ -26,8 +25,8 @@ void MergeKnnMin<DistType>::Begin() {
     this->begin_ = true;
 }
 
-template <typename DistType>
-void MergeKnnMin<DistType>::End() {
+template <typename DistType, template <typename, typename> typename C>
+void MergeKnn<DistType, C>::End() {
     if (!this->begin_)
         return;
 
@@ -38,26 +37,26 @@ void MergeKnnMin<DistType>::End() {
     this->begin_ = false;
 }
 
-template <typename DistType>
-DistType *MergeKnnMin<DistType>::GetDistances() const {
+template <typename DistType, template <typename, typename> typename C>
+DistType *MergeKnn<DistType, C>::GetDistances() const {
     return heap_result_handler_->heap_dis_tab;
 }
 
-template <typename DistType>
-RowID *MergeKnnMin<DistType>::GetIDs() const {
+template <typename DistType, template <typename, typename> typename C>
+RowID *MergeKnn<DistType, C>::GetIDs() const {
     return heap_result_handler_->heap_ids_tab;
 }
 
-template <typename DistType>
-DistType *MergeKnnMin<DistType>::GetDistancesByIdx(i64 idx) const {
+template <typename DistType, template <typename, typename> typename C>
+DistType *MergeKnn<DistType, C>::GetDistancesByIdx(i64 idx) const {
     if (idx >= this->query_count_) {
         ExecutorError("Query index exceeds the limit")
     }
     return heap_result_handler_->heap_dis_tab + idx * this->topk_;
 }
 
-template <typename DistType>
-RowID *MergeKnnMin<DistType>::GetIDsByIdx(i64 idx) const {
+template <typename DistType, template <typename, typename> typename C>
+RowID *MergeKnn<DistType, C>::GetIDsByIdx(i64 idx) const {
     if (idx >= this->query_count_) {
         ExecutorError("Query index exceeds the limit")
     }

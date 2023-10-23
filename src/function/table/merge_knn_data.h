@@ -10,6 +10,12 @@ class MergeKnnBase;
 class ResultHandler;
 class SingleResultHandler;
 
+enum class MergeKnnHeapType {
+    kMaxHeap,
+    kMinHeap,
+    kInvalid,
+};
+
 class MergeKnnFunctionData : public TableFunctionData {
 
 public:
@@ -30,6 +36,7 @@ public:
     i64 query_count_{};
     i64 topk_{};
     EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
+    MergeKnnHeapType heap_type_{MergeKnnHeapType::kInvalid};
     SharedPtr<BaseTableRef> table_ref_{};
 
     SharedPtr<MergeKnnBase> merge_knn_base_{};

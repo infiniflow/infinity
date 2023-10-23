@@ -44,7 +44,7 @@ public:
     inline u64 knn_table_index() const { return knn_table_index_; }
 
 private:
-    template <typename T>
+    template <typename T, template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state);
 
 private:

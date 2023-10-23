@@ -25,13 +25,25 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
     }
     auto merge_knn_input = static_cast<MergeKnnInputState *>(input_state);
     auto merge_knn_output = static_cast<MergeKnnOutputState *>(output_state);
-
-    switch (merge_knn_input->merge_knn_function_data_->elem_type_) {
+    auto &merge_knn_data = *merge_knn_input->merge_knn_function_data_;
+    switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
             ExecutorError("Invalid elem type");
         }
         case kElemFloat: {
-            ExecuteInner<f32>(query_context, merge_knn_input, merge_knn_output);
+            switch (merge_knn_data.heap_type_) {
+                case MergeKnnHeapType::kInvalid: {
+                    ExecutorError("Invalid heap type");
+                }
+                case MergeKnnHeapType::kMaxHeap: {
+                    ExecuteInner<f32, faiss::CMax>(query_context, merge_knn_input, merge_knn_output);
+                    break;
+                }
+                case MergeKnnHeapType::kMinHeap: {
+                    ExecuteInner<f32, faiss::CMin>(query_context, merge_knn_input, merge_knn_output);
+                    break;
+                }
+            }
             break;
         }
         default: {
@@ -42,7 +54,7 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
 
 void PhysicalMergeKnn::Execute(QueryContext *query_context) { NotImplementError("Deprecated function"); }
 
-template <typename T>
+template <typename DataType, template <typename, typename> typename C>
 void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state) {
     auto &merge_knn_data = *input_state->merge_knn_function_data_;
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
@@ -51,14 +63,14 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
 
     auto &input_data = *input_state->input_data_block_;
 
-    auto merge_knn = static_cast<MergeKnn<T> *>(merge_knn_data.merge_knn_base_.get());
+    auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
     ExecutorAssert(column_n >= 0, "Error. The input data block is invalid");
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
 
-    auto dists = reinterpret_cast<T *>(dist_column.data());
+    auto dists = reinterpret_cast<DataType *>(dist_column.data());
     auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
     SizeT row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
@@ -70,7 +82,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
 
         i64 result_n = std::min(merge_knn_data.topk_, merge_knn->total_count());
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; query_idx++) {
-            T *result_dists = merge_knn->GetDistancesByIdx(query_idx);
+            DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
             for (i64 top_idx = result_n - 1; top_idx >= 0; top_idx--) {
                 i32 segment_id = result_row_ids[top_idx].segment_id_;
