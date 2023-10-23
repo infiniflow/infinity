@@ -1,10 +1,20 @@
+#include "unit_test/base_test.h"
 
-#if 0
-
-#include "base_test.h"
-#include "main/infinity.h"
-#include "storage/data_block.h"
-#include "storage/table_def.h"
+import infinity;
+import infinity_exception;
+import infinity_assert;
+import stl;
+import global_resource_usage;
+import third_party;
+import logger;
+//import table;
+import table_def;
+import wal_entry;
+import value;
+import parser;
+import data_block;
+import default_values;
+//import column_vector;
 
 class WalEntryTest : public BaseTest {
     void SetUp() override {
@@ -18,9 +28,9 @@ class WalEntryTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/data/catalog/*");
-        system("rm -rf /tmp/infinity/_tmp");
+//        system("rm -rf /tmp/infinity/data/db");
+//        system("rm -rf /tmp/infinity/data/catalog/*");
+//        system("rm -rf /tmp/infinity/_tmp");
     }
 };
 
@@ -95,5 +105,3 @@ TEST_F(WalEntryTest, ReadWrite) {
     EXPECT_EQ(*entry == *entry2, true);
     EXPECT_EQ(ptr - buf_beg, exp_size);
 }
-
-#endif

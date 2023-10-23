@@ -31,10 +31,26 @@ Infinity::Init(const SharedPtr <String>& config_path) {
         fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
 
         storage_ = MakeUnique<Storage>(config_.get());
-//        storage_->Init();
+        storage_->Init();
 
         initialized_ = true;
     }
+}
+
+void Infinity::UnInit() {
+    if (!initialized_) {
+        return;
+    }
+    initialized_ = false;
+
+    storage_->UnInit();
+    storage_.reset();
+
+    resource_manager_.reset();
+
+    Logger::Shutdown();
+
+    config_.reset();
 }
 
 }
