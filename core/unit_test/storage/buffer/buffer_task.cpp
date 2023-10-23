@@ -1,25 +1,47 @@
 //
 // Created by jinhai on 23-7-21.
 //
-#if 0
-#include "base_test.h"
-#include "main/infinity.h"
-#include "storage/buffer/buffer_manager.h"
-#include "storage/buffer/buffer_task.h"
+
+#include "unit_test/base_test.h"
+
+import infinity;
+import infinity_exception;
+import infinity_assert;
+import stl;
+import global_resource_usage;
+import third_party;
+import logger;
+import table_def;
+import wal_entry;
+import value;
+import parser;
+import data_block;
+import default_values;
+import txn_manager;
+import txn;
+import base_entry;
+import new_catalog;
+import buffer_manager;
+import buffer_handle;
+import object_handle;
+import buffer_task;
+import async_batch_processor;
 
 class BufferTaskProcessorTest : public BaseTest {
-    void SetUp() override {
+    void
+    SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
-        system("rm -rf /tmp/infinity");
     }
 
-    void TearDown() override {
+    void
+    TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity/");
     }
 };
 
@@ -116,4 +138,3 @@ TEST_F(BufferTaskProcessorTest, test1) {
         }
     }
 }
-#endif

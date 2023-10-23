@@ -1,13 +1,34 @@
 //
 // Created by jinhai on 23-8-19.
 //
-#if 0
-#include "base_test.h"
-#include "storage/meta/meta_state.h"
-#include "storage/data_block.h"
-#include "common/column_vector/column_vector.h"
-#include "main/infinity.h"
-#include "storage/table_def.h"
+
+#include "unit_test/base_test.h"
+#include <string>
+
+import infinity;
+import infinity_exception;
+import infinity_assert;
+import stl;
+import global_resource_usage;
+import third_party;
+import logger;
+import table_def;
+import wal_entry;
+import value;
+import parser;
+import data_block;
+import default_values;
+import txn_manager;
+import txn;
+import base_entry;
+import new_catalog;
+import buffer_manager;
+import table_collection_entry;
+import column_vector;
+import column_buffer;
+import block_column_entry;
+import table_collection_type;
+import meta_state;
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {
@@ -58,7 +79,7 @@ TEST_F(TableEntryTest, test1) {
         EXPECT_EQ(table_def->column_count(), 2);
         EXPECT_EQ(table_def->GetColIdByName("tiny_int_col"), 0);
         EXPECT_EQ(table_def->GetColIdByName("big_int_col"), 1);
-        LOG_TRACE("{}", table_def->ToString());
+        LOG_TRACE(Format("{}", table_def->ToString()));
     }
 
     SharedPtr<TableCollectionEntry> table_entry =
@@ -441,4 +462,3 @@ TEST_F(TableEntryTest, test2) {
         new_txn->CommitTxn();
     }
 }
-#endif

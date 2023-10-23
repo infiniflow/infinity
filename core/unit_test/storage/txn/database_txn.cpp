@@ -2,10 +2,25 @@
 // Created by jinhai on 23-6-4.
 //
 
-#if 0
 
-#include "base_test.h"
-#include "main/infinity.h"
+#include "unit_test/base_test.h"
+
+import infinity;
+import infinity_exception;
+import infinity_assert;
+import stl;
+import global_resource_usage;
+import third_party;
+import logger;
+import table_def;
+import wal_entry;
+import value;
+import parser;
+import data_block;
+import default_values;
+import txn_manager;
+import txn;
+import base_entry;
 
 class DBTxnTest : public BaseTest {
     void SetUp() override {
@@ -456,5 +471,3 @@ TEST_F(DBTxnTest, test7) {
     // Txn3: Commit, OK
     new_txn3->CommitTxn();
 }
-
-#endif

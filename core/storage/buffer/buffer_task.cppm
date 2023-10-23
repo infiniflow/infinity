@@ -32,7 +32,7 @@ private:
     void *buffer_handle_{};
 };
 
-class BufferWriteTask : public AsyncTask {
+export class BufferWriteTask : public AsyncTask {
 public:
     explicit BufferWriteTask(void *buffer_handle) : AsyncTask(AsyncTaskType::kBufferWrite), buffer_handle_(buffer_handle) {}
 

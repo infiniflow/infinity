@@ -2,21 +2,17 @@
 // Created by jinhai on 23-1-17.
 //
 #if 0
-#include "planner/logical_planner.h"
-#include "base_test.h"
-#include "common/column_vector/column_vector.h"
-#include "common/types/value.h"
-#include "executor/physical_planner.h"
-#include "legacy_sched/operator_pipeline.h"
-#include "main/infinity.h"
-#include "main/logger.h"
-#include "main/session.h"
-#include "parser/sql_parser.h"
-#include "planner/optimizer.h"
-#include "test_helper/sql_runner.h"
-#include <gtest/gtest.h>
+#include "unit_test/base_test.h"
 
-#include "main/profiler/show_logical_plan.h"
+import infinity_exception;
+import infinity_assert;
+import global_resource_usage;
+import third_party;
+import parser;
+import logger;
+import stl;
+import infinity;
+import sql_runner;
 
 class LogicalPlannerTest : public BaseTest {
     void
@@ -32,6 +28,7 @@ class LogicalPlannerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity");
     }
 };
 
@@ -122,5 +119,4 @@ TEST_F(LogicalPlannerTest, test1) {
 //    BuiltinFunctions builtin_functions(catalog_ptr);
 //    builtin_functions.Init();
 }
-
 #endif
