@@ -395,6 +395,7 @@ public:
     reverse_iterator rend() noexcept { return begin() - 1; }
     [[nodiscard]] const char *c_str() const noexcept { return buffer(); }
     [[nodiscard]] const char *data() const noexcept { return buffer(); }
+    [[nodiscard]] char *data() noexcept { return buffer(); }
     [[nodiscard]] size_type size() const noexcept { return sz_; }
     [[nodiscard]] size_type length() const noexcept { return size(); }
     [[nodiscard]] bool empty() const noexcept { return sz_ == 0; }

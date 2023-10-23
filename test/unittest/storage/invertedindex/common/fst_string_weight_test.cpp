@@ -31,7 +31,7 @@ TEST_F(FSTStringWeightTest, test2) {
 TEST_F(FSTStringWeightTest, test3) {
     std::stringstream ss;
 
-    StringLeftWeight<uint8_t> w0;
+    StringLeftWeight<byte_type> w0;
     w0.PushBack(1);
     w0.PushBack(char(255));
     w0.PushBack(3);
@@ -42,7 +42,7 @@ TEST_F(FSTStringWeightTest, test3) {
     ASSERT_TRUE(w0.Member());
 
     ss.seekg(0);
-    StringLeftWeight<uint8_t> w1;
+    StringLeftWeight<byte_type> w1;
     w1.Read(ss);
     // ASSERT_EQ(w0, w1);
     // ASSERT_EQ(w0.Hash(), w1.Hash());
