@@ -12,7 +12,7 @@ export module file_reader;
 
 namespace infinity {
 
-class FileReader {
+export class FileReader {
 public:
     explicit FileReader(FileSystem &fs, const String &path, SizeT buffer_size);
 

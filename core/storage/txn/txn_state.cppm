@@ -22,7 +22,7 @@ export enum class TxnState {
     kInvalid,
 };
 
-inline String ToString(TxnState txn_state) {
+export inline String ToString(TxnState txn_state) {
     switch (txn_state) {
         case TxnState::kNotStarted: {
             return "Not Started";

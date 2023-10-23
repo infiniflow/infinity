@@ -11,7 +11,7 @@ export module async_dummy_task;
 
 namespace infinity {
 
-class AsyncDummyTask final : public AsyncTask {
+export class AsyncDummyTask final : public AsyncTask {
 public:
     explicit AsyncDummyTask() : AsyncTask(AsyncTaskType::kDummy) {}
 

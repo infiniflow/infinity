@@ -4,6 +4,7 @@
 module;
 
 #include "statement/extra/create_table_info.h"
+#include "type/info/array_info.h"
 #include "type/logical_type.h"
 #include "type/number/float16.h"
 #include "sql_parser.h"
@@ -92,6 +93,7 @@ export using EmbeddingInfo = EmbeddingInfo;
 export using DecimalInfo = DecimalInfo;
 export using BitmapInfo = BitmapInfo;
 export using VarcharInfo = VarcharInfo;
+export using ArrayInfo = ArrayInfo;
 
 export using TypeInfoType = TypeInfoType;
 

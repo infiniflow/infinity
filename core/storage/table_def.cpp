@@ -44,7 +44,7 @@ void TableDef::UnionWith(const SharedPtr<TableDef> &other) {
 bool TableDef::operator==(const TableDef &other) const {
     if (this->schema_name_.get() == nullptr || other.schema_name_.get() == nullptr || this->table_name_.get() == nullptr ||
         other.table_name_.get() == nullptr || !IsEqual(*(this->schema_name_), *(other.schema_name_)) ||
-        IsEqual(*(this->table_name_), *(other.table_name_)) || this->columns_.size() != other.columns_.size() ||
+        !IsEqual(*(this->table_name_), *(other.table_name_)) || this->columns_.size() != other.columns_.size() ||
         this->column_name2id_.size() != other.column_name2id_.size()) {
         return false;
     }
@@ -137,7 +137,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
 }
 

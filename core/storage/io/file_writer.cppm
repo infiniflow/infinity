@@ -12,7 +12,7 @@ export module file_writer;
 
 namespace infinity {
 
-class FileWriter {
+export class FileWriter {
 public:
     explicit FileWriter(FileSystem &fs, const String &path, SizeT buffer_size, u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG)
         : fs_(fs), path_(path), buffer_size_(buffer_size), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0) {
