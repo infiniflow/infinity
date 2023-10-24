@@ -304,7 +304,6 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     StorageAssert(this->column_count_ == segment_entry2->column_count_, "SegmentEntry::MergeFrom requires column_count_ match");
     StorageAssert(this->row_capacity_ == segment_entry2->row_capacity_, "SegmentEntry::MergeFrom requires row_capacity_ match");
     StorageAssert(this->min_row_ts_ == segment_entry2->min_row_ts_, "SegmentEntry::MergeFrom requires min_row_ts_ match");
-    StorageAssert(*this->index_dir_ == *segment_entry2->index_dir_, "SegmentEntry::MergeFrom requires index_dir_ match");
 
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
     this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);

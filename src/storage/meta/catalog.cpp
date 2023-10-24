@@ -190,7 +190,7 @@ nlohmann::json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commi
 }
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const std::vector<std::string> &catalog_paths, BufferManager *buffer_mgr) {
-    UniquePtr<NewCatalog> catalog1 = nullptr;
+    auto catalog1 = MakeUnique<NewCatalog>(nullptr);
     CatalogAssert(!catalog_paths.empty(), "Catalog paths is empty")
         // Load the latest full checkpoint.
         LOG_INFO("Load base catalog1 from: {}", catalog_paths[0]);

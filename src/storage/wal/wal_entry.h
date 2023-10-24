@@ -280,7 +280,7 @@ struct WalEntry : WalEntryHeader {
 
     [[nodiscard]] bool IsCheckPoint() const;
 
-    bool IsFullCheckPoint() const;
+    [[nodiscard]] bool IsFullCheckPoint() const;
 };
 
 class WalEntryIterator {
@@ -299,6 +299,22 @@ private:
     char *ptr_{};
     SizeT entry_index_{};
     Vector<SharedPtr<WalEntry>> entries_{};
+};
+
+class WalListIterator {
+public:
+    explicit WalListIterator(const Vector<String> &wal_list) : wal_list_(wal_list), iter_index_(0) {}
+
+    void Init();
+
+    bool Next();
+
+    [[nodiscard]] SharedPtr<WalEntry> GetEntry();
+
+private:
+    Vector<String> wal_list_{};
+    SizeT iter_index_{};
+    Vector<SharedPtr<WalEntryIterator>> iters_{};
 };
 
 } // namespace infinity

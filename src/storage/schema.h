@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include "storage/table.h"
+#include "storage/base_table.h"
 #include "storage/view.h"
 
 namespace infinity {
 
+class BaseTable;
 class Schema {
 public:
     Schema(String name, u64 id) : name_(std::move(name)), schema_id_(id){};

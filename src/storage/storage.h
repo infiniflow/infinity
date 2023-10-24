@@ -32,7 +32,7 @@ public:
 
     static bool CatalogDirExists(const String &dir);
 
-    void AttachCatalog(const String &catalog_path);
+    void AttachCatalog(const Vector<String> &catalog_files);
     void InitNewCatalog();
 
 private:
