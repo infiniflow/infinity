@@ -81,6 +81,7 @@ SharedPtr<IndexEntry> IndexEntry::Deserialize(const nlohmann::json &index_entry_
     auto index_name = MakeShared<String>(index_entry_json["index_name"].get<String>());
 
     auto index_entry = LoadIndexEntry(segment_entry, std::move(index_name), buffer_mgr);
+    StorageAssert(index_entry != nullptr, "Failed to load index entry");
     index_entry->min_ts_ = index_entry_json["min_ts"];
     index_entry->max_ts_ = index_entry_json["max_ts"];
     index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"];

@@ -2,9 +2,9 @@
 
 #include "common/types/alias/smart_ptr.h"
 #include "common/types/complex/row_id.h"
+#include "common/utility/infinity_assert.h"
 #include "faiss/utils/ordered_key_value.h"
 #include "storage/knnindex/knn_flat/new_result_handler.h"
-
 namespace infinity {
 
 class MergeKnnBase {};
@@ -51,6 +51,67 @@ private:
     UniquePtr<HeapResultHandler> heap_result_handler_{};
     UniquePtr<SingleResultHandler> single_result_handler_{};
 };
+
+template <typename DataType, template <typename, typename> typename C>
+void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, int count) {
+    this->total_count_ += count;
+    for (int64_t i = 0; i < this->query_count_; i++) {
+        const DataType *d = dist + i * count;
+        const RowID *r = row_ids + i * count;
+        for (i16 j = 0; j < count; j++) {
+            single_result_handler_->add_result(d[j], r[j], i);
+        }
+    }
+}
+
+template <typename DataType, template <typename, typename> typename C>
+void MergeKnn<DataType, C>::Begin() {
+    if (this->begin_ || this->query_count_ == 0) {
+        return;
+    }
+    for (SizeT i = 0; i < this->query_count_; i++) {
+        single_result_handler_->begin(i);
+    }
+    this->begin_ = true;
+}
+
+template <typename DataType, template <typename, typename> typename C>
+void MergeKnn<DataType, C>::End() {
+    if (!this->begin_)
+        return;
+
+    for (i32 i = 0; i < this->query_count_; ++i) {
+        single_result_handler_->end(i);
+    }
+
+    this->begin_ = false;
+}
+
+template <typename DataType, template <typename, typename> typename C>
+DataType *MergeKnn<DataType, C>::GetDistances() const {
+    return heap_result_handler_->heap_dis_tab;
+}
+
+template <typename DataType, template <typename, typename> typename C>
+RowID *MergeKnn<DataType, C>::GetIDs() const {
+    return heap_result_handler_->heap_ids_tab;
+}
+
+template <typename DataType, template <typename, typename> typename C>
+DataType *MergeKnn<DataType, C>::GetDistancesByIdx(i64 idx) const {
+    if (idx >= this->query_count_) {
+        ExecutorError("Query index exceeds the limit")
+    }
+    return heap_result_handler_->heap_dis_tab + idx * this->topk_;
+}
+
+template <typename DataType, template <typename, typename> typename C>
+RowID *MergeKnn<DataType, C>::GetIDsByIdx(i64 idx) const {
+    if (idx >= this->query_count_) {
+        ExecutorError("Query index exceeds the limit")
+    }
+    return heap_result_handler_->heap_ids_tab + idx * this->topk_;
+}
 
 template class MergeKnn<f32, faiss::CMax>;
 template class MergeKnn<f32, faiss::CMin>;

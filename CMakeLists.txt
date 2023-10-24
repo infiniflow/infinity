@@ -65,6 +65,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 add_definitions(-march=native)
+if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
+    add_definitions(-mevex512)
+endif ()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 

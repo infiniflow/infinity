@@ -398,4 +398,25 @@ bool WalEntryIterator::Next() {
 
 SharedPtr<WalEntry> WalEntryIterator::GetEntry() { return entries_[entry_index_++]; }
 
+void WalListIterator::Init() {
+    for (const auto &wal : wal_list_) {
+        auto walEntryIterator = std::make_shared<WalEntryIterator>(wal);
+        walEntryIterator->Init();
+        iters_.emplace_back(walEntryIterator);
+    }
+}
+
+bool WalListIterator::Next() {
+    if (iter_index_ < iters_.size()) {
+        if (iters_[iter_index_]->Next()) {
+            return true;
+        } else {
+            iter_index_++;
+            return Next();
+        }
+    }
+    return false;
+}
+SharedPtr<WalEntry> WalListIterator::GetEntry() { return iters_[iter_index_]->GetEntry(); }
+
 } // namespace infinity

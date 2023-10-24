@@ -56,8 +56,6 @@ public:
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
-    SharedPtr<String> index_dir_{};
-
     // Want key type to be const String or shared_ptr<const String>
     HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 

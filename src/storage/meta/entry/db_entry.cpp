@@ -199,6 +199,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     res->commit_ts_ = commit_ts;
     res->deleted_ = deleted;
     res->entry_type_ = entry_type;
+    res->db_entry_dir_ = db_entry_dir;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {

@@ -5,6 +5,7 @@
 #include "wal_manager.h"
 #include "common/utility/exception.h"
 #include "main/logger.h"
+#include "storage/meta/entry/index_def_entry.h"
 #include "storage/meta/entry/segment_entry.h"
 #include "storage/storage.h"
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <iterator>
 #include <regex>
+#include <utility>
 #include <vector>
 
 namespace infinity {
@@ -20,14 +22,14 @@ using namespace std;
 namespace fs = std::filesystem;
 
 WalManager::WalManager(Storage *storage,
-                       const string &wal_path,
+                       string wal_path,
                        u64 wal_size_threshold,
                        u64 full_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_wal_bytes)
-    : storage_(storage), wal_path_(wal_path), wal_size_threshold_(wal_size_threshold), full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
-      delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec), delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes),
-      running_(false) {}
+    : storage_(storage), wal_path_(std::move(wal_path)), wal_size_threshold_(wal_size_threshold),
+      full_checkpoint_interval_sec_(full_checkpoint_interval_sec), delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec),
+      delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -359,43 +361,62 @@ int64_t WalManager::ReplayWalFile() {
         LOG_TRACE("List wal file: {}", wal_file.c_str());
     }
     LOG_INFO("List wal file size: {}", wal_list_.size());
+
     i64 max_commit_ts = 0;
     String catalog_path;
     Vector<SharedPtr<WalEntry>> replay_entries;
-    for (const auto &wal_file : wal_list_) {
+    Vector<String> checkpoint_catalog_paths;
 
-        WalEntryIterator iterator(wal_file);
-        iterator.Init();
+    WalListIterator iterator(wal_list_);
+    iterator.Init();
+    // phase 1: find the max commit ts and catalog path
+    LOG_INFO("Replay phase 1: find the max commit ts and catalog path")
+    while (iterator.Next()) {
+        auto wal_entry = iterator.GetEntry();
 
-        // phase 1: find the max commit ts and catalog path
-        LOG_INFO("Replay phase 1: find the max commit ts and catalog path")
-        while (iterator.Next()) {
-            auto wal_entry = iterator.GetEntry();
-            replay_entries.push_back(wal_entry);
+        replay_entries.push_back(wal_entry);
+
+        if (wal_entry->IsCheckPoint()) {
+
+            checkpoint_catalog_paths.push_back(wal_entry->GetCheckpointInfo().second);
+
             if (wal_entry->IsFullCheckPoint()) {
-                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
+                if (current_max_commit_ts > max_commit_ts) {
+                    max_commit_ts = current_max_commit_ts;
+                    catalog_path = current_catalog_path;
+                }
                 LOG_TRACE("Find checkpoint max commit ts: {}", max_commit_ts);
                 LOG_TRACE("Find catalog path: {}", catalog_path);
-                // attach the catalog path to the storage.
-                storage_->AttachCatalog(catalog_path);
                 break;
+            } else {
+                // delta checkpoint
+                auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
+                // if the current max commit ts is greater than the max commit ts, update the max commit ts and catalog path
+                if (current_max_commit_ts > max_commit_ts) {
+                    max_commit_ts = current_max_commit_ts;
+                    catalog_path = current_catalog_path;
+                }
             }
         }
+    }
 
-        // phase 2: by the max commit ts, find the entries to replay
-        LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay")
-        while (iterator.Next()) {
-            auto wal_entry = iterator.GetEntry();
-            if (wal_entry->commit_ts > max_commit_ts) {
-                replay_entries.push_back(wal_entry);
-            }
+    // phase 2: by the max commit ts, find the entries to replay
+    LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay")
+    while (iterator.Next()) {
+        auto wal_entry = iterator.GetEntry();
+        if (wal_entry->commit_ts > max_commit_ts) {
+            replay_entries.push_back(wal_entry);
         }
     }
 
     // Note: Init a new catalog when not found any checkpoint wal entry
     // Indicates that the system has not done checkpoint in the previous.
-    if (storage_->catalog() == nullptr) {
+    if (checkpoint_catalog_paths.empty()) {
         storage_->InitNewCatalog();
+    } else {
+        std::reverse(checkpoint_catalog_paths.begin(), checkpoint_catalog_paths.end());
+        storage_->AttachCatalog(checkpoint_catalog_paths);
     }
 
     // phase 3: replay the entries
@@ -406,12 +427,15 @@ int64_t WalManager::ReplayWalFile() {
         if (entry->commit_ts > last_commit_ts) {
             last_commit_ts = entry->commit_ts;
         }
+        if (entry->commit_ts < max_commit_ts) {
+            continue;
+        }
         if (entry->IsCheckPoint()) {
             continue;
         }
         ReplayWalEntry(*entry);
     }
-
+    LOG_TRACE("Last commit ts: {}", last_commit_ts);
     return last_commit_ts;
 }
 /*****************************************************************************
@@ -539,11 +563,15 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
         StorageError("Wal Replay: Get table failed");
     }
     auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
-    auto result = TableCollectionEntry::CreateIndex(table_entry, cmd.index_def_, ConflictType::kReplace, txn_id, commit_ts, nullptr);
-    if (!result.Success()) {
+    auto index_def_entry_result = TableCollectionEntry::CreateIndex(table_entry, cmd.index_def_, ConflictType::kReplace, txn_id, commit_ts, nullptr);
+    if (!index_def_entry_result.Success()) {
         StorageError("Wal Replay: Create index failed");
     }
-    result.entry_->Commit(commit_ts);
+    auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto table_store = MakeShared<TxnTableStore>(cmd.table_name_, table_entry, fake_txn.get());
+
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), *cmd.index_def_, commit_ts, storage_->buffer_manager());
+    TableCollectionEntry::CommitCreateIndex(table_entry, table_store->uncommitted_indexes_);
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
