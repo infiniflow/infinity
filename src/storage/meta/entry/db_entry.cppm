@@ -14,6 +14,7 @@ import table_collection_detail;
 import table_collection_meta;
 import buffer_manager;
 import txn_manager;
+#include "statement/extra/extra_ddl_info.h"
 
 export module db_entry;
 

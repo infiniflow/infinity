@@ -110,10 +110,12 @@ private:
 
     // Only Checkpoint thread access following members
     TxnTimeStamp ckp_commit_ts_{};
+    TxnTimeStamp full_ckp_commit_ts_{};
     i64 full_ckp_wal_size_;
     i64 full_ckp_when_;
     i64 delta_ckp_wal_size_;
     i64 delta_ckp_when_;
+
     Vector<String> wal_list_;
 };
 

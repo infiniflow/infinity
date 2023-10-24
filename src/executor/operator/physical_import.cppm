@@ -18,6 +18,7 @@ import zsv;
 
 export module physical_import;
 
+
 namespace infinity {
 
 // class TableCollectionEntry;
@@ -77,6 +78,8 @@ public:
     inline bool header() const { return header_; }
 
     inline char delimiter() const { return delimiter_; }
+
+    static void SaveSegmentData(Txn *txn, SharedPtr<SegmentEntry> &segment_entry, const String &db_name, const String &table_name);
 
 private:
     static void CSVHeaderHandler(void *);

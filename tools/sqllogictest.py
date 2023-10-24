@@ -8,24 +8,30 @@ from shutil import copyfile
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
 
-    if not os.path.exists(copy_dir):
-        os.makedirs(copy_dir)
+    copy_all(data_dir, copy_dir)
 
-    for dirpath, dirnames, filenames in os.walk(data_dir):
-        for filename in filenames:
-            src_path = os.path.join(dirpath, filename)
-            dest_path = os.path.join(copy_dir, filename)
-            copyfile(src_path, dest_path)
     test_cnt = 0
     for dirpath, dirnames, filenames in os.walk(slt_dir):
         for filename in filenames:
             file = os.path.join(dirpath, filename)
             os.system(sqllogictest_bin + " " + file)
             print("Finished running test file: " + file)
-            print("----------------------------------------------------------\n")
+            print("-" * 100)
             test_cnt += 1
 
     print("Finished {} tests.".format(test_cnt))
+
+
+# copy data
+def copy_all(data_dir, copy_dir):
+    if not os.path.exists(copy_dir):
+        os.makedirs(copy_dir)
+    for dirpath, dirnames, filenames in os.walk(data_dir):
+        for filename in filenames:
+            src_path = os.path.join(dirpath, filename)
+            dest_path = os.path.join(copy_dir, filename)
+            copyfile(src_path, dest_path)
+    print("Finished copying all files.")
 
 
 # main
@@ -76,6 +82,12 @@ if __name__ == "__main__":
         type=str,
         default=copy_dir,
         dest="copy",
+    )
+    parser.add_argument(
+        "-jc",
+        "--just_copy",
+        default=copy_all(data_dir, copy_dir),
+        dest="just_copy_all_data",
     )
 
     args = parser.parse_args()

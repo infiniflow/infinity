@@ -19,6 +19,7 @@ import txn_context;
 import wal_entry;
 import txn_store;
 import index_def_entry;
+#include "statement/extra/extra_ddl_info.h"
 
 export module txn;
 
