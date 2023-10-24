@@ -18,7 +18,6 @@ module;
 
 #include "faiss/Index.h"
 #include "faiss/utils/distances.h"
-#include "zsv/common.h"
 
 export module third_party;
 
@@ -157,7 +156,5 @@ export constexpr int faiss_distance_compute_blas_database_bs = 1024;
 export constexpr int faiss_distance_compute_min_k_reservoir = 100;
 
 
-// zsv
-export using ZsvParser = zsv_parser;
 
 } // namespace infinity

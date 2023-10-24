@@ -185,6 +185,7 @@ target_link_libraries(infinity
         sql_parser
         faiss
         onnxruntime_mlas
+        zsv_parser
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -2,7 +2,9 @@ import os
 import random
 
 
-def generate_test_varchar(slt_path: str, csv_path: str, num: int, dim: int, copy_path: str):
+def generate_test_varchar(
+    slt_path: str, csv_path: str, num: int, dim: int, copy_path: str
+):
     # if os.path.exists(slt_path) and os.path.exists(csv_path):
     #     print("file exists, exit")
     #     return
@@ -45,7 +47,9 @@ def generate_test_varchar(slt_path: str, csv_path: str, num: int, dim: int, copy
         slt_file.write("DROP TABLE {};\n".format(table_name))
 
 
-def generate_test_embedding(slt_path: str, csv_path: str, num: int, dim: int, copy_path: str):
+def generate_test_embedding(
+    slt_path: str, csv_path: str, num: int, dim: int, copy_path: str
+):
     if os.path.exists(slt_path) and os.path.exists(csv_path):
         print("The target {} and {} already exists. Return.".format(slt_path, csv_path))
         return
@@ -116,11 +120,12 @@ def generate():
     slt_path = slt_dir + "/test_big_embedding.slt"
     csv_path = csv_dir + "/big_embedding.csv"
     copy_path = tmp_dir + "/big_embedding.csv"
-    generate_test_embedding(slt_path, csv_path, row_n, dim, copy_path)
+    # generate_test_embedding(slt_path, csv_path, row_n, dim, copy_path)
     slt_path = slt_dir + "/test_big_varchar.slt"
     csv_path = csv_dir + "/big_varchar.csv"
     copy_path = tmp_dir + "/big_varchar.csv"
     generate_test_varchar(slt_path, csv_path, row_n, dim, copy_path)
+
 
 if __name__ == "__main__":
     generate()

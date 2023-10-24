@@ -4,10 +4,10 @@
 
 module;
 
-//extern "C" {
-//#include "zsv/api.h"
-//#include "zsv/common.h"
-//}
+// extern "C" {
+// #include "zsv/api.h"
+// #include "zsv/common.h"
+// }
 
 #include <cerrno>
 #include <cstdio>
@@ -42,7 +42,7 @@ import infinity_assert;
 import infinity_exception;
 import table_collection_entry;
 import segment_entry;
-
+import zsv;
 
 module physical_import;
 
@@ -50,12 +50,6 @@ namespace infinity {
 
 void PhysicalImport::Init() {}
 
-/**
- * @brief copy statement execute function
- * @param query_context
- * @param input_state
- * @param output_state
- */
 void PhysicalImport::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto import_input_state = static_cast<ImportInputState *>(input_state);
     auto import_output_state = static_cast<ImportOutputState *>(output_state);
@@ -65,7 +59,7 @@ void PhysicalImport::Execute(QueryContext *query_context, InputState *input_stat
             break;
         }
         case CopyFileType::kJSON: {
-            ImportJSON(query_context);
+            ImportJSON(query_context, import_input_state, import_output_state);
             break;
         }
         case CopyFileType::kFVECS: {
@@ -76,21 +70,9 @@ void PhysicalImport::Execute(QueryContext *query_context, InputState *input_stat
     output_state->SetComplete();
 }
 
-void PhysicalImport::Execute(QueryContext *query_context) {
-    switch (file_type_) {
-        case CopyFileType::kCSV: {
-            return ImportCSV(query_context);
-        }
-        case CopyFileType::kJSON: {
-            return ImportJSON(query_context);
-        }
-        case CopyFileType::kFVECS: {
-            return ImportFVECS(query_context);
-        }
-    }
-}
+void PhysicalImport::Execute(QueryContext *query_context) {}
 
-SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
+void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
     if (table_collection_entry_->columns_.size() != 1) {
         Error<ExecutorException>("FVECS file must have only one column.", __FILE_NAME__, __LINE__);
     }
@@ -182,173 +164,99 @@ SizeT PhysicalImport::ImportFVECSHelper(QueryContext *query_context) {
             object_handle = CommonObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
         }
     }
-    return vector_n;
+    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));
+    output_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportCSVHelper(QueryContext *query_context, ParserContext &parser_context) {
-#if 0
+void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+    // opts, parser and parser_context points to each other.
+    // opt -> parser_context
+    // parser->opt
+    // parser_context -> parser
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
         Error<ExecutorException>(strerror(errno), __FILE_NAME__, __LINE__);
     }
-    struct zsv_opts opts {};
-
-    // TODO: redesign parser_context
-    parser_context.table_collection_entry_ = table_collection_entry_;
-
-    parser_context.txn_ = query_context->GetTxn();
-
-    parser_context.txn_->AddTxnTableStore(
-        *table_collection_entry_->table_collection_name_,
-        MakeUnique<TxnTableStore>(*table_collection_entry_->table_collection_name_, table_collection_entry_, parser_context.txn_));
-
+    Txn *txn = query_context->GetTxn();
+    txn->AddTxnTableStore(*table_collection_entry_->table_collection_name_,
+                          MakeUnique<TxnTableStore>(*table_collection_entry_->table_collection_name_, table_collection_entry_, txn));
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    parser_context.segment_entry_ =
-        SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, parser_context.txn_->TxnID(), segment_id, parser_context.txn_->GetBufferMgr());
-    parser_context.delimiter_ = delimiter_;
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), segment_id, txn->GetBufferMgr());
 
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
-    const String &table_name = *table_collection_entry_->table_collection_name_;
+    auto parser_context = MakeUnique<ParserContext>(table_collection_entry_, txn, segment_entry, delimiter_);
 
+    auto opts = MakeUnique<ZsvOpts>();
     if (header_) {
-        opts.row_handler = CSVHeaderHandler;
+        opts->row_handler = CSVHeaderHandler;
     } else {
-        opts.row_handler = CSVRowHandler;
+        opts->row_handler = CSVRowHandler;
     }
+    opts->delimiter = delimiter_;
+    opts->stream = fp;
+    opts->ctx = parser_context.get();
+    opts->buffsize = (1 << 20); // default buffer size 256k, we use 1M\
 
-    opts.delimiter = delimiter_;
-    opts.stream = fp;
-    opts.ctx = &parser_context;
-    opts.buffsize = (1 << 20); // default buffer size 256k, we use 1M
+    parser_context->parser_ = ZsvParser(opts.get());
 
-    parser_context.parser_ = zsv_new(&opts);
-    enum zsv_status csv_parser_status;
-    while ((csv_parser_status = zsv_parse_more(parser_context.parser_)) == zsv_status_ok) {
+    ZsvStatus csv_parser_status;
+    while ((csv_parser_status = parser_context->parser_.ParseMore()) == zsv_status_ok) {
         ;
     }
+    parser_context->parser_.Finish();
 
-    zsv_finish(parser_context.parser_);
-    // flush the last segment entry
-    if (parser_context.segment_entry_->current_row_ > 0) {
-        parser_context.txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *parser_context.segment_entry_->segment_dir_));
-        auto txn_store = parser_context.txn_->GetTxnTableStore(table_name);
-        txn_store->Import(parser_context.segment_entry_);
+    // add the last segment entry
+    if (parser_context->segment_entry_->current_row_ > 0) {
+        const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
+        const String &table_name = *table_collection_entry_->table_collection_name_;
+        parser_context->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *parser_context->segment_entry_->segment_dir_));
+        auto txn_store = parser_context->txn_->GetTxnTableStore(table_name);
+        txn_store->Import(parser_context->segment_entry_);
     }
-
-    zsv_delete(parser_context.parser_);
-
     fclose(fp);
+
     if (csv_parser_status != zsv_status_no_more_input) {
-        if (parser_context.err_msg_.get() != nullptr) {
-            Error<ExecutorException>(*parser_context.err_msg_, __FILE_NAME__, __LINE__);
+        if (parser_context->err_msg_.get() != nullptr) {
+            Error<ExecutorException>(*parser_context->err_msg_, __FILE_NAME__, __LINE__);
         } else {
-            String err_msg = (char *)zsv_parse_status_desc(csv_parser_status);
+            String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
             Error<ExecutorException>(err_msg, __FILE_NAME__, __LINE__);
         }
     }
-    table_collection_entry_->row_count_ += parser_context.row_count_;
-#endif
-}
+    table_collection_entry_->row_count_ += parser_context->row_count_;
 
-void PhysicalImport::ImportFVECS(QueryContext *query_context) {
-    SizeT row_count = ImportFVECSHelper(query_context);
-
-    Vector<SharedPtr<ColumnDef>> column_defs;
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
-
-    UniquePtr<String> result_msg = MakeUnique<String>(Format("IMPORTED {} Rows", row_count));
-    output_->SetResultMsg(Move(result_msg));
-}
-
-void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
-    SizeT row_count = ImportFVECSHelper(query_context);
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", row_count));
+    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", parser_context->row_count_));
     output_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportCSV(QueryContext *query_context) {
-    ParserContext parser_context{};
-
-    ImportCSVHelper(query_context, parser_context);
-
-    // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs;
-
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
-
-    UniquePtr<String> result_msg = MakeUnique<String>(Format("IMPORTED {} Rows", parser_context.row_count_));
-    output_->SetResultMsg(Move(result_msg));
-}
-
-void PhysicalImport::ImportJSON(QueryContext *query_context) {
-    DBEntry *db_entry = TableCollectionMeta::GetDBEntry(table_collection_entry_->table_collection_meta_);
-    String err = Format("IMPORT Table: {}.{} FROM file: {} WITH format JSON",
-                        *db_entry->db_name_,
-                        *table_collection_entry_->table_collection_name_,
-                        file_path_);
-    Error<NotImplementException>(err, __FILE_NAME__, __LINE__);
-}
-
-/**
- * @brief copy statement import json function
- * @param query_context
- * @param input_state
- * @param output_state
- */
-void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
-
-    ParserContext parser_context{};
-    ImportCSVHelper(query_context, parser_context);
-
-    //    // Generate the result
-    //    Vector<SharedPtr<ColumnDef>> column_defs;
-    //    auto result_table_def_ptr
-    //                = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    //    output_state->table_def_ = Move(result_table_def_ptr);
-
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", parser_context.row_count_));
-    output_state->result_msg_ = Move(result_msg);
-}
-
-/**
- * @brief copy statement import csv function
- * @param query_context
- * @param input_state
- * @param output_state
- */
 void PhysicalImport::ImportJSON(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
-#if 0
     ParserContext *parser_context = static_cast<ParserContext *>(context);
-    SizeT csv_column_count = zsv_cell_count(parser_context->parser_);
+    ZsvParser &parser = parser_context->parser_;
+    SizeT csv_column_count = parser.CellCount();
 
     SizeT table_column_count = parser_context->table_collection_entry_->columns_.size();
     if (csv_column_count != table_column_count) {
         parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
 
-        zsv_abort(parser_context->parser_); // return zsv_status_cancelled
+        parser.Abort(); // return zsv_status_cancelled
         return;
     }
 
     // Not check the header column name
     for (SizeT idx = 0; idx < csv_column_count; ++idx) {
-        auto *csv_col_name = reinterpret_cast<const char *>(zsv_get_cell_str(parser_context->parser_, idx));
+        auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
         auto *table_col_name = parser_context->table_collection_entry_->columns_[idx]->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
-            zsv_abort(parser_context->parser_); // return zsv_status_cancelled
+            parser.Abort(); // return zsv_status_cancelled
             return;
         }
     }
 
     // This is header, doesn't count in row number
-
-    zsv_set_row_handler(parser_context->parser_, CSVRowHandler);
-#endif
+    parser.SetRowHandler(CSVRowHandler);
 }
 
 namespace {
@@ -401,11 +309,9 @@ void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &st
 } // namespace
 
 void PhysicalImport::CSVRowHandler(void *context) {
-#if 0
     ParserContext *parser_context = static_cast<ParserContext *>(context);
-
     auto *table = parser_context->table_collection_entry_;
-    SizeT column_count = zsv_cell_count(parser_context->parser_);
+    SizeT column_count = parser_context->parser_.CellCount();
     auto *txn = parser_context->txn_;
     auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
 
@@ -438,7 +344,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
 
     // append data to segment entry
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
-        struct zsv_cell cell = zsv_get_cell(parser_context->parser_, column_idx);
+        ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         StringView str_view{};
         if (cell.len) {
             str_view = StringView((char *)cell.str, cell.len);
@@ -536,7 +442,6 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++last_block_entry->row_count_;
     ++segment_entry->current_row_;
     ++parser_context->row_count_;
-#endif
 }
 
 } // namespace infinity

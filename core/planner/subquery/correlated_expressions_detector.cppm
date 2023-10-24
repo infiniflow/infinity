@@ -22,9 +22,9 @@ public:
 
     void VisitNode(LogicalNode &op) final;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression) override;
 
     [[nodiscard]] inline bool IsCorrelated() const { return is_correlated_; }
 
