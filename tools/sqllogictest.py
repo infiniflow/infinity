@@ -4,6 +4,7 @@ import shutil
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 
+
 def _main(sqllogictest_rs_path, src_dir, test_dir, dest_dir):
     # create dest_dir if it doesn't exist
     if not os.path.exists(dest_dir):
@@ -50,19 +51,46 @@ def main():
     # parent_path = os.path.dirname(current_path)
     # print(parent_path)
     parent_path = current_path
-    src_dir = parent_path + '/test/data'
+    src_dir = parent_path + "/test/data"
 
-    test_dir = parent_path + '/test/sql'
+    test_dir = parent_path + "/test/sql"
 
-    dest_dir = '/tmp/infinity/sqllogictest'
+    dest_dir = "/tmp/infinity/sqllogictest"
 
-    parser = argparse.ArgumentParser(description='SQL Logic Test For Infinity')
+    parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
-    parser.add_argument('-p', '--path', help='path of sqllogictest-rs', type=str, default='./tools/sqllogictest',
-                        dest='path')
-    parser.add_argument('-s', '--src', help='path of src directory', type=str, default=src_dir, dest='src')
-    parser.add_argument('-t', '--test', help='path of test directory', type=str, default=test_dir, dest='test')
-    parser.add_argument('-d', '--dest', help='path of dest directory', type=str, default=dest_dir, dest='dest')
+    parser.add_argument(
+        "-p",
+        "--path",
+        help="path of sqllogictest-rs",
+        type=str,
+        default="./tools/sqllogictest",
+        dest="path",
+    )
+    parser.add_argument(
+        "-s",
+        "--src",
+        help="path of src directory",
+        type=str,
+        default=src_dir,
+        dest="src",
+    )
+    parser.add_argument(
+        "-t",
+        "--test",
+        help="path of test directory",
+        type=str,
+        default=test_dir,
+        dest="test",
+    )
+    parser.add_argument(
+        "-d",
+        "--dest",
+        help="path of dest directory",
+        type=str,
+        default=dest_dir,
+        dest="dest",
+    )
 
     args = parser.parse_args()
 
@@ -74,9 +102,9 @@ def main():
 
 
 # main
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("generating file")
-    generate1()
-    generate2()
+    # generate1()
+    # generate2()
     print("generate file finsh")
     main()

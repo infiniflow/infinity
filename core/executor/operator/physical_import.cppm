@@ -14,31 +14,37 @@ import third_party;
 import txn;
 import table_collection_entry;
 import segment_entry;
+import zsv;
 
 export module physical_import;
 
 namespace infinity {
 
-//class TableCollectionEntry;
-//class Txn;
-//class SegmentEntry;
-//class ImportInputState;
-//class ImportOutputState;
+// class TableCollectionEntry;
+// class Txn;
+// class SegmentEntry;
+// class ImportInputState;
+// class ImportOutputState;
 
-struct ParserContext {
-    ZsvParser parser_{};
+export class ParserContext {
+public:
+    ZsvParser parser_;
     SizeT row_count_{};
     SharedPtr<String> err_msg_{};
-    TableCollectionEntry *table_collection_entry_{};
-    Txn *txn_{};
+    TableCollectionEntry *const table_collection_entry_{};
+    Txn *const txn_{};
     SharedPtr<SegmentEntry> segment_entry_{};
-    char delimiter_{};
+    const char delimiter_{};
+
+public:
+    ParserContext(TableCollectionEntry *table_collection_entry, Txn *txn, SharedPtr<SegmentEntry> &segment_entry, char delimiter)
+        : row_count_(0), err_msg_(nullptr), table_collection_entry_(table_collection_entry), txn_(txn), segment_entry_(segment_entry),
+          delimiter_(delimiter) {}
 };
 
 export class PhysicalImport : public PhysicalOperator {
 public:
-    explicit
-    PhysicalImport(u64 id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type)
+    explicit PhysicalImport(u64 id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id), table_collection_entry_(table_collection_entry),
           file_path_(Move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 
@@ -54,22 +60,10 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void ImportFVECS(QueryContext *query_context);
-
     void ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);
-
-    void ImportCSV(QueryContext *query_context);
 
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);
-
-private:
-    SizeT ImportFVECSHelper(QueryContext *query_context);
-
-    void ImportCSVHelper(QueryContext *query_context, ParserContext &parser_context);
-
-public:
-    void ImportJSON(QueryContext *query_context);
 
     /// for push based execution
     void ImportJSON(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);

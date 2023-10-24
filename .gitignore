@@ -79,3 +79,5 @@ test/sql/**/*fvecs*.slt
 
 #clang-format
 clang-format-all
+
+tmp/

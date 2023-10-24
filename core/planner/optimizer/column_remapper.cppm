@@ -22,7 +22,7 @@ public:
     void VisitNode(LogicalNode &op) final;
 
 private:
-    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
 
     Vector<ColumnBinding> bindings_;
 };

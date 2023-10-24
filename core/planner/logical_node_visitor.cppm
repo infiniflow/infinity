@@ -23,19 +23,19 @@ export module logical_node_visitor;
 
 namespace infinity {
 
-//class LogicalNode;
-//class BaseExpression;
-//class AggregateExpression;
-//class BetweenExpression;
-//class CaseExpression;
-//class CastExpression;
-//class ColumnExpression;
-//class ConjunctionExpression;
-//class FunctionExpression;
-//class ValueExpression;
-//class InExpression;
-//class SubqueryExpression;
-//class KnnExpression;
+// class LogicalNode;
+// class BaseExpression;
+// class AggregateExpression;
+// class BetweenExpression;
+// class CaseExpression;
+// class CastExpression;
+// class ColumnExpression;
+// class ConjunctionExpression;
+// class FunctionExpression;
+// class ValueExpression;
+// class InExpression;
+// class SubqueryExpression;
+// class KnnExpression;
 
 export class LogicalNodeVisitor {
 public:
@@ -49,27 +49,27 @@ public:
 
     void VisitExpressionChildren(SharedPtr<BaseExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const AggregateExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<AggregateExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const BetweenExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<BetweenExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const CaseExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<CaseExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const CastExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<CastExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const ColumnExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const ConjunctionExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ConjunctionExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const FunctionExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<FunctionExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const ValueExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ValueExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const InExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<InExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const SubqueryExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<SubqueryExpression> &expression);
 
-    virtual SharedPtr<BaseExpression> VisitReplace(const KnnExpression* expression);
+    virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<KnnExpression> &expression);
 };
 
 } // namespace infinity
