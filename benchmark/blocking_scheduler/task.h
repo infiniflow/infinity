@@ -4,12 +4,13 @@
 
 #pragma once
 
-#include "common/types/alias/concurrency.h"
+
 #include "operator.h"
 #include "buffer_queue.h"
 #include "task_queue.h"
 #include <unistd.h>
 #include <cassert>
+#include <condition_variable>
 
 namespace infinity {
 
@@ -18,7 +19,7 @@ class Task;
 class NewScheduler {
 public:
     static void
-    Init(const HashSet<i64>& cpu_set);
+    Init(const HashSet<long>& cpu_set);
 
     static void
     Uninit();
@@ -27,29 +28,29 @@ public:
     RunTask(Task* task);
 
     inline static void
-    DispatchTask(i64 worker_id, Task* task) {
+    DispatchTask(long worker_id, Task* task) {
         task_queues[worker_id]->Enqueue(task);
     }
 private:
     static void
-    CoordinatorLoop(i64 cpu_id);
+    CoordinatorLoop(long cpu_id);
 
     static void
-    WorkerLoop(BlockingQueue* task_queue, i64 worker_id);
+    WorkerLoop(BlockingQueue* task_queue, long worker_id);
 
-    static i64
+    static long
     GetAvailableCPU();
 
 private:
-    static HashSet<i64> cpu_set;
+    static HashSet<long> cpu_set;
 
-    static HashMap<i64, UniquePtr<BlockingQueue>> task_queues;
-    static HashMap<i64, UniquePtr<Thread>> workers;
+    static HashMap<long, UniquePtr<BlockingQueue>> task_queues;
+    static HashMap<long, UniquePtr<std::thread>> workers;
 
     static UniquePtr<BlockingQueue> input_queue;
-    static UniquePtr<Thread> coordinator;
+    static UniquePtr<std::thread> coordinator;
 
-    static Vector<i64> cpu_array;
+    static Vector<long> cpu_array;
     static u64 current_cpu_id;
 };
 
@@ -68,7 +69,7 @@ struct Task {
     Task(TaskType type) : type_(type) {}
 
     virtual void
-    Run(i64 worker_id) {
+    Run(long worker_id) {
         // Not implemented
         last_worker_id_ = worker_id;
     }
@@ -79,7 +80,7 @@ struct Task {
     }
 
     TaskType type_{TaskType::kInvalid};
-    i64 last_worker_id_{-1};
+    long last_worker_id_{-1};
     bool ready_{false};
 };
 
@@ -97,7 +98,7 @@ struct DummyTask final : public Task {
     }
 
     void
-    Run(i64 worker_id) override {
+    Run(long worker_id) override {
         last_worker_id_ = worker_id;
         printf("Run dummy task by worker: %ld\n", worker_id);
         sleep(1);
@@ -137,7 +138,7 @@ struct PipelineTask final : public Task {
     }
 
     inline void
-    Run(i64 worker_id) override {
+    Run(long worker_id) override {
         last_worker_id_ = worker_id;
 //        printf("Run pipeline task by worker: %ld\n", worker_id);
 

@@ -2,14 +2,12 @@
 // Created by jinhai on 23-5-7.
 //
 
-#include "common/types/alias/smart_ptr.h"
-#include "common/types/alias/concurrency.h"
-#include "common/types/alias/containers.h"
-#include "common/types/alias/strings.h"
 #include "task.h"
 #include "fragment.h"
 #include "concurrentqueue.h"
-#include "main/profiler/base_profiler.h"
+#include "base_profiler.h"
+#include "ctpl.h"
+#include <queue>
 
 using namespace infinity;
 
@@ -17,7 +15,7 @@ using namespace infinity;
 void
 test_concurrent_queue() {
     ConcurrentQueue queue;
-    ThreadPool p(2);
+    ctpl::thread_pool p(2);
 
     UniquePtr<Buffer> buffer1 = MakeUnique<Buffer>(BUFFER_SIZE);
     UniquePtr<Buffer> buffer2 = MakeUnique<Buffer>(BUFFER_SIZE);
@@ -49,7 +47,7 @@ test_concurrent_queue() {
 void
 test_waitfree_queue() {
     WaitFreeQueue queue;
-    ThreadPool p(2);
+    ctpl::thread_pool p(2);
     SharedPtr<Buffer> buffer1 = MakeShared<Buffer>(BUFFER_SIZE);
     SharedPtr<Buffer> buffer2 = MakeShared<Buffer>(BUFFER_SIZE);
     SharedPtr<Buffer> buffer3 = MakeShared<Buffer>(BUFFER_SIZE);
@@ -232,7 +230,7 @@ main() -> int {
 
     start_scheduler();
 
-    ThreadPool pool(16);
+    ctpl::thread_pool pool(16);
 
     UniquePtr<Fragment> frag0 = build_fragment0(0, "test");
 //    UniquePtr<Fragment> frag0 = build_fragment1(0, "test");

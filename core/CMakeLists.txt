@@ -133,8 +133,8 @@ file(GLOB_RECURSE
 )
 
 
-add_executable(infinity
-        ${main_cpp}
+add_library(infinity_core
+#        ${main_cpp}
         ${infinity_cpp}
         ${network_cpp}
         ${planner_cpp}
@@ -146,8 +146,8 @@ add_executable(infinity
         ${common_cpp}
 )
 
-target_sources(infinity
-        PRIVATE
+target_sources(infinity_core
+        PUBLIC
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${main_cppm}
         ${infinity_cppm}
@@ -162,24 +162,32 @@ target_sources(infinity
         ${executor_cppm}
 )
 
+target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
+
+target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+
+add_executable(infinity
+        ${main_cpp}
+)
+
 target_link_libraries(infinity
+        infinity_core
         sql_parser
         faiss
         onnxruntime_mlas
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cxxopts/include")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
-target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
-
-target_compile_options(infinity PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 ### unit test
 
@@ -262,8 +270,7 @@ add_executable(unit_test
         ${ut_test_helper_cpp}
         ${ut_planner_cpp}
         ${ut_function_cpp}
-#        ${executor_test_src}
-#        ${function_test_src}
+
         ${infinity_cpp}
         ${network_cpp}
         ${planner_cpp}
@@ -273,11 +280,6 @@ add_executable(unit_test
         ${function_cpp}
         ${common_cpp}
         ${executor_cpp}
-#        ${planner_test_src}
-#        ${storage_test_src}
-#        ${parser_test_src}
-#        ${test_helper_src}
-#        ${third_party_src}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -288,30 +290,14 @@ target_link_libraries(unit_test
         gmock
         gmock_main
         sql_parser
+        infinity_core
         faiss
         onnxruntime_mlas
 )
 
-#add_executable(unittest
-#        ${main_cpp}
-#        ${infinity_cpp}
-#        ${network_cpp}
-#)
-
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${main_cppm}
-        ${infinity_cppm}
-        ${network_cppm}
-        ${common_cppm}
-        ${planner_cppm}
-        ${scheduler_cppm}
-        ${storage_cppm}
-        ${parser_cppm}
-        ${function_cppm}
-        ${expression_cppm}
-        ${executor_cppm}
         ${sql_runner_cppm}
 )
 

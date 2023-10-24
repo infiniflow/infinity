@@ -5,7 +5,7 @@
 
 #include "task.h"
 #include "fragment.h"
-#include "main/profiler/base_profiler.h"
+#include "base_profiler.h"
 
 using namespace infinity;
 

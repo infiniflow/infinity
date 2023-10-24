@@ -17,9 +17,10 @@ add_executable(blocking_scheduler_benchmark
         )
 
 target_include_directories(blocking_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
+target_include_directories(blocking_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(blocking_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 
 target_link_libraries(
         blocking_scheduler_benchmark
-        infinity_core
+        benchmark_profiler
 )

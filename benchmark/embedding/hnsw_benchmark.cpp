@@ -5,8 +5,7 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 
 #include "hnswlib/hnswlib.h"
-#include "common/types/alias/primitives.h"
-#include "main/profiler/base_profiler.h"
+#include "base_profiler.h"
 #include "helper.h"
 
 static const char* sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.fvecs";
