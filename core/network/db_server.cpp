@@ -5,6 +5,7 @@
 module;
 
 #include <thread>
+#include <boost/bind.hpp>
 
 module db_server;
 import infinity;
@@ -47,7 +48,7 @@ void DBServer::Run() {
 
     Infinity::instance().config()->PrintAll();
 
-    Printf("Run 'psql -h {} -p {}' to connect to the server.", listen_address_ref, pg_port);
+    Printf("Run 'psql -h {} -p {}' to connect to the server.\n", listen_address_ref, pg_port);
 
     io_service_.run();
 }
@@ -66,7 +67,7 @@ void DBServer::Shutdown() {
 
 void DBServer::CreateConnection() {
     SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
-//    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
+    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
 }
 
 void DBServer::StartConnection(SharedPtr<Connection> &connection) {
