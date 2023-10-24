@@ -104,7 +104,7 @@ def main():
 # main
 if __name__ == "__main__":
     print("generating file")
-    # generate1()
-    # generate2()
+    generate1()
+    generate2()
     print("generate file finsh")
     main()
