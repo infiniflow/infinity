@@ -5,8 +5,8 @@
 
 namespace infinity {
 
-PositionListDecoder::PositionListDecoder(const PositionListFormatOption &option, MemoryPool *sessionPool)
-    : pos_skiplist_reader_(nullptr), session_pool_(sessionPool), pos_encoder_(nullptr), pos_bitmap_reader_(nullptr),
+PositionListDecoder::PositionListDecoder(const PositionListFormatOption &option, MemoryPool *session_pool)
+    : pos_skiplist_reader_(nullptr), session_pool_(session_pool), pos_encoder_(nullptr), pos_bitmap_reader_(nullptr),
       pos_bitmap_block_buffer_(nullptr), pos_bitmap_block_count_(0), total_tf_(0), decoded_pos_count_(0), record_offset_(0), pre_record_ttf_(0),
       offset_in_record_(0), pos_list_begin_(0), last_decode_offset_(0), option_(option), own_pos_bitmap_block_buffer_(false), need_reopen_(true),
       pos_single_slice_(nullptr) {}

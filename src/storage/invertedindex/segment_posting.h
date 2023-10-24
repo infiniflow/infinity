@@ -13,6 +13,9 @@ public:
     SegmentPosting(const PostingFormatOption &posting_option = OPTION_FLAG_ALL);
     ~SegmentPosting();
 
+    docid_t GetBaseDocId() const { return base_doc_id_; }
+    void SetBaseDocId(docid_t base_doc_id) { base_doc_id_ = base_doc_id; }
+
 private:
     std::shared_ptr<ByteSliceList> slice_list_;
     uint32_t base_doc_id_;

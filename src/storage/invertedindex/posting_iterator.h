@@ -3,6 +3,7 @@
 #include "common/memory/memory_pool.h"
 #include "format/posting_list_format.h"
 #include "format/term_meta.h"
+#include "in_doc_pos_iterator.h"
 #include "segment_posting.h"
 #include "storage/io/byte_slice_reader.h"
 
@@ -16,6 +17,8 @@ public:
     TermMeta *GetTermMeta() const { return const_cast<TermMeta *>(&term_meta_); }
 
     docid_t SeekDoc(docid_t docId);
+
+    void SeekPosition(pos_t pos, pos_t &result);
 
     void Reset() {}
 
@@ -34,5 +37,8 @@ private:
     docpayload_t *doc_payload_buffer_;
 
     // BufferedPostingDecoder *decoder_;
+    bool in_doc_pos_iter_inited_;
+    InDocPositionState state_;
+    InDocPositionIterator *in_doc_pos_iterator_;
 };
 } // namespace infinity
