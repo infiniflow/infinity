@@ -22,9 +22,9 @@ target_link_libraries(
         faiss_benchmark
         infinity_core
         faiss
-        gfortran
         roaring
         zsv_parser
+        benchmark_profiler
 )
 
 add_executable(hnsw_benchmark
@@ -35,10 +35,10 @@ add_executable(hnsw_benchmark
 
 target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-
 target_link_libraries(
         hnsw_benchmark
         infinity_core
         roaring
         zsv_parser
+        benchmark_profiler
 )

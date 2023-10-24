@@ -5,7 +5,7 @@
 #include <thread>
 
 
-#include "main/profiler/base_profiler.h"
+#include "base_profiler.h"
 #include "faiss/IndexFlat.h"
 #include "helper.h"
 #include "faiss/IndexIVFFlat.h"

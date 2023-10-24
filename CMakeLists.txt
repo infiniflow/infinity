@@ -58,7 +58,6 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 #set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 #find_package(Boost REQUIRED)
 
-add_subdirectory(src)
 add_subdirectory(core)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
@@ -67,8 +66,6 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 
 # Compile the unit test
-add_subdirectory(test/unittest)
-#add_subdirectory(core/unit_test)
 
 # Compile benchmark
 add_subdirectory(benchmark)

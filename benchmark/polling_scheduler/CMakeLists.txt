@@ -3,8 +3,6 @@ file(GLOB_RECURSE
         scheduler_benchmark_files
         CONFIGURE_DEPENDS
         scheduler_benchmark.cpp
-#        new_scheduler.cpp
-#        new_scheduler.h
         task.cpp
         task.h
         pipeline.cpp
@@ -23,4 +21,5 @@ target_include_directories(polling_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_DI
 target_link_libraries(
         polling_scheduler_benchmark
         infinity_core
+        benchmark_profiler
 )

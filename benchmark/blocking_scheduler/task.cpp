@@ -11,9 +11,9 @@ namespace infinity {
 
 HashSet<i64> NewScheduler::cpu_set{};
 HashMap<i64, UniquePtr<BlockingQueue>> NewScheduler::task_queues{};
-HashMap<i64, UniquePtr<Thread>> NewScheduler::workers{};
+HashMap<i64, UniquePtr<std::thread>> NewScheduler::workers{};
 UniquePtr<BlockingQueue> NewScheduler::input_queue{};
-UniquePtr<Thread> NewScheduler::coordinator{};
+UniquePtr<std::thread> NewScheduler::coordinator{};
 Vector<i64> NewScheduler::cpu_array{};
 u64 NewScheduler::current_cpu_id{};
 
@@ -121,7 +121,7 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
         cpu_array.emplace_back(cpu_id);
 
         UniquePtr<BlockingQueue> task_queue = MakeUnique<BlockingQueue>();
-        UniquePtr<Thread> task_thread = MakeUnique<Thread>(WorkerLoop, task_queue.get(), cpu_id);
+        UniquePtr<std::thread> task_thread = MakeUnique<std::thread>(WorkerLoop, task_queue.get(), cpu_id);
 
         // Pin the thread to specific cpu
         ThreadUtil::pin(*task_thread, cpu_id);
@@ -132,7 +132,7 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
 
     // Start coordinator
     input_queue = MakeUnique<BlockingQueue>();
-    coordinator = MakeUnique<Thread>(CoordinatorLoop, 0);
+    coordinator = MakeUnique<std::thread>(CoordinatorLoop, 0);
     ThreadUtil::pin(*coordinator, 0);
 }
 
