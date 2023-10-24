@@ -46,6 +46,8 @@ void Infinity::UnInit() {
     storage_->UnInit();
     storage_.reset();
 
+    fragment_scheduler_->UnInit();
+
     resource_manager_.reset();
 
     Logger::Shutdown();

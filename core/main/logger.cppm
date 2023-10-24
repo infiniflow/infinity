@@ -29,27 +29,27 @@ public:
 
 export inline void
 LOG_TRACE(const String& msg) {
-    spd_log(msg, spd_log_level::trace);
+    infinity_logger->trace(msg);
 }
 
 export inline void
 LOG_INFO(const String& msg) {
-    spd_log(msg, spd_log_level::info);
+    infinity_logger->info(msg);
 }
 
 export inline void
 LOG_WARN(const String& msg) {
-    spd_log(msg, spd_log_level::warn);
+    infinity_logger->warn(msg);
 }
 
 export inline void
 LOG_ERROR(const String& msg) {
-    spd_log(msg, spd_log_level::err);
+    infinity_logger->error(msg);
 }
 
 export inline void
 LOG_CRITICAL(const String& msg) {
-    spd_log(msg, spd_log_level::critical);
+    infinity_logger->critical(msg);
 }
 
 }

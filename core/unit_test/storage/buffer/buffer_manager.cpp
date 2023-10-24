@@ -1,11 +1,31 @@
 //
 // Created by jinhai on 23-7-10.
 //
-#if 0
-#include "base_test.h"
-#include "main/infinity.h"
-#include "storage/buffer/buffer_manager.h"
-#include "storage/buffer/buffer_task.h"
+
+#include "unit_test/base_test.h"
+
+import infinity;
+import infinity_exception;
+import infinity_assert;
+import stl;
+import global_resource_usage;
+import third_party;
+import logger;
+import table_def;
+import wal_entry;
+import value;
+import parser;
+import data_block;
+import default_values;
+import txn_manager;
+import txn;
+import base_entry;
+import new_catalog;
+import buffer_manager;
+import buffer_handle;
+import object_handle;
+import buffer_task;
+import async_batch_processor;
 
 class BufferMgrTest : public BaseTest {
     void SetUp() override;
@@ -157,4 +177,3 @@ TEST_F(BufferMgrTest, test1) {
     EXPECT_EQ(buffer_mgr.Free(memory_limit - 1), nullptr);
     EXPECT_EQ(buffer_mgr.current_memory_size_, 0);
 }
-#endif

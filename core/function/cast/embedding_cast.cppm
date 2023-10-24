@@ -21,7 +21,7 @@ namespace infinity {
 
 struct EmbeddingTryCastToVarlen;
 
-inline static BoundCastFunc BindEmbeddingCast(DataType &target) {
+export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);

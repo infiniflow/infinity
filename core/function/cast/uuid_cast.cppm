@@ -18,9 +18,9 @@ export module uuid_cast;
 
 namespace infinity {
 
-struct UuidTryCastToVarlen;
+export struct UuidTryCastToVarlen;
 
-inline static BoundCastFunc BindUuidCast(DataType &target) {
+export inline BoundCastFunc BindUuidCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);

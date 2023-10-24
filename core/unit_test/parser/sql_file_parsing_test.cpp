@@ -15,7 +15,7 @@ import logger;
 import null_value;
 import stl;
 
-class SQLFileParsingTest : public BaseTest {
+class SQLFileParsingTest1 : public BaseTest {
     void SetUp() override {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
@@ -30,7 +30,7 @@ class SQLFileParsingTest : public BaseTest {
     }
 };
 
-TEST_F(SQLFileParsingTest, tpch) {
+TEST_F(SQLFileParsingTest1, tpch) {
     using namespace infinity;
     LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
@@ -40,7 +40,9 @@ TEST_F(SQLFileParsingTest, tpch) {
     // Get all tpch sql text;
     String path = String(test_data_path()) + "/tpch";
     Vector<String> files = GetFilesFromDir(path);
-    for(const String& filename: files) {
+    SizeT file_count = files.size();
+    for(SizeT idx = 0; idx < file_count; ++ idx) {
+        const String& filename = files[idx];
         if (filename == "README.md") {
             continue;
         }
@@ -71,7 +73,7 @@ void ReadSQLs(const String &file_path, Vector<String> &sqls) {
 
 } // namespace infinity
 
-TEST_F(SQLFileParsingTest, hyrise) {
+TEST_F(SQLFileParsingTest1, hyrise) {
     using namespace infinity;
     LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
@@ -100,7 +102,7 @@ TEST_F(SQLFileParsingTest, hyrise) {
     }
 }
 
-TEST_F(SQLFileParsingTest, infinity) {
+TEST_F(SQLFileParsingTest1, infinity) {
     using namespace infinity;
     LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 

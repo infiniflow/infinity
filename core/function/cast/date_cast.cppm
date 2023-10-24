@@ -18,10 +18,10 @@ export module date_cast;
 
 namespace infinity {
 
-struct DateTryCastToFixlen;
-struct DateTryCastToVarlen;
+export struct DateTryCastToFixlen;
+export struct DateTryCastToVarlen;
 
-inline static BoundCastFunc BindDateCast(DataType &target) {
+export inline BoundCastFunc BindDateCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kDateTime: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<DateT, DateTimeT, DateTryCastToFixlen>);

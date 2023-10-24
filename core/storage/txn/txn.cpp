@@ -43,7 +43,7 @@ UniquePtr<String> Txn::GetTableEntry(const String &db_name, const String &table_
     if (db_name_.empty()) {
         db_name_ = db_name;
     } else {
-        if (IsEqual(db_name_, db_name)) {
+        if (!IsEqual(db_name_, db_name)) {
             String err_msg = Format("Attempt to get table {} from another database {}", db_name, table_name);
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);

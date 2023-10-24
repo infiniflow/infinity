@@ -12,7 +12,6 @@ export namespace infinity {
 
 // Each message has the length field to indicate the message size.
 constexpr auto LENGTH_FIELD_SIZE = 4u;
-constexpr auto PG_MSG_BUFFER_SIZE = 4096u;
 
 constexpr char NULL_END = '\0';
 

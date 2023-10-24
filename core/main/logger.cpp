@@ -38,6 +38,7 @@ void Logger::Initialize(const Config *config_ptr) {
 
         SetLogLevel(config_ptr->log_level());
 
+        LOG_TRACE("Logger is initialized.");
     } catch (const StlException &e) {
         Printf("Initialize logger failed: {}", e.what());
         throw e;
@@ -49,6 +50,7 @@ void Logger::Shutdown() {
         ShutdownLogger();
         stdout_sinker = nullptr;
         rotating_file_sinker = nullptr;
+        infinity_logger = nullptr;
     }
 }
 

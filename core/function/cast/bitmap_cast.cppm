@@ -17,9 +17,9 @@ export module bitmap_cast;
 
 namespace infinity {
 
-struct BitmapTryCastToVarlen;
+export struct BitmapTryCastToVarlen;
 
-inline static BoundCastFunc BindBitmapCast(DataType &target) {
+export inline BoundCastFunc BindBitmapCast(DataType &target) {
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BitmapT, VarcharT, BitmapTryCastToVarlen>);
@@ -33,16 +33,15 @@ inline static BoundCastFunc BindBitmapCast(DataType &target) {
 struct BitmapTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        FunctionError("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
+        Error<FunctionException>("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>(),
+                                 __FILE_NAME__,
+                                 __LINE__);
     }
 };
 
 template <>
 inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    Error<FunctionException>(
-            "Not implemented",
-            __FILE_NAME__,
-            __LINE__);
+    Error<FunctionException>("Not implemented", __FILE_NAME__, __LINE__);
 }
 
 } // namespace infinity

@@ -14,15 +14,15 @@ import infinity_assert;
 import infinity_exception;
 import third_party;
 
-export module deciaml_cast;
+export module decimal_cast;
 
 namespace infinity {
 
-struct FloatTryCastToFixlen;
-struct FloatTryCastToVarlen;
+export struct DecimalTryCastToFixlen;
+export struct DecimalTryCastToVarlen;
 
-template <class SourceType>
-static inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
+export template <class SourceType>
+inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
     Assert<FunctionException>(source.type() != target.type(),
                               Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()),
                               __FILE_NAME__,

@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import new_catalog;
 import parser;
@@ -23,22 +25,22 @@ SharedPtr<FunctionSet> FunctionSet::GetFunctionSet(NewCatalog *catalog, const Fu
 }
 
 String FunctionSet::ToString(const String &name, const Vector<SharedPtr<BaseExpression>> &arguments) {
-//    std::stringstream ss;
-//
-//    ss << name;
-//    auto argument_count = arguments.size();
-//    if (argument_count == 0) {
-//        ss << "()";
-//
-//    } else {
-//        ss << "(";
-//        for (auto i = 0; i < argument_count - 1; ++i) {
-//            ss << arguments[i]->Type().ToString() << ", ";
-//        }
-//        ss << arguments.back()->Type().ToString();
-//        ss << ")";
-//    }
-//    return ss.str();
+    std::stringstream ss;
+
+    ss << name;
+    auto argument_count = arguments.size();
+    if (argument_count == 0) {
+        ss << "()";
+
+    } else {
+        ss << "(";
+        for (auto i = 0; i < argument_count - 1; ++i) {
+            ss << arguments[i]->Type().ToString() << ", ";
+        }
+        ss << arguments.back()->Type().ToString();
+        ss << ")";
+    }
+    return ss.str();
 }
 
 } // namespace infinity

@@ -29,7 +29,7 @@ namespace infinity {
 
 FragmentScheduler::FragmentScheduler(const Config *config_ptr) { Init(config_ptr); }
 
-FragmentScheduler::~FragmentScheduler() { UnInit(); }
+FragmentScheduler::~FragmentScheduler() {}
 
 void FragmentScheduler::Init(const Config *config_ptr) {
     u64 total_cpu_count = config_ptr->total_cpu_number();

@@ -97,7 +97,7 @@ QueryResult QueryContext::Query(const String &query) {
     parser->Parse(query, parsed_result);
 
     if (parsed_result->IsError()) {
-        Error<ParserException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
     }
     LogicalPlanner logical_planner(this);
     Optimizer optimizer(this);

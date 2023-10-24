@@ -60,5 +60,6 @@ auto main(int argc, char **argv) -> int {
     infinity::DBServer db_server(parameters);
     db_server.Run();
 
+    db_server.Shutdown();
     return 0;
 }

@@ -15,16 +15,17 @@ import file_system;
 import local_file_system;
 import file_writer;
 import file_reader;
+import infinity;
 
 class FileWriteReadTest : public BaseTest {
     void SetUp() override {
         infinity::GlobalResourceUsage::Init();
-//        std::shared_ptr<std::string> config_path = nullptr;
-//        infinity::Infinity::instance().Init(config_path);
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::Infinity::instance().Init(config_path);
     }
 
     void TearDown() override {
-//        infinity::Infinity::instance().UnInit();
+        infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
