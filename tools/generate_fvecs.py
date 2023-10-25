@@ -1,8 +1,10 @@
-import random
 import numpy as np
+import random
 import os
+import argparse
 
-def generate():
+
+def generate(generate_if_exists: bool):
     row_n = 1000
     dim = 128
     fvecs_dir = "./test/data/fvecs"
@@ -11,13 +13,16 @@ def generate():
     table_name = "test_fvecs"
     fvecs_path = fvecs_dir + "/test.fvecs"
     slt_path = slt_dir + "/test_fvecs.slt"
-    copy_path = "/tmp/infinity/sqllogictest" + "/test.fvecs"
 
     os.makedirs(fvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    # if os.path.exists(fvecs_path) and os.path.exists(slt_path):
-    #     print("file exists, exit")
-    #     return
+    if os.path.exists(fvecs_path) and os.path.exists(slt_path) and generate_if_exists:
+        print(
+            "File {} and {} already existed exists. Skip Generating.".format(
+                slt_path, fvecs_path
+            )
+        )
+        return
     with open(fvecs_path, "wb") as fvecs_file, open(slt_path, "w") as slt_file:
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
@@ -29,9 +34,9 @@ def generate():
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '".format(table_name)
-            + copy_path
-            + "' WITH ( DELIMITER ',', FORMAT fvecs);\n"
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT fvecs);\n".format(
+                table_name, fvecs_path
+            )
         )
         slt_file.write("----\n")
         slt_file.write("\n")
@@ -54,4 +59,14 @@ def generate():
 
 
 if __name__ == "__main__":
-    generate()
+    parser = argparse.ArgumentParser(description="Generate fvecs data for test")
+
+    parser.add_argument(
+        "-g",
+        "--generate",
+        type=bool,
+        default=False,
+        dest="generate_if_exists",
+    )
+    args = parser.parse_args()
+    generate(args.generate_if_exists)

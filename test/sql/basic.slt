@@ -22,7 +22,7 @@ CREATE TABLE NATION (N_NATIONKEY  INT, N_REGIONKEY INT );
 
 # copy data from csv file
 query I
-COPY NATION FROM '/tmp/infinity/sqllogictest/nation.csv' WITH ( DELIMITER ',' );
+COPY NATION FROM './test/data/csv/nation.csv' WITH ( DELIMITER ',' );
 ----
 
 query I
