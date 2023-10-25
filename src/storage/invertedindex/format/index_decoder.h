@@ -19,6 +19,11 @@ public:
     virtual void InitSkipList(uint32_t start, uint32_t end, ByteSliceList *posting_list, df_t df) {}
 
     virtual void InitSkipList(uint32_t start, uint32_t end, ByteSlice *posting_list, df_t df) {}
+
+    uint32_t InnerGetSeekedDocCount() const { return skiped_item_count_ << MAX_DOC_PER_RECORD_BIT_NUM; }
+
+protected:
+    uint32_t skiped_item_count_ = {0};
 };
 
 template <typename SkipListType>
@@ -62,6 +67,7 @@ public:
             return false;
         }
         current_ttf = skiplist_reader_->GetPrevTTF();
+        skiped_item_count_ = skiplist_reader_->GetSkippedItemCount();
 
         doc_list_reader_->Seek(offset + this->doc_list_begin_pos_);
         doc_id_encoder_->Decode((uint32_t *)doc_buffer, MAX_DOC_PER_RECORD, *doc_list_reader_);

@@ -12,6 +12,12 @@ public:
         : pos_decoder_(nullptr), record_offset_(0), offset_in_record_(0), total_position_count_(0) {}
     virtual ~InDocPositionState() = default;
 
+    void SetDocId(docid_t doc_id) { doc_id_ = doc_id; }
+
+    docid_t GetDocId() const { return doc_id_; }
+
+    void SetTermFreq(tf_t tf) { tf_ = tf; }
+
     tf_t GetTermFreq();
 
     void SetPositionListDecoder(PositionListDecoder *pos_decoder) { pos_decoder_ = pos_decoder; }

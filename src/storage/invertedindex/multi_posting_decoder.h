@@ -24,6 +24,12 @@ public:
 
     void DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payload_buffer);
 
+    InDocPositionIterator *GetInDocPositionIterator() { return in_doc_pos_iterator_; }
+
+    const PostingFormatOption &GetPostingFormatOption() const { return cur_segment_format_option_; }
+
+    uint32_t InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
+
 private:
     bool DecodeDocBufferInOneSegment(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
 
