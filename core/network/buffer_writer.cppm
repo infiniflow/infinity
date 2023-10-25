@@ -16,7 +16,7 @@ namespace infinity {
 
 export class BufferWriter {
 public:
-    explicit BufferWriter(const SharedPtr<AsioSocket>& socket) : socket_(socket) {}
+    explicit BufferWriter(const SharedPtr<AsioSocket> &socket) : socket_(socket) {}
 
     [[nodiscard]] SizeT size() const;
 
