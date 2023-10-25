@@ -1,13 +1,22 @@
 import os
 import random
+import argparse
 
 
 def generate_test_varchar(
-    slt_path: str, csv_path: str, num: int, dim: int, copy_path: str
+    slt_path: str,
+    csv_path: str,
+    num: int,
+    dim: int,
+    generate_if_exists: bool,
 ):
-    # if os.path.exists(slt_path) and os.path.exists(csv_path):
-    #     print("file exists, exit")
-    #     return
+    if os.path.exists(slt_path) and os.path.exists(csv_path) and not generate_if_exists:
+        print(
+            "File {} and {} already existed exists. Skip Generating.".format(
+                slt_path, csv_path
+            )
+        )
+        return
     low, high = 0, 100
     table_name = "big_varchar_table"
     with open(slt_path, "w") as slt_file, open(csv_path, "w") as csv_file:
@@ -23,9 +32,7 @@ def generate_test_varchar(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '".format(table_name)
-            + copy_path
-            + "' WITH ( DELIMITER ',' );\n"
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, csv_path)
         )
         slt_file.write("----\n")
         slt_file.write("\n")
@@ -48,10 +55,18 @@ def generate_test_varchar(
 
 
 def generate_test_embedding(
-    slt_path: str, csv_path: str, num: int, dim: int, copy_path: str
+    slt_path: str,
+    csv_path: str,
+    num: int,
+    dim: int,
+    generate_if_exists: bool,
 ):
-    if os.path.exists(slt_path) and os.path.exists(csv_path):
-        print("The target {} and {} already exists. Return.".format(slt_path, csv_path))
+    if os.path.exists(slt_path) and os.path.exists(csv_path) and not generate_if_exists:
+        print(
+            "File {} and {} already existed exists. Skip Generating.".format(
+                slt_path, csv_path
+            )
+        )
         return
     low, high = 0, 1000
     table_name = "big_embedding_table"
@@ -70,9 +85,7 @@ def generate_test_embedding(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '".format(table_name)
-            + copy_path
-            + "' WITH ( DELIMITER ',' );\n"
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, csv_path)
         )
         slt_file.write("----\n")
         slt_file.write("\n")
@@ -97,17 +110,8 @@ def generate_test_embedding(
         slt_file.write("DROP TABLE {};\n".format(table_name))
 
 
-# def execute_slt(slt_path: str, log_path: str):
-#     with open(log_path, "w") as log_file:
-#         log_file = open(log_path, "w")
-#         Popen = subprocess.Popen(
-#             ["sqllogictest", slt_path], stdout=log_file, stderr=log_file
-#         )
-#         Popen.wait()
-
-
-def generate():
-    print("Note: this script must be run under root directory of the project!")
+def generate(generate_if_exists):
+    print("Note: this script must be run under root directory of the project.")
     row_n = 1000
     dim = 128
     slt_dir = "./test/sql/dml/import"
@@ -116,16 +120,23 @@ def generate():
     os.makedirs(slt_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
 
-    tmp_dir = "/tmp/infinity/sqllogictest"
     slt_path = slt_dir + "/test_big_embedding.slt"
     csv_path = csv_dir + "/big_embedding.csv"
-    copy_path = tmp_dir + "/big_embedding.csv"
-    # generate_test_embedding(slt_path, csv_path, row_n, dim, copy_path)
+    generate_test_embedding(slt_path, csv_path, row_n, dim, generate_if_exists)
     slt_path = slt_dir + "/test_big_varchar.slt"
     csv_path = csv_dir + "/big_varchar.csv"
-    copy_path = tmp_dir + "/big_varchar.csv"
-    generate_test_varchar(slt_path, csv_path, row_n, dim, copy_path)
+    generate_test_varchar(slt_path, csv_path, row_n, dim, generate_if_exists)
 
 
 if __name__ == "__main__":
-    generate()
+    parser = argparse.ArgumentParser(description="Generate big data for test")
+
+    parser.add_argument(
+        "-g",
+        "--generate",
+        type=bool,
+        default=False,
+        dest="generate_if_exists",
+    )
+    args = parser.parse_args()
+    generate(args.generate_if_exists)
