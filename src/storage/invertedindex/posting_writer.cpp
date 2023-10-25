@@ -6,10 +6,10 @@ PostingWriter::PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_po
     : byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), posting_option_(posting_option),
       posting_format_(new PostingFormat(posting_option)) {
     if (posting_option.HasPositionList()) {
-        pos_list_encoder_ = new PositionListEncoder(posting_option_.GetPosListFormatOption(),
-                                                    byte_slice_pool_,
-                                                    buffer_pool_,
-                                                    posting_format_->GetPositionListFormat());
+        position_list_encoder_ = new PositionListEncoder(posting_option_.GetPosListFormatOption(),
+                                                         byte_slice_pool_,
+                                                         buffer_pool_,
+                                                         posting_format_->GetPositionListFormat());
     }
     if (posting_option.HasTfBitmap()) {
         doc_list_encoder_ =
@@ -18,8 +18,8 @@ PostingWriter::PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_po
 }
 
 PostingWriter::~PostingWriter() {
-    if (pos_list_encoder_) {
-        delete pos_list_encoder_;
+    if (position_list_encoder_) {
+        delete position_list_encoder_;
     }
     if (doc_list_encoder_) {
         delete doc_list_encoder_;
@@ -28,8 +28,8 @@ PostingWriter::~PostingWriter() {
 
 void PostingWriter::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
     doc_list_encoder_->EndDocument(doc_id, doc_payload);
-    if (pos_list_encoder_) {
-        pos_list_encoder_->EndDocument();
+    if (position_list_encoder_) {
+        position_list_encoder_->EndDocument();
     }
 }
 
@@ -43,8 +43,23 @@ void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf);
 
 void PostingWriter::Write(const std::shared_ptr<FileWriter> &file_writer) {
     doc_list_encoder_->Dump(file_writer);
-    if (pos_list_encoder_) {
-        pos_list_encoder_->Dump(file_writer);
+    if (position_list_encoder_) {
+        position_list_encoder_->Dump(file_writer);
     }
+}
+
+InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder(MemoryPool *session_pool) const {
+    InMemPostingDecoder *posting_decoder =
+        session_pool ? (new ((session_pool)->Allocate(sizeof(InMemPostingDecoder))) InMemPostingDecoder()) : new InMemPostingDecoder();
+
+    InMemDocListDecoder *doc_list_decoder = doc_list_encoder_->GetInMemDocListDecoder(session_pool);
+    posting_decoder->SetDocListDecoder(doc_list_decoder);
+
+    if (position_list_encoder_ != NULL) {
+        InMemPositionListDecoder *position_list_decoder = position_list_encoder_->GetInMemPositionListDecoder(session_pool);
+        posting_decoder->SetPositionListDecoder(position_list_decoder);
+    }
+
+    return posting_decoder;
 }
 } // namespace infinity

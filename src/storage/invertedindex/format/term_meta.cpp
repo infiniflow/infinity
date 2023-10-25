@@ -3,8 +3,8 @@
 
 namespace infinity {
 
-TermInfoLoader::TermInfoLoader(const PostingFormatOption &option) : option_(option) {}
-void TermInfoLoader::Load(ByteSliceReader *byte_slice_reader, TermInfo &term_meta) const {
+TermMetaLoader::TermMetaLoader(const PostingFormatOption &option) : option_(option) {}
+void TermMetaLoader::Load(ByteSliceReader *byte_slice_reader, TermMeta &term_meta) const {
     df_t df = (df_t)byte_slice_reader->ReadVUInt32();
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
@@ -21,7 +21,7 @@ void TermInfoLoader::Load(ByteSliceReader *byte_slice_reader, TermInfo &term_met
     }
 }
 
-void TermInfoLoader::Load(const std::shared_ptr<FileReader> &reader, TermInfo &term_meta) const {
+void TermMetaLoader::Load(const std::shared_ptr<FileReader> &reader, TermMeta &term_meta) const {
     df_t df = (df_t)reader->ReadVInt();
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
@@ -38,7 +38,7 @@ void TermInfoLoader::Load(const std::shared_ptr<FileReader> &reader, TermInfo &t
     }
 }
 
-void TermInfoLoader::Load(uint8_t *&data_cursor, size_t &left_size, TermInfo &term_meta) const {
+void TermMetaLoader::Load(uint8_t *&data_cursor, size_t &left_size, TermMeta &term_meta) const {
     auto df = VByteCompressor::DecodeVInt32(data_cursor, (uint32_t &)left_size);
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
@@ -58,7 +58,7 @@ void TermInfoLoader::Load(uint8_t *&data_cursor, size_t &left_size, TermInfo &te
     }
 }
 
-uint32_t TermInfoDumper::CalculateStoreSize(const TermInfo &term_meta) const {
+uint32_t TermMetaDumper::CalculateStoreSize(const TermMeta &term_meta) const {
     uint32_t len = VByteCompressor::GetVInt32Length(term_meta.GetDocFreq());
     if (option_.HasTermFrequency()) {
         len += VByteCompressor::GetVInt32Length(term_meta.GetTotalTermFreq());
@@ -69,7 +69,7 @@ uint32_t TermInfoDumper::CalculateStoreSize(const TermInfo &term_meta) const {
     return len;
 }
 
-void TermInfoDumper::Dump(const std::shared_ptr<FileWriter> &file, const TermInfo &term_meta) const {
+void TermMetaDumper::Dump(const std::shared_ptr<FileWriter> &file, const TermMeta &term_meta) const {
     file->WriteVInt(term_meta.GetDocFreq());
     if (option_.HasTermFrequency()) {
         file->WriteVInt(term_meta.GetTotalTermFreq());

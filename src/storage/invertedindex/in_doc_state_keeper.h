@@ -18,6 +18,8 @@ public:
 
     void MoveToSegment(ByteSlice *pos_list, tf_t total_tf, uint32_t pos_list_begin, const PositionListFormatOption &option);
 
+    void MoveToSegment(ByteSliceList *pos_list, tf_t total_tf, uint32_t pos_list_begin, const PositionListFormatOption &option);
+
     void MoveToSegment(InMemPositionListDecoder *pos_decoder);
 
 private:

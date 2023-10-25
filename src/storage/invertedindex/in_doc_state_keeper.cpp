@@ -18,12 +18,21 @@ void InDocStateKeeper::MoveToDoc(ttf_t current_ttf) {
     decoder->SkipTo(current_ttf, state_);
 }
 
-void InDocStateKeeper::MoveToSegment(ByteSlice *posList, tf_t total_tf, uint32_t pos_list_begin, const PositionListFormatOption &option) {
+void InDocStateKeeper::MoveToSegment(ByteSlice *pos_list, tf_t total_tf, uint32_t pos_list_begin, const PositionListFormatOption &option) {
     PositionListDecoder *decoder = session_pool_
                                        ? (new ((session_pool_)->Allocate(sizeof(PositionListDecoder))) PositionListDecoder(option, session_pool_))
                                        : new PositionListDecoder(option, session_pool_);
     pos_decoders_.push_back(decoder);
-    decoder->Init(posList, total_tf, pos_list_begin, state_);
+    decoder->Init(pos_list, total_tf, pos_list_begin, state_);
+    state_->SetPositionListDecoder(decoder);
+}
+
+void InDocStateKeeper::MoveToSegment(ByteSliceList *pos_list, tf_t total_tf, uint32_t pos_list_begin, const PositionListFormatOption &option) {
+    PositionListDecoder *decoder = session_pool_
+                                       ? (new ((session_pool_)->Allocate(sizeof(PositionListDecoder))) PositionListDecoder(option, session_pool_))
+                                       : new PositionListDecoder(option, session_pool_);
+    pos_decoders_.push_back(decoder);
+    decoder->Init(pos_list, total_tf, pos_list_begin, state_);
     state_->SetPositionListDecoder(decoder);
 }
 

@@ -10,7 +10,7 @@ PostingDecoder::PostingDecoder(const PostingFormatOption &posting_format_option)
 
 PostingDecoder::~PostingDecoder() {}
 
-void PostingDecoder::Init(TermInfo *term_meta,
+void PostingDecoder::Init(TermMeta *term_meta,
                           const std::shared_ptr<ByteSliceReader> &posting_list_reader,
                           const std::shared_ptr<ByteSliceReader> &position_list_reader,
                           const std::shared_ptr<Bitmap> &tf_bitmap,
@@ -32,7 +32,7 @@ void PostingDecoder::Init(TermInfo *term_meta,
     InitPosListEncoder(posting_format_option_.GetPosListFormatOption(), term_meta_->GetTotalTermFreq());
 }
 
-void PostingDecoder::Init(TermInfo *term_meta, bool is_doc_list, bool df_first) {
+void PostingDecoder::Init(TermMeta *term_meta, bool is_doc_list, bool df_first) {
     term_meta_ = term_meta;
     posting_list_reader_.reset();
     position_list_reader_.reset();

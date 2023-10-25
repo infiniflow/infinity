@@ -13,14 +13,14 @@ public:
     PostingDecoder(const PostingFormatOption &option);
     ~PostingDecoder();
 
-    void Init(TermInfo *term_meta,
+    void Init(TermMeta *term_meta,
               const std::shared_ptr<ByteSliceReader> &posting_list_reader,
               const std::shared_ptr<ByteSliceReader> &position_list_reader,
               const std::shared_ptr<Bitmap> &tf_bitmap,
               size_t posting_data_len);
 
     // init for dict inline compress
-    void Init(TermInfo *term_meta, bool is_doc_list, bool df_first);
+    void Init(TermMeta *term_meta, bool is_doc_list, bool df_first);
 
     // virtual for test
     virtual uint32_t DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, size_t len);
@@ -41,7 +41,7 @@ private:
     virtual void InitDocListEncoder(const DocListFormatOption &doc_list_format_option, df_t df);
     virtual void InitPosListEncoder(const PositionListFormatOption &pos_list_format_option, ttf_t total_tf);
 
-    TermInfo *term_meta_;
+    TermMeta *term_meta_;
 
     std::shared_ptr<ByteSliceReader> posting_list_reader_;
     std::shared_ptr<ByteSliceReader> position_list_reader_;

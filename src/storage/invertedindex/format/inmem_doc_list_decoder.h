@@ -3,11 +3,12 @@
 #include "buffered_byte_slice.h"
 #include "buffered_byte_slice_reader.h"
 #include "common/memory/memory_pool.h"
+#include "index_decoder.h"
 #include "skiplist_reader.h"
 
 namespace infinity {
 
-class InMemDocListDecoder {
+class InMemDocListDecoder : public IndexDecoder {
 public:
     struct DocBufferInfo {
         DocBufferInfo(docid_t *&doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf)

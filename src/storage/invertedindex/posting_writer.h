@@ -22,7 +22,7 @@ public:
 
     uint32_t GetDF() const;
 
-    docpayload_t GetLastDocPayload() const {};
+    docpayload_t GetLastDocPayload() const { return 0; };
 
     void SetCurrentTF(tf_t tf);
 
@@ -30,12 +30,14 @@ public:
 
     void Write(const std::shared_ptr<FileWriter> &file_writer);
 
+    InMemPostingDecoder *CreateInMemPostingDecoder(MemoryPool *session_pool) const;
+
 private:
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
     PostingFormatOption posting_option_;
     PostingFormat *posting_format_;
     DocListEncoder *doc_list_encoder_ = nullptr;
-    PositionListEncoder *pos_list_encoder_ = nullptr;
+    PositionListEncoder *position_list_encoder_ = nullptr;
 };
 } // namespace infinity

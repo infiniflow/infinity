@@ -4,11 +4,11 @@
 
 namespace infinity {
 
-class SkipIndexDecoder {
+class IndexDecoder {
 public:
-    SkipIndexDecoder() {}
+    IndexDecoder() {}
 
-    virtual ~SkipIndexDecoder() = default;
+    virtual ~IndexDecoder() = default;
 
     virtual bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf) = 0;
 
@@ -22,16 +22,16 @@ public:
 };
 
 template <typename SkipListType>
-class SkipListDecoder : public SkipIndexDecoder {
+class SkipIndexDecoder : public IndexDecoder {
 public:
-    SkipListDecoder(MemoryPool *session_pool, ByteSliceReader *doc_list_reader, uint32_t doc_list_begin)
+    SkipIndexDecoder(MemoryPool *session_pool, ByteSliceReader *doc_list_reader, uint32_t doc_list_begin)
         : skiplist_reader_(nullptr), session_pool_(session_pool), doc_list_reader_(doc_list_reader), doc_list_begin_pos_(doc_list_begin) {
         doc_id_encoder_ = GetDocIDEncoder();
         tf_list_encoder_ = GetTFEncoder();
         doc_payload_encoder_ = GetDocPayloadEncoder();
     }
 
-    virtual ~SkipListDecoder() {
+    virtual ~SkipIndexDecoder() {
         if (skiplist_reader_) {
             if (session_pool_) {
                 skiplist_reader_->~SkipListType();
