@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import bitmask_buffer;
 import global_resource_usage;
 import infinity_assert;
@@ -84,18 +86,18 @@ void Bitmask::Resize(SizeT new_count) {
 }
 
 String Bitmask::ToString(SizeT from, SizeT to) {
-//    std::stringstream ss;
-//    ss << "BITMASK(" << to - from << "): ";
-//    if (data_ptr_ == nullptr) {
-//        for (SizeT i = from; i <= to; ++i) {
-//            ss << 1;
-//        }
-//    } else {
-//        for (SizeT i = from; i < to; ++i) {
-//            ss << (IsTrue(i) ? 1 : 0);
-//        }
-//    }
-//    return ss.str();
+    std::stringstream ss;
+    ss << "BITMASK(" << to - from << "): ";
+    if (data_ptr_ == nullptr) {
+        for (SizeT i = from; i <= to; ++i) {
+            ss << 1;
+        }
+    } else {
+        for (SizeT i = from; i < to; ++i) {
+            ss << (IsTrue(i) ? 1 : 0);
+        }
+    }
+    return ss.str();
 }
 
 bool Bitmask::IsAllTrue() const {

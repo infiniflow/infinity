@@ -7,6 +7,7 @@ module;
 import stl;
 import parser;
 import data_access_state;
+import index_entry;
 
 export module txn_store;
 
@@ -26,6 +27,8 @@ public:
 
     UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
 
+    UniquePtr<String> CreateIndexFile(u64 segment_id, SharedPtr<IndexEntry> index);
+
     UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
     void Scan(SharedPtr<DataBlock> &output_block);
@@ -34,12 +37,14 @@ public:
 
     void PrepareCommit();
 
-    void Commit();
+    void Commit() const;
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
     Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
+    HashMap<u64, SharedPtr<IndexEntry>> uncommitted_indexes_{};
     UniquePtr<AppendState> append_state_{};
+    DeleteState delete_state_{};
 
     SizeT current_block_id_{0};
 

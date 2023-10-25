@@ -422,12 +422,12 @@ void LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPt
     } else {
         PlannerException("Invalid index method type.");
     }
-    auto index_def_common = IndexDefCommon(Move(index_name), Move(method_type), Move(column_names));
+    // auto index_def_common = IndexDefCommon(Move(index_name), Move(method_type), Move(column_names));
 
     SharedPtr<IndexDef> index_def_ptr = nullptr;
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
-            index_def_ptr = IVFFlatIndexDef::Make(Move(index_def_common), *create_index_info->index_para_list_);
+            index_def_ptr = IVFFlatIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
             break;
         }
         case IndexMethod::kInvalid: {
@@ -531,10 +531,14 @@ void LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<Bi
     auto *drop_index_info = (DropIndexInfo *)statement->drop_info_.get();
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_index_info->schema_name_);
+    SharedPtr<String> table_name_ptr = MakeShared<String>(drop_index_info->table_name_);
     SharedPtr<String> index_name_ptr = MakeShared<String>(drop_index_info->index_name_);
 
-    SharedPtr<LogicalNode> logical_drop_index =
-        MakeShared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(), schema_name_ptr, index_name_ptr, drop_index_info->conflict_type_);
+    SharedPtr<LogicalNode> logical_drop_index = MakeShared<LogicalDropIndex>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                             schema_name_ptr,
+                                                                             table_name_ptr,
+                                                                             index_name_ptr,
+                                                                             drop_index_info->conflict_type_);
 
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back("OK");
@@ -643,10 +647,22 @@ void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindCon
         case ShowStmtType::kColumns: {
             return BuildShowColumns(statement, bind_context_ptr);
         }
+        case ShowStmtType::kIndexes: {
+            return BuildShowIndexes(statement, bind_context_ptr);
+        }
         default: {
             Error<PlannerException>("Unexpected show statement type.", __FILE_NAME__, __LINE__);
         }
     }
+}
+
+void LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndexes,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
 }
 
 void LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {

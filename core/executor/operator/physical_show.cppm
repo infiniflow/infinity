@@ -60,6 +60,8 @@ private:
     /// Execute push based describe table
     void ExecuteShowColumns(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
 
+    void ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};

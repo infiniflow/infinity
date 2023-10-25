@@ -32,9 +32,11 @@ public:
 
     static SharedPtr<String> ToString(DBMeta *db_meta);
 
-    static Json Serialize(const DBMeta *db_meta);
+    static Json Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBMeta> Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr);
+
+    void MergeFrom(DBMeta &other);
 
 public:
     RWMutex rw_locker_{};

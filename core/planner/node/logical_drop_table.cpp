@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import logical_node_type;
@@ -28,16 +30,16 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalDropTable::GetOutputTypes() const 
 }
 
 String LogicalDropTable::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_ << "." << *table_name_;
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Drop Table: " << *schema_name_ << "." << *table_name_;
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 } // namespace infinity

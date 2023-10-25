@@ -15,6 +15,8 @@ export enum EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
+    kIndexDef,
+    kIndex,
     kView,
     kColumn,
     kSegment,
@@ -28,6 +30,7 @@ export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {}
 
     virtual ~BaseEntry() = default;
+    virtual void MergeFrom(BaseEntry &other) {}
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
@@ -64,5 +67,8 @@ export struct EntryResult {
         return *err_.get();
     }
 };
+
+// Merge two reverse-ordered list inplace.
+export void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &list2);
 
 } // namespace infinity

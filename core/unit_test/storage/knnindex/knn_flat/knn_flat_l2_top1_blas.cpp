@@ -14,20 +14,8 @@ import parser;
 import knn_flat_l2_top1_blas;
 import infinity;
 
-class KnnFlatL2Top1BlasTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
+class KnnFlatL2Top1BlasTest : public BaseTest {};
 
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
 TEST_F(KnnFlatL2Top1BlasTest, test1) {
     using namespace infinity;
 

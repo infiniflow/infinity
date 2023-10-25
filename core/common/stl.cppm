@@ -43,6 +43,9 @@ export {
     using Vector = std::vector<T>;
 
     template <typename T>
+    using Deque = std::deque<T>;
+
+    template <typename T>
     using List = std::list<T>;
 
     template <typename T>
@@ -237,6 +240,7 @@ export {
     using const_ptr_t = const char *;
     using char_t = char;
     using SizeT = size_t;
+    using StreamSize = std::streamsize;
 
     using TxnTimeStamp = u64;
 

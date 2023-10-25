@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import selection;
 import infinity_assert;
@@ -50,6 +52,21 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
     capacity_ = column_vectors[0]->capacity();
     initialized = true;
     this->Finalize();
+}
+
+SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
+    auto data_block = DataBlock::Make();
+    SizeT capacity = input->row_count();
+    if (capacity) {
+        // because size of bitmap in datablock need to be power of 2
+        if (__builtin_popcount(capacity) > 1) {
+            capacity = 1 << (sizeof(SizeT) * 8 - __builtin_clz(capacity));
+        }
+        data_block->Init(input, 0, capacity);
+        data_block->row_count_ = input->row_count();
+    }
+    input->Reset();
+    return data_block;
 }
 
 void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
@@ -154,11 +171,11 @@ void DataBlock::Finalize() {
 }
 
 String DataBlock::ToString() const {
-    StringStream ss;
-    //    for (SizeT idx = 0; idx < column_count_; ++idx) {
-    //        ss << "column " << idx << Endl;
-    //        ss << column_vectors[idx]->ToString() << Endl;
-    //    }
+    std::stringstream ss;
+    for (SizeT idx = 0; idx < column_count_; ++idx) {
+        ss << "column " << idx << std::endl;
+        ss << column_vectors[idx]->ToString() << std::endl;
+    }
     return ss.str();
 }
 

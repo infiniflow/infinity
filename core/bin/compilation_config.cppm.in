@@ -54,4 +54,8 @@ export char* test_data_path() {
     return (char*)TEST_DATA_PATH;
 }
 
+export char* csv_data_path() {
+    return (char*)CSV_DATA_PATH;
+}
+
 }

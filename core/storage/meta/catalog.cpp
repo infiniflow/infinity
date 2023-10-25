@@ -4,6 +4,8 @@
 
 module;
 
+#include <vector>
+
 import stl;
 import base_entry;
 import txn_manager;
@@ -25,7 +27,19 @@ module new_catalog;
 
 namespace infinity {
 
-NewCatalog::NewCatalog(SharedPtr<String> dir) : current_dir_(Move(dir)) {}
+NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(Move(dir)) {
+    if (create_default_db) {
+        // db current dir is same level as catalog
+        Path catalog_path(*this->current_dir_);
+        Path parent_path = catalog_path.parent_path();
+        auto data_dir = MakeShared<String>(parent_path.string());
+        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, 0, 0);
+        db_entry->commit_ts_ = 0;
+        db_meta->entry_list_.emplace_front(Move(db_entry));
+        this->databases_["default"] = Move(db_meta);
+    }
+}
 
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
@@ -116,25 +130,6 @@ void NewCatalog::RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 t
     DBMeta::DeleteNewEntry(db_meta, txn_id, txn_mgr);
 }
 
-Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts) {
-
-    Vector<DBEntry *> results;
-    catalog->rw_locker_.lock_shared();
-
-    results.reserve(catalog->databases_.size());
-    for (const auto &db : catalog->databases_) {
-        EntryResult result = DBMeta::GetEntry(db.second.get(), txn_id, begin_ts);
-        if (result.err_.get() != nullptr) {
-            LOG_WARN(Format("Get database entry error: {}", *result.err_));
-        } else {
-            results.emplace_back((DBEntry *)result.entry_);
-        }
-    }
-    catalog->rw_locker_.unlock_shared();
-
-    return results;
-}
-
 SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);
@@ -190,32 +185,63 @@ void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) 
     catalog->table_functions_.erase(function_name);
 }
 
-Json NewCatalog::Serialize(const NewCatalog *catalog) {
+Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
+    Vector<DBMeta *> databases;
+    {
+        SharedLock<RWMutex> lck(catalog->rw_locker_);
+        json_res["current_dir"] = *catalog->current_dir_;
+        json_res["next_txn_id"] = catalog->next_txn_id_;
+        json_res["catalog_version"] = catalog->catalog_version_;
+        databases.reserve(catalog->databases_.size());
+        for (auto &db_meta : catalog->databases_) {
+            databases.push_back(db_meta.second.get());
+        }
+    }
 
-    json_res["current_dir"] = *catalog->current_dir_;
-    json_res["next_txn_id"] = catalog->next_txn_id_;
-    json_res["catalog_version"] = catalog->catalog_version_;
-    for (const auto &db_meta : catalog->databases_) {
-        json_res["databases"].emplace_back(DBMeta::Serialize(db_meta.second.get()));
+    for (auto &db_meta : databases) {
+        json_res["databases"].emplace_back(DBMeta::Serialize(db_meta, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
 
-UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr) {
+UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
+    auto catalog1 = MakeUnique<NewCatalog>(nullptr);
+    Assert<CatalogException>(!catalog_paths.empty(), "Catalog paths is empty", __FILE_NAME__, __LINE__);
+    // Load the latest full checkpoint.
+    LOG_INFO(Format("Load base catalog1 from: {}", catalog_paths[0]));
+    catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+
+    // Load catalogs delta checkpoints and merge.
+    for (int i = 1; i < catalog_paths.size(); i++) {
+        LOG_INFO(Format("Load delta catalog1 from: {}", catalog_paths[i]));
+        UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
+        catalog1->MergeFrom(*catalog2);
+    }
+    return catalog1;
+}
+
+void NewCatalog::MergeFrom(NewCatalog &other) {
+    // Merge databases.
+    for (auto &[db_name, db_meta2] : other.databases_) {
+        auto it = this->databases_.find(db_name);
+        if (it == this->databases_.end()) {
+            this->databases_.emplace(db_name, Move(db_meta2));
+        } else {
+            it->second->MergeFrom(*db_meta2.get());
+        }
+    }
+}
+
+UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
     UniquePtr<NewCatalog> catalog = nullptr;
-    String filename = dir_entry->path();
-
-    LOG_INFO(Format("Load catalog from: {}", filename));
-
     LocalFileSystem fs;
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(filename, FileFlags::READ_FLAG, FileLockType::kReadLock);
-
-    SizeT file_size = dir_entry->file_size();
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        Error<StorageException>(Format("Catalog file {}, read error.", filename), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Catalog file {}, read error.", catalog_path), __FILE_NAME__, __LINE__);
     }
 
     Json catalog_json = Json::parse(json_str);
@@ -238,8 +264,8 @@ void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr
     }
 }
 
-void NewCatalog::SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, const String &file_name) {
-    Json catalog_json = Serialize(catalog_ptr);
+String NewCatalog::SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    Json catalog_json = Serialize(catalog_ptr, max_commit_ts, is_full_checkpoint);
     String catalog_str = catalog_json.dump();
 
     // FIXME: Temp implementation, will be replaced by async task.
@@ -249,6 +275,11 @@ void NewCatalog::SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, co
         fs.CreateDirectory(dir);
     }
 
+    String file_name = Format("META_{}", max_commit_ts);
+    if (is_full_checkpoint)
+        file_name += ".full.json";
+    else
+        file_name += ".delta.json";
     String file_path = Format("{}/{}", dir, file_name);
 
     u8 fileflags = FileFlags::WRITE_FLAG;
@@ -256,7 +287,6 @@ void NewCatalog::SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, co
         fileflags |= FileFlags::CREATE_FLAG;
     }
 
-    LOG_TRACE(Format("Open catalog file path: {}", file_path));
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(file_path, fileflags, FileLockType::kWriteLock);
 
     // TODO: Save as a temp filename, then rename it to the real filename.
@@ -268,6 +298,7 @@ void NewCatalog::SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, co
     catalog_file_handler->Close();
 
     LOG_INFO(Format("Saved catalog to: {}", file_path));
+    return file_path;
 }
 
 } // namespace infinity

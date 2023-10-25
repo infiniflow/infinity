@@ -26,6 +26,10 @@ std::string ShowStatement::ToString() const {
             ss << "Describe table: " << schema_name_ << "." << table_name_;
             break;
         }
+        case ShowStmtType::kIndexes: {
+            ss << "Describe index of table: " << schema_name_ << ", table: " << table_name_;
+            break;
+        }
     }
     return ss.str();
 }

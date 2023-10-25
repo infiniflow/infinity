@@ -80,4 +80,5 @@ test/sql/**/*fvecs*.slt
 #clang-format
 clang-format-all
 
+#a place for any file unwant to commit
 tmp/

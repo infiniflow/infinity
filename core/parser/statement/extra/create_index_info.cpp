@@ -3,6 +3,9 @@
 //
 
 #include "create_index_info.h"
+#include "parser_assert.h"
+
+#include <sstream>
 
 namespace infinity {
 
@@ -13,6 +16,51 @@ CreateIndexInfo::~CreateIndexInfo() {
     }
 }
 
-std::string CreateIndexInfo::ToString() const { return "create index info"; }
+std::string CreateIndexInfo::ToString() const {
+    std::stringstream ss;
+    ss << "CREATE INDEX ";
+    switch (conflict_type_) {
+        case ConflictType::kIgnore: {
+            ss << "IF NOT EXISTS ";
+        }
+        case ConflictType::kError: {
+            break;
+        }
+        case ConflictType::kReplace: {
+            ParserError("Not implemented.");
+        }
+        case ConflictType::kInvalid: {
+            ParserError("Invalid conflict type.");
+        }
+    }
+    if (index_name_.empty()) {
+        ss << "DEFAULT_INDEX_NAME ";
+    } else {
+        ss << index_name_;
+    }
+    ss << "ON " << table_name_ << "(";
+    size_t column_count = column_names_->size();
+    if (column_count == 0) {
+        ParserError("No column name specified.");
+    }
+    for (size_t idx = 0; idx < column_count - 1; ++idx) {
+        ss << (*column_names_)[idx] << ", ";
+    }
+    ss << (*column_names_)[column_count - 1] << ")";
+    ss << "USING " << method_type_;
+    if (index_para_list_ != nullptr && !index_para_list_->empty()) {
+        ss << "WITH(";
+        size_t para_count = index_para_list_->size();
+        for (size_t idx = 0; idx < para_count; ++idx) {
+            ss << (*index_para_list_)[idx]->para_name_ << " " << (*index_para_list_)[idx]->para_value_;
+            if (idx != para_count - 1) {
+                ss << ", ";
+            }
+        }
+        ss << ")";
+    }
+    ss << ";";
+    return ss.str();
+}
 
 } // namespace infinity

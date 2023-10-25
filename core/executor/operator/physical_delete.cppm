@@ -17,7 +17,7 @@ namespace infinity {
 
 export class PhysicalDelete final : public PhysicalOperator {
 public:
-    explicit PhysicalDelete(i64 id) : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
+    explicit PhysicalDelete(u64 id) : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
 
     ~PhysicalDelete() override = default;
 

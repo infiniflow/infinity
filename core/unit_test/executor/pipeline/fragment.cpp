@@ -14,9 +14,9 @@ import stl;
 import infinity;
 import sql_runner;
 
-class FragmentTest : public BaseTest {
+class FragmentTest  : public BaseTest {
     void SetUp() override {
-        system("rm -rf /tmp/infinity/");
+        BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
@@ -27,13 +27,12 @@ class FragmentTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/");
+        BaseTest::TearDown();
     }
 };
 
 TEST_F(FragmentTest, test_build_fragment) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     /// DDL
     auto result0 = SQLRunner::Run("create table t1(a bigint)", true);
     EXPECT_EQ(result0->definition_ptr_.get()->columns()[0]->name_, "OK");

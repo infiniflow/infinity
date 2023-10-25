@@ -27,24 +27,10 @@ import column_vector;
 import float_cast;
 import bound_cast_func;
 
-class FloatCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class FloatCastTest : public BaseTest {};
 
 TEST_F(FloatCastTest, float_cast0) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     // FloatT to FloatT, throw exception
     {
@@ -238,7 +224,6 @@ TEST_F(FloatCastTest, float_cast0) {
 
 TEST_F(FloatCastTest, float_cast1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kFloat);
 

@@ -28,7 +28,7 @@ namespace infinity {
 
 export struct NewCatalog {
 public:
-    explicit NewCatalog(SharedPtr<String> dir);
+    explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
     static EntryResult CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -55,13 +55,17 @@ public:
 
     static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
-    static Json Serialize(const NewCatalog *catalog);
+    static Json Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static void Deserialize(const Json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
-    static UniquePtr<NewCatalog> LoadFromFile(const SharedPtr<DirEntry> &dir_entry, BufferManager *buffer_mgr);
+    static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
-    static void SaveAsFile(const NewCatalog *catalog_ptr, const String &dir, const String &file_name);
+    static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+
+    static String SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+    void MergeFrom(NewCatalog &other);
 
 public:
     SharedPtr<String> current_dir_{nullptr};

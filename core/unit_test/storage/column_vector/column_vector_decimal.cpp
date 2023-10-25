@@ -18,24 +18,11 @@ import vector_buffer;
 import global_resource_usage;
 import infinity;
 
-class ColumnVectorDecimalTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorDecimalTest : public BaseTest {};
 
 TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
@@ -160,7 +147,7 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
 TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
@@ -251,7 +238,7 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
 TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
@@ -289,7 +276,7 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
 
 TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);

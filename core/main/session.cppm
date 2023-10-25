@@ -27,6 +27,7 @@ public:
     }
 
 public:
+    // Txn is session level.
     Txn *txn_{};
 
 private:

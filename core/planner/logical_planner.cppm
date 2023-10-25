@@ -104,6 +104,8 @@ public:
 
     void BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    void BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     void BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     void BuildShowViews(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

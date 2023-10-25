@@ -4,6 +4,7 @@ module;
 import buffer_handle;
 import stl;
 import third_party;
+import faiss_index_ptr;
 
 export module object_handle;
 
@@ -28,45 +29,19 @@ public:
 
     ~ObjectHandle();
 
-    SharedPtr<String> GetDir() const;
-};
-
-export class CommonObjectHandle : public ObjectHandle {
-    ptr_t ptr_{};
-
 public:
-    CommonObjectHandle() {}
+    [[nodiscard]] SharedPtr<String> GetDir() const;
 
-    explicit CommonObjectHandle(BufferHandle *buffer_handle);
-
-    ~CommonObjectHandle();
-
-    CommonObjectHandle(const CommonObjectHandle &other) = delete;
-
-    CommonObjectHandle &operator=(const CommonObjectHandle &other) = delete;
-
-    CommonObjectHandle(CommonObjectHandle &&other);
-
-    CommonObjectHandle &operator=(CommonObjectHandle &&other);
-
-    [[nodiscard]] ptr_t GetData();
-};
-
-export class IndexObjectHandle : public ObjectHandle {
-    FaissIndex *index_{};
-
-public:
-    explicit IndexObjectHandle(BufferHandle *buffer_handle);
-
-    IndexObjectHandle(const IndexObjectHandle &other) = delete;
-
-    IndexObjectHandle &operator=(const IndexObjectHandle &other) = delete;
-
-    IndexObjectHandle(IndexObjectHandle &&other);
-
-    IndexObjectHandle &operator=(IndexObjectHandle &&other);
+    [[nodiscard]] inline ptr_t GetData() { return static_cast<ptr_t>(GetRaw()); }
 
     [[nodiscard]] FaissIndex *GetIndex();
+
+    void WriteFaissIndex(FaissIndexPtr *index);
+
+private:
+    [[nodiscard]] void *GetRaw();
+
+    void *ptr_{};
 };
 
 } // namespace infinity

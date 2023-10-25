@@ -59,6 +59,7 @@ import physical_table_scan;
 import physical_top;
 import physical_union_all;
 import physical_update;
+import physical_drop_index;
 
 import logical_node;
 import logical_node_type;
@@ -87,6 +88,7 @@ import logical_export;
 import logical_import;
 import logical_dummy_scan;
 import logical_explain;
+import logical_drop_index;
 
 import parser;
 import explain_physical_plan;
@@ -121,6 +123,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kDropTable: {
             result = BuildDropTable(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kDropIndex: {
+            result = BuildDropIndex(logical_operator);
             break;
         }
         case LogicalNodeType::kDropCollection: {
@@ -314,6 +320,17 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<Logi
                                          logical_drop_table->GetOutputNames(),
                                          logical_drop_table->GetOutputTypes(),
                                          logical_drop_table->node_id());
+}
+
+SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalDropIndex> logical_drop_index = std::static_pointer_cast<LogicalDropIndex>(logical_operator);
+    return MakeShared<PhysicalDropIndex>(logical_drop_index->schema_name(),
+                                         logical_drop_index->table_name(),
+                                         logical_drop_index->index_name(),
+                                         logical_drop_index->conflict_type(),
+                                         logical_drop_index->GetOutputNames(),
+                                         logical_drop_index->GetOutputTypes(),
+                                         logical_drop_index->node_id());
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {

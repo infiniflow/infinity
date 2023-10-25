@@ -80,6 +80,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
         case PhysicalOperatorType::kDropTable:
+        case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:

@@ -8,6 +8,8 @@ import table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import infinity_assert;
+import infinity_exception;
 
 module physical_create_index;
 
@@ -15,7 +17,7 @@ namespace infinity {
 void PhysicalCreateIndex::Init() {}
 
 void PhysicalCreateIndex::Execute(QueryContext *query_context) {
-    // TODO shenyushi -1: delete old execute function
+    Error<NotImplementException>("The old execute function is to be deleted.", __FILE_NAME__, __LINE__);
 }
 
 void PhysicalCreateIndex::Execute(QueryContext *query_context,

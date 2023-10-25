@@ -13,6 +13,9 @@ import txn;
 import buffer_manager;
 import index_def;
 import data_access_state;
+import parser;
+import index_entry;
+import txn_store;
 
 export module segment_entry;
 
@@ -26,16 +29,28 @@ class TableCollectionEntry;
 //
 //class IndexDef;
 //
-//class AppendState;
+export class SegmentEntry;
 
+export struct SegmentVersion {
+public:
+    explicit inline SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
+        for (SizeT i = 0; i < capacity; ++i) {
+            created_[i] = 0;
+            deleted_[i] = 0;
+            txn_ptr_[i] = (u64)(nullptr);
+        }
+    }
+    Vector<au64> created_{};
+    Vector<au64> deleted_{};
+    Vector<aptr> txn_ptr_{};
 
-export enum DataSegmentStatus : i8 {
-    kSegmentOpen,
-    kSegmentClosed,
-    kSegmentFlushing,
+public:
+    static Json Serialize(SegmentVersion *segment_version);
+
+    static UniquePtr<SegmentVersion> Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 };
 
-export struct SegmentEntry : public BaseEntry {
+struct SegmentEntry : public BaseEntry {
 public:
     explicit SegmentEntry(const TableCollectionEntry *table_entry);
 
@@ -44,61 +59,48 @@ public:
     const TableCollectionEntry *table_entry_{};
 
     SharedPtr<String> segment_dir_{};
-
-    SizeT row_capacity_{};
-
-    SizeT current_row_{};
-
     i32 segment_id_{};
 
-    Atomic<DataSegmentStatus> status_{DataSegmentStatus::kSegmentOpen};
-
+    SizeT row_count_{};
+    SizeT row_capacity_{};
     u64 column_count_{};
-    //    Vector<SharedPtr<SegmentColumnEntry>> columns_;
 
-    //    UniquePtr<SegmentVersion> segment_version_{};
+    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
 
-    au64 min_row_ts_{};
-    au64 max_row_ts_{}; // Indicate when the segment is removed.
+    Vector<SharedPtr<BlockEntry>> block_entries_{};
 
-    u64 start_ts_{0};
-    u64 end_ts_{MAX_TIMESTAMP};
-
-    Vector<UniquePtr<BlockEntry>> block_entries_{};
-
-    SharedPtr<String> index_dir_{};
-
-    HashMap<u64, SharedPtr<String>> index_name_map_{};
-
-    // TODO shenyushi 3: add index here
-public:
-    [[nodiscard]] inline SizeT AvailableCapacity() const { return row_capacity_ - current_row_; }
+    // Want key type to be const String or shared_ptr<const String>
+    HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
-    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry,
-                                                       u64 txn_id,
-                                                       u64 segment_id,
-                                                       BufferManager *buffer_mgr,
-                                                       SizeT segment_row = DEFAULT_SEGMENT_ROW);
+    static SharedPtr<SegmentEntry>
+    MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr, bool is_new = true);
 
-    static void AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void CreateIndexScalar(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id);
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const Vector<RowID> &rows, BufferManager *buffer_mgr);
 
-    static void CreateIndexEmbedding(SegmentEntry *segment_entry, Txn *txn_ptr, const IndexDef &index_def, u64 column_id, int dimension);
+    static void CreateIndexScalar(SegmentEntry *segment_entry,
+                                  Txn *txn_ptr,
+                                  const IndexDef &index_def,
+                                  u64 column_id,
+                                  BufferManager *buffer_mgr,
+                                  TxnTableStore *txn_store);
+
+    static SharedPtr<IndexEntry> CreateIndexEmbedding(SegmentEntry *segment_entry,
+                                                      const IndexDef &index_def,
+                                                      u64 column_id,
+                                                      int dimension,
+                                                      TxnTimeStamp create_ts,
+                                                      BufferManager *buffer_mgr,
+                                                      TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
 
+    static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
+
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count);
-
-    static bool PrepareFlush(SegmentEntry *segment_entry);
-
-    static bool Flush(SegmentEntry *segment_entry);
-
-    //    inline static SegmentColumnEntry*
-    //    GetColumnDataByID(SegmentEntry* segment_entry, u64 column_id) {
-    //        return segment_entry->columns_[column_id].get();
-    //    }
 
     static u64 GetBlockIDByRowID(SizeT row_id);
 
@@ -106,14 +108,16 @@ public:
 
     static BlockEntry *GetBlockEntryByID(const SegmentEntry *segment_entry, u64 block_id);
 
-    static Json Serialize(const SegmentEntry *segment_entry);
+    static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
+    static int Room(SegmentEntry *segment_entry);
+
+    void MergeFrom(infinity::BaseEntry &other) override;
+
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);
-
-    static SharedPtr<String> DetermineIndexFilename(const String &parent_dir, const String &index_name, u64 seg_id);
 };
 
 } // namespace infinity

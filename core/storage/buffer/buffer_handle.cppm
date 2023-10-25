@@ -8,6 +8,7 @@ import stl;
 import parser;
 import file_system;
 import async_batch_processor;
+import third_party;
 
 export module buffer_handle;
 
@@ -15,7 +16,9 @@ namespace infinity {
 
 export enum class BufferType {
     kTempFile,
+    kTempFaissIndex,
     kFile,
+    kFaissIndex,
     kExtraBlock,
     kInvalid,
 };
@@ -32,34 +35,42 @@ using BufferWriteFN = void (*)(const String &path, DataType data_type);
 
 class ObjectHandle;
 
-class CommonObjectHandle;
-
-class IndexObjectHandle;
-
 // BufferHandle is never destructed
 export class BufferHandle {
-    friend ObjectHandle;
-    friend CommonObjectHandle;
-    friend IndexObjectHandle;
+    friend class ObjectHandle;
 
     friend class BufferMgrTest;
 
 public:
     explicit BufferHandle(void *buffer_mgr);
 
-    ~BufferHandle() = default;
+private:
+    void DeleteData();
+
+    String file_path() {
+        String file_path;
+        if (current_dir_.get() == nullptr or current_dir_->empty()) {
+            file_path = Format("{}/{}", *base_dir_, *file_name_);
+        } else {
+            file_path = Format("{}/{}", *current_dir_, *file_name_);
+        }
+        return file_path;
+    }
+
+public:
+    ~BufferHandle() { DeleteData(); }
 
     inline void SetID(u64 id) { id_ = id; }
 
 private:
-    ptr_t LoadData();
+    void *LoadData();
 
 public:
     void UnloadData();
 
     void AddRefCount();
 
-    [[nodiscard]] inline bool IsFree() const { return data_.get() == nullptr; }
+    [[nodiscard]] inline bool IsFree() const { return data_ == nullptr; }
 
     void FreeData();
 
@@ -86,11 +97,11 @@ public:
 
 private:
     UniquePtr<FileHandler> file_handler_{nullptr};
+    void *data_{nullptr};
 
 public:
     RWMutex rw_locker_{};
 
-    UniquePtr<char[]> data_{nullptr};
     SizeT buffer_size_{0};
     void *buffer_mgr_{};
     u64 reference_count_{0};
@@ -103,9 +114,6 @@ public:
     SharedPtr<String> file_name_{};   // ex. 0.col
     offset_t offset_{};
     u64 id_{};
-
-    // file descriptor
-    int fd_{};
 
     // function to read and write the file.
     BufferReadFN read_func_{};

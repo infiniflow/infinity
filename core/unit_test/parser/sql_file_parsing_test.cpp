@@ -15,24 +15,10 @@ import logger;
 import null_value;
 import stl;
 
-class SQLFileParsingTest1 : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
+class SQLFileParsingTest : public BaseTest {};
 
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
-
-TEST_F(SQLFileParsingTest1, tpch) {
+TEST_F(SQLFileParsingTest, tpch) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
@@ -73,9 +59,8 @@ void ReadSQLs(const String &file_path, Vector<String> &sqls) {
 
 } // namespace infinity
 
-TEST_F(SQLFileParsingTest1, hyrise) {
+TEST_F(SQLFileParsingTest, hyrise) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
@@ -102,9 +87,8 @@ TEST_F(SQLFileParsingTest1, hyrise) {
     }
 }
 
-TEST_F(SQLFileParsingTest1, infinity) {
+TEST_F(SQLFileParsingTest, infinity) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();

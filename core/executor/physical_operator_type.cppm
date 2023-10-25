@@ -66,6 +66,7 @@ export enum class PhysicalOperatorType : i8 {
     kCreateDatabase,
     kCreateView,
     kDropTable,
+    kDropIndex,
     kDropCollection,
     kDropDatabase,
     kDropView,

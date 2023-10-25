@@ -18,11 +18,7 @@ export module block_column_entry;
 
 namespace infinity {
 
-//class BufferManager;
-//
 class BlockEntry;
-//
-//class ColumnVector;
 
 export struct BlockColumnEntry : public BaseEntry {
 public:
@@ -51,7 +47,7 @@ public:
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
-    static Json Serialize(const BlockColumnEntry *block_column_entry);
+    static Json Serialize(BlockColumnEntry *block_column_entry);
 
     static UniquePtr<BlockColumnEntry> Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 };

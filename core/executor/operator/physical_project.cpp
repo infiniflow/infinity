@@ -44,7 +44,8 @@ void PhysicalProject::Execute(QueryContext *query_context, InputState *input_sta
 
     // FIXME: need to handle statement like: SELECT 1;
 
-    project_output_state->data_block_->Reset();
+    // Should not reset here. Reset has be done in sink operator.
+    // project_output_state->data_block_->Reset();
 
     // Loop aggregate expression
     ExpressionEvaluator evaluator;

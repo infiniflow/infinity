@@ -20,7 +20,6 @@ namespace infinity {
 
 //class TxnManager;
 class DBEntry;
-//class BufferManager;
 
 export struct TableCollectionMeta {
 public:
@@ -51,9 +50,11 @@ public:
 
     static inline DBEntry *GetDBEntry(TableCollectionMeta *table_meta) { return table_meta->db_entry_; }
 
-    static Json Serialize(const TableCollectionMeta *table_meta);
+    static Json Serialize(TableCollectionMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableCollectionMeta> Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
+
+    void MergeFrom(TableCollectionMeta &other);
 
 public:
     RWMutex rw_locker_{};

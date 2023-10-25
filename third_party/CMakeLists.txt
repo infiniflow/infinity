@@ -43,5 +43,8 @@ add_subdirectory(concurrentqueue)
 add_subdirectory(fastpfor)
 add_subdirectory(newpfor)
 
+# Build openfst
+add_subdirectory(openfst)
+
 # Build zsv
 add_subdirectory(zsv)

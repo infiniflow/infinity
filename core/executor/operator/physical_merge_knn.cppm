@@ -12,6 +12,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import table;
+import base_table_ref;
 
 export module physical_merge_knn;
 
@@ -46,12 +47,20 @@ public:
     inline u64 knn_table_index() const { return knn_table_index_; }
 
 private:
+    template <typename T, template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state);
+
+private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     u64 knn_table_index_{};
 
+public:
     Vector<SharedPtr<BaseExpression>> knn_expressions_{};
     SharedPtr<BaseExpression> limit_expression_{};
+    SharedPtr<BaseTableRef> table_ref_{};
+
+private:
     OrderType order_by_type_{OrderType::kAsc};
 };
 

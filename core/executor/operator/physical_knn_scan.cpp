@@ -40,13 +40,23 @@ void PhysicalKnnScan::Execute(QueryContext *query_context, InputState *input_sta
     auto *knn_scan_input_state = static_cast<KnnScanInputState *>(input_state);
     auto *knn_scan_output_state = static_cast<KnnScanOutputState *>(output_state);
 
-    ExecuteInternal(query_context, knn_scan_input_state, knn_scan_output_state);
-#if 0
-    KnnScanFunction* knn_scan_func = (KnnScanFunction*)base_table_ref_->table_func_.get();
-    knn_scan_func->main_function_(query_context,
-                                  knn_scan_input_state->knn_scan_function_data_.get(),
-                                  *knn_scan_output_state->data_block_);
-#endif
+    switch (knn_scan_input_state->knn_scan_function_data_->elem_type_) {
+        case kElemFloat: {
+            ExecuteInternal<f32>(query_context, knn_scan_input_state, knn_scan_output_state);
+            break;
+        }
+        case kElemInvalid: {
+            Error<ExecutorException>("Invalid element data type",
+                                     __FILE_NAME__,
+                                     __LINE__);
+            break;
+        }
+        default: {
+            Error<ExecutorException>("Not implemented",
+                                     __FILE_NAME__,
+                                     __LINE__);
+        }
+    }
 }
 
 TableCollectionEntry *PhysicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
@@ -80,6 +90,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalKnnScan::PlanBlockEntries(i64 p
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
+template <typename T>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state) {
     auto *knn_scan_function_data_ptr = input_state->knn_scan_function_data_.get();
     BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
@@ -106,373 +117,59 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
             BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager()));
     }
 
-    switch (knn_scan_function_data_ptr->knn_distance_type_) {
+    auto knn_flat = static_cast<KnnDistance<T> *>(knn_scan_function_data_ptr->knn_distance_.get());
+    knn_flat->Search((T *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
 
-        case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
-        }
-        case KnnDistanceType::kL2: {
-            switch (knn_scan_function_data_ptr->elem_type_) {
-                case EmbeddingDataType::kElemFloat: {
+    block_ids_idx++;
+    if (block_ids_idx == block_ids->size()) {
+        // Last block, Get the result according to the topk row.
+        knn_flat->End();
 
-                    KnnDistance<f32> *knn_flat_l2 = static_cast<KnnDistance<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
+        for (i64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
 
-                    knn_flat_l2->Search((f32 *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
+            T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
+            RowID *row_id = knn_flat->GetIDByIdx(query_idx);
 
-                    if (block_ids_idx == block_ids->size() - 1) {
-                        // Last block, Get the result according to the topk row.
-                        knn_flat_l2->End();
+            i64 result_count = std::min(knn_flat->TotalBaseCount(), knn_flat->TopK());
 
-                        for (i64 query_idx = 0; query_idx < knn_flat_l2->QueryCount(); ++query_idx) {
+            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
+                // Bug here? id = top_idx?
+                SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
+                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                 row_id[id].segment_id_,
+                                 row_id[id].block_id_,
+                                 row_id[id].block_offset_,
+                                 top_distance[id]));
 
-                            f32 *top_distance = knn_flat_l2->GetDistanceByIdx(query_idx);
-                            RowID *row_id = knn_flat_l2->GetIDByIdx(query_idx);
-
-                            i64 result_count = std::min(knn_flat_l2->TotalBaseCount(), knn_flat_l2->TopK());
-
-                            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
-                                SizeT id = query_idx * knn_flat_l2->QueryCount() + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
-                                                 row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
-                                                 top_distance[id]));
-
-                                BlockEntry *block_entry = block_index->segment_block_index_[row_id[id].segment_id_][row_id[id].block_id_];
-
-                                SizeT column_id = 0;
-                                for (; column_id < column_count; ++column_id) {
-                                    ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
-                                                                                                 query_context->storage()->buffer_manager());
-
-                                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
-                                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
-                                }
-
-                                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-                                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-                            }
-
-                            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                                LOG_TRACE(
-                                    Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
-                            }
-                            // Get row from input data block
-                            //                            output_state->data_block_->AppendValue()
-                        }
-                    }
-                    break;
+                BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, row_id[id].block_id_);
+                if (block_entry == nullptr) {
+                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, row_id[id].block_id_),
+                                             __FILE_NAME__,
+                                             __LINE__);
                 }
-                case EmbeddingDataType::kElemBit: {
-                    //            KnnFlat::SearchBit(&knn_scan_function_data_ptr->knn_flat_,
-                    //                               knn_scan_function_data_ptr->dimension_,
-                    //                               (i8*)(column_buffer.GetAll()),
-                    //                               row_count,
-                    //                               (i8*)knn_scan_function_data_ptr->query_embedding_,
-                    //                               knn_scan_function_data_ptr->query_embedding_count_,
-                    //                               knn_scan_function_data_ptr->topk_,
-                    //                               nullptr,
-                    //                               nullptr,
-                    //                               EmbeddingDataType::kElemBit,
-                    //                               knn_scan_function_data_ptr->knn_distance_type_);
-                    //
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchBit(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                         knn_scan_function_data_ptr->topk_,
-                    //                                         knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
 
-                    break;
+                SizeT column_id = 0;
+                for (; column_id < column_count; ++column_id) {
+                    ColumnBuffer column_buffer =
+                        BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
+
+                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
+                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
                 }
-                case EmbeddingDataType::kElemDouble: {
-                    //            KnnFlat::SearchDouble(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                  knn_scan_function_data_ptr->dimension_,
-                    //                                  (f64*)(column_buffer.GetAll()),
-                    //                                  row_count,
-                    //                                  (f64*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                  knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                  knn_scan_function_data_ptr->topk_,
-                    //                                  nullptr,
-                    //                                  nullptr,
-                    //                                  knn_scan_function_data_ptr->knn_distance_type_);
-                    //
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchDouble(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                            knn_scan_function_data_ptr->topk_,
-                    //                                            knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt64: {
-                    //            KnnFlat::SearchInt64(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i64*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i64*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt64(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                            knn_scan_function_data_ptr->topk_,
-                    //                                            knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt32: {
-                    //            KnnFlat::SearchInt32(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i32*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i32*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt32(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                           knn_scan_function_data_ptr->topk_,
-                    //                                           knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt16: {
-                    //            KnnFlat::SearchInt16(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i16*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i16*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt16(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                           knn_scan_function_data_ptr->topk_,
-                    //                                           knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt8: {
-                    //            KnnFlat::SearchInt8(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                knn_scan_function_data_ptr->dimension_,
-                    //                                (i8*)(column_buffer.GetAll()),
-                    //                                row_count,
-                    //                                (i8*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                knn_scan_function_data_ptr->topk_,
-                    //                                nullptr,
-                    //                                nullptr,
-                    //                                knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt8(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                          knn_scan_function_data_ptr->topk_,
-                    //                                          knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
-                }
+
+                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
+                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
             }
-            break;
-        }
-        case KnnDistanceType::kCosine: {
-            Error<ExecutorException>("Not implemented cosine", __FILE_NAME__, __LINE__);
-        }
-        case KnnDistanceType::kInnerProduct: {
-            switch (knn_scan_function_data_ptr->elem_type_) {
-                case EmbeddingDataType::kElemFloat: {
 
-                    KnnDistance<f32> *knn_flat_ip = static_cast<KnnDistance<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
-
-                    knn_flat_ip->Search((f32 *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
-
-                    if (block_ids_idx == block_ids->size() - 1) {
-                        // Last segment, Get the result according to the topk row.
-                        knn_flat_ip->End();
-
-                        for (i64 query_idx = 0; query_idx < knn_flat_ip->QueryCount(); ++query_idx) {
-
-                            f32 *top_distance = knn_flat_ip->GetDistanceByIdx(query_idx);
-                            RowID *row_id = knn_flat_ip->GetIDByIdx(query_idx);
-
-                            i64 result_count = std::min(knn_flat_ip->TotalBaseCount(), knn_flat_ip->TopK());
-
-                            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
-                                SizeT id = query_idx * knn_flat_ip->TotalBaseCount() + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
-                                                 row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
-                                                 top_distance[id]));
-
-                                BlockEntry *block_entry = block_index->segment_block_index_[row_id[id].segment_id_][row_id[id].block_id_];
-
-                                SizeT column_id = 0;
-                                for (; column_id < column_count; ++column_id) {
-                                    ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(),
-                                                                                                 query_context->storage()->buffer_manager());
-
-                                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
-                                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
-                                }
-
-                                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-                                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-                            }
-
-                            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                                LOG_TRACE(
-                                    Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
-                            }
-                        }
-                    }
-                    break;
-                }
-                case EmbeddingDataType::kElemBit: {
-                    //            KnnFlat::SearchBit(&knn_scan_function_data_ptr->knn_flat_,
-                    //                               knn_scan_function_data_ptr->dimension_,
-                    //                               (i8*)(column_buffer.GetAll()),
-                    //                               row_count,
-                    //                               (i8*)knn_scan_function_data_ptr->query_embedding_,
-                    //                               knn_scan_function_data_ptr->query_embedding_count_,
-                    //                               knn_scan_function_data_ptr->topk_,
-                    //                               nullptr,
-                    //                               nullptr,
-                    //                               EmbeddingDataType::kElemBit,
-                    //                               knn_scan_function_data_ptr->knn_distance_type_);
-                    //
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchBit(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                         knn_scan_function_data_ptr->topk_,
-                    //                                         knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-
-                    break;
-                }
-                case EmbeddingDataType::kElemDouble: {
-                    //            KnnFlat::SearchDouble(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                  knn_scan_function_data_ptr->dimension_,
-                    //                                  (f64*)(column_buffer.GetAll()),
-                    //                                  row_count,
-                    //                                  (f64*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                  knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                  knn_scan_function_data_ptr->topk_,
-                    //                                  nullptr,
-                    //                                  nullptr,
-                    //                                  knn_scan_function_data_ptr->knn_distance_type_);
-                    //
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchDouble(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                            knn_scan_function_data_ptr->topk_,
-                    //                                            knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt64: {
-                    //            KnnFlat::SearchInt64(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i64*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i64*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt64(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                            knn_scan_function_data_ptr->topk_,
-                    //                                            knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt32: {
-                    //            KnnFlat::SearchInt32(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i32*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i32*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt32(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                           knn_scan_function_data_ptr->topk_,
-                    //                                           knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt16: {
-                    //            KnnFlat::SearchInt16(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i16*)(column_buffer.GetAll()),
-                    //                                 row_count,
-                    //                                 (i16*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                 knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                 knn_scan_function_data_ptr->topk_,
-                    //                                 nullptr,
-                    //                                 nullptr,
-                    //                                 knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt16(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                           knn_scan_function_data_ptr->topk_,
-                    //                                           knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInt8: {
-                    //            KnnFlat::SearchInt8(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                knn_scan_function_data_ptr->dimension_,
-                    //                                (i8*)(column_buffer.GetAll()),
-                    //                                row_count,
-                    //                                (i8*)knn_scan_function_data_ptr->query_embedding_,
-                    //                                knn_scan_function_data_ptr->query_embedding_count_,
-                    //                                knn_scan_function_data_ptr->topk_,
-                    //                                nullptr,
-                    //                                nullptr,
-                    //                                knn_scan_function_data_ptr->knn_distance_type_);
-                    //            if(segments_idx == segment_indexes->size() - 1) {
-                    //                // Last segment, Get the result according to the topk row.
-                    //                KnnFlat::FinishSearchInt8(&knn_scan_function_data_ptr->knn_flat_,
-                    //                                          knn_scan_function_data_ptr->topk_,
-                    //                                          knn_scan_function_data_ptr->knn_distance_type_);
-                    //            }
-                    break;
-                }
-                case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
-                }
+            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                LOG_TRACE(Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
             }
-            break;
         }
-        case KnnDistanceType::kHamming: {
-            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
-        }
-    }
 
-    if (block_ids_idx >= block_ids->size() - 1) {
         // Last segment, Get the result according to the topk row.
         output_state->SetComplete();
     }
+
     output_state->data_block_->Finalize();
 }
 

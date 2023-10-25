@@ -127,7 +127,6 @@ def generate(generate_if_exists):
     csv_path = csv_dir + "/big_varchar.csv"
     generate_test_varchar(slt_path, csv_path, row_n, dim, generate_if_exists)
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate big data for test")
 

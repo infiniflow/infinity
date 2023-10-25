@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
@@ -57,38 +59,38 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalAggregate::GetOutputTypes() const 
 
 String LogicalAggregate::ToString(i64 &space) const {
 
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str;
-//
-//    if (!aggregates_.empty()) {
-//        ss << "Aggregate on: ";
-//        SizeT expression_count = aggregates_.size();
-//        for (SizeT i = 0; i < expression_count - 1; ++i) {
-//            ss << aggregates_[i]->Name() << ", ";
-//        }
-//        ss << aggregates_.back()->Name();
-//    }
-//
-//    if (!groups_.empty()) {
-//        if (aggregates_.empty()) {
-//            ss << "Group by: ";
-//        } else {
-//            ss << ", Group by: ";
-//        }
-//        SizeT expression_count = groups_.size();
-//        for (SizeT i = 0; i < expression_count - 1; ++i) {
-//            ss << groups_[i]->Name() << ", ";
-//        }
-//        ss << groups_.back()->Name();
-//    }
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str;
+
+    if (!aggregates_.empty()) {
+        ss << "Aggregate on: ";
+        SizeT expression_count = aggregates_.size();
+        for (SizeT i = 0; i < expression_count - 1; ++i) {
+            ss << aggregates_[i]->Name() << ", ";
+        }
+        ss << aggregates_.back()->Name();
+    }
+
+    if (!groups_.empty()) {
+        if (aggregates_.empty()) {
+            ss << "Group by: ";
+        } else {
+            ss << ", Group by: ";
+        }
+        SizeT expression_count = groups_.size();
+        for (SizeT i = 0; i < expression_count - 1; ++i) {
+            ss << groups_[i]->Name() << ", ";
+        }
+        ss << groups_.back()->Name();
+    }
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 } // namespace infinity

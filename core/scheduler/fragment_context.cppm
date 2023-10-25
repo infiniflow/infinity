@@ -32,13 +32,7 @@ export module fragment_context;
 
 namespace infinity {
 
-//class QueryContext;
 class PlanFragment;
-//class PhysicalOperator;
-//class PhysicalSource;
-//class PhysicalSink;
-//class Table;
-//class DataBlock;
 
 // enum class FragmentStatus {
 //     kNotStart,
@@ -63,12 +57,15 @@ public:
 
     virtual ~FragmentContext() = default;
 
-    inline void IncreaseTask() {
-        //        UniqueLock<RWMutex> w_locker(rw_locker_);
-    }
+    inline void IncreaseTask() { task_n_.fetch_add(1); }
 
     inline void FinishTask() {
-        //        UniqueLock<RWMutex> w_locker(rw_locker_);
+        u64 unfinished_task = task_n_.fetch_sub(1);
+        auto sink_op = GetSinkOperator();
+
+        if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
+            Complete();
+        }
     }
 
     Vector<PhysicalOperator *> &GetOperators();
@@ -102,6 +99,8 @@ protected:
     virtual SharedPtr<Table> GetResultInternal() = 0;
 
 protected:
+    au64 task_n_{0};
+
     Mutex locker_{};
     CondVar cv_{};
 

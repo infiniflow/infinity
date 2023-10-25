@@ -34,7 +34,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const Bloc
 
     block_column_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
 
-    block_column_entry->column_type_ = block_entry->segment_entry_->table_entry_->columns_[column_id]->type();
+    auto &column_def = *block_entry->segment_entry_->table_entry_->columns_[column_id];
+    block_column_entry->column_type_ = column_def.type();
     DataType *column_type = block_column_entry->column_type_.get();
 
     SizeT row_capacity = block_entry->row_capacity_;
@@ -78,7 +79,7 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
 }
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
-    CommonObjectHandle object_handle(block_column_entry->buffer_handle_);
+    ObjectHandle object_handle(block_column_entry->buffer_handle_);
     ptr_t dst_p = object_handle.GetData() + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
     DataType *column_type = block_column_entry->column_type_.get();
@@ -116,7 +117,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                         outline_info->written_buffers_.emplace_back(buffer_handle, 0);
                     }
                     auto &[current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
-                    CommonObjectHandle out_object_handle(current_buffer_handle);
+                    ObjectHandle out_object_handle(current_buffer_handle);
                     ptr_t outline_dst_ptr = out_object_handle.GetData() + current_buffer_offset;
                     u16 outline_data_size = varchar_type->length;
                     ptr_t outline_src_ptr = varchar_type->ptr;
@@ -205,26 +206,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
     }
 }
 
-Json BlockColumnEntry::Serialize(const BlockColumnEntry *block_column_entry) {
+Json BlockColumnEntry::Serialize(BlockColumnEntry *block_column_entry) {
     Json json_res;
     json_res["column_id"] = block_column_entry->column_id_;
-    //    json_res["base_dir"] = *block_column_entry->base_dir_;
-    //    json_res["file_name"] = *block_column_entry->file_name_;
     if (block_column_entry->outline_info_) {
         auto &outline_info = block_column_entry->outline_info_;
         json_res["next_outline_idx"] = outline_info->next_file_idx;
     }
-
     return json_res;
 }
 
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
-
-    //    SharedPtr<String> base_dir = MakeShared<String>(column_data_json["base_dir"]);
-    //    SharedPtr<String> file_name = MakeShared<String>(column_data_json["file_name"]);
-
     UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr);
     if (block_column_entry->outline_info_.get() != nullptr) {
         auto outline_info = block_column_entry->outline_info_.get();

@@ -32,6 +32,8 @@ public:
 
     void Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT end_idx);
 
+    static SharedPtr<DataBlock> MoveFrom(SharedPtr<DataBlock> &input);
+
     void Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
     void Init(const Vector<SharedPtr<ColumnVector>> &column_vectors);

@@ -17,7 +17,7 @@ class SeqGenerator {
 public:
     // Begin with 1 to avoid distinguish uninitialized value and the minimal
     // valid value.
-    SeqGenerator(i64 begin = 1) : next_seq_(begin) {}
+    explicit SeqGenerator(i64 begin = 1) : next_seq_(begin) {}
     i64 Generate() { return next_seq_.fetch_add(1); }
     i64 GetLast() { return next_seq_.load() - 1; }
 
@@ -27,13 +27,15 @@ private:
 
 export class WalManager {
 public:
+    static String WalCommandTypeToString(WalCommandType type);
+
+public:
     WalManager(Storage *storage,
-               const String &wal_path,
+               String wal_path,
                u64 wal_size_threshold,
-               u64 full_checkpoint_time_interval,
-               u64 full_checkpoint_txn_interval,
-               u64 delta_checkpoint_time_interval,
-               u64 delta_checkpoint_txn_interval);
+               u64 full_checkpoint_interval_sec,
+               u64 delta_checkpoint_interval_sec,
+               u64 delta_checkpoint_interval_wal_bytes);
 
     ~WalManager();
 
@@ -59,36 +61,59 @@ public:
 
     i64 ReplayWalFile();
 
+    void ReplayWalEntry(const WalEntry &entry);
+
     void RecycleWalFile();
+private:
+    void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
+    void GetWalState(TxnTimeStamp& max_commit_ts, i64& wal_size);
+
+    void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts);
+    void WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts);
 
 public:
     u64 wal_size_threshold_{};
-    u64 full_checkpoint_time_interval_{};
-    u64 full_checkpoint_txn_interval_{};
-    u64 delta_checkpoint_time_interval_{};
-    u64 delta_checkpoint_txn_interval_{};
+    u64 full_checkpoint_interval_sec_{};
+    u64 delta_checkpoint_interval_sec_{};
+    u64 delta_checkpoint_interval_wal_bytes_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
     String wal_path_;
+    Storage *storage_;
+
     // WalManager state
     Atomic<bool> running_;
     Thread flush_thread_;
     Thread checkpoint_thread_;
 
-    Mutex mutex_; // protect que_ and ofs_
-    Queue<SharedPtr<WalEntry>> que_, que2_, que3_;
+    // TxnManager and Flush thread access following members
+    Mutex mutex_;
+    Deque<SharedPtr<WalEntry>> que_;
+
+    // Only Flush thread access following members
+    Deque<SharedPtr<WalEntry>> que2_;
     StdOfStream ofs_;
 
-    SeqGenerator lsn_gen_;
-    Atomic<TxnTimeStamp> commit_ts_pend_;
-    TxnTimeStamp commit_ts_done_{};
+    // Flush and Checkpoint threads access following members
+    Mutex mutex2_;
+    TxnTimeStamp max_commit_ts_;
+    i64 wal_size_;
 
-    i64 checkpoint_ts_{};
-
-    Storage *storage_;
-
+    // Only Checkpoint thread access following members
+    TxnTimeStamp ckp_commit_ts_{};
+    i64 full_ckp_wal_size_;
+    i64 full_ckp_when_;
+    i64 delta_ckp_wal_size_;
+    i64 delta_ckp_when_;
     Vector<String> wal_list_;
 };
 

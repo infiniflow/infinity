@@ -87,7 +87,6 @@ public:
     TableType type_{TableType::kInvalid};
     Vector<SharedPtr<DataBlock>> data_blocks_{};
     SharedPtr<String> result_msg_{};
-
 };
 
 } // namespace infinity

@@ -29,9 +29,14 @@ public:
 
     void UnInit();
 
-private:
     static SharedPtr<DirEntry> GetLatestCatalog(const String &dir);
 
+    static bool CatalogDirExists(const String &dir);
+
+    void AttachCatalog(const Vector<String> &catalog_files);
+    void InitNewCatalog();
+
+private:
     static void InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr);
 
 private:
@@ -40,6 +45,7 @@ private:
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
+    bool exist_catalog_{false};
 };
 
 } // namespace infinity

@@ -78,6 +78,7 @@ public:
     u64 knn_table_index_{};
 
 private:
+    template <typename T>
     void ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state);
 };
 

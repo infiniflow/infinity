@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import logical_node_type;
@@ -71,15 +73,15 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalCrossProduct::GetOutputTypes() con
 }
 
 String LogicalCrossProduct::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Cross Product: ";
-//    space += arrow_str.size();
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Cross Product: ";
+    space += arrow_str.size();
+    return ss.str();
 }
 
 } // namespace infinity

@@ -9,13 +9,7 @@ import infinity_assert;
 import stl;
 import profiler;
 
-class BaseProfilerTest : public BaseTest {
-    void SetUp() override {
-    }
-
-    void TearDown() override {
-    }
-};
+class BaseProfilerTest : public BaseTest {};
 
 TEST_F(BaseProfilerTest, test1) {
     infinity::BaseProfiler prof;

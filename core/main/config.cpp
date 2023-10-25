@@ -106,10 +106,9 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
     // Attention: this phase full checkpoint interval is used for testing,
     //            it should be set to a larger value in production environment.
-    u64 full_checkpoint_time_interval = 20 * 1000;                       // ms
-    u64 full_checkpoint_txn_interval = 3;                                // txn count
-    u64 delta_checkpoint_time_interval = DELTA_CHECKPOINT_TIME_INTERVAL; // ms
-    u64 delta_checkpoint_txn_interval = DELTA_CHECKPOINT_TXN_INTERVAL;   // txn count
+    u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
+    u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
+    u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
 
     if(config_path.get() == nullptr) {
         Printf("No config file is given, use default configs.");
@@ -164,10 +163,9 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Wal
         {
             option_.wal_size_threshold_ = wal_size_threshold;
-            option_.full_checkpoint_time_interval_ = full_checkpoint_time_interval;
-            option_.full_checkpoint_txn_interval_ = full_checkpoint_txn_interval;
-            option_.delta_checkpoint_time_interval_ = delta_checkpoint_time_interval;
-            option_.delta_checkpoint_txn_interval_ = delta_checkpoint_txn_interval;
+            option_.full_checkpoint_interval_sec_ = full_checkpoint_interval_sec;
+            option_.delta_checkpoint_interval_sec_ = delta_checkpoint_interval_sec;
+            option_.delta_checkpoint_interval_wal_bytes_ = delta_checkpoint_interval_wal_bytes;
         }
     } else {
         Printf("Read config from: {}", *config_path);
@@ -178,7 +176,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             auto general_config = config["general"];
 
             String infinity_version = general_config["version"].value_or("invalid");
-            if(IsEqual(default_version, infinity_version)) {
+            if(!IsEqual(default_version, infinity_version)) {
                 return MakeShared<String>("Unmatched version in config file.");
             }
             option_.version = infinity_version;
@@ -300,10 +298,10 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Wal
         {
             auto wal_config = config["wal"];
-            option_.full_checkpoint_time_interval_ = wal_config["full_checkpoint_time_interval"].value_or(full_checkpoint_time_interval);
-            option_.full_checkpoint_txn_interval_ = wal_config["full_checkpoint_txn_interval"].value_or(full_checkpoint_txn_interval);
-            option_.delta_checkpoint_time_interval_ = wal_config["delta_checkpoint_time_interval"].value_or(delta_checkpoint_time_interval);
-            option_.delta_checkpoint_txn_interval_ = wal_config["delta_checkpoint_txn_interval"].value_or(delta_checkpoint_txn_interval);
+            option_.full_checkpoint_interval_sec_ = wal_config["full_checkpoint_interval_sec"].value_or(full_checkpoint_interval_sec);
+            option_.delta_checkpoint_interval_sec_ = wal_config["delta_checkpoint_interval_sec"].value_or(delta_checkpoint_interval_sec);
+            option_.delta_checkpoint_interval_wal_bytes_ =
+                wal_config["delta_checkpoint_interval_wal_bytes"].value_or(delta_checkpoint_interval_wal_bytes);
             auto wal_file_size_threshold_str = wal_config["wal_file_size_threshold"].value_or("10KB");
             result = ParseByteSize(wal_file_size_threshold_str, option_.wal_size_threshold_);
             if (result.get() != nullptr) {
@@ -351,10 +349,10 @@ void Config::PrintAll() const {
     Printf(" - temp_dir: {}\n", option_.temp_dir->c_str());
 
     // Wal
-    Printf(" - full_checkpoint_time_interval: {}\n", option_.buffer_pool_size);
+    Printf(" - full_checkpoint_interval_sec: {}\n", option_.full_checkpoint_interval_sec_);
     Printf(" - full_checkpoint_txn_interval: {}\n", option_.full_checkpoint_txn_interval_);
-    Printf(" - delta_checkpoint_time_interval: {}\n", option_.delta_checkpoint_time_interval_);
-    Printf(" - delta_checkpoint_txn_interval: {}\n", option_.delta_checkpoint_txn_interval_);
+    Printf(" - delta_checkpoint_interval_sec: {}\n", option_.delta_checkpoint_interval_sec_);
+    Printf(" - delta_checkpoint_interval_wal_bytes: {}\n", option_.delta_checkpoint_interval_wal_bytes_);
     Printf(" - wal_size_threshold: {}\n", option_.wal_size_threshold_);
 }
 

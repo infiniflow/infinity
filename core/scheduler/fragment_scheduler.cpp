@@ -162,8 +162,10 @@ void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worke
         }
 
         fragment_task->OnExecute(worker_id);
-        if (!fragment_task->Complete()) {
+        if (!fragment_task->IsComplete()) {
             ScheduleTask(fragment_task);
+        } else {
+            fragment_task->TryCompleteFragment();
         }
     }
     //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
@@ -186,7 +188,7 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
                 local_task_list.erase(task_iter++);
             } else {
                 if (task_ptr->Ready()) {
-                    local_task_list.erase(task_iter++);
+                    local_task_list.erase(task_iter++); // alternatively: task_iter = local_task_list.erase(task_iter);
                     local_ready_queue.push_back(task_ptr);
                 } else {
                     ++task_iter;

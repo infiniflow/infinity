@@ -37,9 +37,9 @@ namespace infinity {
  * @return Table
  */
 SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
-    if (print) {
-        LOG_TRACE(Format("{}", sql_text));
-    }
+//    if (print) {
+//        LOG_TRACE(Format("{}", sql_text));
+//    }
 
     SharedPtr<Session> session_ptr = MakeShared<Session>();
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();

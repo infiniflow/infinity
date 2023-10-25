@@ -50,7 +50,7 @@ public:
 
     inline void SetTxnRollbacked() {
         UniqueLock<RWMutex> w_locker(rw_locker_);
-        if (state_ != TxnState::kRollbacking) {
+        if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
             Error<StorageException>("Transaction isn't in ROLLBACKING status.", __FILE_NAME__, __LINE__);
         }
         state_ = TxnState::kRollbacked;

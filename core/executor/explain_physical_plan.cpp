@@ -361,7 +361,43 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
                                   bool is_recursive,
                                   i64 intent_size) {
-    // TODO shenyushi -1
+    {
+        String create_header_str;
+        if (intent_size != 0) {
+            create_header_str = String(intent_size - 2, ' ') + "-> CREATE INDEX ";
+        } else {
+            create_header_str = "CREATE INDEX ";
+        }
+
+        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(create_header_str));
+    }
+
+    {
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name_;
+        result->emplace_back(MakeShared<String>(schema_name_str));
+    }
+
+    {
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name_;
+        result->emplace_back(MakeShared<String>(table_name_str));
+    }
+
+    // Index definition
+    {
+        String index_def_str = String(intent_size, ' ') + " - index definition: " + create_node->index_def_ptr_->ToString();
+        result->emplace_back(MakeShared<String>(index_def_str));
+    }
+
+    {
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type_);
+        result->emplace_back(MakeShared<String>(conflict_type_str));
+    }
+
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,
@@ -1079,6 +1115,28 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [column_name, column_type, constraint]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowIndexes: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ') + "-> SHOW INDEXES ";
+            } else {
+                show_str = "SHOW INDEXES ";
+            }
+            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            show_column_db_str += show_node->db_name();
+            result->emplace_back(MakeShared<String>(show_column_db_str));
+
+            String show_column_table_str = String(intent_size, ' ') + " - table/collection: ";
+            show_column_table_str += show_node->object_name();
+            result->emplace_back(MakeShared<String>(show_column_table_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, ...]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }

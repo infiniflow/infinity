@@ -22,12 +22,11 @@ class NewCatalog;
 
 export class TxnManager {
 public:
-    inline explicit TxnManager(NewCatalog *catalog,
-                               BufferManager *buffer_mgr,
-                               PutWalEntryFn put_wal_entry_fn,
-                               u64 start_txn_id = 0,
-                               TxnTimeStamp start_ts = 0)
-        : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(true) {}
+    explicit TxnManager(NewCatalog *catalog,
+                        BufferManager *buffer_mgr,
+                        PutWalEntryFn put_wal_entry_fn,
+                        u64 start_txn_id = 0,
+                        TxnTimeStamp start_ts = 1);
 
     ~TxnManager() { Stop(); }
 
@@ -72,7 +71,7 @@ private:
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     Mutex mutex_;
     TxnTimeStamp txn_ts_{};
-    HashMap<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
+    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};
 };

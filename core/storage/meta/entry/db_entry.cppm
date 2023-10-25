@@ -56,15 +56,17 @@ public:
 
     static SharedPtr<String> ToString(DBEntry *db_entry);
 
-    static Json Serialize(const DBEntry *db_entry);
+    static Json Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const Json &db_entry_json, BufferManager *buffer_mgr);
+
+    virtual void MergeFrom(BaseEntry &other);
 
 public:
     RWMutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{};
+    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{}; // NOTE : can use SharedPtr<STring> as key.
 };
 
 } // namespace infinity

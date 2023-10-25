@@ -30,8 +30,9 @@ import block_column_entry;
 import table_collection_type;
 import meta_state;
 
-class TableEntryTest : public BaseTest {
+class TableEntryTest  : public BaseTest {
     void SetUp() override {
+        BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
@@ -42,13 +43,12 @@ class TableEntryTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/log /tmp/infinity/wal /tmp/infinity/data");
+        BaseTest::TearDown();
     }
 };
 
 TEST_F(TableEntryTest, test1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SharedPtr<String> table_dir = MakeShared<String>("/tmp/infinity/table");
     SharedPtr<TableDef> table_def{};
@@ -79,7 +79,6 @@ TEST_F(TableEntryTest, test1) {
         EXPECT_EQ(table_def->column_count(), 2);
         EXPECT_EQ(table_def->GetColIdByName("tiny_int_col"), 0);
         EXPECT_EQ(table_def->GetColIdByName("big_int_col"), 1);
-        LOG_TRACE(Format("{}", table_def->ToString()));
     }
 
     SharedPtr<TableCollectionEntry> table_entry =
@@ -88,7 +87,6 @@ TEST_F(TableEntryTest, test1) {
 
 TEST_F(TableEntryTest, test2) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     BufferManager *buffer_mgr = infinity::Infinity::instance().storage()->buffer_manager();
@@ -221,14 +219,12 @@ TEST_F(TableEntryTest, test2) {
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
                     i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
                     i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
@@ -238,26 +234,6 @@ TEST_F(TableEntryTest, test2) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
-
-                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-                //
-                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-                //                }
-                //
-                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-                //                }
             }
         }
 
@@ -337,14 +313,12 @@ TEST_F(TableEntryTest, test2) {
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
                     i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
                     i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
@@ -354,26 +328,6 @@ TEST_F(TableEntryTest, test2) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
-
-                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-                //
-                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-                //                }
-                //
-                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-                //                }
             }
         }
 
@@ -419,14 +373,12 @@ TEST_F(TableEntryTest, test2) {
                     ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_mgr);
                     i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col0_ptr[row], (i8)(row));
                     }
 
                     ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_mgr);
                     i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
                     for (SizeT row = 0; row < row_count; ++row) {
-                        //                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
                         EXPECT_EQ(col1_ptr[row], (i64)(row));
                     }
 
@@ -436,25 +388,6 @@ TEST_F(TableEntryTest, test2) {
                         EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
                     }
                 }
-                //                EXPECT_EQ(segment_pair.second.column_data_map_.size(), 2);
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(0));
-                //                EXPECT_TRUE(segment_pair.second.column_data_map_.contains(2));
-                //                SegmentColumnEntry* column0 = segment_pair.second.column_data_map_.at(0).segment_column_;
-                //                SegmentColumnEntry* column2 = segment_pair.second.column_data_map_.at(2).segment_column_;
-                //
-                //                SizeT row_count = segment_pair.second.segment_entry_->current_row_;
-                //                ColumnBuffer col0_obj = SegmentColumnEntry::GetColumnData(column0, buffer_mgr);
-                //                i8* col0_ptr = (i8*)(col0_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                ////                LOG_TRACE("COL0 ROW: {}, value: {}", row, (i16)(col0_ptr[row]));
-                //                    EXPECT_EQ(col0_ptr[row], (i8)(row));
-                //                }
-                //
-                //                ColumnBuffer col2_obj = SegmentColumnEntry::GetColumnData(column2, buffer_mgr);
-                //                f64* col2_ptr = (f64*)(col2_obj.GetAll());
-                //                for(SizeT row = 0; row < row_count; ++row) {
-                //                    EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-                //                }
             }
         }
 

@@ -55,7 +55,6 @@ String StringHeapMgr::Stats() const {
         ss << "Chunk id: " << idx++ << ", Capacity: " << chunk->capacity_ << ", Current pos: " << chunk->current_offset_
            << ", object count: " << chunk->object_count_ << Endl;
     }
-
     return ss.str();
 }
 

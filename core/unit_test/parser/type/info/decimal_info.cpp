@@ -15,23 +15,11 @@ import stl;
 import infinity;
 
 class DecimalInfoTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
 };
 
 TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     EXPECT_THROW(DecimalInfo::Make(39, 39), ParserException);
     EXPECT_THROW(DecimalInfo::Make(38, 39), ParserException);

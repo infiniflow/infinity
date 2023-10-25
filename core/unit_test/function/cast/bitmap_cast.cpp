@@ -27,24 +27,10 @@ import column_vector;
 import bitmap_cast;
 import bound_cast_func;
 
-class BitmapCastTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class BitmapCastTest : public BaseTest {};
 
 TEST_F(BitmapCastTest, bitmap_cast0) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     // Try to cast bitmap type to wrong type.
     {
@@ -83,7 +69,6 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
 
 TEST_F(BitmapCastTest, bitmap_cast1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     // Call BindBitmapCast with wrong type of parameters
     {

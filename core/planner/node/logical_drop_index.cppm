@@ -16,9 +16,13 @@ namespace infinity {
 
 export class LogicalDropIndex final : public LogicalNode {
 public:
-    LogicalDropIndex(u64 node_id, SharedPtr<String> schema_name, SharedPtr<String> index_name, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kDropSchema), schema_name_(Move(schema_name)), index_name_(Move(index_name)),
-          conflict_type_(conflict_type) {}
+    LogicalDropIndex(u64 node_id,
+                     SharedPtr<String> schema_name,
+                     SharedPtr<String> table_name,
+                     SharedPtr<String> index_name,
+                     ConflictType conflict_type)
+        : LogicalNode(node_id, LogicalNodeType::kDropIndex), schema_name_(Move(schema_name)), table_name_(Move(table_name)),
+          index_name_(Move(index_name)), conflict_type_(conflict_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -32,12 +36,15 @@ public:
 
     [[nodiscard]] SharedPtr<String> schema_name() const { return schema_name_; }
 
+    [[nodiscard]] SharedPtr<String> table_name() const { return table_name_; }
+
     [[nodiscard]] SharedPtr<String> index_name() const { return index_name_; }
 
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
     SharedPtr<String> schema_name_{};
+    SharedPtr<String> table_name_{};
     SharedPtr<String> index_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 };

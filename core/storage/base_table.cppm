@@ -51,4 +51,3 @@ public:
 };
 
 } // namespace infinity
-

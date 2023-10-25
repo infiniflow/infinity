@@ -41,7 +41,7 @@ class KnnFlatIPBlas final : public KnnDistance<DistType> {
 
 public:
     explicit KnnFlatIPBlas(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpBlas, elem_data_type, query_count, topk, dimension), queries_(queries) {
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpBlas, elem_data_type, query_count, dimension, topk), queries_(queries) {
         id_array_ = MakeUnique<Vector<RowID>>(topk * this->query_count_, RowID());
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * topk * this->query_count_);
 
