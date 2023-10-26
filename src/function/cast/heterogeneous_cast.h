@@ -1,8 +1,0 @@
-//
-// Created by jinhai on 22-12-24.
-//
-
-#ifndef INFINITY_HETEROGENEOUS_CAST_H
-#define INFINITY_HETEROGENEOUS_CAST_H
-
-#endif // INFINITY_HETEROGENEOUS_CAST_H
