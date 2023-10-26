@@ -40,7 +40,7 @@ add_subdirectory(concurrentqueue)
 #target_include_directories(libhv INTERFACE libhv/include)
 
 # Build fastpfor
-add_subdirectory(fastpfor)
+#add_subdirectory(fastpfor)
 add_subdirectory(newpfor)
 
 # Build openfst
