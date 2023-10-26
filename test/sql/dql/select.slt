@@ -6,7 +6,7 @@ CREATE TABLE select2 (id INTEGER , age INTEGER);
 
 # copy data from csv file
 query I
-COPY select2 FROM './test/data/csv/nation.csv' WITH ( DELIMITER ',' );
+COPY select2 FROM '/tmp/infinity/test_data/nation.csv' WITH ( DELIMITER ',' );
 ----
 
 #query ITI
