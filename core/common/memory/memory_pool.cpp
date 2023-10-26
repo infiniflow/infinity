@@ -1,6 +1,14 @@
-#include "memory_pool.h"
-#include "common/utility/infinity_assert.h"
-#include "main/logger.h"
+module;
+
+import infinity_assert;
+import infinity_exception;
+import spinlock;
+import memory_chunk;
+
+#include <unistd.h>
+#include <unordered_map>
+
+module memory_pool;
 
 namespace infinity {
 
@@ -31,10 +39,8 @@ void *MemoryPool::AllocateUnsafe(size_t num_bytes) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            StorageError(fmt::format("Allocate too large memory chunk: {}, max available chunk size: {}",
-                                     num_bytes,
-                                     chunk_allocator_->GetAvailableChunkSize()));
-            return NULL;
+            Error<StorageException>("Allocate too large memory chunk: ", __FILE_NAME__, __LINE__);
+            return nullptr;
         }
         mem_chunk_ = chunk;
         ptr = mem_chunk_->Allocate(alloc_size);
@@ -49,10 +55,8 @@ void *MemoryPool::AllocateUnsafe(size_t num_bytes, size_t alignment) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            StorageError(fmt::format("Allocate too large memory chunk: {}, max available chunk size: {}",
-                                     num_bytes,
-                                     chunk_allocator_->GetAvailableChunkSize()));
-            return NULL;
+            Error<StorageException>("Allocate too large memory chunk: ", __FILE_NAME__, __LINE__);
+            return nullptr;
         }
         mem_chunk_ = chunk;
         ptr = mem_chunk_->Allocate(alloc_size, alignment);

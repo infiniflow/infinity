@@ -81,8 +81,6 @@
  * @author Xin Liu <xliux@fb.com>
  */
 
-#pragma once
-
 /*
 ========================================================================
 Benchmark on (Intel(R) Xeon(R) CPU  L5630  @ 2.13GHz)  8 cores(16 HTs)
@@ -135,11 +133,15 @@ pthread_rwlock_t Read        728698     24us       101ns     7.28ms     194us
 
 */
 
+module;
+
 #include <algorithm>
 #include <atomic>
 #include <thread>
 
 #include "builtin.h"
+
+export module spinlock;
 
 namespace infinity {
 
@@ -158,7 +160,7 @@ namespace infinity {
  * UpgradeLockable concepts except the TimedLockable related locking/unlocking
  * interfaces.
  */
-class SpinLock {
+export class SpinLock {
     enum : int32_t { READER = 4, UPGRADED = 2, WRITER = 1 };
 
 public:
@@ -270,7 +272,7 @@ private:
     std::atomic<int32_t> bits_;
 };
 
-class ScopedSpinLock {
+export class ScopedSpinLock {
 public:
     explicit ScopedSpinLock(SpinLock &lock) : lock_(lock) { lock_.lock(); }
 
@@ -284,7 +286,7 @@ private:
     SpinLock &lock_;
 };
 
-struct ScopedTryLock {
+export struct ScopedTryLock {
     ScopedTryLock(SpinLock &lock) : lock_(lock) { locked_ = lock_.try_lock(); }
 
     ~ScopedTryLock() {

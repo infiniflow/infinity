@@ -1,15 +1,16 @@
-#pragma once
+module;
+
+import spinlock;
+import memory_chunk;
 
 #include <memory>
-#include <stdlib.h>
 #include <unordered_map>
 
-#include "common/utility/spinlock.h"
-#include "memory_chunk.h"
+export module memory_pool;
 
 namespace infinity {
 
-class MemoryPool : public std::enable_shared_from_this<MemoryPool> {
+export class MemoryPool : public std::enable_shared_from_this<MemoryPool> {
 public:
     static const size_t DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024; // 10M
     static const size_t DEFAULT_ALIGN_SIZE = sizeof(char *);
@@ -102,7 +103,7 @@ protected:
     static MemoryChunk DUMMY_CHUNK;
 };
 
-class RecyclePool : public MemoryPool {
+export class RecyclePool : public MemoryPool {
 public:
     RecyclePool(size_t chunkSize, size_t alignSize = 1);
 

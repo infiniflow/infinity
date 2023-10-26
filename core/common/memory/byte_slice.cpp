@@ -1,11 +1,18 @@
-#include "byte_slice.h"
+module;
+
+import memory_pool;
+
+#include <cstdint>
+#include <cstring>
+
+module byte_slice;
 
 namespace infinity {
 
 ByteSlice *ByteSlice::CreateSlice(size_t data_size, MemoryPool *pool) {
     uint8_t *mem;
     size_t mem_size = data_size + GetHeadSize();
-    if (pool == NULL) {
+    if (pool == nullptr) {
         mem = new uint8_t[mem_size];
     } else {
         mem = (uint8_t *)pool->Allocate(mem_size);
@@ -21,7 +28,7 @@ ByteSlice *ByteSlice::CreateSlice(size_t data_size, MemoryPool *pool) {
 void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
     slice->~ByteSlice();
     uint8_t *mem = (uint8_t *)slice;
-    if (pool == NULL) {
+    if (pool == nullptr) {
         delete[] mem;
     } else {
         pool->Deallocate(mem, slice->size_ + GetHeadSize());
@@ -29,21 +36,21 @@ void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
 }
 
 ByteSliceList::ByteSliceList() {
-    head_ = NULL;
-    tail_ = NULL;
+    head_ = nullptr;
+    tail_ = nullptr;
     total_size_ = 0;
 }
 
-ByteSliceList::ByteSliceList(ByteSlice *slice) : head_(NULL), tail_(NULL), total_size_(0) {
-    if (slice != NULL) {
+ByteSliceList::ByteSliceList(ByteSlice *slice) : head_(nullptr), tail_(nullptr), total_size_(0) {
+    if (slice != nullptr) {
         Add(slice);
     }
 }
 
-ByteSliceList::~ByteSliceList() { Clear(NULL); }
+ByteSliceList::~ByteSliceList() { Clear(nullptr); }
 
 void ByteSliceList::Add(ByteSlice *slice) {
-    if (tail_ == NULL) {
+    if (tail_ == nullptr) {
         head_ = tail_ = slice;
     } else {
         tail_->next_ = slice;
@@ -54,7 +61,7 @@ void ByteSliceList::Add(ByteSlice *slice) {
 
 void ByteSliceList::Clear(MemoryPool *pool) {
     ByteSlice *slice = head_;
-    ByteSlice *next = NULL;
+    ByteSlice *next = nullptr;
 
     while (slice) {
         next = slice->next_;
@@ -62,7 +69,7 @@ void ByteSliceList::Clear(MemoryPool *pool) {
         slice = next;
     }
 
-    head_ = tail_ = NULL;
+    head_ = tail_ = nullptr;
     total_size_ = 0;
 }
 
@@ -77,7 +84,7 @@ size_t ByteSliceList::UpdateTotalSize() {
 }
 
 void ByteSliceList::MergeWith(ByteSliceList &other) {
-    if (head_ == NULL) {
+    if (head_ == nullptr) {
         head_ = other.head_;
         tail_ = other.tail_;
     } else {
@@ -86,7 +93,7 @@ void ByteSliceList::MergeWith(ByteSliceList &other) {
     }
 
     total_size_ = total_size_ + other.total_size_;
-    other.head_ = other.tail_ = NULL;
+    other.head_ = other.tail_ = nullptr;
     other.total_size_ = 0;
 }
 
@@ -117,7 +124,7 @@ bool ByteSliceListIterator::SeekSlice(size_t begin_pos) {
 }
 
 bool ByteSliceListIterator::HasNext(size_t end_pos) {
-    if (slice_ == NULL || end_pos > slice_list_->GetTotalSize()) {
+    if (slice_ == nullptr || end_pos > slice_list_->GetTotalSize()) {
         return false;
     }
 

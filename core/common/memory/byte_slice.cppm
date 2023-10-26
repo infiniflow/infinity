@@ -1,12 +1,17 @@
-#pragma once
+module;
 
-#include "memory_pool.h"
+import memory_pool;
+
+#include <cstdint>
+#include <cstring>
+
+export module byte_slice;
 
 namespace infinity {
 
 #pragma pack(push, 1)
 
-struct ByteSlice {
+export struct ByteSlice {
     ByteSlice() = default;
 
     bool operator==(const ByteSlice &other) const {
@@ -15,9 +20,9 @@ struct ByteSlice {
 
     static constexpr size_t GetHeadSize() { return sizeof(ByteSlice); }
 
-    static ByteSlice *CreateSlice(size_t data_size, MemoryPool *pool = NULL);
+    static ByteSlice *CreateSlice(size_t data_size, MemoryPool *pool = nullptr);
 
-    static void DestroySlice(ByteSlice *slice, MemoryPool *pool = NULL);
+    static void DestroySlice(ByteSlice *slice, MemoryPool *pool = nullptr);
 
     static ByteSlice *GetEmptySlice() {
         static ByteSlice slice;
@@ -33,7 +38,7 @@ struct ByteSlice {
 
 #pragma pack(pop)
 
-class ByteSliceList {
+export class ByteSliceList {
 public:
     ByteSliceList();
 
@@ -62,7 +67,7 @@ private:
     size_t total_size_;
 };
 
-class ByteSliceListIterator {
+export class ByteSliceListIterator {
 public:
     ByteSliceListIterator(const ByteSliceList *slice_list);
     ByteSliceListIterator(const ByteSliceListIterator &other);

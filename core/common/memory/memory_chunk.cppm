@@ -1,13 +1,15 @@
-#pragma once
+module;
 
 #include <memory>
 #include <new>
 #include <stddef.h>
 #include <string.h>
 
+export module memory_chunk;
+
 namespace infinity {
 
-class MemoryChunk {
+export class MemoryChunk {
 public:
     MemoryChunk(size_t num_size = 0) : size_(num_size) {
         pos_ = holder_ = sizeof(MemoryChunk);
@@ -67,7 +69,7 @@ protected:
     size_t holder_;
 };
 
-class ChainedMemoryChunk : public MemoryChunk {
+export class ChainedMemoryChunk : public MemoryChunk {
 public:
     ChainedMemoryChunk(size_t nSize) : MemoryChunk(nSize), next_(NULL), prev_(NULL) {
         pos_ = holder_ = sizeof(ChainedMemoryChunk);
@@ -88,7 +90,7 @@ private:
     ChainedMemoryChunk *prev_;
 };
 
-class ChunkAllocator {
+export class ChunkAllocator {
 public:
     ChunkAllocator(size_t chunk_size) : chunk_size_(chunk_size), used_bytes_(0), total_bytes_(0) {}
     ~ChunkAllocator() { Release(); }
