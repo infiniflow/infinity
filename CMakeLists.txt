@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.28)
 
 project(infinity VERSION 0.1.0)
 
@@ -23,8 +23,14 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 23)
 
-# Print CMake version and project name
-message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION}")
+execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
+string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
+if(CLANG_VERSION_STRING VERSION_GREATER 16)
+    # Print CMake version and project name
+    message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
+else ()
+    message(FATAL_ERROR, "Please use clang version 17.0 and above")
+endif ()
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
@@ -43,14 +49,10 @@ set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    MESSAGE("${CMAKE_CXX_COMPILER_ID}")
-    MESSAGE("${CMAKE_CXX_COMPILER}")
-    MESSAGE("CLANG")
-    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
-
+    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -w")
 # set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
 else()
-    message("GCC")
+    message(FATAL_ERROR "Please, use Clang. Current compiler is ${CMAKE_CXX_COMPILER_ID}!")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
