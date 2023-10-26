@@ -3,6 +3,7 @@ module;
 
 #include "ctpl_stl.h"
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -10,6 +11,7 @@ module;
 #include <cstring>
 #include <exception>
 #include <filesystem>
+#include <forward_list>
 #include <iostream>
 #include <list>
 #include <map>
@@ -19,6 +21,7 @@ module;
 #include <shared_mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
@@ -377,6 +380,11 @@ export {
     using LockGuard = std::lock_guard<T>;
 
     constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
+    constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
+    constexpr std::memory_order MemoryOrderRelease = std::memory_order::release;
+    constexpr std::memory_order MemoryOrderAcquire = std::memory_order::acquire;
+    constexpr std::memory_order MemoryOrderAcqrel = std::memory_order::acq_rel;
+    constexpr std::memory_order MemoryOrderSeqcst = std::memory_order::seq_cst;
 
     using CondVar = std::condition_variable;
 
@@ -426,6 +434,9 @@ export {
     float HugeValf() {
         return HUGE_VALF;
     }
+
+    template <typename T, typename Allocator = std::allocator<T>>
+    using ForwardList = std::forward_list<T, Allocator>;
 }
 
 } // namespace infinity
