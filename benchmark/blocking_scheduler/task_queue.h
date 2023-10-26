@@ -17,8 +17,8 @@ struct BlockingQueue {
     }
 
     template<class It>
-    SizeT
-    DequeueBulk(It iter, SizeT count) {
+    size_t
+    DequeueBulk(It iter, size_t count) {
         return queue_.wait_dequeue_bulk(iter, count);
     }
 

@@ -18,7 +18,7 @@ struct BlockingQueue {
 
     template<class It>
     void
-    EnqueueBulk(It iter, SizeT count) {
+    EnqueueBulk(It iter, size_t count) {
         queue_.enqueue_bulk(std::forward<It>(iter), count);
     }
 

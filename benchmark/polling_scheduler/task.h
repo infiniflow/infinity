@@ -4,13 +4,14 @@
 
 #pragma once
 
-#include "common/types/alias/concurrency.h"
 #include "operator.h"
 #include "buffer_queue.h"
 #include "task_queue.h"
 #include "poller_queue.h"
 #include <unistd.h>
 #include <cassert>
+#include <unordered_set>
+#include <unordered_map>
 
 namespace infinity {
 
@@ -19,7 +20,7 @@ class Task;
 class NewScheduler {
 public:
     static void
-    Init(const HashSet<i64>& cpu_set);
+    Init(const std::unordered_set<int64_t>& cpu_set);
 
     static void
     Uninit();
@@ -29,34 +30,34 @@ public:
 
 private:
     static void
-    DispatchTask(i64 worker_id, Task* task);
+    DispatchTask(int64_t worker_id, Task* task);
 
     static void
-    PollerLoop(i64 cpu_id);
+    PollerLoop(int64_t cpu_id);
 
     static void
-    CoordinatorLoop(i64 cpu_id);
+    CoordinatorLoop(int64_t cpu_id);
 
     static void
-    WorkerLoop(BlockingQueue* task_queue, i64 worker_id);
+    WorkerLoop(BlockingQueue* task_queue, int64_t worker_id);
 
-    static i64
+    static int64_t
     GetAvailableCPU();
 
 private:
-    static HashSet<i64> cpu_set;
+    static std::unordered_set<int64_t> cpu_set;
 
-    static HashMap<i64, UniquePtr<BlockingQueue>> task_queues;
-    static HashMap<i64, UniquePtr<Thread>> workers;
+    static std::unordered_map<int64_t, std::unique_ptr<BlockingQueue>> task_queues;
+    static std::unordered_map<int64_t, std::unique_ptr<std::thread>> workers;
 
-    static UniquePtr<BlockingQueue> ready_queue;
-    static UniquePtr<Thread> coordinator;
+    static std::unique_ptr<BlockingQueue> ready_queue;
+    static std::unique_ptr<std::thread> coordinator;
 
-    static UniquePtr<PollerQueue> poller_queue;
-    static UniquePtr<Thread> poller;
+    static std::unique_ptr<PollerQueue> poller_queue;
+    static std::unique_ptr<std::thread> poller;
 
-    static Vector<i64> cpu_array;
-    static u64 current_cpu_id;
+    static std::vector<int64_t> cpu_array;
+    static uint64_t current_cpu_id;
 };
 
 
@@ -82,7 +83,7 @@ struct Task {
     Task(TaskType type) : type_(type) {}
 
     virtual void
-    Run(i64 worker_id) {
+    Run(int64_t worker_id) {
         // Not implemented
         last_worker_id_ = worker_id;
     }
@@ -98,7 +99,7 @@ struct Task {
     }
 
     TaskType type_{TaskType::kInvalid};
-    i64 last_worker_id_{-1};
+    int64_t last_worker_id_{-1};
     bool ready_{false};
     std::atomic<TaskState> state_{TaskState::kPending};
 };
@@ -117,7 +118,7 @@ struct DummyTask final : public Task {
     }
 
     void
-    Run(i64 worker_id) override {
+    Run(int64_t worker_id) override {
         last_worker_id_ = worker_id;
         printf("Run dummy task by worker: %ld\n", worker_id);
         sleep(1);
@@ -146,30 +147,30 @@ struct PipelineTask final : public Task {
     AddSource(Source* source, bool input_queue) {
         source_ = source;
         if(input_queue) {
-            input_queue_ = MakeUnique<ConcurrentQueue>();
+            input_queue_ = std::make_unique<ConcurrentQueue>();
         }
     }
 
     inline void
     AddOperator(Operator* op) {
         operators_.emplace_back(op);
-        buffers_.emplace_back(MakeUnique<Buffer>(BUFFER_SIZE));
+        buffers_.emplace_back(std::make_unique<Buffer>(BUFFER_SIZE));
     }
 
     inline void
-    Run(i64 worker_id) override {
+    Run(int64_t worker_id) override {
         last_worker_id_ = worker_id;
 //        printf("Run pipeline task by worker: %ld\n", worker_id);
 
         // Read data from source buffer or input queue
-        source_buffer_ = MakeShared<Buffer>(BUFFER_SIZE);
+        source_buffer_ = std::make_shared<Buffer>(BUFFER_SIZE);
         source_->Run(input_queue_.get(), nullptr, source_buffer_);
 
         // process the data one by one operator and push to next operator
-        SizeT op_count = operators_.size();
+        size_t op_count = operators_.size();
         assert(op_count > 0);
         operators_[0]->Run(source_buffer_.get(), buffers_[0].get());
-        for(SizeT idx = 1; idx < op_count; ++idx) {
+        for(size_t idx = 1; idx < op_count; ++idx) {
             operators_[idx]->Run(buffers_[idx - 1].get(), buffers_[idx].get());
         }
 
@@ -194,16 +195,16 @@ struct PipelineTask final : public Task {
     }
 
     inline void
-    SetChildren(Vector<SharedPtr<Task>> children) {
+    SetChildren(std::vector<std::shared_ptr<Task>> children) {
         children_ = std::move(children);
-        for(const SharedPtr<Task>& child: children_) {
+        for(const std::shared_ptr<Task>& child: children_) {
             PipelineTask* child_pipeline = (PipelineTask*)child.get();
             child_pipeline->AddOutputQueue(input_queue_.get());
             child_pipeline->AddParent(this);
         }
     }
 
-    [[nodiscard]] inline const Vector<SharedPtr<Task>>&
+    [[nodiscard]] inline const std::vector<std::shared_ptr<Task>>&
     children() const {
         return children_;
     }
@@ -230,18 +231,18 @@ private:
     }
 private:
     Sink* sink_{};
-    Vector<ConcurrentQueue*> output_queues_;
+    std::vector<ConcurrentQueue*> output_queues_;
 
-    Vector<Operator*> operators_{};
-    Vector<SharedPtr<Buffer>> buffers_{};
+    std::vector<Operator*> operators_{};
+    std::vector<std::shared_ptr<Buffer>> buffers_{};
 
     Source* source_{};
-    SharedPtr<Buffer> source_buffer_ = nullptr;
+    std::shared_ptr<Buffer> source_buffer_ = nullptr;
     // Wait-free queue
-    UniquePtr<ConcurrentQueue> input_queue_{nullptr};
+    std::unique_ptr<ConcurrentQueue> input_queue_{nullptr};
 
-    Vector<SharedPtr<Task>> children_{};
-    Vector<Task*> parents_{};
+    std::vector<std::shared_ptr<Task>> children_{};
+    std::vector<Task*> parents_{};
 
     bool root_task_{false};
     bool completed_{false};

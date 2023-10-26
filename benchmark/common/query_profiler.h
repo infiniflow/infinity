@@ -21,11 +21,11 @@ enum class QueryPhase : int8_t {
 
 class OptimizerProfiler {
 public:
-    void StartRule(const String &rule_name);
+    void StartRule(const std::string &rule_name);
 
     void StopRule();
 
-    [[nodiscard]] String ToString(size_t intent = 0) const;
+    [[nodiscard]] std::string ToString(size_t intent = 0) const;
 
 private:
     std::vector<BaseProfiler> profilers_;
@@ -39,9 +39,9 @@ public:
 
     OptimizerProfiler &optimizer() { return optimizer_; }
 
-    [[nodiscard]] String ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
-    static String QueryPhaseToString(QueryPhase phase);
+    static std::string QueryPhaseToString(QueryPhase phase);
 
 private:
     std::vector<BaseProfiler> profilers_{magic_enum::enum_integer(QueryPhase::kInvalid)};

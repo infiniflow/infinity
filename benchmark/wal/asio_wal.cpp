@@ -13,7 +13,7 @@
 #include <thread>
 #include <vector>
 
-#include "common/utility/crc.hpp"
+#include "crc.hpp"
 
 using namespace std;
 

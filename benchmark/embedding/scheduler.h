@@ -4,12 +4,11 @@
 
 #pragma once
 
-#include "common/utility/mpsc_queue.h"
-#include "common/types/alias/primitives.h"
-#include "common/types/alias/containers.h"
-#include "common/types/alias/smart_ptr.h"
-#include "common/types/alias/concurrency.h"
+#include "mpsc_queue.h"
 #include "blockingconcurrentqueue.h"
+
+#include <unordered_set>
+#include <unordered_map>
 
 #include <unistd.h>
 
@@ -30,7 +29,7 @@ struct Task {
     Task(TaskType type) : type_(type) {}
 
     virtual void
-    run(i64 worker_id) {
+    run(int64_t worker_id) {
         // Not implemented
     }
 
@@ -52,7 +51,7 @@ struct DummyTask final : public Task {
     DummyTask() : Task(TaskType::kDummy) {}
 
     void
-    run(i64 worker_id) override {
+    run(int64_t worker_id) override {
         printf("Run dummy task by worker: %ld\n", (long)worker_id);
         sleep(1);
     }
@@ -78,22 +77,21 @@ public:
     Scheduler() = default;
 
     void
-    Init(const HashSet<i64>& cpu_set);
+    Init(const std::unordered_set<int64_t>& cpu_set);
 
     void
     Uninit();
 
     void
-    ScheduleTask(i64 worker_id, Task* task);
+    ScheduleTask(int64_t worker_id, Task* task);
 
     static void
-    ExecuteLoop(TaskQueue* task_queue, i64 worker_id);
+    ExecuteLoop(TaskQueue* task_queue, int64_t worker_id);
 
 private:
-    HashSet<i64> cpu_set_{};
-
-    HashMap<i64, UniquePtr<TaskQueue>> task_queues_{};
-    HashMap<i64, UniquePtr<Thread>> task_threads_{};
+    std::unordered_set<int64_t> cpu_set_{};
+    std::unordered_map<int64_t, std::unique_ptr<TaskQueue>> task_queues_{};
+    std::unordered_map<int64_t, std::unique_ptr<std::thread>> task_threads_{};
 };
 
 }

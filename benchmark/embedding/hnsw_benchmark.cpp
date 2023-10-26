@@ -18,10 +18,10 @@ using namespace infinity;
 
 auto
 main() -> int {
-    SizeT dimension;
-    SizeT embedding_count;
-    SizeT M = 16;
-    SizeT ef_construction = 200;
+    size_t dimension;
+    size_t embedding_count;
+    size_t M = 16;
+    size_t ef_construction = 200;
     float* input_embeddings = nullptr;
     {
         infinity::BaseProfiler profiler;
@@ -42,13 +42,13 @@ main() -> int {
         std::cout << "Found index file ... " << std::endl;
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
     } else {
-        SizeT max_elements = 10000000;        // create index
+        size_t max_elements = 10000000;        // create index
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         profiler.Begin();
         // insert data into index
-        for(SizeT idx = 0; idx < embedding_count; ++idx) {
+        for(size_t idx = 0; idx < embedding_count; ++idx) {
             hnsw_index->addPoint(input_embeddings + idx * dimension, idx);
 
             if(idx % 100000 == 0) {
@@ -96,7 +96,7 @@ main() -> int {
 
     {
         // Query and get result;
-        SizeT n_valid = 0;
+        size_t n_valid = 0;
         hnsw_index->setEf(ef_construction);
         infinity::BaseProfiler profiler;
         profiler.Begin();
@@ -105,7 +105,7 @@ main() -> int {
                     = hnsw_index->searchKnn(queries + i * dimension, top_k);
             assert(top_k == result.size() || !"incorrect topk value");
 
-            std::unordered_set<SizeT> ground_truth_set;
+            std::unordered_set<size_t> ground_truth_set;
             for(int j = 0; j < top_k; ++j) {
                 ground_truth_set.insert(ground_truth[i * top_k + j]);
             }

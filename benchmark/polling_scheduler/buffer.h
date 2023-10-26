@@ -4,21 +4,21 @@
 
 #pragma once
 
-#include "common/types/alias/primitives.h"
-#include "common/types/alias/smart_ptr.h"
+#include <cstring>
+#include <memory>
 
 namespace infinity {
 
 class Buffer {
 public:
     explicit
-    Buffer(SizeT size) : size_(size) {
-        buffer_ = MakeUnique<char>(size);
+    Buffer(size_t size) : size_(size) {
+        buffer_ = std::make_unique<char>(size);
     }
 
     inline void
     Append(const char* str) const {
-        SizeT len = std::strlen(str);
+        size_t len = std::strlen(str);
         if(len + offset_ >= size_) {
             throw;
         }
@@ -31,9 +31,9 @@ public:
     }
 
 private:
-    UniquePtr<char> buffer_{nullptr};
-    SizeT size_{};
-    SizeT offset_{};
+    std::unique_ptr<char> buffer_{nullptr};
+    size_t size_{};
+    size_t offset_{};
 };
 
 }

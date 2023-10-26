@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include "common/types/alias/strings.h"
-#include "common/types/alias/primitives.h"
-
 #include <chrono>
 #include <string>
 
@@ -16,7 +13,7 @@ class BaseProfiler {
 public:
     BaseProfiler() = default;
 
-    explicit BaseProfiler(String name) : name_(std::move(name)) {}
+    explicit BaseProfiler(std::string name) : name_(std::move(name)) {}
 
     // Start the profiler
     void Begin();
@@ -24,13 +21,13 @@ public:
     // End the profiler
     void End();
 
-    [[nodiscard]] String ElapsedToString() const;
+    [[nodiscard]] std::string ElapsedToString() const;
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
-    [[nodiscard]] inline i64 Elapsed() const { return ElapsedInternal().count(); }
+    [[nodiscard]] inline int64_t Elapsed() const { return ElapsedInternal().count(); }
 
-    [[nodiscard]] const String &name() const { return name_; }
-    void set_name(const String &name) { name_ = name; }
+    [[nodiscard]] const std::string &name() const { return name_; }
+    void set_name(const std::string &name) { name_ = name; }
 
 private:
     [[nodiscard]] static inline std::chrono::time_point<std::chrono::high_resolution_clock> Now() {
@@ -43,7 +40,7 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> end_ts_{};
 
     bool finished_ = false;
-    String name_{};
+    std::string name_{};
 };
 
 } // namespace infinity

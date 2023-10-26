@@ -4,7 +4,11 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm)
 
+### Parser
+
 add_subdirectory(parser)
+
+### Infinity
 
 file(GLOB_RECURSE
         main_cpp
