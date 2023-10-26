@@ -22,31 +22,27 @@ import txn;
 import base_entry;
 import new_catalog;
 
-class CatalogTest : public BaseTest {
-    void
-    SetUp() override {
-        system("rm -rf /tmp/infinity/");
+class CatalogTest  : public BaseTest {
+    void SetUp() override {
+        BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
     }
 
-    void
-    TearDown() override {
+    void TearDown() override {
         infinity::Infinity::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/");
+        BaseTest::TearDown();
     }
-
 };
 
 // txn1: create db1, get db1, delete db1, get db1, commit
 // txn2:             get db1,             get db1, commit
 TEST_F(CatalogTest, simple_test1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
@@ -108,7 +104,6 @@ TEST_F(CatalogTest, simple_test1) {
 // txn3:                     start, get db1, delete db1, commit
 TEST_F(CatalogTest, simple_test2) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
@@ -146,7 +141,6 @@ TEST_F(CatalogTest, simple_test2) {
     auto* txn3 = txn_mgr->CreateTxn();
     txn3->BeginTxn();
 
-
     // should be visible to txn3
     {
         EntryResult res;
@@ -171,7 +165,6 @@ TEST_F(CatalogTest, simple_test2) {
 
 TEST_F(CatalogTest, concurrent_test) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();

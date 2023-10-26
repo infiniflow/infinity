@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
@@ -49,21 +51,21 @@ String LogicalTableScan::TableAlias() const { return base_table_ref_->alias_; }
 u64 LogicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
 String LogicalTableScan::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "TableScan: " << base_table_ref_->table_entry_ptr_->table_collection_name_ << ", on: ";
-//    SizeT column_count = base_table_ref_->column_names_->size();
-//    for (SizeT i = 0; i < column_count - 1; ++i) {
-//        ss << base_table_ref_->column_names_->at(i) << " ";
-//    }
-//    ss << base_table_ref_->column_names_->back();
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_entry_ptr_->table_collection_name_ << ", on: ";
+    size_t column_count = base_table_ref_->column_names_->size();
+    for (size_t i = 0; i < column_count - 1; ++i) {
+        ss << base_table_ref_->column_names_->at(i) << " ";
+    }
+    ss << base_table_ref_->column_names_->back();
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 } // namespace infinity

@@ -14,24 +14,12 @@ import stl;
 import infinity;
 
 class DataTypeTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
 };
 
 
 TEST_F(DataTypeTest, GetTypeName) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     DataType bool_type(LogicalType::kBoolean);
     EXPECT_EQ(bool_type.ToString(), "Boolean");
     DataType tinyint_type(LogicalType::kTinyInt);
@@ -98,7 +86,7 @@ TEST_F(DataTypeTest, GetTypeName) {
 
 TEST_F(DataTypeTest, TypeToString) {
 //    using namespace infinity;
-//    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+//
 //    EXPECT_STREQ(DataType::TypeToString<BooleanT>().c_str(), "Boolean");
 //    EXPECT_STREQ(DataType::TypeToString<TinyIntT>().c_str(), "TinyInt");
 //    EXPECT_STREQ(DataType::TypeToString<SmallIntT>().c_str(), "SmallInt");
@@ -132,15 +120,15 @@ TEST_F(DataTypeTest, TypeToString) {
 
 TEST_F(DataTypeTest, Serialize) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     DataType bool_type(LogicalType::kBoolean);
     String bool_type_str = bool_type.Serialize().dump();
-    LOG_TRACE(Format("{}", bool_type_str));
+    std::cout << bool_type_str << std::endl;
 }
 
 TEST_F(DataTypeTest, ReadWrite) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     SharedPtr<TypeInfo> type_info_bitmap = BitmapInfo::Make(1024);
     SharedPtr<TypeInfo> type_info_decimal = DecimalInfo::Make(i64(38), i64(3));
@@ -164,7 +152,6 @@ TEST_F(DataTypeTest, ReadWrite) {
     for (int i = 0; i < data_types.size(); i++) {
         SharedPtr<DataType> &data_type = data_types[i];
         const SharedPtr<TypeInfo> &ti = data_type->type_info();
-        LOG_TRACE(data_type->Serialize().dump());
         int32_t exp_size = data_type->GetSizeInBytes();
         std::vector<char> buf(exp_size);
         char *buf_beg = buf.data();

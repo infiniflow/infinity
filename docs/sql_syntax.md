@@ -15,7 +15,7 @@ CREATE INDEX — define a new index
 
 ```sql
 CREATE INDEX [[IF NOT EXISTS] name] ON table_name (column_name[, ...]) USING method
-[WITH (index_parameter [= value][, ...])]
+[WITH (index_parameter [= value][, ...])];
 ```
 
 #### Description
@@ -43,3 +43,33 @@ CREATE INDEX [[IF NOT EXISTS] name] ON table_name (column_name[, ...]) USING met
 
 <!-- TODO shenyushi
 such as: centroids_count, MetricType -->
+
+### DROP INDEX
+
+DROP INDEX — remove an index
+
+#### Synopsis
+
+```sql
+DROP INDEX [IF EXISTS] name ON table_name;
+```
+
+### DESCRIBE INDEX
+
+#### Synopsis
+
+```sql
+DESCRIBE INDEX table_name;
+```
+
+### KNN SCAN
+
+<!-- TODO shenyushi -->
+<!-- #### Synopsis -->
+
+#### Example
+
+```sql
+SELECT col1 FROM tbl1 ORDER BY KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2') LIMIT 2;
+SELECT col1 FROM tbl1 ORDER BY KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 2;
+```

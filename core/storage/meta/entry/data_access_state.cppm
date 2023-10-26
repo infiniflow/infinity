@@ -7,6 +7,7 @@ module;
 import stl;
 import data_block;
 import column_vector;
+import parser;
 
 export module data_access_state;
 
@@ -47,7 +48,7 @@ export struct ImportState {
 };
 
 export struct DeleteState {
-    HashMap<u64, Vector<u64>> rows_;
+    HashMap<u64, Vector<RowID>> rows_;
 };
 
 export struct GetState {};

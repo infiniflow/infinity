@@ -3,10 +3,10 @@
 //
 module;
 
-#include "statement/extra/create_table_info.h"
 #include "type/info/array_info.h"
 #include "type/logical_type.h"
 #include "type/number/float16.h"
+#include "definition/column_def.h"
 #include "sql_parser.h"
 
 export module parser;

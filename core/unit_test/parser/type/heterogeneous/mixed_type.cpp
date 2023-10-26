@@ -14,23 +14,11 @@ import stl;
 import infinity;
 
 class MixedTypeTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
 };
 
 TEST_F(MixedTypeTest, mixed_integer) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     MixedType mixed_integer1 = MixedType::MakeInteger(10);
     EXPECT_EQ(mixed_integer1.type, MixedValueType::kInteger);
 
@@ -71,7 +59,7 @@ TEST_F(MixedTypeTest, mixed_integer) {
 
 TEST_F(MixedTypeTest, mixed_float) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     MixedType mixed_float1 = MixedType::MakeFloat(1.005);
     EXPECT_EQ(mixed_float1.type, MixedValueType::kFloat);
 
@@ -112,7 +100,7 @@ TEST_F(MixedTypeTest, mixed_float) {
 
 TEST_F(MixedTypeTest, mixed_short_str) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // Short string
     {
@@ -194,7 +182,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
 
 TEST_F(MixedTypeTest, mixed_long_str) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // Long string
     MixedType mixed_long_string = MixedType::MakeString("Hello the world");
@@ -272,21 +260,21 @@ TEST_F(MixedTypeTest, mixed_long_str) {
 
 TEST_F(MixedTypeTest, mixed_null) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     MixedType mixed_null1 = MixedType::MakeNull();
     EXPECT_EQ(mixed_null1.type, MixedValueType::kNull);
 }
 
 TEST_F(MixedTypeTest, mixed_miss) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
     MixedType mixed_miss1 = MixedType::MakeMissing();
     EXPECT_EQ(mixed_miss1.type, MixedValueType::kMissing);
 }
 
 TEST_F(MixedTypeTest, mixed_tuple1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_tuple1 = MixedType::MakeTuple(7);
     EXPECT_EQ(mixed_tuple1.type, MixedValueType::kTuple);
@@ -709,7 +697,7 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
 
 TEST_F(MixedTypeTest, mixed_tuple2) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_tuple1 = MixedType::MakeTuple(7);
     EXPECT_EQ(mixed_tuple1.type, MixedValueType::kTuple);
@@ -1025,7 +1013,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
 
 TEST_F(MixedTypeTest, mixed_tuple3) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_tuple3 = MixedType::MakeTuple(3);
     EXPECT_EQ(mixed_tuple3.type, MixedValueType::kTuple);
@@ -1074,7 +1062,7 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
 
 TEST_F(MixedTypeTest, mixed_array1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_array1 = MixedType::MakeArray(7);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);
@@ -1510,7 +1498,7 @@ TEST_F(MixedTypeTest, mixed_array1) {
 
 TEST_F(MixedTypeTest, mixed_array2) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_array1 = MixedType::MakeArray(7);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);
@@ -1836,7 +1824,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
 
 TEST_F(MixedTypeTest, mixed_array3) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     MixedType mixed_array1 = MixedType::MakeArray(2);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);

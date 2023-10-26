@@ -23,19 +23,6 @@ export module logical_node_visitor;
 
 namespace infinity {
 
-// class LogicalNode;
-// class BaseExpression;
-// class AggregateExpression;
-// class BetweenExpression;
-// class CaseExpression;
-// class CastExpression;
-// class ColumnExpression;
-// class ConjunctionExpression;
-// class FunctionExpression;
-// class ValueExpression;
-// class InExpression;
-// class SubqueryExpression;
-// class KnnExpression;
 
 export class LogicalNodeVisitor {
 public:

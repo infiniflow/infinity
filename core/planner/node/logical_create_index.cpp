@@ -1,9 +1,12 @@
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
 import base_expression;
+import index_def;
 
 module logical_create_index;
 
@@ -24,15 +27,15 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalCreateIndex::GetOutputTypes() cons
 }
 
 String LogicalCreateIndex::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << index_definition_->ToString();
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << index_definition_->ToString();
+    space += arrow_str.size();
+
+    return ss.str();
 }
 } // namespace infinity

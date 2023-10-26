@@ -64,13 +64,14 @@ bool FragmentTask::Ready() const {
     return source_op->ReadyToExec(source_state_.get());
 }
 
-bool FragmentTask::Complete() const {
+bool FragmentTask::IsComplete() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-    if (sink_state_->prev_output_state_->Complete() && sink_op->sink_type() == SinkType::kResult) {
-        fragment_context->Complete();
-    }
-    return true;
+    return sink_state_->prev_output_state_->Complete();
 }
 
+void FragmentTask::TryCompleteFragment() {
+    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+    fragment_context->FinishTask();
+}
 } // namespace infinity

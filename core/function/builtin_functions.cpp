@@ -62,6 +62,7 @@ void BuiltinFunctions::RegisterAggregateFunction() {
 
 void BuiltinFunctions::RegisterScalarFunction() {
     // Insert the function set into catalog
+
     // Arithmetic functions
     RegisterAddFunction(catalog_ptr_);
     RegisterSubtractFunction(catalog_ptr_);
@@ -98,6 +99,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
 }
 
 void BuiltinFunctions::RegisterTableFunction() {
+
     RegisterSeqScanFunction(catalog_ptr_);
     RegisterTableScanFunction(catalog_ptr_);
     RegisterKnnScanFunction(catalog_ptr_);

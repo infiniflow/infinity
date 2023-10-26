@@ -1,4 +1,6 @@
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/toml_config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/toml_config.h)
+
 add_executable(toml_benchmark
         toml_benchmark.cpp
 )

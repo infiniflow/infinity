@@ -27,29 +27,12 @@ import object_handle;
 import buffer_task;
 import async_batch_processor;
 
-class BufferTaskProcessorTest : public BaseTest {
-    void
-    SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void
-    TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/");
-    }
-};
+class BufferTaskProcessorTest : public BaseTest {};
 
 using namespace infinity;
 
 TEST_F(BufferTaskProcessorTest, test1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     SizeT memory_limit = 1024 * 1024 * 1024; // 1 Gib
     SharedPtr<String> temp_path = MakeShared<String>("/tmp/infinity/_tmp");
@@ -66,7 +49,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/_tmp/c1.col");
 
-        CommonObjectHandle object_handle1(buf_handle1);
+        ObjectHandle object_handle1(buf_handle1);
         ptr_t buf_ptr1 = object_handle1.GetData();
         for (i64 i = 0; i < elem_count; ++i) {
             ((i64 *)buf_ptr1)[i] = i;
@@ -79,7 +62,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/_tmp/c2.col");
 
-        CommonObjectHandle object_handle2(buf_handle2);
+        ObjectHandle object_handle2(buf_handle2);
         ptr_t buf_ptr2 = object_handle2.GetData();
         for (i32 i = 0; i < elem_count; ++i) {
             ((i32 *)buf_ptr2)[i] = i + 10;
@@ -114,7 +97,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle1->GetID(), 1);
         EXPECT_EQ(buf_handle1->GetFilename(), "/tmp/infinity/data/c1.col");
 
-        CommonObjectHandle object_handle1(buf_handle1);
+        ObjectHandle object_handle1(buf_handle1);
         ptr_t data_ptr = object_handle1.GetData();
         EXPECT_NE(data_ptr, nullptr);
 
@@ -129,7 +112,7 @@ TEST_F(BufferTaskProcessorTest, test1) {
         EXPECT_EQ(buf_handle2->GetID(), 2);
         EXPECT_EQ(buf_handle2->GetFilename(), "/tmp/infinity/data/c2.col");
 
-        CommonObjectHandle object_handle2(buf_handle2);
+        ObjectHandle object_handle2(buf_handle2);
         ptr_t data_ptr2 = object_handle2.GetData();
         EXPECT_NE(data_ptr2, nullptr);
 

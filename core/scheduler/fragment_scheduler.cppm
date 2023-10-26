@@ -50,6 +50,7 @@ private:
     HashSet<i64> cpu_set_{};
     Vector<i64> cpu_array_{};
 
+    //    Vector<SharedPtr<Thread>> worker_array_{};
     HashMap<i64, UniquePtr<FragmentTaskBlockQueue>> worker_queues_{};
     HashMap<i64, UniquePtr<Thread>> workers{};
 

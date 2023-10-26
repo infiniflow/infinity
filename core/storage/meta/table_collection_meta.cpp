@@ -45,7 +45,6 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                                                 u64 txn_id,
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr) {
-
     TableCollectionEntry *res = nullptr;
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     const String &table_collection_name = *table_collection_name_ptr;
@@ -109,7 +108,8 @@ EntryResult TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
                 }
             } else {
                 // Write-Write conflict
-                LOG_TRACE(Format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
+                LOG_TRACE(
+                    Format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
                 return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
             }
         } else {
@@ -313,28 +313,28 @@ SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta)
     return res;
 }
 
-Json TableCollectionMeta::Serialize(const TableCollectionMeta *table_meta) {
+Json TableCollectionMeta::Serialize(TableCollectionMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
-
-    json_res["db_entry_dir"] = *table_meta->db_entry_dir_;
-    json_res["table_name"] = *table_meta->table_collection_name_;
-
-    for (const auto &entry : table_meta->entry_list_) {
-        if (entry->entry_type_ == EntryType::kTable) {
-            json_res["entries"].emplace_back(TableCollectionEntry::Serialize((TableCollectionEntry *)entry.get()));
-        } else if (entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE(Format("Skip dummy type entry during serialize table {} meta", *table_meta->table_collection_name_));
-        } else {
-            Error<StorageException>("Unexpected entry type", __FILE_NAME__, __LINE__);
+    Vector<TableCollectionEntry *> table_entries;
+    {
+        SharedLock<RWMutex> lck(table_meta->rw_locker_);
+        json_res["db_entry_dir"] = *table_meta->db_entry_dir_;
+        json_res["table_name"] = *table_meta->table_collection_name_;
+        // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
+        for (auto &table_entry : table_meta->entry_list_) {
+            if (table_entry->entry_type_ == EntryType::kTable && table_entry->Committed() && table_entry->commit_ts_ <= max_commit_ts)
+                table_entries.push_back((TableCollectionEntry *)table_entry.get());
         }
     }
-
+    for (TableCollectionEntry *table_entry : table_entries) {
+        json_res["entries"].emplace_back(TableCollectionEntry::Serialize(table_entry, max_commit_ts, is_full_checkpoint));
+    }
     return json_res;
 }
 
 /**
  * @brief Deserialize the table meta from json.
- *        The table meta is a list of table entries.
+ *        The table meta is a list of table entries in reverse order.
  *        Same as CreateNewEntry, the last entry is a dummy entry.
  *        LIST: [👇(a new entry).... table_entry2 , table_entry1 , dummy_entry]
  *        The raw catalog is json, so the dummy entry is not included.
@@ -345,8 +345,6 @@ Json TableCollectionMeta::Serialize(const TableCollectionMeta *table_meta) {
  * @return UniquePtr<TableCollectionMeta>
  */
 UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
-    Json json_res;
-
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE(Format("load table {}", *table_name));
@@ -357,11 +355,25 @@ UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &tabl
             res->entry_list_.emplace_back(Move(table_entry));
         }
     }
+    res->entry_list_.sort([](const UniquePtr<BaseEntry> &ent1, const UniquePtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
     res->entry_list_.emplace_back(Move(dummy_entry));
 
     return res;
+}
+
+void TableCollectionMeta::MergeFrom(TableCollectionMeta &other) {
+    // No locking here since only the load stage needs MergeFrom.
+    Assert<StorageException>(IsEqual(*this->table_collection_name_, *other.table_collection_name_),
+                             "DBEntry::MergeFrom requires table_collection_name_ match",
+                             __FILE_NAME__,
+                             __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_),
+                             "DBEntry::MergeFrom requires db_entry_dir_ match",
+                             __FILE_NAME__,
+                             __LINE__);
+    MergeLists(this->entry_list_, other.entry_list_);
 }
 
 } // namespace infinity

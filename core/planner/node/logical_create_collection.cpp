@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
@@ -14,16 +16,16 @@ module logical_create_collection;
 namespace infinity {
 
 String LogicalCreateCollection::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Create Collection: " << *schema_name_ << "." << *collection_name_;
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Create Collection: " << *schema_name_ << "." << *collection_name_;
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 Vector<ColumnBinding> LogicalCreateCollection::GetColumnBindings() const { return {}; }

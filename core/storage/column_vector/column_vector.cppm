@@ -22,15 +22,15 @@ namespace infinity {
 
 export enum class ColumnVectorType : i8 {
     kInvalid,
-    kFlat,     // Stand without any encode
-    kConstant, // All vector has same type and value
-    //    kDictionary, // There is a dictionary zone
-    //    kRLE, // Run length encoding
-    //    kSequence,
-    //    kBias,
-    //
-    //    kCollectionFlat, // May have missing
-    //    kCollectionDictionary, // May have missing
+    kFlat,          // Stand without any encode
+    kConstant,      // All vector has same type and value
+                    //    kDictionary, // There is a dictionary zone
+                    //    kRLE, // Run length encoding
+                    //    kSequence,
+                    //    kBias,
+                    //
+                    //    kCollectionFlat, // May have missing
+                    //    kCollectionDictionary, // May have missing
     kHeterogeneous, // May have missing
 };
 

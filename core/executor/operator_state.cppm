@@ -15,6 +15,7 @@ import table_scan_function_data;
 import knn_scan_data;
 import table_def;
 import parser;
+import merge_knn_data;
 
 export module operator_state;
 
@@ -38,7 +39,7 @@ export struct InputState {
     inline explicit InputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    DataBlock *input_data_block_{nullptr};
+    DataBlock *input_data_block_{nullptr}; // this is pointed to the previous operator output
     bool *input_complete_ptr_{nullptr};
     i64 received_data_count_{0};
     i64 total_data_count_{0};
@@ -112,6 +113,8 @@ export struct KnnScanOutputState : public OutputState {
 // Merge Knn
 export struct MergeKnnInputState : public InputState {
     inline explicit MergeKnnInputState() : InputState(PhysicalOperatorType::kMergeKnn) {}
+
+    SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
 
 export struct MergeKnnOutputState : public OutputState {
@@ -375,6 +378,14 @@ export struct DropTableInputState : public InputState {
 
 export struct DropTableOutputState : public OutputState {
     inline explicit DropTableOutputState() : OutputState(PhysicalOperatorType::kDropTable) {}
+};
+
+export struct DropIndexInputState : public InputState {
+    inline explicit DropIndexInputState() : InputState(PhysicalOperatorType::kDropIndex) {}
+};
+
+export struct DropIndexOutputState : public OutputState {
+    inline explicit DropIndexOutputState() : OutputState(PhysicalOperatorType::kDropIndex) {}
 };
 
 // Drop Collection

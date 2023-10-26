@@ -18,12 +18,6 @@ export module query_binder;
 
 namespace infinity {
 
-//class QueryContext;
-//class BindContext;
-//class BoundSelectStatement;
-//class TableRef;
-//class Binding;
-//class BindAliasProxy;
 
 export class QueryBinder : public EnableSharedFromThis<QueryBinder> {
 public:

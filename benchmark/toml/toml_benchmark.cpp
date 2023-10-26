@@ -6,7 +6,7 @@
 #include <string>
 #include <filesystem>
 #include "toml.hpp"
-#include "bin/compilation_config.h"
+#include "toml_config.h"
 
 auto
 main() -> int {

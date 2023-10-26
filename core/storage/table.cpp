@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import infinity_assert;
 import infinity_exception;
@@ -40,17 +42,17 @@ static String TableTypeToString(TableType type) {
 }
 
 String Table::ToString() const {
-//    StringStream ss;
-//    ss << definition_ptr_->ToString();
-//    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
-//
-//    SizeT block_count = data_blocks_.size();
-//    for (SizeT idx = 0; idx < block_count; ++idx) {
-//        ss << "Block " << idx << std::endl;
-//        ss << data_blocks_[idx]->ToString();
-//    }
-//
-//    return ss.str();
+    std::stringstream ss;
+    ss << definition_ptr_->ToString();
+    ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
+
+    SizeT block_count = data_blocks_.size();
+    for (SizeT idx = 0; idx < block_count; ++idx) {
+        ss << "Block " << idx << std::endl;
+        ss << data_blocks_[idx]->ToString();
+    }
+
+    return ss.str();
 }
 
 SharedPtr<Vector<RowID>> Table::GetRowIDVector() const {

@@ -7,12 +7,11 @@
 #include <string>
 #include <filesystem>
 
-#include "bin/compilation_config.h"
+#include "csv_config.h"
 
 extern "C" {
 #include "zsv.h"
 }
-
 
 struct my_data {
     zsv_parser parser; /* used to access the parsed data */

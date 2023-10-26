@@ -2,6 +2,8 @@
 // Created by jinhai on 23-2-28.
 //
 
+#pragma once
+
 #include "base_table_reference.h"
 #include "statement/select_statement.h"
 

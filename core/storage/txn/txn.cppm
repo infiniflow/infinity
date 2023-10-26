@@ -18,6 +18,7 @@ import txn_state;
 import txn_context;
 import wal_entry;
 import txn_store;
+import index_def_entry;
 
 export module txn;
 
@@ -43,7 +44,6 @@ class DBEntry;
 
 export class Txn {
 public:
-
     explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
 
     void BeginTxn();
@@ -79,6 +79,8 @@ public:
     EntryResult CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type);
 
     EntryResult DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
+
+    EntryResult DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
     EntryResult GetCollectionByName(const String &db_name, const String &table_name);
 
@@ -127,18 +129,19 @@ public:
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
+    void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
+
+    void SetTxnCommitting(TxnTimeStamp commit_ts) { txn_context_.SetTxnCommitting(commit_ts); }
+
     void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
 
     TxnTableStore *GetTxnTableStore(const String &table_name);
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    void Checkpoint(const TxnTimeStamp max_commit_ts);
+    void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-private:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
-    void CheckpointFlushMemTable();
-    void CheckpointFlushCatalog();
 
 private:
     NewCatalog *catalog_{};
@@ -147,11 +150,11 @@ private:
 
     // Related database
     Set<String> db_names_{};
-    Set<String> table_names_{};
 
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableCollectionEntry *> txn_tables_{};
+    Set<IndexDefEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};
@@ -170,10 +173,6 @@ private:
 
     // Txn Manager
     TxnManager *txn_mgr_{};
-
-    bool is_checkpoint_{false};
-    // Checkpoint max commit ts only for checkpoint
-    TxnTimeStamp max_commit_ts_{};
 };
 
 } // namespace infinity

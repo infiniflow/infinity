@@ -50,6 +50,12 @@ namespace infinity {
 
 void PhysicalImport::Init() {}
 
+/**
+ * @brief copy statement execute function
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
 void PhysicalImport::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto import_input_state = static_cast<ImportInputState *>(input_state);
     auto import_output_state = static_cast<ImportOutputState *>(output_state);
@@ -116,11 +122,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
 
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
-                                                                              query_context->GetTxn()->TxnID(),
                                                                               segment_id,
                                                                               query_context->GetTxn()->GetBufferMgr());
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    CommonObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
+    ObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
     SizeT row_idx = 0;
 
     while (true) {
@@ -133,35 +138,48 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
         }
         ptr_t dst_ptr = object_handle.GetData() + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
-        ++segment_entry->current_row_;
+        ++segment_entry->row_count_;
         ++last_block_entry->row_count_;
 
-        if (BlockEntry::IsFull(last_block_entry)) {
+        if (BlockEntry::Room(last_block_entry) <= 0) {
             segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
                                                                               segment_entry->block_entries_.size(),
+                                                                              0,
                                                                               segment_entry->column_count_,
-                                                                              ++segment_entry->current_row_,
                                                                               txn->GetBufferMgr()));
             last_block_entry = segment_entry->block_entries_.back().get();
         }
 
         row_idx++;
         if (row_idx == vector_n) {
-            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
+            for (auto &block_entry : segment_entry->block_entries_) {
+                BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+            }
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                    table_name,
+                                                    *segment_entry->segment_dir_,
+                                                    segment_entry->segment_id_,
+                                                    segment_entry->block_entries_.size()));
             txn_store->Import(segment_entry);
             break;
         }
-        if (segment_entry->AvailableCapacity() == 0) {
-            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
+        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+            for (auto &block_entry : segment_entry->block_entries_) {
+                BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+            }
+            txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                    table_name,
+                                                    *segment_entry->segment_dir_,
+                                                    segment_entry->segment_id_,
+                                                    segment_entry->block_entries_.size()));
             txn_store->Import(segment_entry);
             segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
-                                                              query_context->GetTxn()->TxnID(),
                                                               segment_id,
                                                               query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
-            object_handle = CommonObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
+            object_handle = ObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
         }
     }
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));
@@ -181,7 +199,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     txn->AddTxnTableStore(*table_collection_entry_->table_collection_name_,
                           MakeUnique<TxnTableStore>(*table_collection_entry_->table_collection_name_, table_collection_entry_, txn));
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), segment_id, txn->GetBufferMgr());
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
 
     auto parser_context = MakeUnique<ParserContext>(table_collection_entry_, txn, segment_entry, delimiter_);
 
@@ -205,10 +223,17 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     parser_context->parser_.Finish();
 
     // add the last segment entry
-    if (parser_context->segment_entry_->current_row_ > 0) {
+    if (parser_context->segment_entry_->row_count_ > 0) {
         const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
         const String &table_name = *table_collection_entry_->table_collection_name_;
-        parser_context->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *parser_context->segment_entry_->segment_dir_));
+        for (auto &block_entry : parser_context->segment_entry_->block_entries_) {
+            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+        }
+        parser_context->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                                table_name,
+                                                                *parser_context->segment_entry_->segment_dir_,
+                                                                parser_context->segment_entry_->segment_id_,
+                                                                parser_context->segment_entry_->block_entries_.size()));
         auto txn_store = parser_context->txn_->GetTxnTableStore(table_name);
         txn_store->Import(parser_context->segment_entry_);
     }
@@ -319,30 +344,33 @@ void PhysicalImport::CSVRowHandler(void *context) {
     const String &db_name = *TableCollectionEntry::GetDBEntry(table)->db_name_;
     const String &table_name = *table->table_collection_name_;
     // we have already used all space of the segment
-    if (segment_entry->AvailableCapacity() == 0) {
+    if (SegmentEntry::Room(segment_entry.get()) <= 0) {
         // add to txn_store
-        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name, table_name, *segment_entry->segment_dir_));
+        for (auto &block_entry : segment_entry->block_entries_) {
+            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
+        }
+        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                table_name,
+                                                *segment_entry->segment_dir_,
+                                                segment_entry->segment_id_,
+                                                segment_entry->block_entries_.size()));
         txn_store->Import(segment_entry);
 
         // create new segment entry
         parser_context->segment_entry_ =
-            SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), TableCollectionEntry::GetNextSegmentID(table), txn->GetBufferMgr());
+            SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
 
-    SizeT write_row = segment_entry->current_row_;
-
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    if (BlockEntry::IsFull(last_block_entry)) {
-        segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
-                                                                          segment_entry->block_entries_.size(),
-                                                                          segment_entry->column_count_,
-                                                                          write_row,
-                                                                          txn->GetBufferMgr()));
+    if (BlockEntry::Room(last_block_entry) <= 0) {
+        segment_entry->block_entries_.emplace_back(
+            MakeUnique<BlockEntry>(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn->GetBufferMgr()));
         last_block_entry = segment_entry->block_entries_.back().get();
     }
 
     // append data to segment entry
+    SizeT write_row = last_block_entry->row_count_;
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         StringView str_view{};
@@ -440,7 +468,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
     }
     ++last_block_entry->row_count_;
-    ++segment_entry->current_row_;
+    ++segment_entry->row_count_;
     ++parser_context->row_count_;
 }
 

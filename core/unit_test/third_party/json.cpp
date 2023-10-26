@@ -30,10 +30,9 @@ class JsonTest : public BaseTest {
 
 TEST_F(JsonTest, test1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     String json_path = String(test_data_path()) + "/json/twitter.json";
-    LOG_TRACE(Format("JSON Path: {}", json_path));
     std::ifstream f(json_path);
 
     Json data = Json::parse(f);

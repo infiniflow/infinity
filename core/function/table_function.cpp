@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import function;
 import parser;
@@ -16,9 +18,9 @@ TableFunction::TableFunction(String name, Vector<LogicalType> argument_types, Ta
     : Function(Move(name), FunctionType::kTable), parameter_types_(Move(argument_types)), main_function_(Move(function)) {}
 
 String TableFunction::ToString() const {
-//    std::stringstream ss;
-//    ss << "Table Function: " << name_;
-//    return ss.str();
+    std::stringstream ss;
+    ss << "Table Function: " << name_;
+    return ss.str();
 }
 
 } // namespace infinity

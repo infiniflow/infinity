@@ -4,6 +4,8 @@
 
 module;
 
+#include <vector>
+
 import stl;
 import third_party;
 import parser;
@@ -16,6 +18,7 @@ import data_block;
 import logger;
 import data_access_state;
 import txn;
+import index_entry;
 
 module txn_store;
 
@@ -73,8 +76,23 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
+UniquePtr<String> TxnTableStore::CreateIndexFile(u64 segment_id, SharedPtr<IndexEntry> index) {
+    uncommitted_indexes_.emplace(segment_id, Move(index));
+    return nullptr;
+}
+
 UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
-    Error<NotImplementException>("TxnTableStore::Delete", __FILE_NAME__, __LINE__);
+    auto &rows = delete_state_.rows_;
+    for (auto row_id : row_ids) {
+        auto it = rows.find(row_id.segment_id_);
+        if (it != rows.end()) {
+            it->second.push_back(row_id);
+        } else {
+            Vector<RowID> tmp_rows = {row_id};
+            rows.emplace(row_id.segment_id_, tmp_rows);
+        }
+    }
+    return nullptr;
 }
 
 void TxnTableStore::Scan(SharedPtr<DataBlock> &output_block) {}
@@ -102,19 +120,22 @@ void TxnTableStore::PrepareCommit() {
     SizeT segment_count = uncommitted_segments_.size();
     for(SizeT seg_idx = 0; seg_idx < segment_count; ++ seg_idx) {
         const auto &uncommitted = uncommitted_segments_[seg_idx];
-        TableCollectionEntry::ImportAppendSegment(table_entry_, txn_, uncommitted, *append_state_, txn_ptr->GetBufferMgr());
+        // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
+        TableCollectionEntry::ImportSegment(table_entry_, txn_, uncommitted);
     }
+
+    TableCollectionEntry::Delete(table_entry_, txn_, delete_state_, txn_ptr->GetBufferMgr());
+
+    TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
 
     LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", this->table_name_));
 }
 
 /**
- * @attention deprecated
  * @brief Call for really commit the data to disk.
  */
-void TxnTableStore::Commit() {
-    Txn *txn_ptr = (Txn *)txn_;
-    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get(), txn_ptr->GetBufferMgr());
+void TxnTableStore::Commit() const {
+    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
 }
 
 } // namespace infinity

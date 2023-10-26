@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import base_expression;
@@ -45,21 +47,21 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalProject::GetOutputTypes() const {
 }
 
 String LogicalProject::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Project on: ";
-//    size_t expression_count = expressions_.size();
-//    for (size_t i = 0; i < expression_count - 1; ++i) {
-//        ss << expressions_[i]->Name() << ", ";
-//    }
-//    ss << expressions_.back()->Name();
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Project on: ";
+    size_t expression_count = expressions_.size();
+    for (size_t i = 0; i < expression_count - 1; ++i) {
+        ss << expressions_[i]->Name() << ", ";
+    }
+    ss << expressions_.back()->Name();
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 } // namespace infinity

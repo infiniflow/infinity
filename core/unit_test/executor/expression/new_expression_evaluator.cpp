@@ -32,24 +32,10 @@ import table_def;
 import data_block;
 import default_values;
 
-class ExpressionEvaluatorTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ExpressionEvaluatorTest : public BaseTest {};
 
 TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
     RegisterAddFunction(catalog_ptr);
 
@@ -150,7 +136,6 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
 
 TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
     RegisterSubtractFunction(catalog_ptr);
 

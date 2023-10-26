@@ -230,20 +230,21 @@ SharedPtr<String> DBMeta::ToString(DBMeta *db_meta) {
     return res;
 }
 
-Json DBMeta::Serialize(const DBMeta *db_meta) {
+Json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
-
-    json_res["data_dir"] = *db_meta->data_dir_;
-    json_res["db_name"] = *db_meta->db_name_;
-    for (const auto &base_entry : db_meta->entry_list_) {
-        if (base_entry->entry_type_ == EntryType::kDatabase) {
-            DBEntry *db_entry = (DBEntry *)base_entry.get();
-            json_res["entries"].emplace_back(DBEntry::Serialize(db_entry));
-        } else if (base_entry->entry_type_ == EntryType::kDummy) {
-            ; // LOG_TRACE("Skip dummy type entry during serialize database {} meta", *db_meta->db_name_);
-        } else {
-            Error<StorageException>("Unexpected entry type", __FILE_NAME__, __LINE__);
+    Vector<DBEntry *> db_entries;
+    {
+        SharedLock<RWMutex> lck(db_meta->rw_locker_);
+        json_res["data_dir"] = *db_meta->data_dir_;
+        json_res["db_name"] = *db_meta->db_name_;
+        // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
+        for (auto &db_entry : db_meta->entry_list_) {
+            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->Committed() && db_entry->commit_ts_ <= max_commit_ts)
+                db_entries.push_back((DBEntry *)db_entry.get());
         }
+    }
+    for (DBEntry *db_entry : db_entries) {
+        json_res["entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -258,7 +259,15 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *b
             res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
         }
     }
+    res->entry_list_.sort([](const UniquePtr<BaseEntry> &ent1, const UniquePtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     return res;
+}
+
+void DBMeta::MergeFrom(DBMeta &other) {
+    // No locking here since only the load stage needs MergeFrom.
+    Assert<StorageException>(IsEqual(*this->db_name_, *other.db_name_), "DBMeta::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(IsEqual(*this->data_dir_, *other.data_dir_), "DBMeta::MergeFrom requires db_dir_ match", __FILE_NAME__, __LINE__);
+    MergeLists(this->entry_list_, other.entry_list_);
 }
 
 } // namespace infinity

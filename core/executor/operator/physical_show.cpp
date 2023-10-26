@@ -25,6 +25,11 @@ import table_collection_entry;
 import table_def;
 import table;
 import third_party;
+import index_def_meta;
+import index_def_entry;
+import index_def;
+import index_entry;
+import ivfflat_index_def;
 
 module physical_show;
 
@@ -76,6 +81,22 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowIndexes: {
+
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+
+            output_names_->emplace_back("index_name");
+            output_names_->emplace_back("method_type");
+            output_names_->emplace_back("column_names");
+            output_names_->emplace_back("other_parameters");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Error<NotImplementException>("Not implemented show type", __FILE_NAME__, __LINE__);
         }
@@ -94,6 +115,10 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
         }
         case ShowType::kShowColumn: {
             ExecuteShowColumns(query_context, show_input_state, show_output_state);
+            break;
+        }
+        case ShowType::kShowIndexes: {
+            ExecuteShowIndexes(query_context, show_input_state, show_output_state);
             break;
         }
         default: {
@@ -339,6 +364,93 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowInputStat
     }
 }
 
+void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+    auto txn = query_context->GetTxn();
+    auto result = txn->GetTableByName(db_name_, object_name_);
+    output_state->error_message_ = std::move(result.err_);
+    if (result.entry_ == nullptr) {
+        return;
+    }
+    auto table_collection_entry = static_cast<TableCollectionEntry *>(result.entry_);
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, varchar_type, "index_name", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(1, varchar_type, "method_type", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(2, varchar_type, "column_names", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(3, varchar_type, "other_parameters", HashSet<ConstraintType>())};
+
+    auto table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+
+    auto output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types(4, varchar_type);
+    output_block_ptr->Init(column_types);
+
+    for (const auto &[index_name, index_def_meta] : table_collection_entry->indexes_) {
+        auto entry = IndexDefMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS());
+        if (entry.Fail()) {
+            continue;
+        }
+        auto index_def_entry = static_cast<IndexDefEntry *>(entry.entry_);
+        auto index_def = index_def_entry->index_def_.get();
+        SizeT column_id = 0;
+        {
+            // Append index name to the first column
+            Value value = Value::MakeVarchar(*index_def->index_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+        ++column_id;
+        {
+            // Append index method type to the second column
+            Value value = Value::MakeVarchar(IndexMethodToString(index_def->method_type_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+        ++column_id;
+        {
+            // Append index column names to the third column
+            String column_names;
+            SizeT idx = 0;
+            for (auto &column_name : index_def->column_names_) {
+                column_names += column_name;
+                if (idx < index_def->column_names_.size() - 1) {
+                    column_names += ",";
+                }
+                idx++;
+            }
+            Value value = Value::MakeVarchar(column_names);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+        ++column_id;
+        {
+            // Append index other parameters to the fourth column
+            String other_parameters;
+            switch (index_def->method_type_) {
+                case IndexMethod::kIVFFlat: {
+                    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def);
+                    other_parameters = Format("metric = {}, centroids_count = {}",
+                                                   MetricTypeToString(ivfflat_index_def->metric_type_),
+                                                   ivfflat_index_def->centroids_count_);
+                    break;
+                }
+                case IndexMethod::kInvalid: {
+                    Error<ExecutorException>("Invalid index method type", __FILE_NAME__, __LINE__);
+                }
+                default: {
+                    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+                    break;
+                }
+            }
+            Value value = Value::MakeVarchar(other_parameters);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+    output_block_ptr->Finalize();
+    output_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
 void PhysicalShow::Execute(QueryContext *query_context) {
 
     switch (scan_type_) {
@@ -348,6 +460,10 @@ void PhysicalShow::Execute(QueryContext *query_context) {
         }
         case ShowType::kShowColumn: {
             ExecuteShowColumns(query_context);
+            break;
+        }
+        case ShowType::kShowIndexes: {
+            Error<ExecutorException>("Not implemented the deprecated call of execute", __FILE_NAME__, __LINE__);
             break;
         }
         case ShowType::kShowViews: {

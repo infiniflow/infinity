@@ -13,24 +13,10 @@ import logger;
 import stl;
 import infinity;
 
-class SelectStatementParsingTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class SelectStatementParsingTest : public BaseTest {};
 
 TEST_F(SelectStatementParsingTest, good_test1) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -69,7 +55,6 @@ TEST_F(SelectStatementParsingTest, good_test1) {
 
 TEST_F(SelectStatementParsingTest, good_test2) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -433,7 +418,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
 
     {
-        String input_sql = "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1, 2], 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1026,7 +1011,6 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
 TEST_F(SelectStatementParsingTest, good_test3) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1301,7 +1285,6 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
 TEST_F(SelectStatementParsingTest, good_test4) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
@@ -1335,13 +1318,12 @@ TEST_F(SelectStatementParsingTest, good_test4) {
 TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     {
         // integer with l2
-        String input_sql = "SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1, 2], 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1402,7 +1384,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     {
         // bigint with cosine
-        String input_sql = "SELECT KNN(c1, [3, 10, 1111], 3, 'bigint', 'cosine') AS distance1 FROM t1 WHERE a < 0 ORDER BY distance1 LIMIT 2;";
+        String input_sql = "SELECT KNN(c1, [3, 10, 1111], 'bigint', 'cosine') AS distance1 FROM t1 WHERE a < 0 ORDER BY distance1 LIMIT 2;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1464,7 +1446,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     {
         // double with cosine
-        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 2, 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1525,7 +1507,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     {
         // double with inner product
-        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 2, 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1587,7 +1569,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     {
         // bit with hamming
-        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 8, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1662,7 +1644,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 
     {
         // float with inner product
-        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 2, 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1.00, 2.00], 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -1728,13 +1710,12 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
 TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     {
         // bad dimension type double not match hamming
-        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 2, 'double', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1.0, 2.0], 'double', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1742,7 +1723,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     {
         // bit which length should be aligned with 8
-        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0], 7, 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+        String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0], 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -1751,7 +1732,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
     {
         // bit only support hamming
         String input_sql =
-            "SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 18, 'bit', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
+            "SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
         parser->Parse(input_sql, result);
         std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());

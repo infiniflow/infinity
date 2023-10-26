@@ -16,7 +16,7 @@ import operator_state;
 import physical_operator_type;
 import third_party;
 import fragment_data;
-// import data_block;
+ import data_block;
 // import column_vector;
 import infinity_assert;
 import infinity_exception;
@@ -76,7 +76,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
             if (explain_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty explain output", __FILE_NAME__, __LINE__);
             }
-            materialize_sink_state->data_block_array_.emplace_back(explain_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kProjection: {
@@ -84,7 +85,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
             if (projection_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty projection output", __FILE_NAME__, __LINE__);
             }
-            materialize_sink_state->data_block_array_.emplace_back(projection_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
@@ -92,7 +94,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
             if (knn_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty knn scan output", __FILE_NAME__, __LINE__);
             }
-            materialize_sink_state->data_block_array_.emplace_back(knn_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         default: {
@@ -212,6 +215,17 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             }
             break;
         }
+        case PhysicalOperatorType::kDropIndex: {
+            auto *output_state = static_cast<DropIndexOutputState *>(task_output_state);
+            if (output_state->error_message_.get() != nullptr) {
+                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            } else {
+                result_sink_state->result_def_ = {
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+                };
+            }
+            break;
+        }
         case PhysicalOperatorType::kDropCollection: {
             auto *output_state = static_cast<DropCollectionOutputState *>(task_output_state);
             if (output_state->error_message_.get() != nullptr) {
@@ -271,7 +285,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState *message_sink
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOutputState *knn_output_state = static_cast<KnnScanOutputState *>(task_output_state);
             SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-            fragment_data->data_block_ = knn_output_state->data_block_;
+            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            fragment_data->data_block_ = new_data_block;
             fragment_data->data_count_ = 1;
             fragment_data->data_idx_ = 1;
             for (const auto &next_fragment_queue : message_sink_state->fragment_data_queues_) {

@@ -31,8 +31,9 @@ import storage;
 import resource_manager;
 import query_context;
 
-class TableScanTest : public BaseTest {
+class TableScanTest  : public BaseTest {
     void SetUp() override {
+        BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
@@ -43,12 +44,12 @@ class TableScanTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        BaseTest::TearDown();
     }
 };
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
 //    RegisterSeqScanFunction(catalog);
     RegisterTableScanFunction(catalog);

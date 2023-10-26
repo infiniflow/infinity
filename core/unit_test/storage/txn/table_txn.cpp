@@ -21,8 +21,9 @@ import txn_manager;
 import txn;
 import base_entry;
 
-class TableTxnTest : public BaseTest {
+class TableTxnTest  : public BaseTest {
     void SetUp() override {
+        BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::Infinity::instance().Init(config_path);
@@ -33,9 +34,7 @@ class TableTxnTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-        system("rm -rf /tmp/infinity/data/db");
-        system("rm -rf /tmp/infinity/data/catalog/*");
-        system("rm -rf /tmp/infinity/_tmp");
+        BaseTest::TearDown();
     }
 };
 
@@ -235,7 +234,6 @@ TEST_F(TableTxnTest, test3) {
 //                    TXN2 Begin                    TXN2 Create tbl1(No DB found)     TXN2 create tbl1(No DB found)    TXN2 Commit
 TEST_F(TableTxnTest, test4) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->CreateTxn();
@@ -281,7 +279,6 @@ TEST_F(TableTxnTest, test4) {
 //                                                     TXN3 Begin    TXN3 Create tbl1(WW-Conflict)  TXN3 Commit
 TEST_F(TableTxnTest, test5) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->CreateTxn();
@@ -331,7 +328,6 @@ TEST_F(TableTxnTest, test5) {
 //               TXN3 Begin                TXN3 Create tbl1(WW-Conflict)  TXN3 Commit
 TEST_F(TableTxnTest, test6) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->CreateTxn();
@@ -377,7 +373,6 @@ TEST_F(TableTxnTest, test6) {
 
 TEST_F(TableTxnTest, test7) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->CreateTxn();
@@ -418,7 +413,6 @@ TEST_F(TableTxnTest, test7) {
 
 TEST_F(TableTxnTest, test8) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
     // Txn1: Create, OK
     Txn *new_txn1 = txn_mgr->CreateTxn();
@@ -472,7 +466,6 @@ TEST_F(TableTxnTest, test8) {
 //                    TXN3 Begin                    TXN3 Create tbl1(WW-Conflict)        TXN3 Create tbl1 OK  TXN3 Commit
 TEST_F(TableTxnTest, test9) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
 
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
@@ -528,7 +521,6 @@ TEST_F(TableTxnTest, test9) {
 //                    TXN3 Begin                    TXN3 Create tbl1(WW-Conflict)      TXN3 Create tbl1 OK  TXN3 Commit
 TEST_F(TableTxnTest, test10) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
     TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
 
     EntryResult create1_res, create2_res, create3_res, dropped1_res, get_res;

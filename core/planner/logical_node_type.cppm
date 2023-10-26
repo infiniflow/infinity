@@ -39,6 +39,7 @@ export enum class LogicalNodeType : u8 {
     kCreateSchema,
     kCreateView,
     kDropTable,
+    kDropIndex,
     kDropCollection,
     kDropSchema,
     kDropView,

@@ -38,6 +38,8 @@ private:
     // Drop operator
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] SharedPtr<PhysicalOperator> BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const;
+
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const;

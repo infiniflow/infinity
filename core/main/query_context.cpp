@@ -2,7 +2,6 @@
 // Created by jinhai on 23-10-16.
 //
 
-
 module;
 
 #include <sstream>
@@ -26,9 +25,10 @@ import fragment_builder;
 import bind_context;
 import logical_node;
 import physical_operator;
+import third_party;
+import logger;
 
 module query_context;
-
 
 namespace infinity {
 
@@ -110,6 +110,10 @@ QueryResult QueryContext::Query(const String &query) {
         try {
             this->CreateTxn();
             this->BeginTxn();
+            LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+                            session_ptr_->txn_->TxnID(),
+                            session_ptr_->txn_->BeginTS(),
+                            statement->ToString()));
 
             // Build unoptimized logical plan for each SQL statement.
             SharedPtr<BindContext> bind_context;

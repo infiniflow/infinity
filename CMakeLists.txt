@@ -2,14 +2,24 @@ cmake_minimum_required(VERSION 3.10)
 
 project(infinity VERSION 0.1.0)
 
-# find_program(CCACHE_FOUND ccache)
-# if(CCACHE_FOUND)
-#   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-#   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
-#   message("Find ccache")
-# else()
-#   message("Can not find ccache")
-# endif()
+find_program(CCACHE_FOUND ccache)
+
+if(CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
+    message("Find ccache")
+else()
+    message("Can not find ccache")
+endif()
+
+option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
+if (${FORCE_COLORED_OUTPUT})
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+       add_compile_options (-fdiagnostics-color=always)
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+       add_compile_options (-fcolor-diagnostics)
+    endif ()
+endif ()
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -33,31 +43,36 @@ set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  MESSAGE("${CMAKE_CXX_COMPILER_ID}")
-  MESSAGE("${CMAKE_CXX_COMPILER}")
-  MESSAGE("CLANG")
-  set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations" )
-#  set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
-else ()
-  message("GCC")
-endif ()
+    MESSAGE("${CMAKE_CXX_COMPILER_ID}")
+    MESSAGE("${CMAKE_CXX_COMPILER}")
+    MESSAGE("CLANG")
+    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
+
+# set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
+else()
+    message("GCC")
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
-  if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    set(default_build_type "RelWithDebInfo")
-  else()
-    set(default_build_type "Debug")
-  endif()
-  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING
-    "Default BUILD_TYPE is ${default_build_type}" FORCE)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+        set(default_build_type "RelWithDebInfo")
+    else()
+        set(default_build_type "Debug")
+    endif()
+
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING
+        "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif()
+
 add_definitions(-march=native)
+if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
+    add_definitions(-mevex512)
+endif ()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
-#set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
-#find_package(Boost REQUIRED)
-
+# set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
+# find_package(Boost REQUIRED)
 add_subdirectory(core)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 

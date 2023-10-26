@@ -26,8 +26,7 @@ buffer_pool_size        = "4GB"
 temp_dir                = "/tmp/infinity/temp"
 
 [wal]
-full_checkpoint_time_interval      = 43200000
-full_checkpoint_txn_interval       = 100000
-delta_checkpoint_time_interval     = 20000
-delta_checkpoint_txn_interval      = 3
+full_checkpoint_interval_sec      = 86400
+delta_checkpoint_interval_sec     = 60
+delta_checkpoint_interval_wal_bytes      = 1000000000
 wal_file_size_threshold            = "1GB"

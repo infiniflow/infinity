@@ -16,6 +16,11 @@ import segment_entry;
 import block_index;
 import table_collection_meta;
 import data_access_state;
+import txn_manager;
+import index_entry;
+import segment_entry;
+import index_def_meta;
+import txn;
 
 export module table_collection_entry;
 
@@ -24,7 +29,7 @@ namespace infinity {
 class DBEntry;
 //class TableCollectionMeta;
 //class BufferManager;
-class Txn;
+//class Txn;
 //class BlockIndex;
 //class ColumnDef;
 //class DeleteState;
@@ -42,7 +47,29 @@ public:
                                   TxnTimeStamp begin_ts);
 
 public:
+    static EntryResult CreateIndex(TableCollectionEntry *table_entry,
+                                   SharedPtr<IndexDef> index_def,
+                                   ConflictType conflict_type,
+                                   u64 txn_id,
+                                   TxnTimeStamp begin_ts,
+                                   TxnManager *txn_mgr);
+
+    static EntryResult DropIndex(TableCollectionEntry *table_entry,
+                                 const String &index_name,
+                                 ConflictType conflict_type,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr);
+
+    static EntryResult GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
+
+    static void RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr);
+
+public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
+
+    static void
+    CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
 
     static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr);
 
@@ -50,7 +77,9 @@ public:
 
     static UniquePtr<String> Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, const ScanState &scan_state, BufferManager *buffer_mgr);
 
-    static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);
+
+    static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 
@@ -58,13 +87,7 @@ public:
 
     static UniquePtr<String> RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static UniquePtr<String> ImportAppendSegment(TableCollectionEntry *table_entry,
-                                                 Txn *txn_ptr,
-                                                 SharedPtr<SegmentEntry> segment,
-                                                 AppendState &append_state,
-                                                 BufferManager *buffer_mgr);
-
-    static EntryResult CreateIndex(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<IndexDef> index_def);
+    static UniquePtr<String> ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment);
 
     static inline u64 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
 
@@ -74,16 +97,16 @@ public:
 
     static DBEntry *GetDBEntry(const TableCollectionEntry *table_entry);
 
-    inline static TableCollectionMeta *GetTableMeta(const TableCollectionEntry *table_entry) {
-        return (TableCollectionMeta *)table_entry->table_collection_meta_;
-    }
+    inline static TableCollectionMeta *GetTableMeta(const TableCollectionEntry *table_entry) { return table_entry->table_collection_meta_; }
 
     static SharedPtr<BlockIndex> GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static Json Serialize(const TableCollectionEntry *table_entry);
+    static Json Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableCollectionEntry>
     Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
+
+    virtual void MergeFrom(BaseEntry &other);
 
 public:
     u64 GetColumnIdByName(const String &column_name);
@@ -97,7 +120,7 @@ public:
     SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_collection_name_{};
-    Vector<SharedPtr<ColumnDef>> columns_{};
+    Vector<SharedPtr<ColumnDef>> columns_{}; // 2. So this should be HashMap
     TableCollectionType table_collection_type_{TableCollectionType::kTableEntry};
 
     TableCollectionMeta *table_collection_meta_{};
@@ -108,7 +131,8 @@ public:
     SegmentEntry *unsealed_segment_{};
     au64 next_segment_id_{};
 
-    HashMap<String, SharedPtr<IndexDef>> indexes_{};
+    //
+    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
 };
 
 } // namespace infinity

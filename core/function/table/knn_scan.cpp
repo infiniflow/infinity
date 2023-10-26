@@ -57,7 +57,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
             switch (knn_scan_function_data_ptr->elem_type_) {
                 case EmbeddingDataType::kElemFloat: {
 
-                    KnnDistance<f32> *knn_flat_l2 = nullptr;
+                    KnnDistance<f32> *knn_flat_l2 = static_cast<KnnDistance<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
 
                     knn_flat_l2->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
 
@@ -213,7 +213,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
             switch (knn_scan_function_data_ptr->elem_type_) {
                 case EmbeddingDataType::kElemFloat: {
 
-                    KnnDistance<f32> *knn_flat_ip = nullptr;
+                    KnnDistance<f32> *knn_flat_ip = static_cast<KnnDistance<f32> *>(knn_scan_function_data_ptr->knn_distance_.get());
 
                     knn_flat_ip->Search((f32 *)(column_buffer.GetAll()), row_count, segment_id, block_id);
 

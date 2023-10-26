@@ -4,6 +4,8 @@
 
 module;
 
+#include <functional>
+
 import txn;
 import txn_state;
 import stl;
@@ -12,10 +14,18 @@ import infinity_assert;
 import infinity_exception;
 import wal_entry;
 import logger;
+import buffer_manager;
 
 module txn_manager;
 
 namespace infinity {
+
+TxnManager::TxnManager(NewCatalog *catalog,
+                       BufferManager *buffer_mgr,
+                       PutWalEntryFn put_wal_entry_fn,
+                       u64 start_txn_id,
+                       TxnTimeStamp start_ts)
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
@@ -59,8 +69,7 @@ u64 TxnManager::GetNewTxnID() {
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     LockGuard<Mutex> guard(mutex_);
     TxnTimeStamp ts = txn_ts_++;
-//    if (prepare_wal && put_wal_entry_ != nullptr) {
-    if(prepare_wal) {
+    if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }
     return ts;
@@ -87,8 +96,8 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     if (is_running_.load() == false) {
         Error<TransactionException>("TxnManager is not running, cannot put wal entry", __FILE_NAME__, __LINE__);
     }
-//    if (put_wal_entry_ == nullptr)
-//        return;
+    if (put_wal_entry_ == nullptr)
+        return;
     UniqueLock<Mutex> lk(mutex_);
     priority_que_[entry->commit_ts] = entry;
     auto it = priority_que_.begin();

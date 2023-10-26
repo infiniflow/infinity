@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import column_binding;
 import parser;
@@ -27,16 +29,16 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalDropView::GetOutputTypes() const {
 }
 
 String LogicalDropView::ToString(i64 &space) const {
-//    std::stringstream ss;
-//    String arrow_str;
-//    if (space > 3) {
-//        space -= 4;
-//        arrow_str = "->  ";
-//    }
-//    ss << String(space, ' ') << arrow_str << "Drop View: " << *schema_name_ << "." << *view_name_;
-//    space += arrow_str.size();
-//
-//    return ss.str();
+    std::stringstream ss;
+    String arrow_str;
+    if (space > 3) {
+        space -= 4;
+        arrow_str = "->  ";
+    }
+    ss << String(space, ' ') << arrow_str << "Drop View: " << *schema_name_ << "." << *view_name_;
+    space += arrow_str.size();
+
+    return ss.str();
 }
 
 } // namespace infinity

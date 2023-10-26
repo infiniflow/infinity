@@ -4,6 +4,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import bound_select_statement;
 import expression_type;
@@ -17,9 +19,9 @@ SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_sel
     : BaseExpression(ExpressionType::kSubQuery, {}), bound_select_statement_ptr_(Move(bound_select_statement)), subquery_type_(subquery_type) {}
 
 String SubqueryExpression::ToString() const {
-//    std::stringstream ss;
-//    ss << "Substring: " << std::endl;
-//    return ss.str();
+    std::stringstream ss;
+    ss << "Substring: " << std::endl;
+    return ss.str();
 }
 
 DataType SubqueryExpression::Type() const {

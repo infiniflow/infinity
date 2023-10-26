@@ -19,6 +19,8 @@ import default_values;
 import block_index;
 import logger;
 import third_party;
+import infinity_exception;
+import infinity_assert;
 
 module db_entry;
 
@@ -176,18 +178,26 @@ SharedPtr<String> DBEntry::ToString(DBEntry *db_entry) {
     return res;
 }
 
-Json DBEntry::Serialize(const DBEntry *db_entry) {
+Json DBEntry::Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
 
-    json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
-    json_res["db_name"] = *db_entry->db_name_;
-    json_res["txn_id"] = db_entry->txn_id_.load();
-    json_res["begin_ts"] = db_entry->begin_ts_;
-    json_res["commit_ts"] = db_entry->commit_ts_.load();
-    json_res["deleted"] = db_entry->deleted_;
-    json_res["entry_type"] = db_entry->entry_type_;
-    for (const auto &table_meta_pair : db_entry->tables_) {
-        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta_pair.second.get()));
+    Vector<TableCollectionMeta *> table_metas;
+    {
+        SharedLock<RWMutex> lck(db_entry->rw_locker_);
+        json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
+        json_res["db_name"] = *db_entry->db_name_;
+        json_res["txn_id"] = db_entry->txn_id_.load();
+        json_res["begin_ts"] = db_entry->begin_ts_;
+        json_res["commit_ts"] = db_entry->commit_ts_.load();
+        json_res["deleted"] = db_entry->deleted_;
+        json_res["entry_type"] = db_entry->entry_type_;
+        table_metas.reserve(db_entry->tables_.size());
+        for (auto &table_meta_pair : db_entry->tables_) {
+            table_metas.push_back(table_meta_pair.second.get());
+        }
+    }
+    for (TableCollectionMeta *table_meta : table_metas) {
+        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -207,6 +217,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager
     res->commit_ts_ = commit_ts;
     res->deleted_ = deleted;
     res->entry_type_ = entry_type;
+    res->db_entry_dir_ = db_entry_dir;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
@@ -216,6 +227,28 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager
     }
 
     return res;
+}
+
+void DBEntry::MergeFrom(BaseEntry &other) {
+    if(other.entry_type_ != EntryType::kDatabase) {
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry", __FILE_NAME__, __LINE__);
+    }
+    DBEntry* db_entry2 = static_cast<DBEntry*>(&other);
+
+    // No locking here since only the load stage needs MergeFrom.
+    Assert<StorageException>(IsEqual(*this->db_name_, *db_entry2->db_name_), "DBEntry::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_),
+                             "DBEntry::MergeFrom requires db_entry_dir_ match",
+                             __FILE_NAME__,
+                             __LINE__);
+    for (auto &[table_name, table_meta2] : db_entry2->tables_) {
+        auto it = this->tables_.find(table_name);
+        if (it == this->tables_.end()) {
+            this->tables_.emplace(table_name, std::move(table_meta2));
+        } else {
+            it->second->MergeFrom(*table_meta2.get());
+        }
+    }
 }
 
 } // namespace infinity

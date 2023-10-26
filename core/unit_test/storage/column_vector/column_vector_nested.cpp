@@ -18,44 +18,31 @@ import vector_buffer;
 import global_resource_usage;
 import infinity;
 
-class ColumnVectorNestedTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class ColumnVectorNestedTest : public BaseTest {};
 TEST_F(ColumnVectorNestedTest, flat_array) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_array) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, flat_tuple) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_tuple) {
     using namespace infinity;
-    LOG_TRACE(Format("Test name: {}.{}", test_info_->test_case_name(), test_info_->name()));
+
 
     // No test cases.
 }

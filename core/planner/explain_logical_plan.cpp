@@ -4,6 +4,8 @@
 
 module;
 
+#include <string>
+
 import stl;
 import logical_node;
 import logical_node_type;
@@ -29,6 +31,7 @@ import logical_join;
 import logical_show;
 import logical_export;
 import logical_import;
+import logical_create_index;
 
 import third_party;
 import parser;
@@ -111,6 +114,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
             break;
         case LogicalNodeType::kCreateTable: {
             Explain((LogicalCreateTable *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kCreateIndex: {
+            Explain((LogicalCreateIndex *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kCreateCollection: {
@@ -254,6 +261,46 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
     // Output column
     {
         String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    {
+        String create_header_str;
+        if (intent_size != 0) {
+            create_header_str = String(intent_size - 2, ' ') + "-> CREATE INDEX ";
+        } else {
+            create_header_str = "CREATE INDEX ";
+        }
+
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(create_header_str));
+    }
+
+    {
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name();
+        result->emplace_back(MakeShared<String>(schema_name_str));
+    }
+
+    {
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name();
+        result->emplace_back(MakeShared<String>(table_name_str));
+    }
+
+    // Index definition
+    {
+        String index_def_str = String(intent_size, ' ') + " - index definition: " + create_node->index_definition()->ToString();
+        result->emplace_back(MakeShared<String>(index_def_str));
+    }
+
+    {
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type());
+        result->emplace_back(MakeShared<String>(conflict_type_str));
+    }
+
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [OK]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }

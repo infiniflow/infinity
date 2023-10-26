@@ -115,7 +115,7 @@ def generate(generate_if_exists):
     row_n = 1000
     dim = 128
     slt_dir = "./test/sql/dml/import"
-    csv_dir = "./test/data/csv"
+    csv_dir = "/tmp/infinity/test_data"
 
     os.makedirs(slt_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
@@ -126,7 +126,6 @@ def generate(generate_if_exists):
     slt_path = slt_dir + "/test_big_varchar.slt"
     csv_path = csv_dir + "/big_varchar.csv"
     generate_test_varchar(slt_path, csv_path, row_n, dim, generate_if_exists)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate big data for test")

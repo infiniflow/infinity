@@ -18,6 +18,7 @@ import file_system_type;
 import infinity_assert;
 import infinity_exception;
 import third_party;
+import logger;
 
 module local_file_system;
 
@@ -202,6 +203,11 @@ Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
     std::ranges::for_each(std::filesystem::directory_iterator{path},
                           [&](const auto &dir_entry) { file_array.emplace_back(MakeShared<DirEntry>(dir_entry)); });
     return file_array;
+}
+
+String LocalFileSystem::GetAbsolutePath(const String &path) {
+    std::filesystem::path p{path};
+    return std::filesystem::absolute(p).string();
 }
 
 } // namespace infinity

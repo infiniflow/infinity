@@ -254,7 +254,7 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        sql_runner_cppm
+        ut_dependent_cppm
         CONFIGURE_DEPENDS
         unit_test/test_helper/sql_runner.cppm
 )
@@ -294,12 +294,13 @@ target_link_libraries(unit_test
         infinity_core
         faiss
         onnxruntime_mlas
+        zsv_parser
 )
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-        ${sql_runner_cppm}
+        ${ut_dependent_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
