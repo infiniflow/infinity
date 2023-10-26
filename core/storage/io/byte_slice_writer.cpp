@@ -1,14 +1,17 @@
-#include "byte_slice_writer.h"
-#include "common/utility/infinity_assert.h"
-#include "main/logger.h"
+module;
 
-#include <iosfwd>
-#include <stdio.h>
-#include <string.h>
+import stl;
+import byte_slice;
+import memory_pool;
+import file_writer;
+import infinity_assert;
+import infinity_exception;
+
+module byte_slice_writer;
 
 namespace infinity {
 
-ByteSliceWriter::ByteSliceWriter(MemoryPool *pool, uint32_t min_slice_size)
+ByteSliceWriter::ByteSliceWriter(MemoryPool *pool, u32 min_slice_size)
     : pool_(pool), last_slice_size_(min_slice_size - ByteSlice::GetHeadSize()), is_own_slice_list_(true), allocated_size_(0) {
     slice_list_ = AllocateByteSliceList();
     slice_list_->Add(CreateSlice(last_slice_size_));
@@ -16,7 +19,7 @@ ByteSliceWriter::ByteSliceWriter(MemoryPool *pool, uint32_t min_slice_size)
 
 ByteSliceWriter::~ByteSliceWriter() { Close(); }
 
-ByteSlice *ByteSliceWriter::CreateSlice(uint32_t size) {
+ByteSlice *ByteSliceWriter::CreateSlice(u32 size) {
     ByteSlice *slice = ByteSlice::CreateSlice(size, pool_);
     allocated_size_ += size + ByteSlice::GetHeadSize();
     last_slice_size_ = slice->size_;
@@ -24,13 +27,11 @@ ByteSlice *ByteSliceWriter::CreateSlice(uint32_t size) {
     return slice;
 }
 
-size_t ByteSliceWriter::GetSize() const { return size_t(slice_list_->GetTotalSize()); }
+SizeT ByteSliceWriter::GetSize() const { return SizeT(slice_list_->GetTotalSize()); }
 
-void ByteSliceWriter::Dump(const std::shared_ptr<FileWriter> &file) {
-    assert(slice_list_ != NULL);
-
+void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
     ByteSlice *slice = slice_list_->GetHead();
-    while (slice != NULL) {
+    while (slice != nullptr) {
         file->Write((char *)(slice->data_), slice->size_);
         slice = slice->next_;
     }
@@ -53,9 +54,9 @@ void ByteSliceWriter::Close() {
     }
 }
 
-void ByteSliceWriter::Write(const void *value, size_t len) {
-    uint32_t left = (uint32_t)len;
-    uint8_t *data = (uint8_t *)(value);
+void ByteSliceWriter::Write(const void *value, SizeT len) {
+    u32 left = (u32)len;
+    u8 *data = (u8 *)(value);
     ByteSlice *slice = slice_list_->GetTail();
     while (left > 0) {
         if (slice->size_ >= last_slice_size_) {
@@ -63,8 +64,8 @@ void ByteSliceWriter::Write(const void *value, size_t len) {
             slice = CreateSlice(last_slice_size_);
             slice_list_->Add(slice);
         }
-        uint32_t copy_len = (last_slice_size_ - slice->size_) > left ? left : (last_slice_size_ - slice->size_);
-        memcpy(slice->data_ + slice->size_, data, copy_len);
+        u32 copy_len = (last_slice_size_ - slice->size_) > left ? left : (last_slice_size_ - slice->size_);
+        Memcpy(slice->data_ + slice->size_, data, copy_len);
         data += copy_len;
         left -= copy_len;
         slice->size_ = slice->size_ + copy_len;
@@ -74,14 +75,14 @@ void ByteSliceWriter::Write(const void *value, size_t len) {
 
 void ByteSliceWriter::Write(ByteSliceList &src) { slice_list_->MergeWith(src); }
 
-void ByteSliceWriter::Write(const ByteSliceList &src, uint32_t start, uint32_t end) {
+void ByteSliceWriter::Write(const ByteSliceList &src, u32 start, u32 end) {
     if (start >= end || end > src.GetTotalSize()) {
-        StorageError(fmt::format("start = {}, end = {}, totalSize = {}", start, end, src.GetTotalSize()));
+        Error<StorageException>("Write past EOF ", __FILE_NAME__, __LINE__);
     }
 
-    ByteSlice *curr_slice = NULL;
+    ByteSlice *curr_slice = nullptr;
     ByteSlice *next_slice = src.GetHead();
-    uint32_t next_slice_offset = 0;
+    u32 next_slice_offset = 0;
     while (start >= next_slice_offset) {
         curr_slice = next_slice;
         next_slice = curr_slice->next_;
@@ -89,7 +90,7 @@ void ByteSliceWriter::Write(const ByteSliceList &src, uint32_t start, uint32_t e
     }
 
     while (end > next_slice_offset) {
-        uint32_t copy_len = next_slice_offset - start;
+        u32 copy_len = next_slice_offset - start;
         Write(curr_slice->data_ + curr_slice->size_ - copy_len, copy_len);
 
         curr_slice = next_slice;
@@ -97,8 +98,8 @@ void ByteSliceWriter::Write(const ByteSliceList &src, uint32_t start, uint32_t e
         start = next_slice_offset;
         next_slice_offset += curr_slice->size_;
     }
-    uint32_t copy_len = end - start;
-    uint32_t curr_slice_offset = next_slice_offset - curr_slice->size_;
+    u32 copy_len = end - start;
+    u32 curr_slice_offset = next_slice_offset - curr_slice->size_;
     Write(curr_slice->data_ + start - curr_slice_offset, copy_len);
 }
 

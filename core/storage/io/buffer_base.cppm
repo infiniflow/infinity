@@ -1,12 +1,13 @@
-#pragma once
+module;
 
-#include <algorithm>
-#include <cstdint>
+import stl;
+
+export module buffer_base;
 
 namespace infinity {
 
 // Base class for ReadBuffer and WriteBuffer.
-class BufferBase {
+export class BufferBase {
 public:
     using Position = char *;
 
@@ -15,8 +16,8 @@ public:
 
         Position Begin() const { return begin_pos_; }
         Position End() const { return end_pos_; }
-        size_t Size() const { return size_t(end_pos_ - begin_pos_); }
-        void Resize(size_t size) { end_pos_ = begin_pos_ + size; }
+        SizeT Size() const { return SizeT(end_pos_ - begin_pos_); }
+        void Resize(SizeT size) { end_pos_ = begin_pos_ + size; }
         bool Empty() const { return Size() == 0; }
 
     private:
@@ -24,9 +25,9 @@ public:
         Position end_pos_;
     };
 
-    BufferBase(Position ptr, size_t size, size_t offset) : pos_(ptr + offset), working_buffer_(ptr, ptr + size), internal_buffer_(ptr, ptr + size) {}
+    BufferBase(Position ptr, SizeT size, SizeT offset) : pos_(ptr + offset), working_buffer_(ptr, ptr + size), internal_buffer_(ptr, ptr + size) {}
 
-    void Set(Position ptr, size_t size, size_t offset) {
+    void Set(Position ptr, SizeT size, SizeT offset) {
         internal_buffer_ = Buffer(ptr, ptr + size);
         working_buffer_ = Buffer(ptr, ptr + size);
         pos_ = ptr + offset;
@@ -38,13 +39,13 @@ public:
 
     Position &Pos() { return pos_; }
 
-    size_t Offset() const { return size_t(pos_ - working_buffer_.Begin()); }
+    SizeT Offset() const { return SizeT(pos_ - working_buffer_.Begin()); }
 
     /// How many bytes are available for read/write
-    size_t Available() const { return size_t(working_buffer_.End() - pos_); }
+    SizeT Available() const { return SizeT(working_buffer_.End() - pos_); }
 
     /// How many bytes have been read/written
-    size_t Count() const { return bytes_ + Offset(); }
+    SizeT Count() const { return bytes_ + Offset(); }
 
     bool HasPendingData() const { return Available() > 0; }
 
@@ -58,7 +59,7 @@ protected:
     Position pos_;
 
     /// How many bytes have been read/written, not counting those that are now in the buffer.
-    size_t bytes_ = 0;
+    SizeT bytes_ = 0;
 
     /// A piece of memory that you can use.
     Buffer working_buffer_;

@@ -1,13 +1,15 @@
-#pragma once
+module;
 
-#include "common/memory/byte_slice.h"
-#include "common/utility/infinity_assert.h"
-#include "main/logger.h"
-#include <memory>
+import stl;
+import byte_slice;
+import infinity_assert;
+import infinity_exception;
+
+export module byte_slice_reader;
 
 namespace infinity {
 
-class ByteSliceReader {
+export class ByteSliceReader {
 public:
     static const int BYTE_SLICE_EOF = -1;
 
@@ -17,34 +19,34 @@ public:
     ByteSliceReader(ByteSliceList *slice_list);
 
 public:
-    uint8_t ReadByte();
+    u8 ReadByte();
 
-    int16_t ReadInt16();
+    i16 ReadInt16();
 
-    int32_t ReadInt32();
+    i32 ReadInt32();
 
-    uint32_t ReadUInt32();
+    u32 ReadUInt32();
 
-    int64_t ReadInt64();
+    i64 ReadInt64();
 
-    uint64_t ReadUInt64();
+    u64 ReadUInt64();
 
-    int32_t ReadVInt32();
+    i32 ReadVInt32();
 
-    uint32_t ReadVUInt32();
+    u32 ReadVUInt32();
 
-    size_t Read(void *value, size_t len);
+    SizeT Read(void *value, SizeT len);
 
-    size_t ReadMayCopy(void *&value, size_t len);
+    SizeT ReadMayCopy(void *&value, SizeT len);
 
-    int32_t PeekInt32();
+    i32 PeekInt32();
 
-    size_t Seek(size_t offset);
+    SizeT Seek(SizeT offset);
 
-    size_t Tell() const { return global_offset_; }
+    SizeT Tell() const { return global_offset_; }
 
-    bool CurrentSliceEnough(size_t len) { return current_slice_offset_ + len <= GetSliceDataSize(current_slice_); }
-    uint8_t *GetCurrentSliceData() { return current_slice_->data_ + current_slice_offset_; }
+    bool CurrentSliceEnough(SizeT len) { return current_slice_offset_ + len <= GetSliceDataSize(current_slice_); }
+    u8 *GetCurrentSliceData() { return current_slice_->data_ + current_slice_offset_; }
 
 public:
     void Open(ByteSliceList *sliceList);
@@ -53,7 +55,7 @@ public:
 
     void Close();
 
-    size_t GetSize() const { return slice_list_->GetTotalSize(); }
+    SizeT GetSize() const { return slice_list_->GetTotalSize(); }
 
     ByteSliceList *GetByteSliceList() const { return slice_list_; }
     bool End() const { return Tell() + 1 >= size_; }
@@ -67,40 +69,41 @@ private:
 
     ByteSlice *NextSlice(ByteSlice *byte_slice) { return byte_slice->next_; }
 
-    size_t GetSliceDataSize(ByteSlice *byte_slice) const { return byte_slice->size_; }
+    SizeT GetSliceDataSize(ByteSlice *byte_slice) const { return byte_slice->size_; }
 
 private:
     ByteSlice *current_slice_;
-    size_t current_slice_offset_;
-    size_t global_offset_;
+    SizeT current_slice_offset_;
+    SizeT global_offset_;
     ByteSliceList *slice_list_;
-    size_t size_;
+    SizeT size_;
 };
 
-inline uint8_t ByteSliceReader::ReadByte() {
+inline u8 ByteSliceReader::ReadByte() {
     if (current_slice_offset_ >= GetSliceDataSize(current_slice_)) {
         current_slice_ = NextSlice(current_slice_);
         if (!current_slice_) {
-            StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+            // StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+            Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
         }
         current_slice_offset_ = 0;
     }
-    uint8_t value = current_slice_->data_[current_slice_offset_++];
+    u8 value = current_slice_->data_[current_slice_offset_++];
     global_offset_++;
     return value;
 }
 
-inline int16_t ByteSliceReader::ReadInt16() { return ReadInt<int16_t>(); }
+inline i16 ByteSliceReader::ReadInt16() { return ReadInt<i16>(); }
 
-inline int32_t ByteSliceReader::ReadInt32() { return ReadInt<int32_t>(); }
+inline i32 ByteSliceReader::ReadInt32() { return ReadInt<i32>(); }
 
-inline uint32_t ByteSliceReader::ReadUInt32() { return ReadInt<uint32_t>(); }
+inline u32 ByteSliceReader::ReadUInt32() { return ReadInt<u32>(); }
 
-inline int32_t ByteSliceReader::ReadVInt32() { return (int32_t)ReadVUInt32(); }
+inline i32 ByteSliceReader::ReadVInt32() { return (i32)ReadVUInt32(); }
 
-inline uint32_t ByteSliceReader::ReadVUInt32() {
-    uint8_t byte = ReadByte();
-    uint32_t value = byte & 0x7F;
+inline u32 ByteSliceReader::ReadVUInt32() {
+    u8 byte = ReadByte();
+    u32 value = byte & 0x7F;
     int shift = 7;
 
     while (byte & 0x80) {
@@ -111,27 +114,27 @@ inline uint32_t ByteSliceReader::ReadVUInt32() {
     return value;
 }
 
-inline int64_t ByteSliceReader::ReadInt64() { return ReadInt<int64_t>(); }
+inline i64 ByteSliceReader::ReadInt64() { return ReadInt<i64>(); }
 
-inline uint64_t ByteSliceReader::ReadUInt64() { return ReadInt<uint64_t>(); }
+inline u64 ByteSliceReader::ReadUInt64() { return ReadInt<u64>(); }
 
-inline int32_t ByteSliceReader::PeekInt32() {
-    assert(current_slice_ != NULL);
-
-    if (current_slice_offset_ + sizeof(int32_t) <= GetSliceDataSize(current_slice_)) {
-        return *((int32_t *)(current_slice_->data_ + current_slice_offset_));
+inline i32 ByteSliceReader::PeekInt32() {
+    Assert<StorageException>(current_slice_ != nullptr, "current_slice null", __FILE_NAME__, __LINE__);
+    if (current_slice_offset_ + sizeof(i32) <= GetSliceDataSize(current_slice_)) {
+        return *((i32 *)(current_slice_->data_ + current_slice_offset_));
     }
 
-    uint8_t bytes[sizeof(int32_t)];
+    u8 bytes[sizeof(i32)];
     char *buffer = (char *)bytes;
     ByteSlice *slice = current_slice_;
-    ByteSlice *next_slice = NULL;
-    size_t cur_slice_offset = current_slice_offset_;
-    for (size_t i = 0; i < sizeof(int32_t); ++i) {
+    ByteSlice *next_slice = nullptr;
+    SizeT cur_slice_offset = current_slice_offset_;
+    for (SizeT i = 0; i < sizeof(i32); ++i) {
         if (cur_slice_offset >= GetSliceDataSize(slice)) {
             next_slice = NextSlice(slice);
-            if (next_slice == NULL || next_slice->data_ == NULL) {
-                StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+            if (next_slice == nullptr || next_slice->data_ == nullptr) {
+                // StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+                Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
             } else {
                 slice = next_slice;
             }
@@ -139,7 +142,7 @@ inline int32_t ByteSliceReader::PeekInt32() {
         }
         bytes[i] = slice->data_[cur_slice_offset++];
     }
-    return *((int32_t *)buffer);
+    return *((i32 *)buffer);
 }
 
 template <typename T>
@@ -152,9 +155,9 @@ inline T ByteSliceReader::ReadInt() {
         return value;
     }
 
-    uint8_t bytes[sizeof(T)];
+    u8 bytes[sizeof(T)];
     char *buffer = (char *)bytes;
-    for (size_t i = 0; i < sizeof(T); ++i) {
+    for (SizeT i = 0; i < sizeof(T); ++i) {
         bytes[i] = ReadByte();
     }
     return *((T *)buffer);

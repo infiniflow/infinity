@@ -1,9 +1,11 @@
-#include "byte_slice_reader.h"
+module;
 
-#include <ostream>
-#include <stdint.h>
-#include <string.h>
-#include <string>
+import stl;
+import byte_slice;
+import infinity_assert;
+import infinity_exception;
+
+module byte_slice_reader;
 
 namespace infinity {
 
@@ -22,7 +24,7 @@ void ByteSliceReader::Open(ByteSliceList *slice_list) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+        Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
     }
 }
 
@@ -33,7 +35,7 @@ void ByteSliceReader::Open(ByteSlice *slice) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
+        Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
     }
 }
 
@@ -47,26 +49,26 @@ void ByteSliceReader::Close() {
     }
 }
 
-size_t ByteSliceReader::Read(void *value, size_t len) {
+SizeT ByteSliceReader::Read(void *value, SizeT len) {
     if (current_slice_ == nullptr || len == 0) {
         return 0;
     }
 
     if (current_slice_offset_ + len <= GetSliceDataSize(current_slice_)) {
-        memcpy(value, current_slice_->data_ + current_slice_offset_, len);
+        Memcpy(value, current_slice_->data_ + current_slice_offset_, len);
         current_slice_offset_ += len;
         global_offset_ += len;
         return len;
     }
     // current byteslice is not long enough, read next byteslices
     char *dest = (char *)value;
-    int64_t total_len = (int64_t)len;
-    size_t offset = current_slice_offset_;
-    int64_t leftLen = 0;
+    i64 total_len = (i64)len;
+    SizeT offset = current_slice_offset_;
+    i64 leftLen = 0;
     while (total_len > 0) {
         leftLen = GetSliceDataSize(current_slice_) - offset;
         if (leftLen < total_len) {
-            memcpy(dest, current_slice_->data_ + offset, leftLen);
+            Memcpy(dest, current_slice_->data_ + offset, leftLen);
             total_len -= leftLen;
             dest += leftLen;
 
@@ -76,20 +78,20 @@ size_t ByteSliceReader::Read(void *value, size_t len) {
                 break;
             }
         } else {
-            memcpy(dest, current_slice_->data_ + offset, total_len);
+            Memcpy(dest, current_slice_->data_ + offset, total_len);
             dest += total_len;
-            offset += (size_t)total_len;
+            offset += (SizeT)total_len;
             total_len = 0;
         }
     }
 
     current_slice_offset_ = offset;
-    size_t read_len = (size_t)(len - total_len);
+    SizeT read_len = (SizeT)(len - total_len);
     global_offset_ += read_len;
     return read_len;
 }
 
-size_t ByteSliceReader::ReadMayCopy(void *&value, size_t len) {
+SizeT ByteSliceReader::ReadMayCopy(void *&value, SizeT len) {
     if (current_slice_ == nullptr || len == 0)
         return 0;
 
@@ -102,12 +104,13 @@ size_t ByteSliceReader::ReadMayCopy(void *&value, size_t len) {
     return Read(value, len);
 }
 
-size_t ByteSliceReader::Seek(size_t offset) {
+SizeT ByteSliceReader::Seek(SizeT offset) {
     if (offset < global_offset_) {
-        StorageError(fmt::format("invalid offset value: seek offset = {}, State: list length = {}, offset = {}", offset, GetSize(), global_offset_));
+        // fmt::format("invalid offset value: seek offset = {}, State: list length = {}, offset = {}", offset, GetSize(), global_offset_));
+        Error<StorageException>("Invalide offset value", __FILE_NAME__, __LINE__);
     }
 
-    size_t len = offset - global_offset_;
+    SizeT len = offset - global_offset_;
     if (current_slice_ == nullptr || len == 0) {
         return global_offset_;
     }
@@ -118,8 +121,8 @@ size_t ByteSliceReader::Seek(size_t offset) {
         return global_offset_;
     } else {
         // current byteslice is not long enough, seek to next byteslices
-        int64_t total_len = len;
-        int64_t remainLen;
+        i64 total_len = len;
+        i64 remainLen;
         while (total_len > 0) {
             remainLen = current_slice_->size_ - current_slice_offset_;
             if (remainLen <= total_len) {

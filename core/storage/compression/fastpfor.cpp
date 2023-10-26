@@ -1,4 +1,4 @@
-#include "fastpfor.h"
+module;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -9,6 +9,10 @@
 #include <headers/fastpfor.h>
 
 #pragma GCC diagnostic pop
+
+import stl;
+
+module fastpfor;
 
 namespace infinity {
 
@@ -30,26 +34,26 @@ template <FastPForCodec Codec>
 FastPForWrapper<Codec>::~FastPForWrapper() = default;
 
 template <FastPForCodec Codec>
-u32 FastPForWrapper<Codec>::Compress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const {
+u32 FastPForWrapper<Codec>::Compress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
     auto &codec = this->impl_->codec;
     codec.encodeArray(src, count, dest, outsize);
     return outsize;
 }
 // -------------------------------------------------------------------------------------
 template <FastPForCodec Codec>
-const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const {
+const u32 *FastPForWrapper<Codec>::Decompress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const {
     auto &codec = this->impl_->codec;
     return codec.decodeArray(src, count, dest, outsize);
 }
 
 template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::ApplyDelta(u32 *src, size_t count) {
+void FastPForWrapper<Codec>::ApplyDelta(u32 *src, SizeT count) {
     using namespace FastPForLib;
     FastPForLib::Delta::deltaSIMD(src, count);
 }
 
 template <FastPForCodec Codec>
-void FastPForWrapper<Codec>::RevertDelta(u32 *src, size_t count) {
+void FastPForWrapper<Codec>::RevertDelta(u32 *src, SizeT count) {
     using namespace FastPForLib;
     FastPForLib::Delta::inverseDeltaSIMD(src, count);
 }

@@ -1,8 +1,8 @@
-#pragma once
+module;
 
-#include "common/types/alias/primitives.h"
-#include <memory>
-#include <type_traits>
+import stl;
+
+export module fastpfor;
 
 namespace infinity {
 
@@ -13,26 +13,26 @@ namespace infinity {
 enum class FastPForCodec { FastPFor, SIMDBitPacking };
 
 // -------------------------------------------------------------------------------------
-template <FastPForCodec Codec>
+export template <FastPForCodec Codec>
 struct FastPForWrapper {
     FastPForWrapper();
 
     ~FastPForWrapper();
 
-    u32 Compress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const;
+    u32 Compress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const;
 
-    const u32 *Decompress(const u32 *src, u32 count, u32 *dest, size_t &outsize) const;
+    const u32 *Decompress(const u32 *src, u32 count, u32 *dest, SizeT &outsize) const;
 
-    static void ApplyDelta(u32 *src, size_t count);
+    static void ApplyDelta(u32 *src, SizeT count);
 
-    static void RevertDelta(u32 *src, size_t count);
+    static void RevertDelta(u32 *src, SizeT count);
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    UniquePtr<Impl> impl_;
 };
 
-using FastPFor = FastPForWrapper<FastPForCodec::FastPFor>;
-using SIMDBitPacking = FastPForWrapper<FastPForCodec::SIMDBitPacking>;
+export using FastPFor = FastPForWrapper<FastPForCodec::FastPFor>;
+export using SIMDBitPacking = FastPForWrapper<FastPForCodec::SIMDBitPacking>;
 
 } // namespace infinity

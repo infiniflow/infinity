@@ -1,21 +1,19 @@
 module;
 
 import memory_pool;
-
-#include <cstdint>
-#include <cstring>
+import stl;
 
 module byte_slice;
 
 namespace infinity {
 
-ByteSlice *ByteSlice::CreateSlice(size_t data_size, MemoryPool *pool) {
-    uint8_t *mem;
-    size_t mem_size = data_size + GetHeadSize();
+ByteSlice *ByteSlice::CreateSlice(SizeT data_size, MemoryPool *pool) {
+    u8 *mem;
+    SizeT mem_size = data_size + GetHeadSize();
     if (pool == nullptr) {
-        mem = new uint8_t[mem_size];
+        mem = new u8[mem_size];
     } else {
-        mem = (uint8_t *)pool->Allocate(mem_size);
+        mem = (u8 *)pool->Allocate(mem_size);
     }
     ByteSlice *slice = new (mem) ByteSlice;
     slice->data_ = mem + GetHeadSize();
@@ -27,7 +25,7 @@ ByteSlice *ByteSlice::CreateSlice(size_t data_size, MemoryPool *pool) {
 
 void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
     slice->~ByteSlice();
-    uint8_t *mem = (uint8_t *)slice;
+    u8 *mem = (u8 *)slice;
     if (pool == nullptr) {
         delete[] mem;
     } else {
@@ -73,7 +71,7 @@ void ByteSliceList::Clear(MemoryPool *pool) {
     total_size_ = 0;
 }
 
-size_t ByteSliceList::UpdateTotalSize() {
+SizeT ByteSliceList::UpdateTotalSize() {
     total_size_ = 0;
     ByteSlice *slice = head_;
     while (slice) {
@@ -104,13 +102,13 @@ ByteSliceListIterator::ByteSliceListIterator(const ByteSliceListIterator &other)
     : slice_list_(other.slice_list_), slice_(other.slice_), pos_in_slice_(other.pos_in_slice_), seeked_slice_size_(other.seeked_slice_size_),
       end_pos_(other.end_pos_) {}
 
-bool ByteSliceListIterator::SeekSlice(size_t begin_pos) {
+bool ByteSliceListIterator::SeekSlice(SizeT begin_pos) {
     if (begin_pos < seeked_slice_size_ + pos_in_slice_) {
         return false;
     }
 
     while (slice_) {
-        size_t slice_end_pos = seeked_slice_size_ + slice_->size_;
+        SizeT slice_end_pos = seeked_slice_size_ + slice_->size_;
         if (begin_pos >= seeked_slice_size_ && begin_pos < slice_end_pos) {
             pos_in_slice_ = begin_pos - seeked_slice_size_;
             return true;
@@ -123,19 +121,19 @@ bool ByteSliceListIterator::SeekSlice(size_t begin_pos) {
     return false;
 }
 
-bool ByteSliceListIterator::HasNext(size_t end_pos) {
+bool ByteSliceListIterator::HasNext(SizeT end_pos) {
     if (slice_ == nullptr || end_pos > slice_list_->GetTotalSize()) {
         return false;
     }
 
     end_pos_ = end_pos;
-    size_t cur_pos = seeked_slice_size_ + pos_in_slice_;
+    SizeT cur_pos = seeked_slice_size_ + pos_in_slice_;
     return cur_pos < end_pos;
 }
 
-void ByteSliceListIterator::Next(void *&data, size_t &size) {
-    size_t cur_pos = seeked_slice_size_ + pos_in_slice_;
-    size_t slice_end_pos = seeked_slice_size_ + slice_->size_;
+void ByteSliceListIterator::Next(void *&data, SizeT &size) {
+    SizeT cur_pos = seeked_slice_size_ + pos_in_slice_;
+    SizeT slice_end_pos = seeked_slice_size_ + slice_->size_;
 
     data = slice_->data_ + pos_in_slice_;
     if (end_pos_ >= slice_end_pos) {
