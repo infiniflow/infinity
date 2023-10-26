@@ -618,7 +618,7 @@ void LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindC
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Error<PlannerException>(Format("File: {} doesn't exist.", statement->file_path_), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("File: {} doesn't exist.", fs.GetAbsolutePath(statement->file_path_)), __FILE_NAME__, __LINE__);
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),

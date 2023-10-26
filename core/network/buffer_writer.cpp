@@ -97,7 +97,7 @@ void BufferWriter::send_value_u32(u32 host_value) {
 void BufferWriter::flush(SizeT bytes) {
     Assert<NetworkException>(bytes <= size(), "Can't flush more bytes than available", __FILE_NAME__, __LINE__);
     const auto bytes_to_send = bytes ? bytes : size();
-    SizeT bytes_sent;
+    SizeT bytes_sent{0};
 
     boost::system::error_code boost_error;
     if ((RingBufferIterator::Distance(start_pos_, current_pos_) < 0)) {
