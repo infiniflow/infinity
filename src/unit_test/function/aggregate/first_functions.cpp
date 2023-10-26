@@ -277,7 +277,7 @@ TEST_F(FirstFunctionTest, first_func) {
         data_block.Init(column_types);
 
         for (SizeT idx = 0; idx < row_count; ++idx) {
-            String s = "hello" + std::to_string(idx);
+            String s = "hello" + ToStr(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
             data_block.AppendValue(0, v);

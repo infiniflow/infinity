@@ -53,20 +53,20 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     int32_t deleted_size = ReadBufAdv<int32_t>(ptr);
     created_.reserve(created_size);
     deleted_.reserve(deleted_size);
-    Memcpy(created_.data(), ptr, created_.size() * sizeof(std::pair<TxnTimeStamp, int32_t>));
-    ptr += created_.size() * sizeof(std::pair<TxnTimeStamp, int32_t>);
+    Memcpy(created_.data(), ptr, created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>));
+    ptr += created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     Memcpy(deleted_.data(), ptr, deleted_.size() * sizeof(TxnTimeStamp));
 }
 
 void BlockVersion::SaveToFile(const String &version_path) {
-    int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(std::pair<TxnTimeStamp, int32_t>);
+    int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     exp_size += sizeof(int32_t) + deleted_.size() * sizeof(TxnTimeStamp);
     Vector<char> buf(exp_size);
     char *ptr = buf.data();
     WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
     WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
-    Memcpy(ptr, created_.data(), created_.size() * sizeof(std::pair<TxnTimeStamp, int32_t>));
-    ptr += created_.size() * sizeof(std::pair<TxnTimeStamp, int32_t>);
+    Memcpy(ptr, created_.data(), created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>));
+    ptr += created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     Memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
@@ -144,7 +144,7 @@ void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
     if (block_entry->min_row_ts_ == 0) {
         block_entry->min_row_ts_ = commit_ts;
     }
-    block_entry->max_row_ts_ = std::max(block_entry->max_row_ts_, commit_ts);
+    block_entry->max_row_ts_ = Max(block_entry->max_row_ts_, commit_ts);
 
     auto &block_version = block_entry->block_version_;
     block_version->created_.push_back({commit_ts, int32_t(block_entry->row_count_)});
@@ -160,7 +160,7 @@ void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
     if (block_entry->min_row_ts_ == 0) {
         block_entry->min_row_ts_ = commit_ts;
     }
-    block_entry->max_row_ts_ = std::max(block_entry->max_row_ts_, commit_ts);
+    block_entry->max_row_ts_ = Max(block_entry->max_row_ts_, commit_ts);
 }
 
 void BlockEntry::FlushData(BlockEntry *block_entry, int64_t checkpoint_row_count) {

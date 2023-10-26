@@ -37,7 +37,7 @@ inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
         ;
     } else {
         // Both left and right are not inline
-        u16 min_len = std::min(right.length, left.length);
+        u16 min_len = Min(right.length, left.length);
         if (Memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) != 0) {
             result = true;
         } else {

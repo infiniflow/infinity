@@ -46,7 +46,7 @@ void TableScanFunc(QueryContext *query_context, TableFunctionData *table_functio
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
 
         auto remaining_rows = current_block_entry->row_count_ - read_offset;
-        auto write_size = std::min(write_capacity, remaining_rows);
+        auto write_size = Min(write_capacity, remaining_rows);
 
         SizeT output_column_id{0};
         for (auto column_id : column_ids) {

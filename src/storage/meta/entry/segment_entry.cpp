@@ -204,7 +204,7 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
         if (segment_entry->min_row_ts_ == 0) {
             segment_entry->min_row_ts_ = commit_ts;
         }
-        segment_entry->max_row_ts_ = std::max(segment_entry->max_row_ts_, commit_ts);
+        segment_entry->max_row_ts_ = Max(segment_entry->max_row_ts_, commit_ts);
         block_entry = segment_entry->block_entries_[block_id];
     }
     BlockEntry::CommitAppend(block_entry.get(), txn_ptr);
@@ -223,7 +223,7 @@ void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 s
         //     IndexEntry::Flush(index_entry.get(), commit_ts);
         // }
     }
-    segment_entry->max_row_ts_ = std::max(segment_entry->max_row_ts_, commit_ts);
+    segment_entry->max_row_ts_ = Max(segment_entry->max_row_ts_, commit_ts);
 }
 
 u64 SegmentEntry::GetBlockIDByRowID(SizeT row_id) {
@@ -315,7 +315,7 @@ SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
     do {
-        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
+        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
 }
@@ -345,11 +345,11 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
                              __FILE_NAME__,
                              __LINE__);
 
-    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
-    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
+    this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
+    this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);
+    this->row_capacity_ = Max(this->row_capacity_, segment_entry2->row_capacity_);
 
-    int block_count = std::min(this->block_entries_.size(), segment_entry2->block_entries_.size());
+    int block_count = Min(this->block_entries_.size(), segment_entry2->block_entries_.size());
     for (int i = 0; i < block_count; i++) {
         auto &block_entry1 = this->block_entries_[i];
         auto &block_entry2 = this->block_entries_[i];

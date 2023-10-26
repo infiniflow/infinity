@@ -383,7 +383,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     while(write_capacity > 0 && segments_idx < segment_indexes->size()) {
         SegmentEntry* current_segment_entry = segment_entries[segments_idx];
         auto remaining_rows = current_segment_entry->current_row_ - read_offset;
-        auto write_size = std::min(write_capacity, remaining_rows);
+        auto write_size = Min(write_capacity, remaining_rows);
 
         SizeT output_column_id{0};
         for (auto column_id : column_ids) {

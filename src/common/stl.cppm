@@ -116,94 +116,10 @@ export {
 
     // ToStr()
 
-    _GLIBCXX_NODISCARD
-    inline String ToStr(int __val)
-#if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_INT__) <= 32
-        noexcept // any 32-bit value fits in the SSO buffer
-#endif
-    {
-        const bool __neg = __val < 0;
-        const unsigned __uval = __neg ? (unsigned)~__val + 1u : __val;
-        const auto __len = std::__detail::__to_chars_len(__uval);
-        String __str(__neg + __len, '-');
-        std::__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
-        return __str;
+    template<typename T>
+    inline String ToStr(T value) {
+        return std::to_string(value);
     }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(unsigned __val)
-#if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_INT__) <= 32
-        noexcept // any 32-bit value fits in the SSO buffer
-#endif
-    {
-        String __str(std::__detail::__to_chars_len(__val), '\0');
-        std::__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
-        return __str;
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(long __val)
-#if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_LONG__) <= 32
-        noexcept // any 32-bit value fits in the SSO buffer
-#endif
-    {
-        const bool __neg = __val < 0;
-        const unsigned long __uval = __neg ? (unsigned long)~__val + 1ul : __val;
-        const auto __len = std::__detail::__to_chars_len(__uval);
-        String __str(__neg + __len, '-');
-        std::__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
-        return __str;
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(unsigned long __val)
-#if _GLIBCXX_USE_CXX11_ABI && (__CHAR_BIT__ * __SIZEOF_LONG__) <= 32
-        noexcept // any 32-bit value fits in the SSO buffer
-#endif
-    {
-        String __str(std::__detail::__to_chars_len(__val), '\0');
-        std::__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
-        return __str;
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(long long __val) {
-        const bool __neg = __val < 0;
-        const unsigned long long __uval = __neg ? (unsigned long long)~__val + 1ull : __val;
-        const auto __len = std::__detail::__to_chars_len(__uval);
-        String __str(__neg + __len, '-');
-        std::__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
-        return __str;
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(unsigned long long __val) {
-        String __str(std::__detail::__to_chars_len(__val), '\0');
-        std::__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
-        return __str;
-    }
-
-#if _GLIBCXX_USE_C99_STDIO
-    // NB: (v)snprintf vs sprintf.
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(float __val) {
-        const int __n = __gnu_cxx::__numeric_traits<float>::__max_exponent10 + 20;
-        return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%f", __val);
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(double __val) {
-        const int __n = __gnu_cxx::__numeric_traits<double>::__max_exponent10 + 20;
-        return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%f", __val);
-    }
-
-    _GLIBCXX_NODISCARD
-    inline String ToStr(long double __val) {
-        const int __n = __gnu_cxx::__numeric_traits<long double>::__max_exponent10 + 20;
-        return __gnu_cxx::__to_xstring<String>(&std::vsnprintf, __n, "%Lf", __val);
-    }
-#endif // _GLIBCXX_USE_C99_STDIO
 
     // stoi
     inline int StrToInt(const std::string &str, size_t *idx = 0, int base = 10) { return std::stoi(str, idx, base); }
@@ -323,15 +239,15 @@ export {
     using StlException = std::exception;
 
     // Move
-    template <typename _Tp>
-    _GLIBCXX_NODISCARD constexpr typename std::remove_reference<_Tp>::type &&Move(_Tp && __t) noexcept {
-        return static_cast<typename std::remove_reference<_Tp>::type &&>(__t);
+    template <typename T>
+    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&Move(T&& value) noexcept {
+        return static_cast<typename std::remove_reference<T>::type &&>(value);
     }
 
     // Forward
-    template <typename _Tp>
-    _GLIBCXX_NODISCARD constexpr _Tp &&Forward(typename std::remove_reference<_Tp>::type & __t) noexcept {
-        return static_cast<_Tp &&>(__t);
+    template <typename T>
+    [[nodiscard]] constexpr T &&Forward(typename std::remove_reference<T>::type& value) noexcept {
+        return static_cast<T &&>(value);
     }
 
     // Chrono
@@ -383,12 +299,6 @@ export {
     // Stringstream
     using StringStream = std::basic_stringstream<char>;
 
-    // Endl;
-    template <typename _CharT, typename _Traits>
-    inline std::basic_ostream<_CharT, _Traits> &Endl(std::basic_ostream<_CharT, _Traits> & __os) {
-        return std::flush(__os.put(__os.widen('\n')));
-    }
-
     // Dir
     using Path = std::filesystem::path;
     using DirEntry = std::filesystem::directory_entry;
@@ -411,15 +321,6 @@ export {
     // SharedPtr
     template <typename T>
     using EnableSharedFromThis = std::enable_shared_from_this<T>;
-
-    // static ptr cast
-    template<typename _Tp, typename _Tp1, std::_Lock_policy _Lp>
-    inline std::__shared_ptr<_Tp, _Lp>
-    StaticPointCast(const std::__shared_ptr<_Tp1, _Lp>& __r) noexcept
-    {
-        using _Sp = std::__shared_ptr<_Tp, _Lp>;
-        return _Sp(__r, static_cast<typename _Sp::element_type*>(__r.get()));
-    }
 
     using Mutex = std::mutex;
 

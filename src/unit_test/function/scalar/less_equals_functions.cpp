@@ -436,11 +436,11 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
 
         for (SizeT i = 0; i < row_count; ++i) {
             if (i % 2 == 0) {
-                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
-                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + ToStr(i)));
+                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + ToStr(i)));
             } else {
-                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
-                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + std::to_string(i)));
+                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + ToStr(i)));
+                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + ToStr(i)));
             }
         }
         data_block.Finalize();
@@ -451,11 +451,11 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
             EXPECT_EQ(v2.type_.type(), LogicalType::kVarchar);
             if (i % 2 == 0) {
-                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
-                EXPECT_EQ(v2.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
+                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + ToStr(i));
+                EXPECT_EQ(v2.value_.varchar.ToString(), "Helloworld" + ToStr(i));
             } else {
-                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
-                EXPECT_EQ(v2.value_.varchar.ToString(), "helloworld" + std::to_string(i));
+                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + ToStr(i));
+                EXPECT_EQ(v2.value_.varchar.ToString(), "helloworld" + ToStr(i));
             }
         }
 
@@ -467,16 +467,16 @@ TEST_F(LessEqualsFunctionsTest, less_equals_func) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
             if (i % 2 == 0) {
-                String s1 = "Helloworld" + std::to_string(i);
-                String s2 = "Helloworld" + std::to_string(i);
+                String s1 = "Helloworld" + ToStr(i);
+                String s2 = "Helloworld" + ToStr(i);
                 if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {
                     EXPECT_EQ(v.value_.boolean, false);
                 }
             } else {
-                String s1 = "Helloworld" + std::to_string(i);
-                String s2 = "helloworld" + std::to_string(i);
+                String s1 = "Helloworld" + ToStr(i);
+                String s2 = "helloworld" + ToStr(i);
                 if (s1 <= s2) {
                     EXPECT_EQ(v.value_.boolean, true);
                 } else {

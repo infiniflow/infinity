@@ -50,7 +50,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -85,7 +85,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -102,7 +102,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
 
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -151,7 +151,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         column_vector.AppendByPtr((ptr_t)(&varchar_value));
 
@@ -170,7 +170,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
@@ -221,7 +221,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < 1; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -242,7 +242,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -286,7 +286,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < 1; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -314,7 +314,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -324,7 +324,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -350,7 +350,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(2 * i);
+        String s = "hello" + ToStr(2 * i);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -372,7 +372,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -382,7 +382,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(i);
+        String s = "hello" + ToStr(i);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -407,7 +407,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hello" + std::to_string(src_idx);
+        String s = "hello" + ToStr(src_idx);
 
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -451,7 +451,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -486,7 +486,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
 
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -503,7 +503,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
 
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -554,7 +554,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
         VarcharT varchar_value(s);
         column_vector.AppendByPtr((ptr_t)(&varchar_value));
 
@@ -574,7 +574,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
@@ -625,7 +625,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < 1; ++i) {
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -646,7 +646,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
 
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
         if (vx.value_.varchar.IsInlined()) {
@@ -690,7 +690,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < 1; ++i) {
-        String s = "hellohellohello" + std::to_string(i);
+        String s = "hellohellohello" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -740,7 +740,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "Professional" + std::to_string(i);
+        String s = "Professional" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -780,7 +780,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
 
-        String s = "Professional" + std::to_string(i);
+        String s = "Professional" + ToStr(i);
 
         if (s.length() <= VarcharT::INLINE_LENGTH) {
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -798,7 +798,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
 
-        String s = "Professional" + std::to_string(i);
+        String s = "Professional" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -850,7 +850,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "Professional" + std::to_string(i);
+        String s = "Professional" + ToStr(i);
         VarcharT varchar_value(s);
         Value v = Value::MakeVarchar(varchar_value);
         column_vector.AppendValue(v);
@@ -871,7 +871,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String s = "Professional" + std::to_string(i);
+        String s = "Professional" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);

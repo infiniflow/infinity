@@ -24,7 +24,7 @@ void ExplainFragment::Explain(PlanFragment *fragment_ptr, SharedPtr<Vector<Share
             fragment_header = "FRAGMENT ";
         }
 
-        fragment_header += "(" + std::to_string(fragment_ptr->FragmentID()) + ")";
+        fragment_header += "(" + ToStr(fragment_ptr->FragmentID()) + ")";
         result->emplace_back(MakeShared<String>(fragment_header));
     }
 

@@ -79,7 +79,7 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
     while (true) {
         i64 byte_count1 = end_pos - buffer;
         i64 byte_count2 = already_read_size_ - buffer_offset_;
-        i64 to_read = std::min(byte_count1, byte_count2);
+        i64 to_read = Min(byte_count1, byte_count2);
         if (to_read > 0) {
             Memcpy(buffer, data_.get() + buffer_offset_, to_read);
             buffer_offset_ += to_read;

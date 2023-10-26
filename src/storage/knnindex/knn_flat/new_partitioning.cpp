@@ -16,6 +16,7 @@ module;
 
 #include <faiss/impl/platform_macros.h>
 
+import stl;
 import parser;
 
 module knn_partition;
@@ -220,14 +221,14 @@ void find_minimax(const uint16_t *vals, size_t n, uint16_t &smin, uint16_t &smax
     smin = tab32[0], smax = tab32[16];
 
     for (int i = 1; i < 16; i++) {
-        smin = std::min(smin, tab32[i]);
-        smax = std::max(smax, tab32[i + 16]);
+        smin = Min(smin, tab32[i]);
+        smax = Max(smax, tab32[i + 16]);
     }
 
     // missing values
     for (size_t i = (n & ~15); i < n; i++) {
-        smin = std::min(smin, vals[i]);
-        smax = std::max(smax, vals[i]);
+        smin = Min(smin, vals[i]);
+        smax = Max(smax, vals[i]);
     }
 }
 
@@ -752,7 +753,7 @@ simd16uint16 histogram_8(const uint16_t *data, Preproc pp, size_t n_in) {
         simd16uint16 a4lo(0); // 4-bit accus
         simd16uint16 a4hi(0);
 
-        int i1 = std::min(i0 + 15, n);
+        int i1 = Min(i0 + 15, n);
         int i;
         for (i = i0; i + 2 < i1; i += 3) {
             compute_accu2<3>(data, pp, a4lo, a4hi); // adds 3 max
@@ -848,7 +849,7 @@ simd16uint16 histogram_16(const uint16_t *data, Preproc pp, size_t n_in) {
         simd32uint8 a4_2(0); // 2, 6, 10, 14
         simd32uint8 a4_3(0); // 3, 7, 11, 15
 
-        int i1 = std::min(i0 + 7, n);
+        int i1 = Min(i0 + 7, n);
         int i;
         for (i = i0; i + 2 < i1; i += 3) {
             compute_accu2_16<3>(data, pp, a4_0, a4_1, a4_2, a4_3);
@@ -888,7 +889,7 @@ struct PreprocMinShift {
 
     explicit PreprocMinShift(uint16_t min) {
         min16.set1(min);
-        int vmax0 = std::min((nbin << shift) + min, 65536);
+        int vmax0 = Min((nbin << shift) + min, 65536);
         uint16_t vmax = uint16_t(vmax0 - 1 - min);
         max16.set1(vmax); // vmax inclusive
     }
@@ -1049,7 +1050,7 @@ void simd_histogram_16(const uint16_t *data, int n, uint16_t min, int shift, int
             hist[data[i]]++;
         }
     } else {
-        int vmax0 = std::min((16 << shift) + min, 65536);
+        int vmax0 = Min((16 << shift) + min, 65536);
         uint16_t vmax = uint16_t(vmax0 - 1 - min);
 
         for (size_t i = 0; i < n; i++) {

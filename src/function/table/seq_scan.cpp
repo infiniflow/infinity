@@ -74,7 +74,7 @@ static void SeqScanFunc(QueryContext *query_context, TableFunctionData *table_fu
             auto *block_entry = segment_entry->block_entries_[current_block_id].get();
             auto remaining = block_entry->row_count_ - read_offset;
 
-            auto write_size = std::min(write_capacity, remaining);
+            auto write_size = Min(write_capacity, remaining);
 
             for (i64 output_column_id = 0; auto column_id : column_ids) {
                 ColumnBuffer column_buffer =

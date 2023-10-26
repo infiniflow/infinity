@@ -284,7 +284,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *query_context, cons
 
     String binding_name;
     if (subquery_ref->alias_ == nullptr) {
-        binding_name = "subquery" + std::to_string(subquery_table_index);
+        binding_name = "subquery" + ToStr(subquery_table_index);
     } else {
         binding_name = subquery_ref->alias_->alias_;
         if (subquery_ref->alias_->column_alias_array_ != nullptr) {
@@ -384,7 +384,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     auto table_ref = MakeShared<BaseTableRef>(table_scan_function,
                                               table_collection_entry,
                                               columns,
-                                              std::move(block_index),
+                                              Move(block_index),
                                               alias,
                                               table_index,
                                               names_ptr,
@@ -733,7 +733,7 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                SharedPtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
-    bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
+    bind_context_ptr_->group_by_table_name_ = "groupby" + ToStr(table_index);
 
     if (select.group_by_list_ != nullptr) {
         // Start to bind GROUP BY clause
@@ -762,7 +762,7 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
                               SharedPtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
-    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
+    bind_context_ptr_->aggregate_table_name_ = "aggregate" + ToStr(table_index);
 
     // All having expr must appear in group by list or aggregate function list.
     if (select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
@@ -787,7 +787,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *query_context, const Select
 void QueryBinder::BuildSelectList(QueryContext *query_context, SharedPtr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
-    bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
+    bind_context_ptr_->project_table_name_ = "project" + ToStr(table_index);
 
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
 

@@ -77,7 +77,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         len_value_expr->AppendToChunk(col2);
 
         for (SizeT idx = 0; idx < row_count; ++idx) {
-            String s = "hello" + std::to_string(idx);
+            String s = "hello" + ToStr(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
             col0->AppendValue(v);
@@ -151,7 +151,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         len_value_expr->AppendToChunk(col2);
 
         for (SizeT idx = 0; idx < row_count; ++idx) {
-            String s = "hellohellohellohello" + std::to_string(idx);
+            String s = "hellohellohellohello" + ToStr(idx);
             VarcharT varchar_value(s);
             Value v = Value::MakeVarchar(varchar_value);
             col0->AppendValue(v);

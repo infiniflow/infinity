@@ -157,49 +157,49 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
 
         source = std::numeric_limits<SmallIntT>::min();
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 6);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = std::numeric_limits<SmallIntT>::max();
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 5);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 0;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 1);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 9;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 1);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 10;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 2);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 99;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 2);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = -100;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 4);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 100;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
-        src_str = std::to_string(source);
+        src_str = ToStr(source);
         EXPECT_EQ(src_str.size(), 3);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
     }
@@ -377,7 +377,7 @@ TEST_F(SmallIntegerCastTest, small_integer_cast1) {
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             i16 check_value = static_cast<i16>(i);
             EXPECT_FALSE(vx.is_null());
-            String check_str(std::to_string(check_value));
+            String check_str(ToStr(check_value));
             EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_str.c_str());
         }
     }

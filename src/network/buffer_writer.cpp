@@ -33,7 +33,7 @@ void BufferWriter::send_string(const String &value, NullTerminator null_terminat
     }
 
     while (position_in_string < value.size()) {
-        const auto bytes_to_transfer = std::min(max_capacity(), value.size() - position_in_string);
+        const auto bytes_to_transfer = Min(max_capacity(), value.size() - position_in_string);
         try_flush(bytes_to_transfer);
         RingBufferIterator::CopyN(value.c_str() + position_in_string, bytes_to_transfer, current_pos_);
         current_pos_.increment(bytes_to_transfer);

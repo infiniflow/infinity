@@ -307,7 +307,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
 
     Path old_file_path = Path(wal_path_);
 
-    String new_file_path = old_file_path.string() + '.' + std::to_string(max_commit_ts);
+    String new_file_path = old_file_path.string() + '.' + ToStr(max_commit_ts);
     LOG_INFO(Format("Wal Swap to new path: {}", new_file_path.c_str()));
 
     // Rename the current wal file to a new one.

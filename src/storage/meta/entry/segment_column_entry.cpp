@@ -38,7 +38,7 @@ SharedPtr<SegmentColumnEntry> SegmentColumnEntry::MakeNewColumnDataEntry(const S
     column_data_entry->row_capacity_ = row_capacity;
     column_data_entry->column_type_ = data_type;
     column_data_entry->column_id_ = column_id;
-    column_data_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    column_data_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
     column_data_entry->buffer_handle_ =
         buffer_mgr->AllocateBufferHandle(column_data_entry->base_dir_, column_data_entry->file_name_, data_type->Size() * row_capacity);
     if (data_type->type() == kVarchar) {

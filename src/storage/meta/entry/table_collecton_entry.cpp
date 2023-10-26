@@ -68,7 +68,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
             index_name_base += "_" + column_name;
         }
         while (true) {
-            auto index_name = index_id > 0 ? (index_name_base + "_" + std::to_string(index_id)) : index_name_base;
+            auto index_name = index_id > 0 ? (index_name_base + "_" + ToStr(index_id)) : index_name_base;
             if (auto iter = table_entry->indexes_.find(index_name); iter == table_entry->indexes_.end()) {
                 index_def->index_name_ = MakeShared<String>(std::move(index_name));
                 break;
@@ -456,7 +456,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
                              __FILE_NAME__,
                              __LINE__);
 
-    this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
+    this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
         auto it = this->segments_.find(seg_id);
         if (it == this->segments_.end()) {

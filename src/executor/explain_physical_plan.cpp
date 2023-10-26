@@ -277,7 +277,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node,
             create_header_str = "CREATE SCHEMA ";
         }
 
-        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -312,7 +312,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node,
             create_header_str = "CREATE TABLE ";
         }
 
-        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -369,7 +369,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
             create_header_str = "CREATE INDEX ";
         }
 
-        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -412,7 +412,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,
             create_header_str = "CREATE COLLECTION ";
         }
 
-        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -453,7 +453,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node,
             drop_header_str = "DROP SCHEMA ";
         }
 
-        drop_header_str += "(" + std::to_string(drop_node->node_id()) + ")";
+        drop_header_str += "(" + ToStr(drop_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
@@ -488,7 +488,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node,
             drop_header_str = "DROP TABLE ";
         }
 
-        drop_header_str += "(" + std::to_string(drop_node->node_id()) + ")";
+        drop_header_str += "(" + ToStr(drop_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
@@ -529,7 +529,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node,
             drop_header_str = "DROP COLLECTION ";
         }
 
-        drop_header_str += "(" + std::to_string(drop_node->node_id()) + ")";
+        drop_header_str += "(" + ToStr(drop_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
@@ -570,7 +570,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
             insert_header_str = "INSERT ";
         }
 
-        insert_header_str += "(" + std::to_string(insert_node->node_id()) + ")";
+        insert_header_str += "(" + ToStr(insert_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(insert_header_str));
     }
 
@@ -633,13 +633,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node,
             project_header = "PROJECT ";
         }
 
-        project_header += "(" + std::to_string(project_node->node_id()) + ")";
+        project_header += "(" + ToStr(project_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(project_header));
     }
 
     // Table index
     {
-        String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(project_node->TableIndex());
+        String table_index = String(intent_size, ' ') + " - table index: #" + ToStr(project_node->TableIndex());
         result->emplace_back(MakeShared<String>(table_index));
     }
 
@@ -676,7 +676,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node,
         filter_node_header = "FILTER ";
     }
 
-    filter_node_header += "(" + std::to_string(filter_node->node_id()) + ")";
+    filter_node_header += "(" + ToStr(filter_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(filter_node_header));
 
     // filter expression
@@ -713,7 +713,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
         table_scan_header = "TABLE SCAN ";
     }
 
-    table_scan_header += "(" + std::to_string(table_scan_node->node_id()) + ")";
+    table_scan_header += "(" + ToStr(table_scan_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(table_scan_header));
 
     // Table alias and name
@@ -725,7 +725,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(table_scan_node->TableIndex());
+    String table_index = String(intent_size, ' ') + " - table index: #" + ToStr(table_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns
@@ -758,7 +758,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
         knn_scan_header = "KNN SCAN ";
     }
 
-    knn_scan_header += "(" + std::to_string(knn_scan_node->node_id()) + ")";
+    knn_scan_header += "(" + ToStr(knn_scan_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(knn_scan_header));
 
     // Table alias and name
@@ -771,7 +771,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(knn_scan_node->knn_table_index_);
+    String table_index = String(intent_size, ' ') + " - table index: #" + ToStr(knn_scan_node->knn_table_index_);
     result->emplace_back(MakeShared<String>(table_index));
 
     for (const auto &knn_expression : knn_scan_node->knn_expressions_) {
@@ -784,7 +784,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
             String(intent_size + 2, ' ') + " - element type: " + EmbeddingT::EmbeddingDataType2String(knn_expr_raw->embedding_data_type_);
         result->emplace_back(MakeShared<String>(embedding_type_str));
 
-        String embedding_dimension_str = String(intent_size + 2, ' ') + " - dimension: " + std::to_string(knn_expr_raw->dimension_);
+        String embedding_dimension_str = String(intent_size + 2, ' ') + " - dimension: " + ToStr(knn_expr_raw->dimension_);
         result->emplace_back(MakeShared<String>(embedding_dimension_str));
 
         String distance_type_str = String(intent_size + 2, ' ') + " - distance type: " + KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
@@ -838,14 +838,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
             agg_header = "AGGREGATE ";
         }
 
-        agg_header += "(" + std::to_string(aggregate_node->node_id()) + ")";
+        agg_header += "(" + ToStr(aggregate_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(agg_header));
     }
 
     // Aggregate Table index
     {
         String aggregate_table_index =
-            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(aggregate_node->AggregateTableIndex());
+            String(intent_size, ' ') + " - aggregate table index: #" + ToStr(aggregate_node->AggregateTableIndex());
         result->emplace_back(MakeShared<String>(aggregate_table_index));
     }
 
@@ -866,7 +866,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
     // Group by expressions
     if (groups_count != 0) {
         // Group by table index
-        String group_table_index = String(intent_size, ' ') + " - group by table index: #" + std::to_string(aggregate_node->GroupTableIndex());
+        String group_table_index = String(intent_size, ' ') + " - group by table index: #" + ToStr(aggregate_node->GroupTableIndex());
         result->emplace_back(MakeShared<String>(group_table_index));
 
         String group_by_expression_str = String(intent_size, ' ') + " - group by: [";
@@ -894,7 +894,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vecto
             sort_header = "SORT ";
         }
 
-        sort_header += "(" + std::to_string(sort_node->node_id()) + ")";
+        sort_header += "(" + ToStr(sort_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(sort_header));
     }
 
@@ -941,7 +941,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vec
             limit_header = "LIMIT ";
         }
 
-        limit_header += "(" + std::to_string(limit_node->node_id()) + ")";
+        limit_header += "(" + ToStr(limit_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(limit_header));
     }
 
@@ -986,7 +986,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node
         } else {
             cross_product_header = "CROSS PRODUCT ";
         }
-        cross_product_header += "(" + std::to_string(cross_product_node->node_id()) + ")";
+        cross_product_header += "(" + ToStr(cross_product_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(cross_product_header));
     }
 
@@ -1023,7 +1023,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node,
         join_header = "NESTED LOOP JOIN ";
     }
 
-    join_header += "(" + std::to_string(join_node->node_id()) + ")";
+    join_header += "(" + ToStr(join_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(join_header));
 
     // Conditions
@@ -1074,7 +1074,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             } else {
                 show_str = "SHOW TABLES ";
             }
-            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            show_str += "(" + ToStr(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str =
@@ -1089,7 +1089,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             } else {
                 show_str = "SHOW VIEWS ";
             }
-            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            show_str += "(" + ToStr(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             String output_columns_str = String(intent_size, ' ') + " - output columns: [schema, view, column_count]";
@@ -1103,7 +1103,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             } else {
                 show_str = "DESCRIBE TABLE/COLLECTION ";
             }
-            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            show_str += "(" + ToStr(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             String show_column_db_str = String(intent_size, ' ') + " - schema: ";
@@ -1125,7 +1125,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             } else {
                 show_str = "SHOW INDEXES ";
             }
-            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            show_str += "(" + ToStr(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             String show_column_db_str = String(intent_size, ' ') + " - schema: ";
@@ -1223,7 +1223,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
             import_header_str = "IMPORT ";
         }
 
-        import_header_str += "(" + std::to_string(import_node->node_id()) + ")";
+        import_header_str += "(" + ToStr(import_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(import_header_str));
     }
 
@@ -1286,7 +1286,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node,
             export_header_str = "EXPORT ";
         }
 
-        export_header_str += "(" + std::to_string(export_node->node_id()) + ")";
+        export_header_str += "(" + ToStr(export_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(export_header_str));
     }
 
@@ -1353,7 +1353,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node,
             create_header_str = "CREATE VIEW ";
         }
 
-        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
+        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -1409,7 +1409,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node,
             drop_header_str = "DROP VIEW ";
         }
 
-        drop_header_str += "(" + std::to_string(drop_node->node_id()) + ")";
+        drop_header_str += "(" + ToStr(drop_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
@@ -1442,13 +1442,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, SharedPtr<Vec
 
     switch (flush_node->flush_type()) {
         case FlushType::kData:
-            flush_header_str += "DATA (" + std::to_string(flush_node->node_id()) + ")";
+            flush_header_str += "DATA (" + ToStr(flush_node->node_id()) + ")";
             break;
         case FlushType::kLog:
-            flush_header_str += "LOG (" + std::to_string(flush_node->node_id()) + ")";
+            flush_header_str += "LOG (" + ToStr(flush_node->node_id()) + ")";
             break;
         case FlushType::kBuffer:
-            flush_header_str += "BUFFER (" + std::to_string(flush_node->node_id()) + ")";
+            flush_header_str += "BUFFER (" + ToStr(flush_node->node_id()) + ")";
             break;
     }
 
@@ -1465,7 +1465,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
     } else {
         explain_header_str = "SOURCE ";
     }
-    explain_header_str += "(" + std::to_string(source_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(source_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1476,7 +1476,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vecto
     } else {
         explain_header_str = "SINK ";
     }
-    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(sink_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1490,7 +1490,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalParallelAggregate *parallel_aggr
     } else {
         explain_header_str = "PARALLEL AGGREGATE ";
     }
-    explain_header_str += "(" + std::to_string(parallel_aggregate_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(parallel_aggregate_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1504,7 +1504,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeParallelAggregate *merge_pa
     } else {
         explain_header_str = "MERGE PARALLEL AGGREGATE ";
     }
-    explain_header_str += "(" + std::to_string(merge_parallel_aggregate_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_parallel_aggregate_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1518,7 +1518,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalIntersect *intersect_node,
     } else {
         explain_header_str = "INTERSECT ";
     }
-    explain_header_str += "(" + std::to_string(intersect_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(intersect_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1532,7 +1532,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalExcept *except_node,
     } else {
         explain_header_str = "EXCEPT ";
     }
-    explain_header_str += "(" + std::to_string(except_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(except_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1543,7 +1543,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node, SharedPtr<Vecto
     } else {
         explain_header_str = "HASH ";
     }
-    explain_header_str += "(" + std::to_string(hash_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(hash_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1557,7 +1557,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeHash *merge_hash_node,
     } else {
         explain_header_str = "MERGE HASH ";
     }
-    explain_header_str += "(" + std::to_string(merge_hash_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_hash_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1571,7 +1571,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
     } else {
         explain_header_str = "MERGE LIMIT ";
     }
-    explain_header_str += "(" + std::to_string(merge_limit_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_limit_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1585,7 +1585,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
     } else {
         explain_header_str = "MERGE TOP ";
     }
-    explain_header_str += "(" + std::to_string(merge_top_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_top_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1599,7 +1599,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeSort *merge_sort_node,
     } else {
         explain_header_str = "MERGE SORT ";
     }
-    explain_header_str += "(" + std::to_string(merge_sort_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_sort_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -1613,11 +1613,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     } else {
         explain_header_str = "MERGE KNN ";
     }
-    explain_header_str += "(" + std::to_string(merge_knn_node->node_id()) + ")";
+    explain_header_str += "(" + ToStr(merge_knn_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 
     // Table index
-    String table_index = String(intent_size, ' ') + " - table index: #" + std::to_string(merge_knn_node->knn_table_index());
+    String table_index = String(intent_size, ' ') + " - table index: #" + ToStr(merge_knn_node->knn_table_index());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns

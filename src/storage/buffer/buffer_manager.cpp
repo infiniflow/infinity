@@ -58,7 +58,7 @@ BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir, 
     switch (buffer_type) {
         case BufferType::kFaissIndex: {
             LOG_TRACE("Read index file, Generate Buffer Handle");
-            std::unique_lock<RWMutex> w_locker(rw_locker_);
+            UniqueLock<RWMutex> w_locker(rw_locker_);
             const auto &[iter, insert_ok] = buffer_map_.emplace(*full_name, this);
             Assert<StorageException>(insert_ok, "Insert buffer handle failed", __FILE_NAME__, __LINE__);
             auto &[_full_name, buffer_handle] = *iter;

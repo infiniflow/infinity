@@ -130,7 +130,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
             T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
             RowID *row_id = knn_flat->GetIDByIdx(query_idx);
 
-            i64 result_count = std::min(knn_flat->TotalBaseCount(), knn_flat->TopK());
+            i64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
 
             for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
                 // Bug here? id = top_idx?

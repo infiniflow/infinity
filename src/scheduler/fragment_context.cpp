@@ -477,7 +477,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     switch (first_operator->operator_type()) {
         case PhysicalOperatorType::kTableScan: {
             auto *table_scan_operator = static_cast<PhysicalTableScan *>(first_operator);
-            parallel_count = std::min(parallel_count, (i64)(table_scan_operator->BlockEntryCount()));
+            parallel_count = Min(parallel_count, (i64)(table_scan_operator->BlockEntryCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }
@@ -485,7 +485,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kKnnScan: {
             auto *knn_scan_operator = static_cast<PhysicalKnnScan *>(first_operator);
-            parallel_count = std::min(parallel_count, (i64)(knn_scan_operator->BlockEntryCount()));
+            parallel_count = Min(parallel_count, (i64)(knn_scan_operator->BlockEntryCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }

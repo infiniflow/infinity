@@ -41,7 +41,7 @@ void Storage::Init() {
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
-                                      std::filesystem::path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
+                                      Path(*config_ptr_->wal_dir()) / WAL_FILE_TEMP_FILE,
                                       config_ptr_->wal_size_threshold(),
                                       config_ptr_->full_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_sec(),
