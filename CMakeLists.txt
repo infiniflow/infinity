@@ -77,7 +77,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
 # set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 # find_package(Boost REQUIRED)
-add_subdirectory(core)
+add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # set parameters for unit test coverage
