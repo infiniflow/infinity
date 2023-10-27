@@ -4,7 +4,6 @@
 
 module;
 
-#include <string>
 #include <bits/stl_algo.h>
 
 import stl;
@@ -67,7 +66,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                     return expr->type() != ExpressionType::kColumn;
                 });
                 // FIXME: It would be more elegant if the operators were generalized using enums e.g. DuckDB: cond.comparison == ExpressionType::COMPARE_EQUAL
-                if (func_expr->func_.name() != std::string("=") || has_not_column_expr) {
+                if (IsEqual(func_expr->func_.name(), "=") || has_not_column_expr) {
                     continue;
                 }
                 Assert<PlannerException>(args.size() == 2, "BinaryFunction can only have two arguments.", __FILE_NAME__, __LINE__);

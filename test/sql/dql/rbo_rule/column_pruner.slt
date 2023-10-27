@@ -1,0 +1,96 @@
+statement ok
+CREATE TABLE t1 (c1 INTEGER PRIMARY KEY, c2 INTEGER, c3 INTEGER, c4 INTEGER);
+
+statement ok
+CREATE TABLE t2 (c1 INTEGER PRIMARY KEY, c2 INTEGER, c3 INTEGER, c4 INTEGER);
+
+query I
+EXPLAIN LOGICAL SELECT * FROM t1;
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [c1 (#0), c2 (#1), c3 (#2), c4 (#3)]
+-> TABLE SCAN (2)
+   - table name: t1(default.t1)
+   - table index: #1
+   - output columns: [c1, c2, c3, c4]
+
+query I
+EXPLAIN LOGICAL SELECT c2 FROM t1;
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [c2 (#0)]
+-> TABLE SCAN (2)
+   - table name: t1(default.t1)
+   - table index: #1
+   - output columns: [c2]
+
+query I
+EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 INNER JOIN t2 ON t1.c1 = t2.c2;
+----
+PROJECT (5)
+  - table index: #5
+  - expressions: [c1 (#0), c2 (#1)]
+ -> INNER JOIN(4)
+    - filters: [c1 (#0) = c2 (#1)
+    - output columns: [c1, c2]
+   -> TABLE SCAN (2)
+      - table name: t1(default.t1)
+      - table index: #1
+      - output columns: [c1]
+   -> TABLE SCAN (3)
+      - table name: t2(default.t2)
+      - table index: #2
+      - output columns: [c2]
+
+query I
+EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c2;
+----
+PROJECT (5)
+  - table index: #5
+  - expressions: [c1 (#0), c2 (#1)]
+ -> LEFT JOIN(4)
+    - filters: [c1 (#0) = c2 (#1)
+    - output columns: [c1, c2]
+   -> TABLE SCAN (2)
+      - table name: t1(default.t1)
+      - table index: #1
+      - output columns: [c1]
+   -> TABLE SCAN (3)
+      - table name: t2(default.t2)
+      - table index: #2
+      - output columns: [c2]
+
+query I
+EXPLAIN LOGICAL SELECT MIN(c1), AVG(c2) FROM t1;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [min(c1) (#0), avg(c2) (#1)]
+ -> AGGREGATE (3)
+    - aggregate table index: #3
+    - aggregate: [MIN(c1 (#0)), AVG(c2 (#1))]
+   -> TABLE SCAN (2)
+      - table name: t1(default.t1)
+      - table index: #1
+      - output columns: [c1, c2]
+
+query I
+EXPLAIN LOGICAL SELECT AVG(c2) FROM t1 GROUP BY c1;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [avg(c2) (#1)]
+ -> AGGREGATE (3)
+    - aggregate table index: #3
+    - aggregate: [AVG(c2 (#1))]
+    - group by table index: #2
+    - group by: [c1 (#0)]
+   -> TABLE SCAN (2)
+      - table name: t1(default.t1)
+      - table index: #1
+      - output columns: [c1, c2]
+
+
+# TODO Delete Case
