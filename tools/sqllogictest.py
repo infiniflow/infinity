@@ -52,7 +52,7 @@ if __name__ == "__main__":
         "--path",
         help="path of sqllogictest-rs",
         type=str,
-        default="./tools/sqllogictest",
+        default="sqllogictest",
         dest="path",
     )
     parser.add_argument(
