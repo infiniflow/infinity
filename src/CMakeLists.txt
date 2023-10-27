@@ -8,10 +8,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bin/compilation_config.cppm.in ${CMAK
 
 add_subdirectory(parser)
 
-### third_party modules
-
-#add_subdirectory(third_party_modules/std_modules)
-
 ### Infinity
 
 file(GLOB_RECURSE
