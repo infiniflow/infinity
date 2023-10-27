@@ -3,14 +3,15 @@
 //
 
 #include "scheduler.h"
-#include "common/utility/threadutil.h"
+#include "threadutil.h"
 
 #include <iostream>
+#include <unordered_set>
 
 namespace infinity {
 
 void
-Scheduler::ExecuteLoop(TaskQueue* task_queue, i64 worker_id) {
+Scheduler::ExecuteLoop(TaskQueue* task_queue, int64_t worker_id) {
     Task* task{nullptr};
     bool running{true};
     while(running) {
@@ -28,18 +29,18 @@ Scheduler::ExecuteLoop(TaskQueue* task_queue, i64 worker_id) {
 }
 
 void
-Scheduler::Init(const HashSet<i64>& cpu_set) {
+Scheduler::Init(const std::unordered_set<int64_t>& cpu_set) {
     if(!cpu_set_.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
         return;
     }
     cpu_set_ = cpu_set;
 
-    for(i64 cpu_id: cpu_set) {
-        UniquePtr<Thread> thread_ptr = MakeUnique<Thread>();
-        UniquePtr<std::atomic<bool>> running = MakeUnique<std::atomic<bool>>(true);
-        UniquePtr<TaskQueue> task_queue = MakeUnique<TaskQueue>();
-        UniquePtr<Thread> task_thread = MakeUnique<Thread>(ExecuteLoop, task_queue.get(), cpu_id);
+    for(int64_t cpu_id: cpu_set) {
+        std::unique_ptr<std::thread> thread_ptr = std::make_unique<std::thread>();
+        std::unique_ptr<std::atomic<bool>> running = std::make_unique<std::atomic<bool>>(true);
+        std::unique_ptr<TaskQueue> task_queue = std::make_unique<TaskQueue>();
+        std::unique_ptr<std::thread> task_thread = std::make_unique<std::thread>(ExecuteLoop, task_queue.get(), cpu_id);
 
         // Pin the thread to specific cpu
         ThreadUtil::pin(*task_thread, cpu_id);
@@ -53,8 +54,8 @@ Scheduler::Init(const HashSet<i64>& cpu_set) {
 
 void
 Scheduler::Uninit() {
-    UniquePtr<TerminateTask> terminate_task = MakeUnique<TerminateTask>();
-    for(i64 cpu_id: cpu_set_) {
+    std::unique_ptr<TerminateTask> terminate_task = std::make_unique<TerminateTask>();
+    for(int64_t cpu_id: cpu_set_) {
         task_queues_[cpu_id]->Enqueue(terminate_task.get());
         task_threads_[cpu_id]->join();
         std::cout << "Stop worker: " << cpu_id << std::endl;
@@ -62,7 +63,7 @@ Scheduler::Uninit() {
 }
 
 void
-Scheduler::ScheduleTask(i64 worker_id, Task* task) {
+Scheduler::ScheduleTask(int64_t worker_id, Task* task) {
     task_queues_[worker_id]->Enqueue(task);
 }
 

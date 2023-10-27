@@ -16,10 +16,10 @@ namespace infinity {
 class Pipeline {
 public:
     inline explicit
-    Pipeline(u64 fragment_id, u64 pipeline_id): fragment_id_(fragment_id), pipeline_id_(pipeline_id) {}
+    Pipeline(uint64_t fragment_id, uint64_t pipeline_id): fragment_id_(fragment_id), pipeline_id_(pipeline_id) {}
 
     inline void
-    Add(UniquePtr<Operator> op) {
+    Add(std::unique_ptr<Operator> op) {
         operators_.emplace_back(std::move(op));
 
         // 128 bytes buffer for the operators input
@@ -48,10 +48,10 @@ public:
     }
 
 private:
-    Vector<UniquePtr<Operator>> operators_{};
-    Vector<Buffer> buffers_{};
-    u64 fragment_id_{};
-    u64 pipeline_id_{};
+    std::vector<std::unique_ptr<Operator>> operators_{};
+    std::vector<Buffer> buffers_{};
+    uint64_t fragment_id_{};
+    uint64_t pipeline_id_{};
 };
 #endif
 enum class FragmentType {
@@ -63,37 +63,37 @@ enum class FragmentType {
 class Fragment {
 public:
     inline explicit
-    Fragment(u64 id, FragmentType type) : id_(id), fragment_type_(type) {}
+    Fragment(uint64_t id, FragmentType type) : id_(id), fragment_type_(type) {}
 
-    Vector<SharedPtr<Task>>
-    BuildTask(u64 parallel_size);
+    std::vector<std::shared_ptr<Task>>
+    BuildTask(uint64_t parallel_size);
 
     inline void
-    AddOperator(UniquePtr<Operator> op) {
+    AddOperator(std::unique_ptr<Operator> op) {
         operators_.emplace_back(std::move(op));
     }
 
     inline void
-    SetChild(UniquePtr<Fragment> child) {
+    SetChild(std::unique_ptr<Fragment> child) {
         child_ = std::move(child);
     }
 
     inline void
-    AddSource(UniquePtr<Source> op) {
+    AddSource(std::unique_ptr<Source> op) {
         source_ = std::move(op);
     }
 
     inline void
-    AddSink(UniquePtr<Sink> op) {
+    AddSink(std::unique_ptr<Sink> op) {
         sink_ = std::move(op);
     }
 private:
-    u64 id_{};
+    uint64_t id_{};
     FragmentType fragment_type_{FragmentType::kInvalid};
-    UniquePtr<Source> source_{};
-    Vector<UniquePtr<Operator>> operators_{};
-    UniquePtr<Sink> sink_{};
-    UniquePtr<Fragment> child_{};
+    std::unique_ptr<Source> source_{};
+    std::vector<std::unique_ptr<Operator>> operators_{};
+    std::unique_ptr<Sink> sink_{};
+    std::unique_ptr<Fragment> child_{};
 };
 
 }

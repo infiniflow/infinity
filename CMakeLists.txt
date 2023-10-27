@@ -21,7 +21,7 @@ if (${FORCE_COLORED_OUTPUT})
     endif ()
 endif ()
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
 string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
@@ -49,7 +49,9 @@ set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -w")
+#    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
+    set(CMAKE_CXX_FLAGS "-Wno-read-modules-implicitly")
+#    set(CMAKE_CXX_FLAGS_DEBUG "-Wno-unused-variable -Wno-unused-result -Wno-read-modules-implicitly")
 # set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
 else()
     message(FATAL_ERROR "Please, use Clang. Current compiler is ${CMAKE_CXX_COMPILER_ID}!")
@@ -75,7 +77,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
 # set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 # find_package(Boost REQUIRED)
-add_subdirectory(core)
+add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # set parameters for unit test coverage
