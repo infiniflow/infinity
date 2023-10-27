@@ -4,32 +4,32 @@
 
 
 #include "task.h"
-#include "common/utility/threadutil.h"
+#include "threadutil.h"
 #include <iostream>
 #include <emmintrin.h>
 
 namespace infinity {
 
-HashSet<i64> NewScheduler::cpu_set{};
-HashMap<i64, UniquePtr<BlockingQueue>> NewScheduler::task_queues{};
-HashMap<i64, UniquePtr<Thread>> NewScheduler::workers{};
+std::unordered_set<int64_t> NewScheduler::cpu_set{};
+std::unordered_map<int64_t, std::unique_ptr<BlockingQueue>> NewScheduler::task_queues{};
+std::unordered_map<int64_t, std::unique_ptr<std::thread>> NewScheduler::workers{};
 
-UniquePtr<BlockingQueue> NewScheduler::ready_queue{};
-UniquePtr<Thread> NewScheduler::coordinator{};
+std::unique_ptr<BlockingQueue> NewScheduler::ready_queue{};
+std::unique_ptr<std::thread> NewScheduler::coordinator{};
 
-UniquePtr<PollerQueue> NewScheduler::poller_queue{};
-UniquePtr<Thread> NewScheduler::poller{};
+std::unique_ptr<PollerQueue> NewScheduler::poller_queue{};
+std::unique_ptr<std::thread> NewScheduler::poller{};
 
-Vector<i64> NewScheduler::cpu_array{};
-u64 NewScheduler::current_cpu_id{};
+std::vector<int64_t> NewScheduler::cpu_array{};
+uint64_t NewScheduler::current_cpu_id{};
 
 void
-NewScheduler::PollerLoop(i64 cpu_id) {
-    List<Task*> local_task_list{};
-    Vector<Task*> local_ready_queue{};
+NewScheduler::PollerLoop(int64_t cpu_id) {
+    std::list<Task*> local_task_list{};
+    std::vector<Task*> local_ready_queue{};
     bool running{true};
     printf("start poller on CPU: %ld\n", cpu_id);
-    SizeT spin_count{0};
+    size_t spin_count{0};
     while(running) {
         poller_queue->DequeueBulk(local_task_list);
         auto task_iter = local_task_list.begin();
@@ -82,7 +82,7 @@ NewScheduler::PollerLoop(i64 cpu_id) {
 }
 
 void
-NewScheduler::CoordinatorLoop(i64 cpu_id) {
+NewScheduler::CoordinatorLoop(int64_t cpu_id) {
     Task* input_task{nullptr};
     bool running{true};
     printf("start coordinator on CPU: %ld\n", cpu_id);
@@ -139,7 +139,7 @@ NewScheduler::CoordinatorLoop(i64 cpu_id) {
 }
 
 void
-NewScheduler::WorkerLoop(BlockingQueue* task_queue, i64 worker_id) {
+NewScheduler::WorkerLoop(BlockingQueue* task_queue, int64_t worker_id) {
     Task* task{nullptr};
     bool running{true};
     printf("start worker on CPU: %ld\n", worker_id);
@@ -170,7 +170,7 @@ NewScheduler::WorkerLoop(BlockingQueue* task_queue, i64 worker_id) {
 }
 
 void
-NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
+NewScheduler::Init(const std::unordered_set<int64_t>& input_cpu_set) {
     if(!cpu_set.empty()) {
         std::cerr << "scheduler was initialized before" << std::endl;
         return;
@@ -178,11 +178,11 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     cpu_set = input_cpu_set;
 
     cpu_array.reserve(cpu_set.size());
-    for(i64 cpu_id: cpu_set) {
+    for(int64_t cpu_id: cpu_set) {
         cpu_array.emplace_back(cpu_id);
 
-        UniquePtr<BlockingQueue> task_queue = MakeUnique<BlockingQueue>();
-        UniquePtr<Thread> task_thread = MakeUnique<Thread>(WorkerLoop, task_queue.get(), cpu_id);
+        std::unique_ptr<BlockingQueue> task_queue = std::make_unique<BlockingQueue>();
+        std::unique_ptr<std::thread> task_thread = std::make_unique<std::thread>(WorkerLoop, task_queue.get(), cpu_id);
 
         // Pin the thread to specific cpu
         ThreadUtil::pin(*task_thread, cpu_id);
@@ -192,16 +192,16 @@ NewScheduler::Init(const HashSet<i64>& input_cpu_set) {
     }
 
     // Start coordinator
-    ready_queue = MakeUnique<BlockingQueue>();
-    coordinator = MakeUnique<Thread>(CoordinatorLoop, 0);
+    ready_queue = std::make_unique<BlockingQueue>();
+    coordinator = std::make_unique<std::thread>(CoordinatorLoop, 0);
 
-    poller_queue = MakeUnique<PollerQueue>();
-    poller = MakeUnique<Thread>(PollerLoop, 0);
+    poller_queue = std::make_unique<PollerQueue>();
+    poller = std::make_unique<std::thread>(PollerLoop, 0);
     ThreadUtil::pin(*coordinator, 0);
     ThreadUtil::pin(*poller, 0);
 }
 
-i64
+int64_t
 NewScheduler::GetAvailableCPU() {
     assert(false);
     return 0;
@@ -209,11 +209,11 @@ NewScheduler::GetAvailableCPU() {
 
 void
 NewScheduler::Uninit() {
-    UniquePtr<TerminateTask> terminate_task = MakeUnique<TerminateTask>();
+    std::unique_ptr<TerminateTask> terminate_task = std::make_unique<TerminateTask>();
     poller_queue->Enqueue(terminate_task.get());
     poller->join();
     coordinator->join();
-    for(i64 cpu_id: cpu_set) {
+    for(int64_t cpu_id: cpu_set) {
         task_queues[cpu_id]->Enqueue(terminate_task.get());
         workers[cpu_id]->join();
     }
@@ -225,7 +225,7 @@ NewScheduler::RunTask(Task* task) {
 }
 
 void
-NewScheduler::DispatchTask(i64 worker_id, Task* task) {
+NewScheduler::DispatchTask(int64_t worker_id, Task* task) {
     if(!task_queues.contains(worker_id)) {
         printf("Can't use this CPU: %ld\n", worker_id);
         assert(false);

@@ -6,15 +6,13 @@
 
 #include "buffer.h"
 #include "buffer_queue.h"
-#include "common/types/alias/strings.h"
-#include "common/types/alias/containers.h"
 
 namespace infinity {
 
 class Operator {
 public:
     explicit
-    Operator(const String& name) : op_name_(MakeUnique<String>(name)) {}
+    Operator(const std::string& name) : op_name_(std::make_unique<std::string>(name)) {}
 
     inline void
     Run(const Buffer* input_buffer, Buffer* output_buffer) {
@@ -22,22 +20,22 @@ public:
     }
 
 private:
-    UniquePtr<String> op_name_;
+    std::unique_ptr<std::string> op_name_;
 };
 
 class Sink {
 public:
     explicit
-    Sink(const String& name) : op_name_(MakeUnique<String>(name)) {}
+    Sink(const std::string& name) : op_name_(std::make_unique<std::string>(name)) {}
 
     inline void
-    Run(const Buffer* input_buffer, Vector<ConcurrentQueue*>& output_buffers) {
+    Run(const Buffer* input_buffer, std::vector<ConcurrentQueue*>& output_buffers) {
 //        printf("Sink::Run(): %s\n", op_name_->c_str());
         // Read all input buffer and send to output buffer
 //        output_buffer_->Append(input_buffer_->Get());
     }
 private:
-    UniquePtr<String> op_name_;
+    std::unique_ptr<std::string> op_name_;
 };
 
 enum class SourceType {
@@ -48,7 +46,7 @@ enum class SourceType {
 class Source {
 public:
     explicit
-    Source(const String& name, SourceType source_type) : op_name_(MakeUnique<String>(name)), type_(source_type) {}
+    Source(const std::string& name, SourceType source_type) : op_name_(std::make_unique<std::string>(name)), type_(source_type) {}
 
     inline void
     Run(ConcurrentQueue* input_queue, const Buffer* input_buffer, Buffer* output_buffer) {
@@ -63,7 +61,7 @@ public:
         return type_;
     }
 private:
-    UniquePtr<String> op_name_;
+    std::unique_ptr<std::string> op_name_;
     SourceType type_;
 };
 
