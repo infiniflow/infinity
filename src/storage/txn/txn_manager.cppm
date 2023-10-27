@@ -4,13 +4,13 @@
 
 module;
 
+export module txn_manager;
+
 import stl;
 import txn;
 import buffer_manager;
 import txn_state;
 import wal_entry;
-
-export module txn_manager;
 
 namespace infinity {
 
