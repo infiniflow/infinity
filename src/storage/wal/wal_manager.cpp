@@ -74,7 +74,7 @@ WalManager::WalManager(Storage *storage,
                        u64 full_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_wal_bytes)
-    : storage_(storage), wal_path_(std::move(wal_path)), wal_size_threshold_(wal_size_threshold),
+    : storage_(storage), wal_path_(Move(wal_path)), wal_size_threshold_(wal_size_threshold),
       full_checkpoint_interval_sec_(full_checkpoint_interval_sec), delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec),
       delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), running_(false) {}
 
@@ -226,7 +226,7 @@ void WalManager::Flush() {
             if (file_size > wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts);
             }
-        } catch (std::exception &e) {
+        } catch (StlException &e) {
             LOG_WARN(e.what());
         } catch (...) {
             LOG_WARN("WalManager::Flush threads get exception");
@@ -284,7 +284,7 @@ void WalManager::Checkpoint() {
             }
             LOG_INFO(Format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
             RecycleWalFile();
-        } catch (std::exception &e) {
+        } catch (StlException &e) {
             LOG_ERROR(Format("WalManager::Checkpoint failed: {}", e.what()));
         }
     }
@@ -647,7 +647,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         block_entry->max_row_ts_ = commit_ts;
         block_entry->min_row_ts_ = commit_ts;
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
-        segment_entry->block_entries_.emplace_back(std::move(block_entry));
+        segment_entry->block_entries_.emplace_back(Move(block_entry));
     }
 }
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) {
@@ -671,7 +671,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     table_store->Append(cmd.block);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
-    table_store->append_state_ = std::move(append_state);
+    table_store->append_state_ = Move(append_state);
 
     TableCollectionEntry::Append(table_store->table_entry_, table_store->txn_, table_store.get(), storage_->buffer_manager());
     TableCollectionEntry::CommitAppend(table_store->table_entry_, table_store->txn_, table_store->append_state_.get());

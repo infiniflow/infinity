@@ -13,7 +13,7 @@ namespace infinity {
 
 export class Exception : public StlException {
 public:
-    explicit Exception(String message) : message_(std::move(message)) {}
+    explicit Exception(String message) : message_(Move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
 
 protected:
@@ -49,7 +49,7 @@ String Exception::BuildMessage(Args... params) {
 
 template <typename T, typename... Args>
 String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... params) {
-    values.push_back(std::move(param));
+    values.push_back(Move(param));
     return BuildMessageInternal(values, params...);
 }
 

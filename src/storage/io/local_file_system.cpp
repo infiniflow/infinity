@@ -135,7 +135,7 @@ SizeT LocalFileSystem::GetFileSize(FileHandler &file_handler) {
 
 void LocalFileSystem::DeleteFile(const String &file_name) {
     std::error_code error_code;
-    std::filesystem::path p{file_name};
+    Path p{file_name};
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() == 0) {
         if (!is_deleted) {
@@ -156,7 +156,7 @@ void LocalFileSystem::SyncFile(FileHandler &file_handler) {
 // Directory related methods
 bool LocalFileSystem::Exists(const String &path) {
     std::error_code error_code;
-    std::filesystem::path p{path};
+    Path p{path};
     bool is_exists = std::filesystem::exists(p, error_code);
     if (error_code.value() == 0) {
         return is_exists;
@@ -167,13 +167,13 @@ bool LocalFileSystem::Exists(const String &path) {
 
 bool LocalFileSystem::CreateDirectoryNoExp(const String &path) {
     std::error_code error_code;
-    std::filesystem::path p{path};
+    Path p{path};
     return std::filesystem::create_directories(p, error_code);
 }
 
 void LocalFileSystem::CreateDirectory(const String &path) {
     std::error_code error_code;
-    std::filesystem::path p{path};
+    Path p{path};
     bool is_success = std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
         Error<StorageException>(Format("{} create exception: {}", path, strerror(errno)), __FILE_NAME__, __LINE__);
@@ -182,7 +182,7 @@ void LocalFileSystem::CreateDirectory(const String &path) {
 
 void LocalFileSystem::DeleteDirectory(const String &path) {
     std::error_code error_code;
-    std::filesystem::path p{path};
+    Path p{path};
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() == 0) {
         if (!is_deleted) {
@@ -194,7 +194,7 @@ void LocalFileSystem::DeleteDirectory(const String &path) {
 }
 
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
-    std::filesystem::path dir_path(path);
+    Path dir_path(path);
     if (!is_directory(dir_path)) {
         Error<StorageException>(Format("{} isn't a directory", path), __FILE_NAME__, __LINE__);
     }
@@ -206,7 +206,7 @@ Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
 }
 
 String LocalFileSystem::GetAbsolutePath(const String &path) {
-    std::filesystem::path p{path};
+    Path p{path};
     return std::filesystem::absolute(p).string();
 }
 

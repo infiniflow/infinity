@@ -218,7 +218,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
         case PhysicalOperatorType::kDropIndex: {
             auto *output_state = static_cast<DropIndexOutputState *>(task_output_state);
             if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+                result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),

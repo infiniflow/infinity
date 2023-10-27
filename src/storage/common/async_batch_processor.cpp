@@ -30,7 +30,7 @@ void AsyncBatchProcessor::Stop() {
 
 void AsyncBatchProcessor::Submit(SharedPtr<AsyncTask> async_task) {
     LOG_TRACE("Submit task: " + async_task->ToString());
-    prepare_queue_->Enqueue(std::move(async_task));
+    prepare_queue_->Enqueue(Move(async_task));
 }
 
 void AsyncBatchProcessor::PrepareLoop() {

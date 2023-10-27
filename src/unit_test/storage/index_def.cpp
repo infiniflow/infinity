@@ -19,7 +19,7 @@ TEST_F(IndexDefTest, ReadWrite) {
     std::cout << "index_def: " << index_def->ToString() << std::endl;
 
     int32_t exp_size = index_def->GetSizeInBytes();
-    std::vector<char> buf(exp_size, char(0));
+    Vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     index_def->WriteAdv(ptr);

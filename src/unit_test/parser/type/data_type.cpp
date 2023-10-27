@@ -139,7 +139,7 @@ TEST_F(DataTypeTest, ReadWrite) {
     EXPECT_NE(type_info_embedding, nullptr);
     EXPECT_NE(type_info_varchar, nullptr);
 
-    std::vector<SharedPtr<DataType>> data_types = {
+    Vector<SharedPtr<DataType>> data_types = {
         MakeShared<DataType>(LogicalType::kTinyInt),
         MakeShared<DataType>(LogicalType::kFloat),
         MakeShared<DataType>(LogicalType::kTuple),
@@ -153,7 +153,7 @@ TEST_F(DataTypeTest, ReadWrite) {
         SharedPtr<DataType> &data_type = data_types[i];
         const SharedPtr<TypeInfo> &ti = data_type->type_info();
         int32_t exp_size = data_type->GetSizeInBytes();
-        std::vector<char> buf(exp_size);
+        Vector<char> buf(exp_size);
         char *buf_beg = buf.data();
         char *ptr = buf_beg;
         data_type->WriteAdv(ptr);

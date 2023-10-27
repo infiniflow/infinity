@@ -147,7 +147,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
@@ -155,7 +155,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
         auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
         auto *txn2 = txn_mgr->CreateTxn();
         txn2->BeginTxn();
-        auto result2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+        auto result2 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
         EXPECT_NE(result2.entry_, nullptr);
         txn2->CommitTxn();
 
@@ -170,7 +170,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->BeginTxn();
-            auto result3 = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto result3 = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
             EXPECT_NE(result3.entry_, nullptr);
             txn3->CommitTxn();
         }
@@ -198,7 +198,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
@@ -257,7 +257,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
@@ -265,7 +265,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->BeginTxn();
-            auto result3 = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto result3 = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
             EXPECT_NE(result3.entry_, nullptr);
             txn3->CommitTxn();
         }
@@ -273,7 +273,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl4"), columns);
             auto *txn4 = txn_mgr->CreateTxn();
             txn4->BeginTxn();
-            auto result4 = txn4->CreateTable("default", std::move(tbl4_def), ConflictType::kIgnore);
+            auto result4 = txn4->CreateTable("default", Move(tbl4_def), ConflictType::kIgnore);
             EXPECT_NE(result4.entry_, nullptr);
             txn4->CommitTxn();
         }
@@ -343,7 +343,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl5_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl5_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
@@ -445,7 +445,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
@@ -453,7 +453,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
             auto *txn2 = txn_mgr->CreateTxn();
             txn2->BeginTxn();
-            auto result3 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            auto result3 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
             EXPECT_NE(result3.entry_, nullptr);
             txn2->CommitTxn();
         }
@@ -463,7 +463,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
 
             txn3->BeginTxn();
-            auto result3 = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
+            auto result3 = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
             EXPECT_NE(result3.entry_, nullptr);
             txn3->CommitTxn();
         }
@@ -588,7 +588,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
-            auto result = txn->CreateTable("default", std::move(tbl5_def), ConflictType::kIgnore);
+            auto result = txn->CreateTable("default", Move(tbl5_def), ConflictType::kIgnore);
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }

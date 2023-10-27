@@ -51,7 +51,7 @@ void BufferReadTask::Prepare() {
     LOG_TRACE(Format("BufferReadTask: Prepare Read {}", buffer_handle->GetFilename()));
     try {
         buffer_handle->ReadFile();
-    } catch (const std::exception &e) {
+    } catch (const StlException &e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
@@ -61,7 +61,7 @@ void BufferReadTask::Commit() {
     LOG_TRACE(Format("BufferReadTask: Commit Read {}", buffer_handle->GetFilename()));
     try {
         buffer_handle->CloseFile();
-    } catch (const std::exception &e) {
+    } catch (const StlException &e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
@@ -71,7 +71,7 @@ void BufferWriteTask::Prepare() {
     LOG_TRACE(Format("BufferWriteTask: Prepare Write {}", buffer_handle->GetFilename()));
     try {
         buffer_handle->WriteFile(buffer_handle->buffer_size_);
-    } catch (const std::exception &e) {
+    } catch (const StlException &e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }
@@ -82,7 +82,7 @@ void BufferWriteTask::Commit() {
     try {
         buffer_handle->SyncFile();
         buffer_handle->CloseFile();
-    } catch (const std::exception &e) {
+    } catch (const StlException &e) {
         this->SetError(MakeUnique<String>(e.what()));
     }
 }

@@ -35,7 +35,7 @@ TEST_F(MixedTypeTest, mixed_integer) {
     EXPECT_EQ(integer_mixed_ptr2->value, 10);
 
     // Move constructor
-    MixedType mixed_integer3 = std::move(mixed_integer2);
+    MixedType mixed_integer3 = Move(mixed_integer2);
     EXPECT_EQ(mixed_integer3.type, MixedValueType::kInteger);
     EXPECT_EQ(mixed_integer2.type, MixedValueType::kInvalid);
     auto *integer_mixed_ptr3 = (IntegerMixedType *)(&mixed_integer3);
@@ -50,7 +50,7 @@ TEST_F(MixedTypeTest, mixed_integer) {
 
     // Move assignment
     MixedType mixed_integer5;
-    mixed_integer5 = std::move(mixed_integer3);
+    mixed_integer5 = Move(mixed_integer3);
     EXPECT_EQ(mixed_integer5.type, MixedValueType::kInteger);
     auto *integer_mixed_ptr5 = (IntegerMixedType *)(&mixed_integer5);
     EXPECT_EQ(integer_mixed_ptr5->value, 10);
@@ -76,7 +76,7 @@ TEST_F(MixedTypeTest, mixed_float) {
     EXPECT_FLOAT_EQ(float_mixed_ptr2->value, 1.005);
 
     // Move constructor
-    MixedType mixed_float3 = std::move(mixed_float2);
+    MixedType mixed_float3 = Move(mixed_float2);
     EXPECT_EQ(mixed_float3.type, MixedValueType::kFloat);
     EXPECT_EQ(mixed_float2.type, MixedValueType::kInvalid);
     auto *float_mixed_ptr3 = (FloatMixedType *)(&mixed_float3);
@@ -91,7 +91,7 @@ TEST_F(MixedTypeTest, mixed_float) {
 
     // Move assignment
     MixedType mixed_float5;
-    mixed_float5 = std::move(mixed_float3);
+    mixed_float5 = Move(mixed_float3);
     EXPECT_EQ(mixed_float5.type, MixedValueType::kFloat);
     auto *float_mixed_ptr5 = (FloatMixedType *)(&mixed_float5);
     EXPECT_FLOAT_EQ(float_mixed_ptr5->value, 1.005);
@@ -138,7 +138,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
         EXPECT_EQ(short_string_mixed_ptr->length, 14);
 
         // Move constructor
-        MixedType mixed_short_string3 = std::move(mixed_short_string2);
+        MixedType mixed_short_string3 = Move(mixed_short_string2);
         EXPECT_EQ(mixed_short_string3.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr3 = (ShortStrMixedType *)(&mixed_short_string3);
         result = String(short_string_mixed_ptr3->ptr, short_string_mixed_ptr3->length);
@@ -166,7 +166,7 @@ TEST_F(MixedTypeTest, mixed_short_str) {
 
         // Move assignment
         MixedType mixed_short_string5;
-        mixed_short_string5 = std::move(mixed_short_string3);
+        mixed_short_string5 = Move(mixed_short_string3);
         EXPECT_EQ(mixed_short_string5.type, MixedValueType::kShortStr);
         auto *short_string_mixed_ptr5 = (ShortStrMixedType *)(&mixed_short_string5);
         result = String(short_string_mixed_ptr5->ptr, short_string_mixed_ptr5->length);
@@ -218,7 +218,7 @@ TEST_F(MixedTypeTest, mixed_long_str) {
     EXPECT_EQ(long_string_mixed_ptr->length, 0);
 
     // Move constructor
-    MixedType mixed_long_string2 = std::move(mixed_long_string1);
+    MixedType mixed_long_string2 = Move(mixed_long_string1);
     EXPECT_EQ(mixed_long_string2.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr2 = (LongStrMixedType *)(&mixed_long_string2);
     long_str = String(long_string_mixed_ptr2->ptr, long_string_mixed_ptr2->length);
@@ -244,7 +244,7 @@ TEST_F(MixedTypeTest, mixed_long_str) {
 
     // Move assignment
     MixedType mixed_long_string4;
-    mixed_long_string4 = std::move(mixed_long_string2);
+    mixed_long_string4 = Move(mixed_long_string2);
     EXPECT_EQ(mixed_long_string4.type, MixedValueType::kLongStr);
     auto *long_string_mixed_ptr4 = (LongStrMixedType *)(&mixed_long_string4);
     long_str = String(long_string_mixed_ptr4->ptr, long_string_mixed_ptr4->length);
@@ -807,7 +807,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             EXPECT_EQ(value65_ptr->type, MixedValueType::kNull);
         }
 
-        mixed_tuple1.MoveIntoTuple("key6", std::move(mixed_tuple_key6));
+        mixed_tuple1.MoveIntoTuple("key6", Move(mixed_tuple_key6));
     }
     {
         auto *value6_ptr = mixed_tuple1.GetFromTuple("key6");
@@ -865,7 +865,7 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
         }
 
-        mixed_tuple1.MoveIntoTuple("key7", std::move(mixed_array7));
+        mixed_tuple1.MoveIntoTuple("key7", Move(mixed_array7));
     }
     {
         auto *value7_ptr = mixed_tuple1.GetFromTuple("key7");
@@ -1605,7 +1605,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             EXPECT_EQ(value5_ptr->type, MixedValueType::kNull);
         }
 
-        mixed_array1.MoveIntoArray(std::move(mixed_tuple5), 5);
+        mixed_array1.MoveIntoArray(Move(mixed_tuple5), 5);
 
         // Nested_array should be reset to empty
         EXPECT_EQ(mixed_tuple5.type, MixedValueType::kInvalid);
@@ -1667,7 +1667,7 @@ TEST_F(MixedTypeTest, mixed_array2) {
             EXPECT_EQ(value4_ptr->type, MixedValueType::kNull);
         }
 
-        mixed_array1.MoveIntoArray(std::move(nested_array), 6);
+        mixed_array1.MoveIntoArray(Move(nested_array), 6);
 
         // Nested_array should be reset to empty
         EXPECT_EQ(nested_array.type, MixedValueType::kInvalid);

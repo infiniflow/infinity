@@ -43,7 +43,7 @@ TEST_F(BlobTypeTest, blob1) {
     EXPECT_FALSE(b1 != b2);
 
     // Move constructor
-    BlobT b3(std::move(b1));
+    BlobT b3(Move(b1));
     EXPECT_STREQ(b2.ptr, "abcdefghijklmnopqrstuvwxyz");
     EXPECT_EQ(b2.size, SIZE);
 
@@ -58,7 +58,7 @@ TEST_F(BlobTypeTest, blob1) {
 
     // Move assignment
     BlobT b5;
-    b5 = std::move(b2);
+    b5 = Move(b2);
     EXPECT_STREQ(b5.ptr, "abcdefghijklmnopqrstuvwxyz");
     EXPECT_EQ(b5.size, SIZE);
 

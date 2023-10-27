@@ -176,7 +176,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);
-                } catch (std::exception &e) {
+                } catch (StlException &e) {
                     StorageException("Train index failed: {}", e.what());
                 }
             }
@@ -184,7 +184,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             auto index_entry =
                 IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, create_ts, buffer_mgr, new FaissIndexPtr(index, quantizer));
 
-            txn_store->CreateIndexFile(segment_entry->segment_id_, std::move(index_entry));
+            txn_store->CreateIndexFile(segment_entry->segment_id_, Move(index_entry));
             return index_entry;
         }
         case IndexMethod::kInvalid: {
@@ -211,7 +211,7 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 b
 }
 
 void SegmentEntry::CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry) {
-    segment_entry->index_entry_map_.emplace(*index_entry->index_name_, std::move(index_entry));
+    segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
 }
 
 void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count) {
@@ -297,13 +297,13 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             segment_entry->block_entries_.reserve(block_entry->block_id_ + 1);
-            segment_entry->block_entries_[block_entry->block_id_] = std::move(block_entry);
+            segment_entry->block_entries_[block_entry->block_id_] = Move(block_entry);
         }
     }
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
             SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
-            segment_entry->index_entry_map_.emplace(*index_entry->index_name_, std::move(index_entry));
+            segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
         }
     }
 

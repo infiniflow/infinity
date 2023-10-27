@@ -244,7 +244,7 @@ void DBEntry::MergeFrom(BaseEntry &other) {
     for (auto &[table_name, table_meta2] : db_entry2->tables_) {
         auto it = this->tables_.find(table_name);
         if (it == this->tables_.end()) {
-            this->tables_.emplace(table_name, std::move(table_meta2));
+            this->tables_.emplace(table_name, Move(table_meta2));
         } else {
             it->second->MergeFrom(*table_meta2.get());
         }

@@ -20,8 +20,8 @@ module scalar_function;
 namespace infinity {
 
 ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionType function)
-    : Function(std::move(name), FunctionType::kScalar), parameter_types_(std::move(argument_types)), return_type_(std::move(return_type)),
-      function_(std::move(function)) {}
+    : Function(Move(name), FunctionType::kScalar), parameter_types_(Move(argument_types)), return_type_(Move(return_type)),
+      function_(Move(function)) {}
 
 void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type

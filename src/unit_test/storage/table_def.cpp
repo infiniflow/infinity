@@ -68,7 +68,7 @@ TEST_F(TableDefTest, ReadWrite) {
     TableDef table_def(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
 
     int32_t exp_size = table_def.GetSizeInBytes();
-    std::vector<char> buf(exp_size, char(0));
+    Vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     table_def.WriteAdv(ptr);

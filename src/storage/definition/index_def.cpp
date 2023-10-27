@@ -159,7 +159,7 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
         case IndexMethod::kIVFFlat: {
             size_t centroids_count = index_def_json["centroids_count"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IVFFlatIndexDef>(std::move(index_name), method_type, std::move(column_names), centroids_count, metric_type);
+            auto ptr = MakeShared<IVFFlatIndexDef>(Move(index_name), method_type, Move(column_names), centroids_count, metric_type);
             res = std::static_pointer_cast<IndexDef>(ptr);
             break;
         }

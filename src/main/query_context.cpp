@@ -142,7 +142,7 @@ QueryResult QueryContext::Query(const String &query) {
         } catch (const Exception &e) {
             this->RollbackTxn();
             throw Exception(e.what());
-        } catch (std::exception &e) {
+        } catch (StlException &e) {
             throw e;
         }
         return query_result;

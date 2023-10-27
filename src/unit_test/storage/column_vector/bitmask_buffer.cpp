@@ -57,14 +57,14 @@ TEST_F(BitmaskBufferTest, ReadWrite) {
 
 
     constexpr size_t bit_count = 8192;
-    std::vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count), Bitmask::Make(bit_count), Bitmask::Make(bit_count)};
+    Vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count), Bitmask::Make(bit_count), Bitmask::Make(bit_count)};
     masks[1]->SetAllFalse();
     masks[2]->SetFalse(4096);
 
     for (int i = 0; i < 3; i++) {
         auto &bitmask = masks[i];
         int32_t exp_size = bitmask->GetSizeInBytes();
-        std::vector<char> buf(exp_size);
+        Vector<char> buf(exp_size);
         char *ptr = buf.data();
 
         bitmask->WriteAdv(ptr);

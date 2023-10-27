@@ -161,7 +161,7 @@ TEST_F(VarcharTypeTest, TestMove) {
     {
         
         VarcharT v1(s1);
-        VarcharT v2 = std::move(v1);
+        VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
         EXPECT_EQ(v1.ToString(), "");
         EXPECT_EQ(v2.length, s1.length());
@@ -172,7 +172,7 @@ TEST_F(VarcharTypeTest, TestMove) {
     {
         
         VarcharT v1(s2);
-        VarcharT v2 = std::move(v1);
+        VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
         EXPECT_EQ(v1.ptr, nullptr);
         EXPECT_EQ(v1.ToString(), "");
@@ -244,7 +244,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         
         VarcharT v1(s1);
         VarcharT v2;
-        v2 = std::move(v1);
+        v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
         EXPECT_EQ(v1.ToString(), "");
         EXPECT_EQ(v2.length, s1.length());
@@ -256,7 +256,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         
         VarcharT v1(s2);
         VarcharT v2;
-        v2 = std::move(v1);
+        v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
         EXPECT_EQ(v1.ptr, nullptr);
         EXPECT_EQ(v1.ToString(), "");
@@ -271,14 +271,14 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         VarcharT v2(s2);
         VarcharT v3(s3);
 
-        v2 = std::move(v1);
+        v2 = Move(v1);
 
         EXPECT_EQ(v1.length, 0);
         EXPECT_EQ(v1.ToString(), "");
         EXPECT_EQ(v2.length, s1.length());
         EXPECT_EQ(v2.ToString(), s1);
 
-        v2 = std::move(v3);
+        v2 = Move(v3);
         EXPECT_EQ(v2.length, s3.length());
         EXPECT_EQ(v2.ToString(), s3);
         EXPECT_EQ(v3.length, 0);

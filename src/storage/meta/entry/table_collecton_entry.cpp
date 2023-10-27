@@ -70,7 +70,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         while (true) {
             auto index_name = index_id > 0 ? (index_name_base + "_" + ToStr(index_id)) : index_name_base;
             if (auto iter = table_entry->indexes_.find(index_name); iter == table_entry->indexes_.end()) {
-                index_def->index_name_ = MakeShared<String>(std::move(index_name));
+                index_def->index_name_ = MakeShared<String>(Move(index_name));
                 break;
             }
             index_id++;
@@ -86,7 +86,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         index_def_meta = new_index_def_meta.get();
 
         table_entry->rw_locker_.lock();
-        table_entry->indexes_[*index_def->index_name_] = std::move(new_index_def_meta);
+        table_entry->indexes_[*index_def->index_name_] = Move(new_index_def_meta);
         table_entry->rw_locker_.unlock();
 
         LOG_TRACE(Format("Add new index entry for {} in new index meta of table_entry {} ", *index_def->index_name_, *table_entry->table_entry_dir_));
@@ -95,7 +95,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
             Format("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_));
     }
     IndexDef *index_def_ptr = index_def.get();
-    EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, std::move(index_def), conflict_type, txn_id, begin_ts, txn_mgr);
+    EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr);
 
     return res;
 }
@@ -424,7 +424,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     if (table_entry_json.contains("indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
             UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            table_entry->indexes_.emplace(*index_def_meta->index_name_, std::move(index_def_meta));
+            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
         }
     }
 

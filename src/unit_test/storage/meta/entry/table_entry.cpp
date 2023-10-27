@@ -133,7 +133,7 @@ TEST_F(TableEntryTest, test2) {
     }
 
     UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-    table1_res = new_txn->CreateTable("db1", std::move(tbl1_def), ConflictType::kError);
+    table1_res = new_txn->CreateTable("db1", Move(tbl1_def), ConflictType::kError);
     EXPECT_NE(table1_res.entry_, nullptr);
 
     // Txn1: Commit, OK

@@ -36,12 +36,12 @@ TEST_F(UuidTypeTest, Uuid) {
 
     // Move assignment
     UuidT uuid4{};
-    uuid4 = std::move(uuid2);
+    uuid4 = Move(uuid2);
     EXPECT_STREQ(uuid4.ToString().c_str(), uuid_str);
     EXPECT_STREQ(uuid2.ToString().c_str(), "");
 
     // Move constructor
-    UuidT uuid5(std::move(uuid3));
+    UuidT uuid5(Move(uuid3));
     EXPECT_STREQ(uuid5.ToString().c_str(), uuid_str);
     EXPECT_STREQ(uuid3.ToString().c_str(), "");
 

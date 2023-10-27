@@ -89,7 +89,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
         }
     }
 
-    BitmapT bt4 = std::move(bt3);
+    BitmapT bt4 = Move(bt3);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
@@ -124,7 +124,7 @@ TEST_F(BitmapTypeTest, bitmap1) {
     EXPECT_THROW(bt5.GetBit(50), ParserException);
     EXPECT_THROW(bt5.SetBit(50, false), ParserException);
 
-    bt5 = std::move(bt2);
+    bt5 = Move(bt2);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
@@ -234,7 +234,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
         }
     }
 
-    BitmapT bt4 = std::move(bt3);
+    BitmapT bt4 = Move(bt3);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
@@ -269,7 +269,7 @@ TEST_F(BitmapTypeTest, bitmap2) {
     EXPECT_THROW(bt5.GetBit(50), ParserException);
     EXPECT_THROW(bt5.SetBit(50, false), ParserException);
 
-    bt5 = std::move(bt2);
+    bt5 = Move(bt2);
 
     for (u64 i = 0; i < 100; ++i) {
         if (i % 2 == 0) {

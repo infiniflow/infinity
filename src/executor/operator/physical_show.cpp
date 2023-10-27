@@ -367,7 +367,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowInputStat
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
     auto txn = query_context->GetTxn();
     auto result = txn->GetTableByName(db_name_, object_name_);
-    output_state->error_message_ = std::move(result.err_);
+    output_state->error_message_ = Move(result.err_);
     if (result.entry_ == nullptr) {
         return;
     }
@@ -448,7 +448,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputStat
         }
     }
     output_block_ptr->Finalize();
-    output_state->output_.emplace_back(std::move(output_block_ptr));
+    output_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 void PhysicalShow::Execute(QueryContext *query_context) {

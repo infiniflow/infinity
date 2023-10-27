@@ -78,7 +78,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         entry->commit_ts = commit_ts;
 
         i32 expect_size = entry->GetSizeInBytes();
-        std::vector<char> buf(expect_size);
+        Vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -98,7 +98,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
         entry->commit_ts = 3;
         i32 expect_size = entry->GetSizeInBytes();
-        std::vector<char> buf(expect_size);
+        Vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -118,7 +118,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
         entry->commit_ts = 4;
         i32 expect_size = entry->GetSizeInBytes();
-        std::vector<char> buf(expect_size);
+        Vector<char> buf(expect_size);
         char *ptr = buf.data();
         entry->WriteAdv(ptr);
         i32 actual_size = ptr - buf.data();
@@ -168,7 +168,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
 
     i32 exp_size = entry->GetSizeInBytes();
-    std::vector<char> buf(exp_size, char(0));
+    Vector<char> buf(exp_size, char(0));
     char *buf_beg = buf.data();
     char *ptr = buf_beg;
     entry->WriteAdv(ptr);

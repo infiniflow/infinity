@@ -436,8 +436,8 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                 output_state->data_block_->Init(*output_types);
             }
 
-            task->operator_input_state_[operator_id] = std::move(input_state);
-            task->operator_output_state_[operator_id] = std::move(output_state);
+            task->operator_input_state_[operator_id] = Move(input_state);
+            task->operator_output_state_[operator_id] = Move(output_state);
         }
     }
 
@@ -458,7 +458,7 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
         task_array.emplace_back(task.get());
     }
 
-    fragment_ptr->SetContext(std::move(fragment_context));
+    fragment_ptr->SetContext(Move(fragment_context));
 }
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
@@ -913,7 +913,7 @@ SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
             }
 
             SharedPtr<Table> result_table = Table::MakeResultTable(column_defs);
-            result_table->data_blocks_ = std::move(materialize_sink_state->data_block_array_);
+            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {
@@ -935,7 +935,7 @@ SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
             }
 
             SharedPtr<Table> result_table = Table::MakeEmptyResultTable();
-            result_table->SetResultMsg(std::move(message_sink_state->message_));
+            result_table->SetResultMsg(Move(message_sink_state->message_));
             return result_table;
         }
         case SinkStateType::kQueue: {
