@@ -32,11 +32,10 @@ private:
     SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
     template <class T>
-    void ClearUnusedExpressions(Vector<T> &list, idx_t table_idx, bool replace = true);
-    void ReplaceBinding(ColumnBinding current_binding, ColumnBinding new_binding);
+    void ClearUnusedExpressions(Vector<T> &list, idx_t table_idx);
 
     bool all_referenced_;
-    HashMap<ColumnBinding, Vector<SharedPtr<ColumnExpression>>> column_references_;
+    HashSet<ColumnBinding> column_references_;
 };
 
 export class ColumnPruner : public OptimizerRule {

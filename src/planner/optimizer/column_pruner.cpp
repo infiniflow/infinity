@@ -4,7 +4,7 @@
 
 module;
 
-#include <bits/stl_algo.h>
+#include <algorithm>
 
 import stl;
 import logical_node;
@@ -16,6 +16,7 @@ import expression_type;
 import logical_join;
 import logical_aggregate;
 import logical_project;
+import logical_filter;
 import logical_table_scan;
 import parser;
 import base_table_ref;
@@ -54,35 +55,6 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kIntersect:
             break;
         case LogicalNodeType::kJoin: {
-            auto &join = op.Cast<LogicalJoin>();
-
-            if (all_referenced_ || join.join_type_ != JoinType::kInner) {
-                break;
-            }
-            for (const auto& cond : join.conditions_) {
-                FunctionExpression *func_expr = static_cast<FunctionExpression *>(cond.get());
-                auto args = func_expr->arguments();
-                bool has_not_column_expr = std::any_of(args.cbegin(), args.cend(), [](SharedPtr<BaseExpression> expr) {
-                    return expr->type() != ExpressionType::kColumn;
-                });
-                // FIXME: It would be more elegant if the operators were generalized using enums e.g. DuckDB: cond.comparison == ExpressionType::COMPARE_EQUAL
-                if (IsEqual(func_expr->func_.name(), "=") || has_not_column_expr) {
-                    continue;
-                }
-                Assert<PlannerException>(args.size() == 2, "BinaryFunction can only have two arguments.", __FILE_NAME__, __LINE__);
-                auto lhs_binding = static_cast<ColumnExpression *>(args[0].get())->binding();
-                auto rhs_binding = static_cast<ColumnExpression *>(args[1].get())->binding();
-                auto col_refs = column_references_.find(rhs_binding);
-
-                if (col_refs == column_references_.end()) {
-                    continue;
-                }
-                for (auto &entry : col_refs->second) {
-                    entry->binding() = lhs_binding;
-                    column_references_[lhs_binding].push_back(entry);
-                }
-                column_references_.erase(rhs_binding);
-            }
             break;
         }
         case LogicalNodeType::kCrossProduct:
@@ -167,20 +139,16 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             if (all_referenced_) {
                 return;
             }
-            Vector<int> proj_idxs;
+            Vector<size_t> project_indices;
             auto &scan_column_ids = scan.base_table_ref_->column_ids_;
-            for (int col_idx = 0; col_idx < scan_column_ids.size(); col_idx++) {
-                proj_idxs.push_back(col_idx);
+            for (size_t col_idx = 0; col_idx < scan_column_ids.size(); col_idx++) {
+                project_indices.push_back(col_idx);
             }
-            auto filtered_idxs = proj_idxs;
-            ClearUnusedExpressions(filtered_idxs, scan.TableIndex(), false);
+            ClearUnusedExpressions(project_indices, scan.TableIndex());
 
             // TODO: Scan does not currently support Filter Pushdown
-
-            Vector<int> differences;
-            std::set_difference(proj_idxs.cbegin(), proj_idxs.cend(), filtered_idxs.cbegin(), filtered_idxs.cend(), std::back_inserter(differences));
             // remove the original columns of scan with the filtered columns
-            scan.base_table_ref_->EraseColumnByIdxs(std::move(differences));
+            scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
 
             // TODO: Scan does not currently support Filter Prune
 
@@ -206,40 +174,26 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
     }
     LogicalNodeVisitor::VisitNodeExpression(op);
     LogicalNodeVisitor::VisitNodeChildren(op);
-
 }
 
 SharedPtr<BaseExpression> RemoveUnusedColumns::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
-    column_references_[expression->binding()].push_back(expression);
+    column_references_.insert(expression->binding());
     return expression;
 }
 
-void RemoveUnusedColumns::ReplaceBinding(ColumnBinding current_binding, ColumnBinding new_binding) {
-    auto col_refs = column_references_.find(current_binding);
-
-    if (col_refs == column_references_.end()) {
-        return;
-    }
-    for (auto &colref : col_refs->second) {
-        colref->SetBinding(new_binding.table_idx, new_binding.column_idx);
-    }
-}
-
 template <class T>
-void RemoveUnusedColumns::ClearUnusedExpressions(Vector<T> &list, idx_t table_idx, bool replace) {
-    idx_t offset = 0;
+void RemoveUnusedColumns::ClearUnusedExpressions(Vector<T> &list, idx_t table_idx) {
+    Vector<T> items;
+    items.reserve(list.size());
+
     for (idx_t col_idx = 0; col_idx < list.size(); col_idx++) {
-        auto current_binding = ColumnBinding(table_idx, col_idx + offset);
-        auto entry = column_references_.find(current_binding);
-        if (entry == column_references_.end()) {
-            list.erase(list.begin() + col_idx);
-            offset++;
-            col_idx--;
-        } else if (offset > 0 && replace) {
-            // column is used but the ColumnBinding has changed because of removed columns
-            ReplaceBinding(current_binding, ColumnBinding(table_idx, col_idx));
+        auto current_binding = ColumnBinding(table_idx, col_idx);
+
+        if (column_references_.contains(current_binding)) {
+            items.push_back(list[col_idx]);
         }
     }
+    list = items;
 }
 
 } // namespace infinity
