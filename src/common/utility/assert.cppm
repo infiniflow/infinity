@@ -3,10 +3,10 @@
 //
 module;
 
-export module infinity_assert;
-
 import stl;
 import infinity_exception;
+
+export module infinity_assert;
 
 namespace infinity {
 
