@@ -136,6 +136,11 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
+file(GLOB_RECURSE
+        std_cppm
+        CONFIGURE_DEPENDS
+        third_party_modules/std_modules/*.cppm
+)
 
 add_library(infinity_core
 #        ${main_cpp}
@@ -164,6 +169,7 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
+        ${std_cppm}
 )
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -173,6 +179,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ctpl")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
@@ -192,6 +199,7 @@ target_link_libraries(infinity
         faiss
         onnxruntime_mlas
         zsv_parser
+        roaring
         fastpfor
         newpfor
 )
@@ -303,6 +311,7 @@ target_link_libraries(unit_test
         faiss
         onnxruntime_mlas
         zsv_parser
+        roaring
         fastpfor
         newpfor
 )
