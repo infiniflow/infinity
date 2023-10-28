@@ -55,6 +55,8 @@ export namespace std {
 
     using std::invoke_result;
     using std::invoke_result_t;
+
+    using std::is_same_v;
 #if defined(__GLIBCXX__) || defined(__GLIBCPP__)
     using std::result_of_t;
     using std::result_of;
