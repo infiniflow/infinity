@@ -63,8 +63,6 @@ protected:
     FlushInfo flush_info_;
     ShortBuffer buffer_;
     ByteSliceWriter posting_writer_;
-
-    friend class BufferedByteSliceTest;
 };
 
 template <typename T>

@@ -61,13 +61,13 @@ public:
 
     const PostingValues *GetPostingValues() const { return posting_values_; }
 
+    static u8 AllocatePlan(u8 curCapacity);
+
 private:
     void *Allocate(SizeT size) { return pool_->Allocate(size); }
     void Deallocate(void *buf, SizeT size) { pool_->Deallocate(buf, size); }
 
     bool Reallocate();
-
-    static u8 AllocatePlan(u8 curCapacity);
 
     static void BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_col_count, const PostingValues *posting_values, u8 srcSize);
 
@@ -89,8 +89,6 @@ private:
     bool has_pool_;
     MemoryPool *pool_;
     const PostingValues *posting_values_;
-
-    friend class ShortBufferTest;
 };
 
 //////////////////////////////////////////////////////////
