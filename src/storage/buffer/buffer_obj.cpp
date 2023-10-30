@@ -78,10 +78,10 @@ BufferHandleMut BufferObj::LoadMut() {
         }
         case BufferStatus::kLoaded:
         case BufferStatus::kLoadedUnsaved: {
-            throw Exception("Do not load mut handle when any other is loaded.");
+            throw StorageException("Do not load mut handle when any other is loaded.");
         }
         case BufferStatus::kLoadedMutable: {
-            throw Exception("Do not load mut handle when any other is loaded.");
+            throw StorageException("Do not load mut handle when any other is loaded.");
         }
     }
     status_ = BufferStatus::kLoadedMutable;

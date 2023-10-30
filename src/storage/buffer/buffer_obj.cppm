@@ -6,8 +6,6 @@ import buffer_handle;
 
 export module buffer_obj;
 
-class BufferObjTest_test1_Test;
-
 namespace infinity {
 
 class BufferManager;
@@ -28,9 +26,6 @@ export enum class BufferType {
 };
 
 export class BufferObj {
-    // Friend for test
-    friend class ::BufferObjTest_test1_Test;
-
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
     explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker);
@@ -66,6 +61,12 @@ private:
 
     // check the invalid state
     void CheckState() const;
+
+public:
+    // interface for unit test
+    BufferStatus status() const { return status_; }
+    BufferType type() const { return type_; }
+    u64 rc() const { return rc_; }
 
 private:
     RWMutex rw_locker_{};
