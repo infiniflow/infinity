@@ -39,6 +39,7 @@ cmake-build-debug-gcc/**
 cmake-build-release/**
 cmake-build-release-clang/**
 cmake-build-release-gcc/**
+cmake-build-debug-**
 Infinity.xml
 
 # OSX dir

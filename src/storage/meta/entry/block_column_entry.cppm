@@ -28,7 +28,7 @@ public:
     const BlockEntry *block_entry_{nullptr};
     u64 column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferHandle *buffer_handle_{};
+    BufferHandle *buffer_handle_{nullptr};
 
     const SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
@@ -36,7 +36,7 @@ public:
     UniquePtr<OutlineInfo> outline_info_{};
 
 public:
-    static UniquePtr<BlockColumnEntry> MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager);
+    static UniquePtr<BlockColumnEntry> MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager,bool is_replay=false);
 
     static ColumnBuffer GetColumnData(BlockColumnEntry *column_data_entry, BufferManager *buffer_manager);
 

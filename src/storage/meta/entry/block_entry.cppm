@@ -19,7 +19,6 @@ class Txn;
 class SegmentEntry;
 class DataBlock;
 
-
 struct BlockVersion {
     BlockVersion(SizeT capacity) : deleted_(capacity) {}
     i32 GetRowCount(TxnTimeStamp begin_ts);
@@ -32,7 +31,17 @@ struct BlockVersion {
 
 export struct BlockEntry : public BaseEntry {
 public:
+    /// Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
+    /// Construct a new block entry For Replay
+    explicit BlockEntry(const SegmentEntry *segment_entry,
+                        i16 block_id,
+                        TxnTimeStamp checkpoint_ts,
+                        u64 column_count,
+                        BufferManager *buffer_mgr,
+                        i16 row_count_,
+                        i16 min_row_ts_,
+                        i16 max_row_ts_);
 
     RWMutex rw_locker_{};
 
@@ -48,17 +57,19 @@ public:
 
     UniquePtr<BlockVersion> block_version_{};
 
-    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this BlockEntry
-    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
-    TxnTimeStamp checkpoint_ts_{0};
+    TxnTimeStamp min_row_ts_{0};    // Indicate the commit_ts which create this BlockEntry
+    TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
+    TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
     Txn *txn_ptr_{nullptr};
+    BufferManager *buffer_{nullptr};
 
     // checkpoint state
     i16 checkpoint_row_count_{0};
 
 public:
-    static i16 AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows);
+    static i16
+    AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows, BufferManager *buffer_mgr);
 
     static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset);
 
@@ -85,5 +96,4 @@ public:
 private:
     static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);
 };
-
 } // namespace infinity

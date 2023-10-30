@@ -87,6 +87,8 @@ BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir, 
             iter.first->second.current_dir_ = file_dir;
             iter.first->second.file_name_ = filename;
             iter.first->second.buffer_type_ = buffer_type;
+            // FIXME: need to remove the buffer size
+            iter.first->second.buffer_size_ = DEFAULT_VECTOR_SIZE * 8;
 
             return &(iter.first->second);
         }

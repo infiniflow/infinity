@@ -12,6 +12,7 @@ import parser;
 import third_party;
 import index_def;
 import crc;
+import wal_entry;
 
 module wal_entry;
 
@@ -50,7 +51,12 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             String segment_dir = ReadBufAdv<String>(ptr);
             i32 segment_id = ReadBufAdv<i32>(ptr);
             i32 block_entries_size = ReadBufAdv<i32>(ptr);
-            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir, segment_id, block_entries_size);
+            Vector<i32> row_counts;
+            for (i32 i = 0; i < block_entries_size; ++i) {
+                auto row_count = ReadBufAdv<i32>(ptr);
+                row_counts.push_back(row_count);
+            }
+            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir, segment_id, block_entries_size, row_counts);
             break;
         }
         case WalCommandType::APPEND: {
@@ -121,7 +127,8 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
     if (other_cmd == nullptr || !IsEqual(db_name, other_cmd->db_name) || !IsEqual(table_name, other_cmd->table_name) ||
-        segment_dir != other_cmd->segment_dir || segment_id != other_cmd->segment_id || block_entries_size != other_cmd->block_entries_size)
+        segment_dir != other_cmd->segment_dir || segment_id != other_cmd->segment_id || block_entries_size != other_cmd->block_entries_size ||
+        row_counts_.size() != other_cmd->row_counts_.size())
         return false;
     return true;
 }
@@ -175,7 +182,7 @@ i32 WalCmdDropIndex::GetSizeInBytes() const {
 
 i32 WalCmdImport::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
-           this->segment_dir.size() + sizeof(i32) + sizeof(i32);
+           this->segment_dir.size() + sizeof(i32) + sizeof(i32) + this->row_counts_.size() * sizeof(i32);
 }
 
 i32 WalCmdAppend::GetSizeInBytes() const {
@@ -232,6 +239,9 @@ void WalCmdImport::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->segment_dir);
     WriteBufAdv(buf, this->segment_id);
     WriteBufAdv(buf, this->block_entries_size);
+    for (const auto &row_count : this->row_counts_) {
+        WriteBufAdv(buf, row_count);
+    }
 }
 
 void WalCmdAppend::WriteAdv(char *&buf) const {
@@ -377,6 +387,68 @@ bool WalEntry::IsFullCheckPoint() const {
         }
     }
     return false;
+}
+String WalEntry::ToString() const {
+    std::stringstream ss;
+    ss << "wal entry" << std::endl;
+    ss << "wal entry header" << std::endl;
+    ss << "txn_id: " << txn_id << std::endl;
+    ss << "commit_ts: " << commit_ts << std::endl;
+    ss << "size: " << size << std::endl;
+    for (const auto &cmd : cmds) {
+        ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
+        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
+            ss << "catalog path: " << checkpoint_cmd->catalog_path_ << std::endl;
+            ss << "max commit ts: " << checkpoint_cmd->max_commit_ts_ << std::endl;
+            ss << "is full checkpoint: " << checkpoint_cmd->is_full_checkpoint_ << std::endl;
+        }
+        if (cmd->GetType() == WalCommandType::IMPORT) {
+            auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
+            ss << "segment dir: " << import_cmd->segment_dir << std::endl;
+            ss << "segment id: " << import_cmd->segment_id << std::endl;
+            ss << "table name: " << import_cmd->table_name << std::endl;
+            ss << "block entries size: " << import_cmd->block_entries_size << std::endl;
+        }
+        if (cmd->GetType() == WalCommandType::APPEND) {
+            auto append_cmd = dynamic_cast<const WalCmdAppend *>(cmd.get());
+            ss << "db name: " << append_cmd->db_name << std::endl;
+            ss << "table name: " << append_cmd->table_name << std::endl;
+            ss << append_cmd->block->ToString();
+        }
+    }
+    return ss.str();
+}
+
+String WalCmd::WalCommandTypeToString(WalCommandType type) {
+    switch (type) {
+        case WalCommandType::INVALID:
+            return "INVALID";
+        case WalCommandType::CREATE_DATABASE:
+            return "CREATE_DATABASE";
+        case WalCommandType::DROP_DATABASE:
+            return "DROP_DATABASE";
+        case WalCommandType::CREATE_TABLE:
+            return "CREATE_TABLE";
+        case WalCommandType::DROP_TABLE:
+            return "DROP_TABLE";
+        case WalCommandType::ALTER_INFO:
+            return "ALTER_INFO";
+        case WalCommandType::IMPORT:
+            return "IMPORT";
+        case WalCommandType::APPEND:
+            return "APPEND";
+        case WalCommandType::DELETE:
+            return "DELETE";
+        case WalCommandType::CHECKPOINT:
+            return "CHECKPOINT";
+        case WalCommandType::CREATE_INDEX:
+            return "CREATE_INDEX";
+        case WalCommandType::DROP_INDEX:
+            return "DROP_INDEX";
+        default:
+            Error<StorageException>("Unknown command type", __FILE_NAME__, __LINE__);
+    }
 }
 
 void WalEntryIterator::Init() {

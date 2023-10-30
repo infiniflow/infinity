@@ -288,8 +288,8 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     for (auto &block_entry : segment->block_entries_) {
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
-        block_entry->checkpoint_ts_ = commit_ts;
-        block_entry->block_version_->created_.push_back({commit_ts, block_entry->row_count_});
+        // ATTENTION: Do not modify the block_entry checkpoint_ts_
+        block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
     }
 
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);

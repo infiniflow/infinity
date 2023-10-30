@@ -61,7 +61,9 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         auto entry = MakeShared<WalEntry>();
         entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
         entry->cmds.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
-        entry->cmds.push_back(MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3));
+        Vector<i32> row_counts{1, 2, 3};
+        entry->cmds.push_back(
+            MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -141,7 +143,8 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3));
+    Vector<i32> row_counts{1, 2, 3};
+    entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
 
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
                                            Vector<String>{"col1", "col2"},

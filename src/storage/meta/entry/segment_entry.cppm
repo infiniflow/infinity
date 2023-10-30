@@ -21,13 +21,13 @@ export module segment_entry;
 
 namespace infinity {
 
-//class BufferManager;
+// class BufferManager;
 //
-//class Txn;
+// class Txn;
 //
 class TableCollectionEntry;
 //
-//class IndexDef;
+// class IndexDef;
 //
 export class SegmentEntry;
 
@@ -74,8 +74,10 @@ public:
     HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
+    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr);
+
     static SharedPtr<SegmentEntry>
-    MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr, bool is_new = true);
+    MakeReplaySegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, SharedPtr<String> segment_dir, TxnTimeStamp commit_ts);
 
     static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 

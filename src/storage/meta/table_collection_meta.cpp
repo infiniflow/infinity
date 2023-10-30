@@ -195,7 +195,7 @@ EntryResult TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
         return {nullptr, MakeUnique<String>("No valid table entry.")};
     }
 
-    TableCollectionEntry *header_table_entry = (TableCollectionEntry *)header_base_entry;
+    auto *header_table_entry = (TableCollectionEntry *)header_base_entry;
     if (header_table_entry->commit_ts_ < UNCOMMIT_TS) {
         // Committed
         if (begin_ts > header_table_entry->commit_ts_) {
@@ -278,7 +278,7 @@ EntryResult TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 t
 
     for (const auto &table_entry : table_meta->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("No valid table entry.");
+            LOG_TRACE("No valid table entry. dummy entry");
             return {nullptr, MakeUnique<String>("No valid table entry.")};
         }
 

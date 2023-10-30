@@ -84,7 +84,7 @@ SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
     auto plan_fragment = fragment_builder.BuildFragment(physical_plan.get());
 
     // Schedule the query pipeline
-    query_context_ptr.get()->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
+    query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
     QueryResult query_result;

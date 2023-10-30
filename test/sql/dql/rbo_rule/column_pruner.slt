@@ -132,3 +132,8 @@ EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
       - output columns: [c1, c2]
 
 # TODO Delete Case
+statement ok
+DROP TABLE t1;
+
+statement ok
+DROP TABLE t2;

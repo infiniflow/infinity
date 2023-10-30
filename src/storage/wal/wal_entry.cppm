@@ -15,9 +15,9 @@ import index_def;
 
 namespace infinity {
 
-//class TableDef;
+// class TableDef;
 //
-//class DataBlock;
+// class DataBlock;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -44,6 +44,7 @@ export enum class WalCommandType : i8 {
     CHECKPOINT = 99,
 };
 
+// WalCommandType -> String
 export struct WalCmd {
     virtual ~WalCmd() = default;
 
@@ -57,6 +58,8 @@ export struct WalCmd {
     virtual void WriteAdv(char *&ptr) const = 0;
     // Read from a serialized version
     static SharedPtr<WalCmd> ReadAdv(char *&ptr, i32 max_bytes);
+
+    static String WalCommandTypeToString(WalCommandType type);
 };
 
 export struct WalCmdCreateDatabase : public WalCmd {
@@ -149,9 +152,9 @@ export struct WalCmdDropIndex : public WalCmd {
 };
 
 export struct WalCmdImport : public WalCmd {
-    WalCmdImport(String db_name_, String table_name_, String segment_dir_, i32 segment_id_, i32 block_entries_size_)
+    WalCmdImport(String db_name_, String table_name_, String segment_dir_, i32 segment_id_, i32 block_entries_size_, Vector<i32> &row_counts_)
         : db_name(Move(db_name_)), table_name(Move(table_name_)), segment_dir(Move(segment_dir_)), segment_id(segment_id_),
-          block_entries_size(block_entries_size_) {}
+          block_entries_size(block_entries_size_), row_counts_(row_counts_) {}
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const override;
@@ -163,6 +166,8 @@ export struct WalCmdImport : public WalCmd {
     String segment_dir;
     i32 segment_id;
     i32 block_entries_size;
+    // row_counts_[i] means the number of rows in the i-th block entry
+    Vector<i32> row_counts_;
 };
 
 export struct WalCmdAppend : public WalCmd {
@@ -240,6 +245,8 @@ export struct WalEntry : WalEntryHeader {
     [[nodiscard]] bool IsCheckPoint() const;
 
     [[nodiscard]] bool IsFullCheckPoint() const;
+
+    [[nodiscard]] String ToString() const;
 };
 
 export class WalEntryIterator {

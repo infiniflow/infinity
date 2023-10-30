@@ -29,7 +29,8 @@ module block_column_entry;
 
 namespace infinity {
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager) {
+UniquePtr<BlockColumnEntry>
+BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager, bool is_replay) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir_);
 
     block_column_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
@@ -41,8 +42,13 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::MakeNewBlockColumnEntry(const Bloc
     SizeT row_capacity = block_entry->row_capacity_;
     SizeT total_data_size = row_capacity * column_type->Size();
 
-    block_column_entry->buffer_handle_ =
-        buffer_manager->AllocateBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+    if (!is_replay) {
+        block_column_entry->buffer_handle_ =
+            buffer_manager->AllocateBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+    } else {
+        block_column_entry->buffer_handle_ =
+            buffer_manager->GetBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, BufferType::kFile);
+    }
 
     if (block_column_entry->column_type_->type() == kVarchar) {
         block_column_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_manager);
@@ -216,10 +222,9 @@ Json BlockColumnEntry::Serialize(BlockColumnEntry *block_column_entry) {
     return json_res;
 }
 
-UniquePtr<BlockColumnEntry>
-BlockColumnEntry::Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockColumnEntry> BlockColumnEntry::Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr);
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr, true);
     if (block_column_entry->outline_info_.get() != nullptr) {
         auto outline_info = block_column_entry->outline_info_.get();
         outline_info->next_file_idx = column_data_json["next_outline_idx"];

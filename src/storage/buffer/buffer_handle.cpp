@@ -101,7 +101,6 @@ void *BufferHandle::LoadData() {
                     }
                 }
             }
-
             case BufferStatus::kFreed: {
                 if (reference_count_ != 0 || data_ != nullptr) {
                     LOG_ERROR("Error happened when buffer with freed status.");
@@ -458,11 +457,6 @@ void BufferHandle::WriteFile(SizeT buffer_length) {
         fs.CreateDirectory(to_write_path);
     }
 
-    if (fs.Exists(to_write_file)) {
-        String err_msg = Format("File {} was already been created before.", to_write_file);
-        LOG_ERROR(err_msg);
-        Error<StorageException>(err_msg, __FILE_NAME__, __LINE__);
-    }
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(to_write_file, flags, FileLockType::kWriteLock);
