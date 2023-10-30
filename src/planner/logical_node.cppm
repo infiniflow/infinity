@@ -54,6 +54,19 @@ protected:
     SharedPtr<LogicalNode> left_node_{};
     SharedPtr<LogicalNode> right_node_{};
     u64 node_id_{};
+
+public:
+    template <class TARGET>
+    TARGET &Cast() {
+        // FIXME: Assert Check
+        return reinterpret_cast<TARGET &>(*this);
+    }
+
+    template <class TARGET>
+    const TARGET &Cast() const {
+        // FIXME: Assert Check
+        return reinterpret_cast<const TARGET &>(*this);
+    }
 };
 
 } // namespace infinity

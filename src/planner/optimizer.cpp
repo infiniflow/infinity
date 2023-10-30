@@ -8,6 +8,7 @@ import stl;
 import logical_node_type;
 import logical_explain;
 import column_remapper;
+import column_pruner;
 import parser;
 import explain_logical_plan;
 
@@ -15,7 +16,10 @@ module optimizer;
 
 namespace infinity {
 
-Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) { AddRule(MakeShared<ColumnRemapper>()); }
+Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
+    AddRule(MakeShared<ColumnPruner>());
+    AddRule(MakeShared<ColumnRemapper>());
+}
 
 void Optimizer::AddRule(SharedPtr<OptimizerRule> rule) { rules_.emplace_back(Move(rule)); }
 

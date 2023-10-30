@@ -32,10 +32,10 @@ LogicalTableScan::LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_tab
 
 Vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
-    SizeT column_count = base_table_ref_->column_names_->size();
-    result.reserve(column_count);
-    for (SizeT i = 0; i < column_count; ++i) {
-        result.emplace_back(base_table_ref_->table_index_, i);
+    auto &column_ids = base_table_ref_->column_ids_;
+    result.reserve(column_ids.size());
+    for (SizeT col_id : column_ids) {
+        result.emplace_back(base_table_ref_->table_index_, col_id);
     }
     return result;
 }
