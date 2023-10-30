@@ -97,16 +97,16 @@ public:
     void Finalize(SizeT index);
 
     // Used by Append by Ptr
-    void SetByRawPtr(SizeT index, const ptr_t raw_ptr);
+    void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
     // Use by Append value
-    void SetByPtr(SizeT index, const ptr_t value_ptr);
+    void SetByPtr(SizeT index, const_ptr_t value_ptr);
 
     void AppendValue(const Value &value);
 
-    void AppendByRawPtr(const ptr_t raw_ptr);
+    void AppendByRawPtr(const_ptr_t raw_ptr);
 
-    void AppendByPtr(const ptr_t value_ptr);
+    void AppendByPtr(const_ptr_t value_ptr);
 
     void AppendWith(const ColumnVector &other);
 
@@ -152,8 +152,6 @@ public:
     static SharedPtr<ColumnVector> ReadAdv(char *&ptr, i32 maxbytes);
 
 private:
-
-
     template <typename DataT>
     inline void CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select);
 
@@ -173,9 +171,7 @@ public:
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
 
     [[nodiscard]] inline SizeT Size() const { return tail_index_; }
-
 };
-
 
 template <typename DataT>
 inline void ColumnVector::CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
