@@ -25,6 +25,8 @@ public:
     explicit FaissIndexFileWorker(SharedPtr<String> relative_dir, SharedPtr<String> file_name, SizeT buffer_size)
         : FileWorker(Move(relative_dir), Move(file_name), buffer_size) {}
 
+    virtual ~FaissIndexFileWorker() override;
+
 public:
     void AllocateInMemory() override;
 

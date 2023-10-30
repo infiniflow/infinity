@@ -31,7 +31,7 @@ private:
     friend class BufferObj;
 
     // BufferHandle calls it, before allocate memory. It will start GC if necessary.
-    void RequestSpace(SizeT need_size);
+    void RequestSpace(SizeT need_size, BufferObj *buffer_obj);
 
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_handle);

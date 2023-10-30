@@ -30,6 +30,8 @@ public:
     // called by BufferMgr::Get or BufferMgr::Allocate
     explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker);
 
+    ~BufferObj();
+
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
@@ -41,11 +43,11 @@ public:
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    void Save(SizeT buffer_size);
+    bool Save(SizeT buffer_size);
 
-    void Sync() { file_worker_->Sync(); }
+    void Sync();
 
-    void CloseFile() { file_worker_->CloseFile(); }
+    void CloseFile();
 
     SizeT GetBufferSize() const { return file_worker_->buffer_size_; }
 

@@ -18,10 +18,14 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 
     if (is_ephemeral) {
         type_ = BufferType::kEphemeral;
+        status_ = BufferStatus::kNew;
     } else {
         type_ = BufferType::kPersistent;
+        status_ = BufferStatus::kFreed;
     }
 }
+
+BufferObj::~BufferObj() {}
 
 BufferHandle BufferObj::Load() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
@@ -40,7 +44,7 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kFreed: {
-            buffer_mgr_->RequestSpace(GetBufferSize());
+            buffer_mgr_->RequestSpace(GetBufferSize(), this);
             file_worker_->ReadFromFile(type_ == BufferType::kEphemeral);
             status_ = BufferStatus::kLoaded;
             break;
@@ -66,13 +70,13 @@ BufferHandleMut BufferObj::LoadMut() {
             break;
         }
         case BufferStatus::kFreed: {
-            buffer_mgr_->RequestSpace(GetBufferSize());
+            buffer_mgr_->RequestSpace(GetBufferSize(), this);
             file_worker_->ReadFromFile(type_ == BufferType::kEphemeral);
             type_ = BufferType::kEphemeral;
             break;
         }
         case BufferStatus::kNew: {
-            buffer_mgr_->RequestSpace(GetBufferSize());
+            buffer_mgr_->RequestSpace(GetBufferSize(), this);
             file_worker_->AllocateInMemory();
             break;
         }
@@ -119,7 +123,7 @@ void BufferObj::UnloadInner() {
 }
 
 bool BufferObj::Free() {
-    // UniqueLock<RWMutex> w_locker(rw_locker_);
+    UniqueLock<RWMutex> w_locker(rw_locker_);
     CheckState();
     switch (status_) {
         case BufferStatus::kFreed:
@@ -146,8 +150,11 @@ bool BufferObj::Free() {
     return true;
 }
 
-void BufferObj::Save(SizeT buffer_size) {
+bool BufferObj::Save(SizeT buffer_size) {
     UniqueLock<RWMutex> w_locker(rw_locker_);
+    if (type_ == BufferType::kPersistent) {
+        return false;
+    }
     CheckState();
     switch (status_) {
         case BufferStatus::kLoaded:
@@ -175,6 +182,17 @@ void BufferObj::Save(SizeT buffer_size) {
         }
     }
     type_ = BufferType::kPersistent;
+    return true;
+}
+
+void BufferObj::Sync() {
+    UniqueLock<RWMutex> w_locker(rw_locker_);
+    file_worker_->Sync();
+}
+
+void BufferObj::CloseFile() {
+    UniqueLock<RWMutex> w_locker(rw_locker_);
+    file_worker_->CloseFile();
 }
 
 void BufferObj::CheckState() const {

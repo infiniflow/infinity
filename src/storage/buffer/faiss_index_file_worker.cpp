@@ -14,6 +14,13 @@ module faiss_index_file_worker;
 
 namespace infinity {
 
+FaissIndexFileWorker::~FaissIndexFileWorker() {
+    if (data_ != nullptr) {
+        FreeInMemory();
+        data_ = nullptr;
+    }
+}
+
 struct FSIOReader : faiss::IOReader {
     FSIOReader(FileHandler *file_handler) : file_handler_(file_handler) {}
     size_t operator()(void *ptr, size_t size, size_t nitems) override {
@@ -33,11 +40,17 @@ struct FSIOWriter : faiss::IOWriter {
 };
 
 void FaissIndexFileWorker::AllocateInMemory() {
+    if (data_) {
+        Error<StorageException>("Data is already allocated.", __FILE_NAME__, __LINE__);
+    }
     auto faiss_index_ptr = new FaissIndexPtr(nullptr, nullptr);
     data_ = static_cast<void *>(faiss_index_ptr);
 }
 
 void FaissIndexFileWorker::FreeInMemory() {
+    if (!data_) {
+        Error<StorageException>("Data is not allocated.", __FILE_NAME__, __LINE__);
+    }
     auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
     delete faiss_index_ptr->index_;
     delete faiss_index_ptr->quantizer_;

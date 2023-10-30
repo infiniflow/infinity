@@ -60,12 +60,17 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     return iter2->second.get();
 }
 
-void BufferManager::RequestSpace(SizeT need_size) {
+void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
     while (current_memory_size_ + need_size > memory_limit_) {
-        BufferObj *buffer_handle = nullptr;
-        if (gc_queue_.try_dequeue(buffer_handle)) {
-            if (buffer_handle->Free()) {
-                current_memory_size_ -= buffer_handle->GetBufferSize();
+        BufferObj *buffer_obj1 = nullptr;
+        if (gc_queue_.try_dequeue(buffer_obj1)) {
+            if (buffer_obj == buffer_obj1) {
+                Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.", __FILE_NAME__, __LINE__);
+                // prevent dead lock
+                continue;
+            }
+            if (buffer_obj1->Free()) {
+                current_memory_size_ -= buffer_obj1->GetBufferSize();
             }
         } else {
             throw StorageException("Out of memory.");

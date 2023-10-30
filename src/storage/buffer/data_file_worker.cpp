@@ -10,17 +10,30 @@ module data_file_worker;
 
 namespace infinity {
 
-void DataFileWorker::AllocateInMemory() { data_ = reinterpret_cast<void *>(new char[buffer_size_]); }
+DataFileWorker::~DataFileWorker() {
+    if (data_ != nullptr) {
+        FreeInMemory();
+        data_ = nullptr;
+    }
+}
+
+void DataFileWorker::AllocateInMemory() {
+    if (data_) {
+        Error<StorageException>("Data is already allocated.", __FILE_NAME__, __LINE__);
+    }
+    Assert<StorageException>(buffer_size_ > 0, "Bug.", __FILE_NAME__, __LINE__);
+    data_ = reinterpret_cast<void *>(new char[buffer_size_]);
+}
 
 void DataFileWorker::FreeInMemory() {
+    if (data_ == nullptr) {
+        Error<StorageException>("Data is already freed.", __FILE_NAME__, __LINE__);
+    }
     delete[] reinterpret_cast<char *>(data_);
     data_ = nullptr;
 }
 
 void DataFileWorker::WriteToFileImpl(bool &prepare_success, SizeT buffer_size) {
-    if (buffer_size == 0) {
-        buffer_size = buffer_size_;
-    }
     LocalFileSystem fs;
     // File structure:
     // - header: magic number

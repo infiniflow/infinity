@@ -211,16 +211,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     if (parser_context->segment_entry_->row_count_ > 0) {
         const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
         const String &table_name = *table_collection_entry_->table_collection_name_;
-        for (auto &block_entry : parser_context->segment_entry_->block_entries_) {
-            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
-        }
-        parser_context->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
-                                                                 table_name,
-                                                                 *parser_context->segment_entry_->segment_dir_,
-                                                                 parser_context->segment_entry_->segment_id_,
-                                                                 parser_context->segment_entry_->block_entries_.size()));
-        auto txn_store = parser_context->txn_->GetTxnTableStore(table_name);
-        txn_store->Import(parser_context->segment_entry_);
+        SaveSegmentData(parser_context->txn_, parser_context->segment_entry_, db_name, table_name);
     }
     fclose(fp);
 
@@ -330,18 +321,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     const String &table_name = *table->table_collection_name_;
     // we have already used all space of the segment
     if (SegmentEntry::Room(segment_entry.get()) <= 0) {
-        // add to txn_store
-        for (auto &block_entry : segment_entry->block_entries_) {
-            BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
-        }
-        txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
-                                                table_name,
-                                                *segment_entry->segment_dir_,
-                                                segment_entry->segment_id_,
-                                                segment_entry->block_entries_.size()));
-        txn_store->Import(segment_entry);
-
-        // create new segment entry
+        SaveSegmentData(txn, segment_entry, db_name, table_name);
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }

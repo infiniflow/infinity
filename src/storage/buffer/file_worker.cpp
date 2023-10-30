@@ -11,7 +11,30 @@ import defer_op;
 module file_worker;
 
 namespace infinity {
+
+FileWorker::~FileWorker() {
+    // if (file_handler_.get() != nullptr) {
+    //     LocalFileSystem fs;
+    //     fs.Close(*file_handler_);
+    // }
+}
+
+void FileWorker::Sync() {
+    LocalFileSystem fs;
+    fs.SyncFile(*file_handler_);
+}
+
+void FileWorker::CloseFile() {
+    LocalFileSystem fs;
+    fs.Close(*file_handler_);
+}
+
 void FileWorker::WriteToFile(bool to_spill, SizeT buffer_size) {
+    if (buffer_size == 0) {
+        buffer_size = buffer_size_;
+    } else {
+        Assert<StorageException>(buffer_size <= buffer_size_, "Invalid buffer size.", __FILE_NAME__, __LINE__);
+    }
     if (data_ == nullptr) {
         Error<StorageException>("No data will be written.", __FILE_NAME__, __LINE__);
     }

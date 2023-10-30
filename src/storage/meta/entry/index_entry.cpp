@@ -74,10 +74,10 @@ bool IndexEntry::Flush(IndexEntry *index_entry, TxnTimeStamp checkpoint_ts) {
         LOG_WARN("Index entry is not initialized");
         return false;
     }
-
-    index_entry->buffer_->Save(0);
-    index_entry->buffer_->Sync();
-    index_entry->buffer_->CloseFile();
+    if (index_entry->buffer_->Save(0)) {
+        index_entry->buffer_->Sync();
+        index_entry->buffer_->CloseFile();
+    }
 
     index_entry->checkpoint_ts_ = checkpoint_ts;
     LOG_TRACE(Format("Segment: {}, Index: {} is flushed", index_entry->segment_entry_->segment_id_, *index_entry->index_name_));

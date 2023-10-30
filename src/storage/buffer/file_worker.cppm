@@ -15,7 +15,7 @@ public:
         : file_dir_(Move(file_dir)), file_name_(Move(file_name)), buffer_size_(buffer_size) {}
 
     // No destruct here
-    virtual ~FileWorker() = default;
+    virtual ~FileWorker();
 
 public:
     void WriteToFile(bool to_spill, SizeT buffer_size = 0);
@@ -38,9 +38,9 @@ public:
     // Get file path. As key of buffer handle.
     String GetFilePath() const { return Format("{}/{}", *file_dir_, *file_name_); }
 
-    void Sync() { file_handler_->Sync(); }
+    void Sync();
 
-    void CloseFile() { file_handler_->Close(); }
+    void CloseFile();
 
 protected:
     virtual void WriteToFileImpl(bool &prepare_success, SizeT buffer_size) = 0;
