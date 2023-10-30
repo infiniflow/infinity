@@ -32,7 +32,7 @@ private:
     SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
     template <class T>
-    void ClearUnusedExpressions(Vector<T> &list, idx_t table_idx);
+    Vector<T> ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx);
 
     bool all_referenced_;
     HashSet<ColumnBinding> column_references_;

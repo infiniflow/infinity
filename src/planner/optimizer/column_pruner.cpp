@@ -36,7 +36,9 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kAggregate: {
             if (!all_referenced_) {
                 auto &aggr = op.Cast<LogicalAggregate>();
-                ClearUnusedExpressions(aggr.aggregates_, aggr.aggregate_index_);
+                auto filtered_aggregates = ClearUnusedExpressions(aggr.aggregates_, aggr.aggregate_index_);
+
+                aggr.aggregates_ = Move(filtered_aggregates);
                 if (aggr.aggregates_.empty() && aggr.groups_.empty()) {
                     // TODO: CountStar -> Count(*) is not supported yet
                 }
@@ -69,8 +71,9 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kProjection: {
             if (!all_referenced_) {
                 auto &proj = op.Cast<LogicalProject>();
-                ClearUnusedExpressions(proj.expressions_, proj.table_index_);
+                auto filtered_expressions = ClearUnusedExpressions(proj.expressions_, proj.table_index_);
 
+                proj.expressions_ = Move(filtered_expressions);
                 if (proj.expressions_.empty()) {
                     // nothing references the projected expressions
                     // this happens in the case of e.g. EXISTS(SELECT * FROM ...)
@@ -139,12 +142,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             if (all_referenced_) {
                 return;
             }
-            Vector<size_t> project_indices;
-            auto &scan_column_ids = scan.base_table_ref_->column_ids_;
-            for (size_t col_idx = 0; col_idx < scan_column_ids.size(); col_idx++) {
-                project_indices.push_back(col_idx);
-            }
-            ClearUnusedExpressions(project_indices, scan.TableIndex());
+            Vector<SizeT> project_indices = ClearUnusedExpressions(scan.base_table_ref_->column_ids_, scan.TableIndex());
 
             // TODO: Scan does not currently support Filter Pushdown
             // remove the original columns of scan with the filtered columns
@@ -182,7 +180,7 @@ SharedPtr<BaseExpression> RemoveUnusedColumns::VisitReplace(const SharedPtr<Colu
 }
 
 template <class T>
-void RemoveUnusedColumns::ClearUnusedExpressions(Vector<T> &list, idx_t table_idx) {
+Vector<T> RemoveUnusedColumns::ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx) {
     Vector<T> items;
     items.reserve(list.size());
 
@@ -193,7 +191,7 @@ void RemoveUnusedColumns::ClearUnusedExpressions(Vector<T> &list, idx_t table_id
             items.push_back(list[col_idx]);
         }
     }
-    list = items;
+    return items;
 }
 
 } // namespace infinity
