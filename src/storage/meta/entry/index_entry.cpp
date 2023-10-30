@@ -75,7 +75,7 @@ bool IndexEntry::Flush(IndexEntry *index_entry, TxnTimeStamp checkpoint_ts) {
         return false;
     }
 
-    index_entry->buffer_->Save();
+    index_entry->buffer_->Save(0);
     index_entry->buffer_->Sync();
     index_entry->buffer_->CloseFile();
 

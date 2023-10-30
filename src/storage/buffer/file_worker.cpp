@@ -11,7 +11,7 @@ import defer_op;
 module file_worker;
 
 namespace infinity {
-void FileWorker::WriteToFile(bool to_spill) {
+void FileWorker::WriteToFile(bool to_spill, SizeT buffer_size) {
     if (data_ == nullptr) {
         Error<StorageException>("No data will be written.", __FILE_NAME__, __LINE__);
     }
@@ -32,7 +32,7 @@ void FileWorker::WriteToFile(bool to_spill) {
             file_handler_ = nullptr;
         }
     });
-    WriteToFileImpl(prepare_success);
+    WriteToFileImpl(prepare_success, buffer_size);
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {

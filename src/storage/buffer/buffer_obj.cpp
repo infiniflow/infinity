@@ -146,7 +146,7 @@ bool BufferObj::Free() {
     return true;
 }
 
-void BufferObj::Save() {
+void BufferObj::Save(SizeT buffer_size) {
     UniqueLock<RWMutex> w_locker(rw_locker_);
     CheckState();
     switch (status_) {
@@ -158,12 +158,12 @@ void BufferObj::Save() {
         case BufferStatus::kLoadedUnsaved:
         case BufferStatus::kLoadedMutable: {
             status_ = BufferStatus::kLoaded;
-            file_worker_->WriteToFile(false);
+            file_worker_->WriteToFile(false, buffer_size);
             break;
         }
         case BufferStatus::kUnloadedModified: {
             status_ = BufferStatus::kUnloaded;
-            file_worker_->WriteToFile(false);
+            file_worker_->WriteToFile(false, buffer_size);
             break;
         }
         case BufferStatus::kFreed: {

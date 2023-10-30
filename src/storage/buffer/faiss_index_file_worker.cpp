@@ -4,6 +4,7 @@ module;
 #include "faiss/impl/io.h"
 #include "faiss/index_io.h"
 
+import stl;
 import infinity_exception;
 import infinity_assert;
 import file_system;
@@ -44,7 +45,7 @@ void FaissIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success) {
+void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success, SizeT _buffer_size) {
     try {
         auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
         FSIOWriter writer(file_handler_.get());

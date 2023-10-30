@@ -4,33 +4,34 @@ project(infinity VERSION 0.1.0)
 
 find_program(CCACHE_FOUND ccache)
 
-if(CCACHE_FOUND)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
-    message("Find ccache")
-else()
-    message("Can not find ccache")
-endif()
+# if(CCACHE_FOUND)
+# set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+# set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
+# message("Find ccache")
+# else()
+# message("Can not find ccache")
+# endif()
+option(FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
 
-option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
-if (${FORCE_COLORED_OUTPUT})
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-       add_compile_options (-fdiagnostics-color=always)
-    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-       add_compile_options (-fcolor-diagnostics)
-    endif ()
-endif ()
+if(${FORCE_COLORED_OUTPUT})
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        add_compile_options(-fdiagnostics-color=always)
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        add_compile_options(-fcolor-diagnostics)
+    endif()
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
-string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
+string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
+
 if(CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
-else ()
+else()
     message(FATAL_ERROR, "Please use clang version 17.0 and above")
-endif ()
+endif()
 
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
@@ -50,9 +51,10 @@ set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-#    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
+    # set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
     set(CMAKE_CXX_FLAGS "-Wno-read-modules-implicitly")
-#    set(CMAKE_CXX_FLAGS_DEBUG "-Wno-unused-variable -Wno-unused-result -Wno-read-modules-implicitly")
+
+# set(CMAKE_CXX_FLAGS_DEBUG "-Wno-unused-variable -Wno-unused-result -Wno-read-modules-implicitly")
 # set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
 else()
     message(FATAL_ERROR "Please, use Clang. Current compiler is ${CMAKE_CXX_COMPILER_ID}!")
@@ -70,9 +72,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 add_definitions(-march=native)
-if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
     add_definitions(-mevex512)
-endif ()
+endif()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 

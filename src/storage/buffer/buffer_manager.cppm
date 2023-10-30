@@ -42,7 +42,7 @@ private:
     SharedPtr<String> base_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    u64 current_memory_size_{}; // TODO: need to be atomic
+    au64 current_memory_size_{}; // TODO: need to be atomic
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
     ConcurrentQueue<BufferObj *> gc_queue_{};
 };

@@ -31,7 +31,7 @@ public:
     void FreeInMemory() override;
 
 protected:
-    void WriteToFileImpl(bool &prepare_success) override;
+    void WriteToFileImpl(bool &prepare_success, SizeT buffer_size) override;
 
     void ReadFromFileImpl() override;
 };

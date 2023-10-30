@@ -46,13 +46,15 @@ public:
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    void Save();
+    void Save(SizeT buffer_size);
 
     void Sync() { file_worker_->Sync(); }
 
     void CloseFile() { file_worker_->CloseFile(); }
 
     SizeT GetBufferSize() const { return file_worker_->buffer_size_; }
+
+    String GetFilename() const { return file_worker_->GetFilePath(); }
 
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.

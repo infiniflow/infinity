@@ -188,19 +188,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kEmbedding:
         case kRowID: {
             SizeT buffer_size = row_count * column_type->Size();
-            block_column_entry->buffer_->Save();
+            block_column_entry->buffer_->Save(buffer_size);
             block_column_entry->buffer_->Sync();
             block_column_entry->buffer_->CloseFile();
             break;
         }
         case kVarchar: {
             SizeT buffer_size = row_count * column_type->Size();
-            block_column_entry->buffer_->Save();
+            block_column_entry->buffer_->Save(buffer_size);
             block_column_entry->buffer_->Sync();
             block_column_entry->buffer_->CloseFile();
             auto outline_info = block_column_entry->outline_info_.get();
             for (auto [outline_buffer_handle, outline_size] : outline_info->written_buffers_) {
-                outline_buffer_handle->Save();
+                outline_buffer_handle->Save(outline_size);
                 outline_buffer_handle->Sync();
                 outline_buffer_handle->CloseFile();
             }
