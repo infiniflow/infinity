@@ -14,7 +14,7 @@ export class BufferHandle {
 public:
     BufferHandle() = default;
 
-    explicit BufferHandle(BufferObj *buffer_handle, const void *data);
+    explicit BufferHandle(BufferObj *buffer_handle, void *data);
 
     BufferHandle(const BufferHandle &other);
 
@@ -27,32 +27,9 @@ public:
     ~BufferHandle();
 
 public:
-    [[nodiscard]] const void *GetRaw() { return data_; }
+    [[nodiscard]] const void *GetData();
 
-private:
-    BufferObj *buffer_obj_{};
-
-    const void *data_{};
-};
-
-export class BufferHandleMut {
-public:
-    BufferHandleMut() = default;
-
-    explicit BufferHandleMut(BufferObj *buffer_handle, void *data);
-
-    BufferHandleMut(const BufferHandleMut &other) = delete;
-
-    BufferHandleMut &operator=(const BufferHandleMut &other) = delete;
-
-    BufferHandleMut(BufferHandleMut &&other);
-
-    BufferHandleMut &operator=(BufferHandleMut &&other);
-
-    ~BufferHandleMut();
-
-public:
-    [[nodiscard]] void *GetRaw() { return data_; }
+    [[nodiscard]] void *GetDataMut();
 
 private:
     BufferObj *buffer_obj_{};

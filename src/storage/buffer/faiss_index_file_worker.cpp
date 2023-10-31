@@ -58,7 +58,7 @@ void FaissIndexFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success, SizeT _buffer_size) {
+void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success) {
     try {
         auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
         FSIOWriter writer(file_handler_.get());

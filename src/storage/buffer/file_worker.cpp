@@ -12,12 +12,7 @@ module file_worker;
 
 namespace infinity {
 
-FileWorker::~FileWorker() {
-    // if (file_handler_.get() != nullptr) {
-    //     LocalFileSystem fs;
-    //     fs.Close(*file_handler_);
-    // }
-}
+FileWorker::~FileWorker() = default;
 
 void FileWorker::Sync() {
     LocalFileSystem fs;
@@ -29,12 +24,12 @@ void FileWorker::CloseFile() {
     fs.Close(*file_handler_);
 }
 
-void FileWorker::WriteToFile(bool to_spill, SizeT buffer_size) {
-    if (buffer_size == 0) {
-        buffer_size = buffer_size_;
-    } else {
-        Assert<StorageException>(buffer_size <= buffer_size_, "Invalid buffer size.", __FILE_NAME__, __LINE__);
-    }
+void FileWorker::WriteToFile(bool to_spill) {
+    // if (buffer_size == 0) {
+    //     buffer_size = buffer_size_;
+    // } else if (buffer_size > buffer_size_) {
+    //     Error<StorageException>("Invalid buffer size.", __FILE_NAME__, __LINE__);
+    // }
     if (data_ == nullptr) {
         Error<StorageException>("No data will be written.", __FILE_NAME__, __LINE__);
     }
@@ -55,7 +50,7 @@ void FileWorker::WriteToFile(bool to_spill, SizeT buffer_size) {
             file_handler_ = nullptr;
         }
     });
-    WriteToFileImpl(prepare_success, buffer_size);
+    WriteToFileImpl(prepare_success);
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {

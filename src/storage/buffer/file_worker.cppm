@@ -18,7 +18,7 @@ public:
     virtual ~FileWorker();
 
 public:
-    void WriteToFile(bool to_spill, SizeT buffer_size = 0);
+    void WriteToFile(bool to_spill);
 
     void ReadFromFile(bool from_spill);
 
@@ -43,7 +43,7 @@ public:
     void CloseFile();
 
 protected:
-    virtual void WriteToFileImpl(bool &prepare_success, SizeT buffer_size) = 0;
+    virtual void WriteToFileImpl(bool &prepare_success) = 0;
 
     virtual void ReadFromFileImpl() = 0;
 

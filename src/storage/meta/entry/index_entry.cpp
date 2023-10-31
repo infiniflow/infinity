@@ -34,8 +34,8 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(SegmentEntry *segment_entry,
     auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, std::move(index_name), buffer));
     index_entry->min_ts_ = create_ts;
     index_entry->max_ts_ = create_ts;
-    auto buffer_handle = IndexEntry::GetIndexMut(index_entry.get(), buffer_manager);
-    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetRaw());
+    auto buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_manager);
+    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
     *dest = *index;
     return index_entry;
 }
@@ -51,14 +51,12 @@ SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, Sh
 
 BufferHandle IndexEntry::GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr) { return index_entry->buffer_->Load(); }
 
-BufferHandleMut IndexEntry::GetIndexMut(IndexEntry *index_entry, BufferManager *buffer_mgr) { return index_entry->buffer_->LoadMut(); }
-
 void IndexEntry::UpdateIndex(IndexEntry *index_entry, TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr) {
     Error<NotImplementException>("Not tested. TODO shenyushi0", __FILE_NAME__, __LINE__);
 
     index_entry->max_ts_ = commit_ts;
-    auto buffer_handle = IndexEntry::GetIndexMut(index_entry, buffer_mgr);
-    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetRaw());
+    auto buffer_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
     *dest = *index;
 }
 
@@ -74,7 +72,7 @@ bool IndexEntry::Flush(IndexEntry *index_entry, TxnTimeStamp checkpoint_ts) {
         LOG_WARN("Index entry is not initialized");
         return false;
     }
-    if (index_entry->buffer_->Save(0)) {
+    if (index_entry->buffer_->Save()) {
         index_entry->buffer_->Sync();
         index_entry->buffer_->CloseFile();
     }

@@ -184,8 +184,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
-                BufferHandleMut buffer_handle = block_column_entry->buffer_->LoadMut();
-                auto block_data_ptr = reinterpret_cast<float *>(buffer_handle.GetRaw());
+                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+                auto block_data_ptr = reinterpret_cast<float *>(buffer_handle.GetDataMut());
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);

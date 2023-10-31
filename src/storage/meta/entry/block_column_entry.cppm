@@ -41,8 +41,6 @@ public:
 
     static ColumnBuffer GetColumnData(BlockColumnEntry *column_data_entry, BufferManager *buffer_manager);
 
-    static ColumnBufferMut GetColumnDataMut(BlockColumnEntry *column_data_entry, BufferManager *buffer_manager);
-
     static void
     Append(BlockColumnEntry *column_entry, offset_t column_entry_offset, ColumnVector *input_column_vector, offset_t input_offset, SizeT append_rows);
 

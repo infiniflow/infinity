@@ -127,7 +127,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
     SharedPtr<SegmentEntry> segment_entry =
         SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    BufferHandleMut buffer_handle = last_block_entry->columns_[0]->buffer_->LoadMut();
+    BufferHandle buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
     SizeT row_idx = 0;
 
     while (true) {
@@ -138,7 +138,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
                                      __FILE_NAME__,
                                      __LINE__);
         }
-        ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetRaw()) + row_idx * sizeof(FloatT) * dimension;
+        ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut()) + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
         ++segment_entry->row_count_;
         ++last_block_entry->row_count_;
@@ -164,7 +164,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
-            buffer_handle = last_block_entry->columns_[0]->buffer_->LoadMut();
+            buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
         }
     }
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));

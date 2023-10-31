@@ -33,8 +33,6 @@ private:
 public:
     [[nodiscard]] static BufferHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
 
-    [[nodiscard]] static BufferHandleMut GetIndexMut(IndexEntry *index_entry, BufferManager *buffer_mgr);
-
     static void UpdateIndex(IndexEntry *index_entry, TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
 
     static bool Flush(IndexEntry *index_entry, TxnTimeStamp checkpoint_ts);

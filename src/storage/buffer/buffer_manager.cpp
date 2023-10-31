@@ -26,10 +26,10 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, Share
 
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-    auto buffer_handle = MakeUnique<BufferObj>(this, true, Move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, true, Move(file_worker));
 
     rw_locker_.lock();
-    auto [iter, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_handle));
+    auto [iter, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
     rw_locker_.unlock();
 
     if (!insert_ok) {
@@ -50,10 +50,10 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     }
 
     // Cannot find BufferHandle in buffer_map, read from disk
-    auto buffer_handle = MakeUnique<BufferObj>(this, false, Move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, false, Move(file_worker));
 
     rw_locker_.lock();
-    auto [iter2, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_handle));
+    auto [iter2, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
     // If insert_ok is false, it means another thread has inserted the same buffer handle. Return it.
     rw_locker_.unlock();
 
@@ -79,9 +79,9 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
     current_memory_size_ += need_size;
 }
 
-void BufferManager::PushGCQueue(BufferObj *buffer_handle) {
+void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
     // gc_queue_ is lock-free. No lock is needed.
-    gc_queue_.enqueue(buffer_handle);
+    gc_queue_.enqueue(buffer_obj);
 }
 
 } // namespace infinity

@@ -23,15 +23,15 @@ TEST_F(BufferObjTest, test1) {
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
     SizeT test_size1 = 1024;
-    auto relative_dir1 = MakeShared<String>("dir1");
+    auto file_dir1 = MakeShared<String>("/tmp/infinity/data/dir1");
     auto test_fname1 = MakeShared<String>("test1");
-    auto file_worker1 = MakeUnique<DataFileWorker>(relative_dir1, test_fname1, test_size1);
+    auto file_worker1 = MakeUnique<DataFileWorker>(file_dir1, test_fname1, test_size1);
     auto buf1 = buffer_manager.Allocate(std::move(file_worker1));
 
     SizeT test_size2 = 1024;
-    auto relative_dir2 = MakeShared<String>("dir2");
+    auto file_dir2 = MakeShared<String>("/tmp/infinity/data/dir2");
     auto test_fname2 = MakeShared<String>("test2");
-    auto file_worker2 = MakeUnique<DataFileWorker>(relative_dir2, test_fname2, test_size2);
+    auto file_worker2 = MakeUnique<DataFileWorker>(file_dir2, test_fname2, test_size2);
     auto buf2 = buffer_manager.Allocate(std::move(file_worker2));
 
     // kNew, kEphemeral
@@ -39,43 +39,8 @@ TEST_F(BufferObjTest, test1) {
     EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
 
     {
-        auto handle1 = buf1->LoadMut();
-        // kNew, kEphemeral -> kLoadedMutable, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedMutable);
-    }
-
-    // kLoadedMutable, kEphemeral -> kUnloadedModified, kEphemeral
-    EXPECT_EQ(buf1->status(), BufferStatus::kUnloadedModified);
-
-    {
-        auto handle1 = buf1->LoadMut();
-        // kUnloadedModified, kEphemeral -> kLoadedMutable, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedMutable);
-    }
-
-    {
         auto handle1 = buf1->Load();
-        // kLoadedMutable, kEphemeral -> kLoadedUnsaved, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedUnsaved);
-    }
-
-    // kLoadedUnsaved, kEphemeral -> kUnloadedModified, kEphemeral
-    EXPECT_EQ(buf1->status(), BufferStatus::kUnloadedModified);
-
-    { auto handle2 = buf2->LoadMut(); }
-    // kUnloadedModified, kEphemeral -> kFreed, kEphemeral
-    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
-
-    {
-        auto handle1 = buf1->LoadMut();
-        // kFreed, kEphemeral -> kLoadedMutable, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedMutable);
-    }
-    { auto handle2 = buf2->Load(); }
-
-    {
-        auto handle1 = buf1->Load();
-        // kFreed, kEphemeral -> kLoaded kEphemeral
+        // kNew, kEphemeral -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
     }
 
@@ -92,8 +57,36 @@ TEST_F(BufferObjTest, test1) {
     // kUnloaded, kEphemeral -> kFreed, kEphemeral
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
-    buf1->Save(test_size1);
-    // kFreed, kEphemeral -> kFreed, kPersistent
+    {
+        auto handle1 = buf1->Load();
+        auto data1 = handle1.GetDataMut();
+        // kFreed, kEphemeral -> kLoaded, kEphemeral
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+    { auto handle2 = buf2->Load(); }
+
+    {
+        auto handle1 = buf1->Load();
+        // kFreed, kEphemeral -> kLoaded kTemp
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+        EXPECT_EQ(buf1->type(), BufferType::kTemp);
+    }
+
+    // kLoaded, kTemp -> kUnloaded, kTemp
+    EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
+
+    {
+        auto handle1 = buf1->Load();
+        // kUnloaded, kTemp -> kLoaded, kTemp
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
+    }
+
+    { auto handle2 = buf2->Load(); }
+    // kUnloaded, kTemp -> kFreed, kTemp
+    EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
+
+    buf1->Save();
+    // kFreed, kTemp -> kFreed, kPersistent
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
 
     {
@@ -116,52 +109,63 @@ TEST_F(BufferObjTest, test1) {
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
     {
-        auto handle1 = buf1->LoadMut();
-        // kFreed, kPersistent -> kLoadedMutable, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedMutable);
+        auto handle1 = buf1->Load();
+        auto data1 = handle1.GetDataMut();
+        // kFreed, kPersistent -> kLoaded, kEphemeral
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
     }
 
-    buf1->Save(test_size1);
+    buf1->Save();
     // kUnloadedModified, kEphemeral -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
 
     {
-        auto handle1 = buf1->LoadMut();
-        // kUnloaded, kPersistent -> kLoadedMutable, kEphemeral
-        EXPECT_EQ(buf1->status(), BufferStatus::kLoadedMutable);
+        auto handle1 = buf1->Load();
+        auto data1 = handle1.GetDataMut();
+        // kUnloaded, kPersistent -> kLoaded, kEphemeral
+        EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
 
-        buf1->Save(test_size1);
-        // kLoadedMutable, kEphemeral -> kLoaded, kPersistent
+        buf1->Save();
+        // kLoaded, kEphemeral -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
     }
-
-    { auto handle1 = buf1->LoadMut(); }
 
     {
         auto handle1 = buf1->Load();
-        buf1->Save(test_size1);
-        // kLoadedUnsaved, kEphemeral -> kLoaded, kPersistent
+        auto data1 = handle1.GetDataMut();
+    }
+
+    {
+        auto handle1 = buf1->Load();
+        buf1->Save();
+        // kLoaded, kEphemeral -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
     }
 
-    { auto handle1 = buf1->LoadMut(); }
+    {
+        auto handle1 = buf1->Load();
+        auto data1 = handle1.GetDataMut();
+    }
     { auto handle2 = buf2->Load(); }
     {
         auto handle1 = buf1->Load();
-        buf1->Save(test_size1);
+        buf1->Save();
         // kLoaded, kPersistent -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
     }
-    { auto handle1 = buf1->LoadMut(); }
+    {
+        auto handle1 = buf1->Load();
+        auto data1 = handle1.GetDataMut();
+    }
     { auto handle2 = buf2->Load(); }
     { auto handle1 = buf1->Load(); }
-    buf1->Save(test_size1);
+    buf1->Save();
     // kUnloaded, kPersistent -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);

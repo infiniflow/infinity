@@ -22,8 +22,8 @@ export struct FaissIndexPtr {
 
 export class FaissIndexFileWorker : public FileWorker {
 public:
-    explicit FaissIndexFileWorker(SharedPtr<String> relative_dir, SharedPtr<String> file_name, SizeT buffer_size)
-        : FileWorker(Move(relative_dir), Move(file_name), buffer_size) {}
+    explicit FaissIndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
+        : FileWorker(Move(file_dir), Move(file_name), buffer_size) {}
 
     virtual ~FaissIndexFileWorker() override;
 
@@ -33,7 +33,7 @@ public:
     void FreeInMemory() override;
 
 protected:
-    void WriteToFileImpl(bool &prepare_success, SizeT buffer_size) override;
+    void WriteToFileImpl(bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
 };

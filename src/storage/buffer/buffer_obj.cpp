@@ -25,54 +25,24 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
     }
 }
 
-BufferObj::~BufferObj() {}
+BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
     CheckState();
     switch (status_) {
-        case BufferStatus::kLoaded:
-        case BufferStatus::kLoadedUnsaved: {
+        case BufferStatus::kLoaded: {
             break;
         }
         case BufferStatus::kUnloaded: {
-            status_ = BufferStatus::kLoaded;
-            break;
-        }
-        case BufferStatus::kUnloadedModified: {
-            status_ = BufferStatus::kLoadedUnsaved;
             break;
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->RequestSpace(GetBufferSize(), this);
-            file_worker_->ReadFromFile(type_ == BufferType::kEphemeral);
-            status_ = BufferStatus::kLoaded;
-            break;
-        }
-        case BufferStatus::kLoadedMutable: {
-            throw StorageException("Do not load handle when a mutable is loaded.");
-        }
-        case BufferStatus::kNew: {
-            throw StorageException("New buffer should be loaded as mutable to initialize.");
-        }
-    }
-    rc_++;
-    const void *data = file_worker_->GetData();
-    return BufferHandle(this, data);
-}
-
-BufferHandleMut BufferObj::LoadMut() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
-    CheckState();
-    switch (status_) {
-        case BufferStatus::kUnloaded:
-        case BufferStatus::kUnloadedModified: {
-            break;
-        }
-        case BufferStatus::kFreed: {
-            buffer_mgr_->RequestSpace(GetBufferSize(), this);
-            file_worker_->ReadFromFile(type_ == BufferType::kEphemeral);
-            type_ = BufferType::kEphemeral;
+            file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
+            if (type_ == BufferType::kEphemeral) {
+                type_ = BufferType::kTemp;
+            }
             break;
         }
         case BufferStatus::kNew: {
@@ -80,19 +50,17 @@ BufferHandleMut BufferObj::LoadMut() {
             file_worker_->AllocateInMemory();
             break;
         }
-        case BufferStatus::kLoaded:
-        case BufferStatus::kLoadedUnsaved: {
-            throw StorageException("Do not load mut handle when any other is loaded.");
-        }
-        case BufferStatus::kLoadedMutable: {
-            throw StorageException("Do not load mut handle when any other is loaded.");
-        }
     }
-    status_ = BufferStatus::kLoadedMutable;
-    type_ = BufferType::kEphemeral;
-    rc_++;
+    status_ = BufferStatus::kLoaded;
+    ++rc_;
     void *data = file_worker_->GetData();
-    return BufferHandleMut(this, data);
+    return BufferHandle(this, data);
+}
+
+void BufferObj::GetMutPointer() {
+    UniqueLock<RWMutex> w_locker(rw_locker_);
+    CheckState();
+    type_ = BufferType::kEphemeral;
 }
 
 void BufferObj::UnloadInner() {
@@ -100,19 +68,10 @@ void BufferObj::UnloadInner() {
     CheckState();
     switch (status_) {
         case BufferStatus::kLoaded: {
-            rc_--;
+            --rc_;
             if (rc_ == 0) {
                 buffer_mgr_->PushGCQueue(this);
                 status_ = BufferStatus::kUnloaded;
-            }
-            break;
-        }
-        case BufferStatus::kLoadedUnsaved:
-        case BufferStatus::kLoadedMutable: {
-            rc_--;
-            if (rc_ == 0) {
-                buffer_mgr_->PushGCQueue(this);
-                status_ = BufferStatus::kUnloadedModified;
             }
             break;
         }
@@ -127,18 +86,23 @@ bool BufferObj::Free() {
     CheckState();
     switch (status_) {
         case BufferStatus::kFreed:
-        case BufferStatus::kLoaded:
-        case BufferStatus::kLoadedMutable: {
+        case BufferStatus::kLoaded: {
             // loaded again after free, do nothing.
             // Or has been freed in fronter of the queue.
             return false;
         }
         case BufferStatus::kUnloaded: {
-            break;
-        }
-        case BufferStatus::kLoadedUnsaved:
-        case BufferStatus::kUnloadedModified: {
-            file_worker_->WriteToFile(true);
+            switch (type_) {
+                case BufferType::kTemp:
+                case BufferType::kPersistent: {
+                    // do nothing
+                    break;
+                }
+                case BufferType::kEphemeral: {
+                    file_worker_->WriteToFile(true);
+                    break;
+                }
+            }
             break;
         }
         case BufferStatus::kNew: {
@@ -150,27 +114,17 @@ bool BufferObj::Free() {
     return true;
 }
 
-bool BufferObj::Save(SizeT buffer_size) {
+bool BufferObj::Save() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
     if (type_ == BufferType::kPersistent) {
+        // No need to save because of no change happens
         return false;
     }
     CheckState();
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
-            // No modification
-            break;
-        }
-        case BufferStatus::kLoadedUnsaved:
-        case BufferStatus::kLoadedMutable: {
-            status_ = BufferStatus::kLoaded;
-            file_worker_->WriteToFile(false, buffer_size);
-            break;
-        }
-        case BufferStatus::kUnloadedModified: {
-            status_ = BufferStatus::kUnloaded;
-            file_worker_->WriteToFile(false, buffer_size);
+            file_worker_->WriteToFile(false);
             break;
         }
         case BufferStatus::kFreed: {
@@ -185,15 +139,9 @@ bool BufferObj::Save(SizeT buffer_size) {
     return true;
 }
 
-void BufferObj::Sync() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
-    file_worker_->Sync();
-}
+void BufferObj::Sync() { file_worker_->Sync(); }
 
-void BufferObj::CloseFile() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
-    file_worker_->CloseFile();
-}
+void BufferObj::CloseFile() { file_worker_->CloseFile(); }
 
 void BufferObj::CheckState() const {
     switch (status_) {
@@ -203,18 +151,6 @@ void BufferObj::CheckState() const {
         }
         case BufferStatus::kUnloaded: {
             Assert<StorageException>(rc_ == 0, "Invalid status.", __FILE_NAME__, __LINE__);
-            break;
-        }
-        case BufferStatus::kLoadedUnsaved: {
-            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ > 0, "Invalid status.", __FILE_NAME__, __LINE__);
-            break;
-        }
-        case BufferStatus::kLoadedMutable: {
-            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ == 1, "Invalid status.", __FILE_NAME__, __LINE__);
-            break;
-        }
-        case BufferStatus::kUnloadedModified: {
-            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ == 0, "Invalid status.", __FILE_NAME__, __LINE__);
             break;
         }
         case BufferStatus::kFreed: {

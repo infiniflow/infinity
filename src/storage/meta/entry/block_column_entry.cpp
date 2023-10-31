@@ -68,18 +68,6 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entr
                    : ColumnBuffer(block_column_entry->buffer_);
 }
 
-ColumnBufferMut BlockColumnEntry::GetColumnDataMut(BlockColumnEntry *block_column_entry, BufferManager *buffer_manager) {
-    if (block_column_entry->buffer_ == nullptr) {
-        // Get buffer handle from buffer manager
-        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, 0);
-        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
-    }
-
-    bool outline = block_column_entry->column_type_->type() == kVarchar;
-    return outline ? ColumnBufferMut(block_column_entry->buffer_, buffer_manager, block_column_entry->base_dir_)
-                   : ColumnBufferMut(block_column_entry->buffer_);
-}
-
 void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
                               offset_t column_entry_offset,
                               ColumnVector *input_column_vector,
@@ -97,8 +85,8 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
 }
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
-    BufferHandleMut buffer_handle = block_column_entry->buffer_->LoadMut();
-    ptr_t dst_p = static_cast<ptr_t>(buffer_handle.GetRaw()) + dst_offset;
+    BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+    ptr_t dst_p = static_cast<ptr_t>(buffer_handle.GetDataMut()) + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
@@ -135,8 +123,8 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
-                    BufferHandleMut out_buffer_handle = current_buffer_obj->LoadMut();
-                    ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetRaw()) + current_buffer_offset;
+                    BufferHandle out_buffer_handle = current_buffer_obj->Load();
+                    ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
                     u16 outline_data_size = varchar_type->length;
                     ptr_t outline_src_ptr = varchar_type->ptr;
                     Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
@@ -188,7 +176,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kEmbedding:
         case kRowID: {
             SizeT buffer_size = row_count * column_type->Size();
-            if (block_column_entry->buffer_->Save(buffer_size)) {
+            if (block_column_entry->buffer_->Save()) {
                 block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();
             }
@@ -197,13 +185,13 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         }
         case kVarchar: {
             SizeT buffer_size = row_count * column_type->Size();
-            if (block_column_entry->buffer_->Save(buffer_size)) {
+            if (block_column_entry->buffer_->Save()) {
                 block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();
             }
             auto outline_info = block_column_entry->outline_info_.get();
             for (auto [outline_buffer_handle, outline_size] : outline_info->written_buffers_) {
-                if (outline_buffer_handle->Save(outline_size)) {
+                if (outline_buffer_handle->Save()) {
                     outline_buffer_handle->Sync();
                     outline_buffer_handle->CloseFile();
                 }

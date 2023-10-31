@@ -33,7 +33,7 @@ void DataFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void DataFileWorker::WriteToFileImpl(bool &prepare_success, SizeT buffer_size) {
+void DataFileWorker::WriteToFileImpl(bool &prepare_success) {
     LocalFileSystem fs;
     // File structure:
     // - header: magic number
@@ -47,14 +47,14 @@ void DataFileWorker::WriteToFileImpl(bool &prepare_success, SizeT buffer_size) {
         Error<StorageException>(Format("Write magic number which length is {}.", nbytes), __FILE_NAME__, __LINE__);
     }
 
-    nbytes = fs.Write(*file_handler_, const_cast<SizeT *>(&buffer_size), sizeof(buffer_size));
-    if (nbytes != sizeof(buffer_size)) {
+    nbytes = fs.Write(*file_handler_, const_cast<SizeT *>(&buffer_size_), sizeof(buffer_size_));
+    if (nbytes != sizeof(buffer_size_)) {
         Error<StorageException>(Format("Write buffer length field which length is {}.", nbytes), __FILE_NAME__, __LINE__);
     }
 
-    nbytes = fs.Write(*file_handler_, data_, buffer_size);
-    if (nbytes != buffer_size) {
-        Error<StorageException>(Format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size, nbytes),
+    nbytes = fs.Write(*file_handler_, data_, buffer_size_);
+    if (nbytes != buffer_size_) {
+        Error<StorageException>(Format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes),
                                 __FILE_NAME__,
                                 __LINE__);
     }

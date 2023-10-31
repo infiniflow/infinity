@@ -13,9 +13,9 @@ class BufferManager;
 export enum class BufferStatus {
     kLoaded,
     kUnloaded,
-    kLoadedUnsaved,
-    kLoadedMutable,
-    kUnloadedModified,
+    // kLoadedUnsaved,
+    // kLoadedMutable,
+    // kUnloadedModified,
     kFreed,
     kNew,
 };
@@ -23,6 +23,7 @@ export enum class BufferStatus {
 export enum class BufferType {
     kPersistent,
     kEphemeral,
+    kTemp,
 };
 
 export class BufferObj {
@@ -36,14 +37,12 @@ public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();
 
-    BufferHandleMut LoadMut();
-
     // called by BufferMgr in GC process.
     // return true if is freed.
     bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
-    bool Save(SizeT buffer_size);
+    bool Save();
 
     void Sync();
 
@@ -56,9 +55,12 @@ public:
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
     friend class BufferHandle;
-    friend class BufferHandleMut;
+    // friend class BufferHandleMut;
 
-    // called when ObjectHandle destructs, to decrease rc_ by 1.
+    // called when BufferHandle needs mutable pointer.
+    void GetMutPointer();
+
+    // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
 
     // check the invalid state
@@ -76,7 +78,7 @@ private:
     BufferManager *buffer_mgr_;
 
     BufferStatus status_{BufferStatus::kNew};
-    BufferType type_{BufferType::kEphemeral};
+    BufferType type_{BufferType::kTemp};
     u64 rc_{0};
     UniquePtr<FileWorker> file_worker_{nullptr};
 };
