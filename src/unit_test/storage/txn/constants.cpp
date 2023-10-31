@@ -11,7 +11,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 import txn_state;
-import infinity;
+import infinity_context;
 
 class TxnContants : public BaseTest {};
 

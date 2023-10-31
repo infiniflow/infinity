@@ -8,7 +8,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -41,7 +41,7 @@ void PhysicalFilter::Init() {
     //
     //    SharedPtr<TableDef> table_def = TableDef::Make("filter", columns, false);
     //
-    //    output_ = Table::Make(table_def, TableType::kIntermediate);
+    //    output_ = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
 void PhysicalFilter::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
@@ -86,7 +86,7 @@ void PhysicalFilter::Execute(QueryContext *query_context) {
         output_types.emplace_back(column_type);
     }
     SharedPtr<TableDef> selected_table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("selected"), columns);
-    SharedPtr<Table> selected_table = Table::Make(selected_table_def, TableType::kIntermediate);
+    SharedPtr<DataTable> selected_table = DataTable::Make(selected_table_def, TableType::kIntermediate);
 
     SizeT input_data_block_count = input_table_->DataBlockCount();
     for (SizeT idx = 0; idx < input_data_block_count; ++idx) {

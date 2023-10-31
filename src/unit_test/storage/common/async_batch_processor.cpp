@@ -15,7 +15,7 @@ import async_task;
 import commit_task;
 import async_batch_processor;
 import async_dummy_task;
-import infinity;
+import infinity_context;
 
 class AsyncTaskProcessorTest : public BaseTest {};
 

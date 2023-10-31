@@ -8,7 +8,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -59,7 +59,7 @@ void PhysicalCreateTable::Execute(QueryContext *query_context) {
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
-    output_ = Table::MakeResultTable(column_defs);
+    output_ = DataTable::MakeResultTable(column_defs);
 }
 
 } // namespace infinity

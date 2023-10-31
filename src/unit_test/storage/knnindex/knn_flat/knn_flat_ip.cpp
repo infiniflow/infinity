@@ -12,7 +12,7 @@ import third_party;
 import logger;
 import parser;
 import knn_flat_ip;
-import infinity;
+import infinity_context;
 
 class KnnFlatIpTest : public BaseTest {};
 

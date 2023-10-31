@@ -4,7 +4,7 @@
 
 #include "unit_test/base_test.h"
 
-import infinity;
+import infinity_context;
 import infinity_exception;
 import infinity_assert;
 import stl;
@@ -27,11 +27,11 @@ class CatalogTest  : public BaseTest {
         BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -44,8 +44,8 @@ class CatalogTest  : public BaseTest {
 TEST_F(CatalogTest, simple_test1) {
     using namespace infinity;
 
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
-    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
+    TxnManager* txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto* txn1 = txn_mgr->CreateTxn();
@@ -105,8 +105,8 @@ TEST_F(CatalogTest, simple_test1) {
 TEST_F(CatalogTest, simple_test2) {
     using namespace infinity;
 
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
-    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
+    TxnManager* txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto* txn1 = txn_mgr->CreateTxn();
@@ -166,8 +166,8 @@ TEST_F(CatalogTest, simple_test2) {
 TEST_F(CatalogTest, concurrent_test) {
     using namespace infinity;
 
-    TxnManager* txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
-    NewCatalog* catalog = infinity::Infinity::instance().storage()->catalog();
+    TxnManager* txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    NewCatalog* catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     for(int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2

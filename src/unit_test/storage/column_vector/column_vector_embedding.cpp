@@ -15,7 +15,7 @@ import third_party;
 import stl;
 import selection;
 import vector_buffer;
-import infinity;
+import infinity_context;
 import global_resource_usage;
 
 class ColumnVectorEmbeddingTest : public BaseTest {};

@@ -118,9 +118,9 @@ std::shared_ptr<cxxopts::Value> cxx_value() {
 export using ParseResult = cxxopts::ParseResult;
 
 // Toml parser
-using TomlParseResult = toml::parse_result;
+export using TomlTable = toml::table;
 //
-export TomlParseResult TomlParseFile(const std::string &file_path) { return toml::parse_file(file_path); }
+export TomlTable TomlParseFile(const std::string &file_path) { return toml::parse_file(file_path); }
 
 // Returns integer value from enum value.
 export template <typename E>

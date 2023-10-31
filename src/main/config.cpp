@@ -169,8 +169,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         }
     } else {
         Printf("Read config from: {}", *config_path);
-        auto config = TomlParseFile(*config_path);
-//        auto config = toml::parse_file(*config_path);
+        TomlTable config = TomlParseFile(*config_path);
         // General
         {
             auto general_config = config["general"];

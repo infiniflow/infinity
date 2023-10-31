@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -57,7 +57,7 @@ void PhysicalLimit::Execute(QueryContext *query_context) {
     output_ = GetLimitOutput(input_table_, limit, offset);
 }
 
-SharedPtr<Table> PhysicalLimit::GetLimitOutput(const SharedPtr<Table> &input_table, i64 limit, i64 offset) {
+SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &input_table, i64 limit, i64 offset) {
     SizeT start_block = 0;
     SizeT start_row_id = 0;
     SizeT end_block = 0;
@@ -134,7 +134,7 @@ SharedPtr<Table> PhysicalLimit::GetLimitOutput(const SharedPtr<Table> &input_tab
     }
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("limit"), columns);
-    SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
+    SharedPtr<DataTable> output_table = DataTable::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
 

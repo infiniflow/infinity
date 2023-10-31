@@ -10,14 +10,14 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import table;
+import data_table;
 import table_def;
 import value;
 import parser;
 import data_block;
 import default_values;
 import column_vector;
-import infinity;
+import infinity_context;
 
 class TableTest : public BaseTest {};
 
@@ -47,7 +47,7 @@ TEST_F(TableTest, test1) {
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_table"), columns);
 
-    SharedPtr<Table> order_by_table = Table::Make(table_def, TableType::kOrderBy);
+    SharedPtr<DataTable> order_by_table = DataTable::Make(table_def, TableType::kOrderBy);
 
     for (SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<DataBlock> data_block = DataBlock::Make();

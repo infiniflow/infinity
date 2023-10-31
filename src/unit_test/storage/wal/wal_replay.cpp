@@ -4,7 +4,7 @@
 import stl;
 import global_resource_usage;
 import storage;
-import infinity;
+import infinity_context;
 import parser;
 import txn_manager;
 import table_def;
@@ -45,9 +45,9 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->CreateTxn();
@@ -80,7 +80,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         txn6->CreateDatabase("db5", ConflictType::kIgnore);
         txn6->CommitTxn();
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -89,9 +89,9 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->CreateTxn();
@@ -101,7 +101,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         EXPECT_NE(result.entry_, nullptr);
         txn->CommitTxn();
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -138,9 +138,9 @@ TEST_F(WalReplayTest, WalReplayTables) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
@@ -181,7 +181,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             txn6->CommitTxn();
         }
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -189,9 +189,9 @@ TEST_F(WalReplayTest, WalReplayTables) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
@@ -210,7 +210,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             txn->CommitTxn();
         }
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -221,9 +221,9 @@ TEST_F(WalReplayTest, WalReplayAppend) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
@@ -312,7 +312,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             txn6->Checkpoint(3, true);
             txn6->CommitTxn();
         }
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -321,9 +321,9 @@ TEST_F(WalReplayTest, WalReplayAppend) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
 
@@ -397,7 +397,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             }
         }
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -408,9 +408,9 @@ TEST_F(WalReplayTest, WalReplayImport) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
 
@@ -556,7 +556,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             txn6->CommitTxn();
         }
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -566,9 +566,9 @@ TEST_F(WalReplayTest, WalReplayImport) {
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
 
-        Storage *storage = infinity::Infinity::instance().storage();
+        Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
 
@@ -639,7 +639,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             }
         }
 
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();

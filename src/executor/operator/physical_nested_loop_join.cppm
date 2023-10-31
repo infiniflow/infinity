@@ -11,7 +11,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
-import table;
+import data_table;
 
 export module physical_nested_loop_join;
 
@@ -42,8 +42,8 @@ public:
     inline const Vector<SharedPtr<BaseExpression>> &conditions() const { return conditions_; }
 
 private:
-    SharedPtr<Table> left_table_{};
-    SharedPtr<Table> right_table_{};
+    SharedPtr<DataTable> left_table_{};
+    SharedPtr<DataTable> right_table_{};
     JoinType join_type_{JoinType::kInner};
     Vector<SharedPtr<BaseExpression>> conditions_{};
 };

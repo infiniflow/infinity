@@ -23,7 +23,7 @@ import base_entry;
 import value;
 import table_collection_entry;
 import table_def;
-import table;
+import data_table;
 import third_party;
 import index_def_meta;
 import index_def_entry;
@@ -496,7 +496,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
     };
 
     auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
@@ -632,7 +632,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context) {
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
@@ -718,7 +718,7 @@ void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vec
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
     Vector<SharedPtr<DataType>> column_types{
@@ -776,7 +776,7 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), output_column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
     Vector<SharedPtr<DataType>> output_column_types{

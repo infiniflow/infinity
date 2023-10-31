@@ -16,7 +16,7 @@ import stl;
 import selection;
 import vector_buffer;
 import global_resource_usage;
-import infinity;
+import infinity_context;
 
 class ColumnVectorNestedTest : public BaseTest {};
 TEST_F(ColumnVectorNestedTest, flat_array) {

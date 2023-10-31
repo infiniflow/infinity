@@ -11,7 +11,7 @@ import third_party;
 import parser;
 import logger;
 import stl;
-import infinity;
+import infinity_context;
 import new_catalog;
 import scalar_function;
 import add;
@@ -27,7 +27,7 @@ import column_vector;
 import expression_state;
 import value;
 import expression_evaluator;
-import table;
+import data_table;
 import table_def;
 import data_block;
 import default_values;
@@ -73,7 +73,7 @@ TEST_F(ExpressionEvaluatorTest, add_bigint_constant_1) {
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, data_type, "c1", HashSet<ConstraintType>());
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
-    SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
+    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
         SharedPtr<DataBlock> input_data_block = DataBlock::Make();
@@ -172,7 +172,7 @@ TEST_F(ExpressionEvaluatorTest, subtract_constant_8192_bigint) {
 
     SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kBigInt)), "c1", HashSet<ConstraintType>());
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), {col_def});
-    SharedPtr<Table> input_table = Table::Make(table_def, TableType::kDataTable);
+    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kDataTable);
 
     {
         SharedPtr<DataBlock> input_data_block = DataBlock::Make();

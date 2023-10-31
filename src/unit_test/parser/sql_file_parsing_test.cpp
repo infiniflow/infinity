@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import compilation_config;
-import infinity;
+import infinity_context;
 import infinity_exception;
 import infinity_assert;
 import global_resource_usage;

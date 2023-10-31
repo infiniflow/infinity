@@ -13,7 +13,9 @@ import resource_manager;
 import profiler;
 import storage;
 import txn;
-import table;
+import data_table;
+import parser;
+import optimizer;
 
 export module query_context;
 
@@ -22,14 +24,17 @@ namespace infinity {
 //class Session;
 //class Storage;
 //class ResourceManager;
+class LogicalPlanner;
+class PhysicalPlanner;
+class FragmentBuilder;
 class FragmentScheduler;
 //class QueryProfiler;
 //class Table;
 //class Txn;
 //class Config;
 
-export struct QueryResult {
-    SharedPtr<Table> result_;
+export struct QueryResponse {
+    SharedPtr<DataTable> result_;
     LogicalNodeType root_operator_type_;
 
     [[nodiscard]] String ToString() const;
@@ -38,12 +43,11 @@ export struct QueryResult {
 export class QueryContext {
 
 public:
-    explicit QueryContext() = default;
+    explicit QueryContext(SessionBase* session);
 
-    inline ~QueryContext() { UnInit(); }
+    ~QueryContext();
 
-    void Init(Session *session_ptr,
-              const Config *global_config_ptr,
+    void Init(const Config *global_config_ptr,
               FragmentScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr);
@@ -57,7 +61,9 @@ public:
         resource_manager_ = nullptr;
     }
 
-    QueryResult Query(const String &query);
+    QueryResponse Query(const String &query);
+
+    QueryResponse QueryStatement(const BaseStatement *statement);
 
     inline void set_current_schema(const String &current_schema) { current_schema_ = current_schema; }
 
@@ -83,7 +89,7 @@ public:
 
     void RollbackTxn();
 
-    [[nodiscard]] Txn *GetTxn() const;
+    [[nodiscard]] Txn *GetTxn() const { return session_ptr_->txn(); }
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 
@@ -93,14 +99,26 @@ public:
 
     [[nodiscard]] inline ResourceManager *resource_manager() { return resource_manager_; }
 
+    [[nodiscard]] inline SQLParser *parser() const { return parser_.get(); }
+    [[nodiscard]] inline LogicalPlanner *logical_planner() const { return logical_planner_.get(); }
+    [[nodiscard]] inline Optimizer *optimizer() const { return optimizer_.get(); }
+    [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
+    [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
+
 private:
+    // Parser
+    UniquePtr<SQLParser> parser_{};
+    UniquePtr<LogicalPlanner> logical_planner_{};
+    UniquePtr<Optimizer> optimizer_{};
+    UniquePtr<PhysicalPlanner> physical_planner_{};
+    UniquePtr<FragmentBuilder> fragment_builder_{};
 
     SharedPtr<QueryProfiler> query_metrics_;
 
     const Config *global_config_{};
     FragmentScheduler *scheduler_{};
     Storage *storage_{};
-    Session *session_ptr_{};
+    SessionBase *session_ptr_{};
     ResourceManager *resource_manager_{};
 
     // Get following information from session.

@@ -4,7 +4,7 @@
 
 #include "unit_test/base_test.h"
 
-import infinity;
+import infinity_context;
 import infinity_exception;
 import infinity_assert;
 import stl;

@@ -4,7 +4,7 @@
 
 #include "unit_test/base_test.h"
 
-import infinity;
+import infinity_context;
 import infinity_exception;
 import infinity_assert;
 import stl;
@@ -34,7 +34,7 @@ class BufferMgrTest : public BaseTest {
 void BufferMgrTest::SetUp() {
     infinity::GlobalResourceUsage::Init();
     std::shared_ptr<std::string> config_path = nullptr;
-    infinity::Infinity::instance().Init(config_path);
+    infinity::InfinityContext::instance().Init(config_path);
 
     using namespace infinity;
 

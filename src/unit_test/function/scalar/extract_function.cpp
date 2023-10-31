@@ -11,7 +11,7 @@ import third_party;
 import parser;
 import logger;
 import stl;
-import infinity;
+import infinity_context;
 import new_catalog;
 import extract;
 import scalar_function;

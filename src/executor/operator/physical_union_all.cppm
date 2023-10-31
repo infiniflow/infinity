@@ -11,7 +11,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
-import table;
+import data_table;
 
 export module physical_union_all;
 

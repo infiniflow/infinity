@@ -11,7 +11,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
-import table;
+import data_table;
 
 export module physical_sort;
 
@@ -35,18 +35,18 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    void Sort(const SharedPtr<Table> &order_by_table, const Vector<OrderType> &order_by_types_);
+    void Sort(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types_);
 
-    static SharedPtr<Table> GenerateOutput(const SharedPtr<Table> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector);
+    static SharedPtr<DataTable> GenerateOutput(const SharedPtr<DataTable> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector);
 
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderType> order_by_types_{};
 
 private:
-    SharedPtr<Table> GetOrderTable() const;
+    SharedPtr<DataTable> GetOrderTable() const;
 
 private:
-    SharedPtr<Table> input_table_{};
+    SharedPtr<DataTable> input_table_{};
     u64 input_table_index_{};
 };
 

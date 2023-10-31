@@ -11,7 +11,7 @@ import heap_chunk;
 import third_party;
 import stl;
 import global_resource_usage;
-import infinity;
+import infinity_context;
 
 class StringChunkTest : public BaseTest {};
 

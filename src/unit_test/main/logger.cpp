@@ -4,7 +4,7 @@
 
 #include "unit_test/base_test.h"
 
-import infinity;
+import infinity_context;
 import global_resource_usage;
 import logger;
 
@@ -13,11 +13,11 @@ class LoggerTest : public BaseTest {
         BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();

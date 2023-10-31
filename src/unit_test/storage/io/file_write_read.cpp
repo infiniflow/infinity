@@ -15,7 +15,7 @@ import file_system;
 import local_file_system;
 import file_writer;
 import file_reader;
-import infinity;
+import infinity_context;
 
 class FileWriteReadTest : public BaseTest {};
 

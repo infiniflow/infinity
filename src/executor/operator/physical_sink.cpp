@@ -10,7 +10,7 @@ import stl;
 // import txn;
 import query_context;
 // import table_def;
-// import table;
+// import data_table;
  import parser;
 import operator_state;
 import physical_operator_type;

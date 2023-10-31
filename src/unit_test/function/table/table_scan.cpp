@@ -11,7 +11,7 @@ import third_party;
 import parser;
 import logger;
 import stl;
-import infinity;
+import infinity_context;
 import new_catalog;
 import scalar_function;
 import scalar_function_set;
@@ -36,11 +36,11 @@ class TableScanTest  : public BaseTest {
         BaseTest::SetUp();
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -61,12 +61,12 @@ TEST_F(TableScanTest, block_read_test) {
     storage.Init();
 
     // create dummy query_context
-    UniquePtr<Session> session_ptr = MakeUnique<Session>();
+    UniquePtr<RemoteSession> session_ptr = MakeUnique<RemoteSession>();
 
     UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(), config.total_memory_size());
 
-    UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>();
-    query_context->Init(session_ptr.get(), &config, nullptr, &storage, resource_manager.get());
+    UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>(session_ptr.get());
+    query_context->Init(&config, nullptr, &storage, resource_manager.get());
 
     Vector<SharedPtr<DataType>> column_types;
     column_types.push_back(MakeShared<DataType>(LogicalType::kInteger));

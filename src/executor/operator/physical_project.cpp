@@ -10,7 +10,7 @@ import stl;
 //import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import operator_state;
 import expression_evaluator;
@@ -35,7 +35,7 @@ void PhysicalProject::Init() {
     //    }
     //    SharedPtr<TableDef> table_def = TableDef::Make("project", columns, false);
     //
-    //    outputs_[output_table_index_] = Table::Make(table_def, TableType::kIntermediate);
+    //    outputs_[output_table_index_] = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
 void PhysicalProject::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
@@ -106,7 +106,7 @@ void PhysicalProject::Execute(QueryContext *query_context) {
 
     // output table definition
     SharedPtr<TableDef> projection_tabledef = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("projection"), projection_columns);
-    SharedPtr<Table> projection_table = Table::Make(projection_tabledef, TableType::kAggregate);
+    SharedPtr<DataTable> projection_table = DataTable::Make(projection_tabledef, TableType::kAggregate);
 
     if (left_.get() == nullptr) {
         Vector<SharedPtr<DataBlock>> empty_input_blocks;
@@ -123,7 +123,7 @@ void PhysicalProject::Execute(QueryContext *query_context) {
         projection_table->Append(output_data_block);
     } else {
         // Get input from left child
-        SharedPtr<Table> input_table = left_->output();
+        SharedPtr<DataTable> input_table = left_->output();
         Assert<ExecutorException>(input_table.get() != nullptr, "No input table for projection", __FILE_NAME__, __LINE__);
         // Get block count;
         SizeT input_block_count = input_table->DataBlockCount();

@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -64,7 +64,7 @@ void PhysicalTableScan::Execute(QueryContext *query_context) {
 
     SharedPtr<TableDef> table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>(base_table_ref_->alias_), column_defs);
 
-    output_ = MakeShared<Table>(table_def_ptr, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def_ptr, TableType::kResult);
 
     while (true) {
         SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
