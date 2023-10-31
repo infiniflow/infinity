@@ -21,6 +21,7 @@ export class SessionBase {
 public:
     explicit SessionBase(SessionType session_type) : current_database_("default"), session_type_(session_type) {}
 
+    inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
 
     inline Txn*& txn() { return txn_; }

@@ -53,6 +53,7 @@ export enum class LogicalNodeType : u8 {
     // ?
     kShow,
     kExplain,
+    kCommand,
     kPrepare,
     kFlush,
 };

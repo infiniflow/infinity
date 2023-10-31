@@ -23,6 +23,7 @@ enum class StatementType {
     kShow,
     kExplain,
     kFlush,
+    kCommand,
 };
 
 class BaseStatement {

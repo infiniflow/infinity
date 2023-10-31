@@ -16,6 +16,7 @@ namespace infinity {
 
 export enum class ShowType {
     kInvalid,
+    kShowDatabases,
     kShowTables,
     kShowViews,
     kShowColumn,

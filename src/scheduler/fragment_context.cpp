@@ -282,6 +282,10 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
             MakeTaskStateTemplate<DropViewInputState, DropViewOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
         }
+        case PhysicalOperatorType::kCommand: {
+            MakeTaskStateTemplate<CommandInputState, CommandOutputState>(input_state, output_state, physical_ops[operator_id]);
+            break;
+        }
         case PhysicalOperatorType::kExplain: {
             MakeTaskStateTemplate<ExplainInputState, ExplainOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
@@ -648,6 +652,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
@@ -853,6 +858,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
             break;
         }
+        case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateCollection:

@@ -10,11 +10,23 @@ export class CreateDatabaseOptions {
 
 };
 
+export class DropDatabaseOptions {
+
+};
+
 export class CreateTableOptions {
 
 };
 
+export class DropTableOptions {
+
+};
+
 export class CreateIndexOptions {
+
+};
+
+export class DropIndexOptions {
 
 };
 

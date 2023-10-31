@@ -54,6 +54,8 @@ private:
                                const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
                                const SharedPtr<Vector<String>> &column_names);
 
+    void ExecuteShowDatabases(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+
     /// Execute push based show table
     void ExecuteShowTable(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
 

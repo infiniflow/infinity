@@ -29,7 +29,7 @@ public:
 
     QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options);
 
-    QueryResult DropDatabase(const String &db_name, const CreateDatabaseOptions &options);
+    QueryResult DropDatabase(const String &db_name, const DropDatabaseOptions &options);
 
     QueryResult ListDatabases();
 

@@ -22,6 +22,7 @@ import boost;
 import compilation_config;
 import default_values;
 import logger;
+import local_file_system;
 
 namespace infinity {
 
@@ -110,7 +111,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
 
-    if(config_path.get() == nullptr) {
+    LocalFileSystem fs;
+    if(config_path.get() == nullptr || !fs.Exists(*config_path)) {
         Printf("No config file is given, use default configs.");
 
         // General

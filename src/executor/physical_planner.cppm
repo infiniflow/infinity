@@ -98,7 +98,11 @@ private:
     // Flush
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    // Knn
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    // Command
+    [[nodiscard]] SharedPtr<PhysicalOperator> BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Explain
     [[nodiscard]] SharedPtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;

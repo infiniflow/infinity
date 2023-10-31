@@ -148,9 +148,10 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
         this->CommitTxn();
     } catch (const Exception &e) {
         this->RollbackTxn();
-        throw Exception(e.what());
+        query_response.result_ = nullptr;
+        query_response.result_msg_ = MakeShared<String>(e.what());
     } catch (StlException &e) {
-        throw e;
+        throw Exception(e.what());
     }
     return query_response;
 }

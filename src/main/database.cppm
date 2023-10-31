@@ -14,6 +14,8 @@ namespace infinity {
 
 export class Database {
 public:
+    explicit Database(const String &db_name) : db_name_(db_name) {}
+
     QueryResult CreateTable(const String &column_name, Vector<Pair<String, String>>, const CreateTableOptions &create_table_options);
 
     QueryResult DropTable(const String &table_name);
@@ -23,6 +25,9 @@ public:
     QueryResult DescribeTable(const String &table_name);
 
     SharedPtr<Table> GetDatabase(const String &table_name);
+
+private:
+    String db_name_{};
 };
 
 } // namespace infinity

@@ -73,6 +73,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             BuildExplain(phys_op, current_fragment_ptr);
             return;
         }
+        case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndex:

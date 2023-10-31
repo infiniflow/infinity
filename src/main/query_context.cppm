@@ -34,10 +34,11 @@ class FragmentScheduler;
 //class Config;
 
 export struct QueryResponse {
-    SharedPtr<DataTable> result_;
-    LogicalNodeType root_operator_type_;
+    SharedPtr<DataTable> result_{};
+    LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
+    SharedPtr<String> result_msg_{};
 
-    [[nodiscard]] String ToString() const;
+    String ToString() const;
 };
 
 export class QueryContext {
@@ -65,9 +66,9 @@ public:
 
     QueryResponse QueryStatement(const BaseStatement *statement);
 
-    inline void set_current_schema(const String &current_schema) { current_schema_ = current_schema; }
+    inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
 
-    [[nodiscard]] inline const String &schema_name() const { return current_schema_; }
+    [[nodiscard]] inline const String &schema_name() const { return session_ptr_->current_database(); }
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 

@@ -41,6 +41,7 @@ import logical_flush;
 import logical_export;
 import logical_import;
 import logical_explain;
+import logical_command;
 import explain_logical_plan;
 import explain_ast;
 
@@ -108,6 +109,10 @@ void LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext
         }
         case StatementType::kAlter: {
             BuildAlter(static_cast<const AlterStatement *>(statement), bind_context_ptr);
+            break;
+        }
+        case StatementType::kCommand: {
+            BuildCommand(static_cast<const CommandStatement*>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kInvalidStmt: {
@@ -635,8 +640,34 @@ void LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindC
     Error<PlannerException>("Alter statement isn't supported.", __FILE_NAME__, __LINE__);
 }
 
+void LogicalPlanner::BuildCommand(const CommandStatement* statement, SharedPtr<BindContext> &bind_context_ptr) {
+    Txn* txn = query_context_ptr_->GetTxn();
+    auto *command_statement = (CommandStatement *)statement;
+    switch(command_statement->command_info_->type()) {
+        case CommandType::kUse: {
+            UseCmd* use_command_info = (UseCmd*)(command_statement->command_info_.get());
+            EntryResult result = txn->GetDatabase(use_command_info->db_name());
+            if(result.Success()) {
+                SharedPtr<LogicalNode> logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                                    command_statement->command_info_);
+
+                this->logical_plan_ = logical_command;
+            } else {
+                Error<PlannerException>("Invalid command type.", __FILE_NAME__, __LINE__);
+            }
+            break;
+        }
+        default: {
+            Error<PlannerException>("Invalid command type.", __FILE_NAME__, __LINE__);
+        }
+    }
+}
+
 void LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->show_type_) {
+        case ShowStmtType::kDatabases: {
+            return BuildShowDatabases(statement, bind_context_ptr);
+        }
         case ShowStmtType::kTables:
         case ShowStmtType::kCollections: {
             return BuildShowTables(statement, bind_context_ptr);
@@ -692,6 +723,16 @@ void LogicalPlanner::BuildShowViews(const ShowStatement *statement, SharedPtr<Bi
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowViews,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  object_name,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+}
+
+void LogicalPlanner::BuildShowDatabases(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    String object_name;
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowDatabases,
                                                                   query_context_ptr_->schema_name(),
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
