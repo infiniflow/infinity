@@ -23,13 +23,13 @@ import infinity_assert;
 import infinity_exception;
 import defer_op;
 import ivfflat_index_def;
-import object_handle;
+import buffer_handle;
+import faiss_index_file_worker;
 import logger;
 import local_file_system;
 import random;
 import parser;
 import index_entry;
-import faiss_index_ptr;
 import txn_store;
 
 module segment_entry;
@@ -46,9 +46,7 @@ UniquePtr<SegmentVersion> SegmentVersion::Deserialize(const Json &table_entry_js
 
 SegmentEntry::SegmentEntry(const TableCollectionEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
-SharedPtr<SegmentEntry>
-SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr, bool is_new) {
-
+SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr) {
     SharedPtr<SegmentEntry> new_entry = MakeShared<SegmentEntry>(table_entry);
     new_entry->row_count_ = 0;
     new_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
@@ -60,10 +58,25 @@ SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 s
     new_entry->column_count_ = table_ptr->columns_.size();
 
     new_entry->segment_dir_ = SegmentEntry::DetermineSegFilename(*table_entry->table_entry_dir_, segment_id);
-    if (new_entry->block_entries_.empty() && is_new) {
+    if (new_entry->block_entries_.empty()) {
         new_entry->block_entries_.emplace_back(
             MakeUnique<BlockEntry>(new_entry.get(), new_entry->block_entries_.size(), 0, new_entry->column_count_, buffer_mgr));
     }
+    return new_entry;
+}
+
+SharedPtr<SegmentEntry>
+SegmentEntry::MakeReplaySegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, SharedPtr<String> segment_dir, TxnTimeStamp commit_ts) {
+
+    auto new_entry = MakeShared<SegmentEntry>(table_entry);
+    new_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+    new_entry->segment_id_ = segment_id;
+    new_entry->min_row_ts_ = commit_ts;
+    new_entry->max_row_ts_ = commit_ts;
+
+    const auto *table_ptr = (const TableCollectionEntry *)table_entry;
+    new_entry->column_count_ = table_ptr->columns_.size();
+    new_entry->segment_dir_ = std::move(segment_dir);
     return new_entry;
 }
 
@@ -98,7 +111,7 @@ int SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
             i16 range_block_start_row = last_block_entry->row_count_;
 
             i16 actual_appended =
-                BlockEntry::AppendData(last_block_entry, txn_ptr, input_block, append_state_ptr->current_block_offset_, to_append_rows);
+                BlockEntry::AppendData(last_block_entry, txn_ptr, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
 
             append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_block_id, range_block_start_row, actual_appended);
 
@@ -171,8 +184,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
-                ObjectHandle object_handle(block_column_entry->buffer_handle_);
-                auto block_data_ptr = reinterpret_cast<float *>(object_handle.GetData());
+                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+                auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);
@@ -262,14 +275,27 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
         json_res["deleted"] = segment_entry->deleted_;
         json_res["row_count"] = segment_entry->row_count_;
         for (auto &block_entry : segment_entry->block_entries_) {
-            if (max_commit_ts > block_entry->checkpoint_ts_)
+            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts_) {
                 block_entries.push_back((BlockEntry *)block_entry.get());
+            }
         }
     }
     for (BlockEntry *block_entry : block_entries) {
+        LOG_TRACE(Format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                         block_entry->checkpoint_ts_,
+                         block_entry->min_row_ts_,
+                         block_entry->max_row_ts_,
+                         max_commit_ts));
         BlockEntry::Flush(block_entry, max_commit_ts);
-        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts)
+        LOG_TRACE(Format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                         block_entry->checkpoint_ts_,
+                         block_entry->min_row_ts_,
+                         block_entry->max_row_ts_,
+                         max_commit_ts));
+        // WARNING: this operation may influence data visibility
+        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
             continue;
+        }
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry, max_commit_ts));
     }
     for (const auto &[_index_name, index_entry] : segment_entry->index_entry_map_) {
@@ -296,10 +322,13 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
-            segment_entry->block_entries_.reserve(block_entry->block_id_ + 1);
-            segment_entry->block_entries_[block_entry->block_id_] = Move(block_entry);
+            auto block_entries_size = segment_entry->block_entries_.size();
+            segment_entry->block_entries_.resize(Max(block_entries_size, static_cast<SizeT>(block_entry->block_id_ + 1)));
+            segment_entry->block_entries_[block_entry->block_id_] = std::move(block_entry);
         }
     }
+    LOG_TRACE(Format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
+
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
             SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);

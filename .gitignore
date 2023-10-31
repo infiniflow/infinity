@@ -39,6 +39,7 @@ cmake-build-debug-gcc/**
 cmake-build-release/**
 cmake-build-release-clang/**
 cmake-build-release-gcc/**
+cmake-build-debug-**
 Infinity.xml
 
 # OSX dir
@@ -82,3 +83,6 @@ clang-format-all
 
 #a place for any file unwant to commit
 tmp/
+
+benchmark/toml/toml_config.h
+benchmark/csv/csv_config.h

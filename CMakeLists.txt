@@ -4,13 +4,13 @@ project(infinity VERSION 0.1.0)
 
 find_program(CCACHE_FOUND ccache)
 
-if(CCACHE_FOUND)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
-    message("Find ccache")
-else()
-    message("Can not find ccache")
-endif()
+# if(CCACHE_FOUND)
+#     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+#     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache) # Less useful to do it for linking, see edit2
+#     message("Find ccache")
+# else()
+#     message("Can not find ccache")
+# endif()
 
 option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
 if (${FORCE_COLORED_OUTPUT})
@@ -44,6 +44,7 @@ message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
 
 execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD OUTPUT_VARIABLE GIT_COMMIT_ID OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
+
 
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)

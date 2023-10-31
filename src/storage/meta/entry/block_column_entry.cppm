@@ -6,7 +6,7 @@ module;
 
 import stl;
 import base_entry;
-import buffer_handle;
+import buffer_obj;
 import parser;
 import third_party;
 import column_buffer;
@@ -28,15 +28,16 @@ public:
     const BlockEntry *block_entry_{nullptr};
     u64 column_id_{};
     SharedPtr<DataType> column_type_{};
-    BufferHandle *buffer_handle_{};
+    BufferObj *buffer_{};
 
-    const SharedPtr<String> base_dir_{};
+    SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
 
     UniquePtr<OutlineInfo> outline_info_{};
 
 public:
-    static UniquePtr<BlockColumnEntry> MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager);
+    static UniquePtr<BlockColumnEntry>
+    MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager, bool is_replay = false);
 
     static ColumnBuffer GetColumnData(BlockColumnEntry *column_data_entry, BufferManager *buffer_manager);
 
@@ -50,6 +51,8 @@ public:
     static Json Serialize(BlockColumnEntry *block_column_entry);
 
     static UniquePtr<BlockColumnEntry> Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
+
+    static SharedPtr<String> OutlineFilename(SizeT file_idx) { return MakeShared<String>(Format("out_{}", file_idx)); }
 };
 
 } // namespace infinity

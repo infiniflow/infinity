@@ -23,10 +23,14 @@ import db_entry;
 import table_collection_type;
 import parser;
 import txn_store;
+import db_entry;
 import segment_entry;
 import block_entry;
 import table_collection_entry;
 import data_access_state;
+import infinity_assert;
+import infinity_exception;
+#include "statement/extra/extra_ddl_info.h"
 
 module wal_manager;
 
@@ -281,6 +285,7 @@ void WalManager::Checkpoint() {
             if (is_full_checkpoint) {
                 full_ckp_when_ = now;
                 full_ckp_wal_size_ = wal_size;
+                full_ckp_commit_ts_ = max_commit_ts;
             }
             LOG_INFO(Format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
             RecycleWalFile();
@@ -360,13 +365,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
  *
  */
 int64_t WalManager::ReplayWalFile() {
-    // if the wal directory does not exist, just return 0.
-    if (!std::filesystem::exists(wal_path_)) {
-        storage_->InitNewCatalog();
-        return 0;
-    }
-    // if the wal file is empty, just return 0.
-    if (std::filesystem::file_size(wal_path_) == 0) {
+    if (!std::filesystem::exists(wal_path_) || std::filesystem::file_size(wal_path_) == 0) {
         storage_->InitNewCatalog();
         return 0;
     }
@@ -421,6 +420,8 @@ int64_t WalManager::ReplayWalFile() {
     while (iterator.Next()) {
         auto wal_entry = iterator.GetEntry();
 
+        LOG_TRACE(wal_entry->ToString());
+
         replay_entries.push_back(wal_entry);
 
         if (wal_entry->IsCheckPoint()) {
@@ -447,13 +448,19 @@ int64_t WalManager::ReplayWalFile() {
             }
         }
     }
+    LOG_INFO(Format("Find checkpoint max commit ts: {}", max_commit_ts));
 
     // phase 2: by the max commit ts, find the entries to replay
     LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
     while (iterator.Next()) {
         auto wal_entry = iterator.GetEntry();
+
+        LOG_TRACE(wal_entry->ToString());
+
         if (wal_entry->commit_ts > max_commit_ts) {
             replay_entries.push_back(wal_entry);
+        } else {
+            break;
         }
     }
 
@@ -470,19 +477,28 @@ int64_t WalManager::ReplayWalFile() {
     LOG_INFO("Replay phase 3: replay the entries");
     std::reverse(replay_entries.begin(), replay_entries.end());
     i64 last_commit_ts = 0;
-    for (const auto &entry : replay_entries) {
-        if (entry->commit_ts > last_commit_ts) {
-            last_commit_ts = entry->commit_ts;
+    i64 last_txn_id = 0;
+    i64 replay_count = 0;
+    for (; replay_count < replay_entries.size(); ++replay_count) {
+        if (replay_entries[replay_count]->commit_ts > max_commit_ts) {
+            break;
         }
-        if (entry->commit_ts < max_commit_ts) {
-            continue;
-        }
-        if (entry->IsCheckPoint()) {
-            continue;
-        }
-        ReplayWalEntry(*entry);
     }
-    LOG_TRACE(Format("Last commit ts: {}", last_commit_ts));
+
+    for (; replay_count < replay_entries.size(); ++replay_count) {
+        Assert<StorageException>(replay_entries[replay_count]->commit_ts > max_commit_ts, "Wal Replay: Commit ts should be greater than max commit ts", __FILE_NAME__, __LINE__);
+        last_commit_ts = replay_entries[replay_count]->commit_ts;
+        last_txn_id = replay_entries[replay_count]->txn_id;
+        if (replay_entries[replay_count]->IsCheckPoint()) {
+            LOG_TRACE(Format("Replay Skip checkpoint entry: {}", replay_entries[replay_count]->ToString()));
+            continue;
+        }
+        ReplayWalEntry(*replay_entries[replay_count]);
+        LOG_TRACE(replay_entries[replay_count]->ToString());
+    }
+
+    LOG_TRACE(Format("Last commit ts: {}, last txn id: {}", last_commit_ts, last_txn_id));
+    storage_->catalog()->next_txn_id_ = last_txn_id;
     return last_commit_ts;
 }
 /*****************************************************************************
@@ -502,7 +518,7 @@ void WalManager::RecycleWalFile() {
         for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
             if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
                 auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                if (std::stoll(suffix) < ckp_commit_ts_) {
+                if (std::stoll(suffix) < full_ckp_commit_ts_) {
                     std::filesystem::remove(entry.path());
                     LOG_TRACE(Format("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str()));
                 }
@@ -571,11 +587,12 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_i
                                                  cmd.table_def->columns(),
                                                  txn_id,
                                                  commit_ts,
-                                                 nullptr);
+                                                 storage_->txn_manager());
     if (!result.Success()) {
-        Error<StorageException>("Wal Replay: Create table failed", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Wal Replay: Create table failed" + result.ToString(), __FILE_NAME__, __LINE__);
     }
-    result.entry_->Commit(commit_ts);
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
+    table_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts) {
@@ -622,7 +639,21 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
-    Error<NotImplementException>("WalCmdDropIndex Replay Not implemented", __FILE_NAME__, __LINE__);
+    auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name_, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        Error<StorageException>("Wal Replay: Get database failed" + db_entry_result.ToString(), __FILE_NAME__, __LINE__);
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto table_entry_result = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts);
+    if (!table_entry_result.Success()) {
+        Error<StorageException>("Wal Replay: Get table failed" + table_entry_result.ToString(), __FILE_NAME__, __LINE__);
+    }
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+    auto result = TableCollectionEntry::DropIndex(table_entry, cmd.index_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
+    if (!result.Success()) {
+        Error<StorageException>("Wal Replay: Drop index failed" + result.ToString(), __FILE_NAME__, __LINE__);
+    }
+    result.entry_->Commit(commit_ts);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) {
@@ -637,18 +668,26 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         Error<StorageException>("Wal Replay: Get table failed", __FILE_NAME__, __LINE__);
     }
     auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+    auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir);
+    auto segment_entry = SegmentEntry::MakeReplaySegmentEntry(table_entry, cmd.segment_id, segment_dir_ptr, commit_ts);
 
-    // get the segment entries id
-    auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry, cmd.segment_id, storage_->buffer_manager(), false);
-    segment_entry->min_row_ts_ = commit_ts;
-    segment_entry->max_row_ts_ = commit_ts;
     for (int id = 0; id < cmd.block_entries_size; ++id) {
-        auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(), id, 0, segment_entry->column_count_, storage_->buffer_manager());
-        block_entry->max_row_ts_ = commit_ts;
-        block_entry->min_row_ts_ = commit_ts;
-        block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
-        segment_entry->block_entries_.emplace_back(Move(block_entry));
+        auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(),
+                                                  id,
+                                                  0,
+                                                  segment_entry->column_count_,
+                                                  storage_->buffer_manager(),
+                                                  cmd.row_counts_[id],
+                                                  commit_ts,
+                                                  commit_ts);
+
+        segment_entry->block_entries_.emplace_back(std::move(block_entry));
+        segment_entry->row_count_ += cmd.row_counts_[id];
     }
+
+    table_entry->segments_.emplace(cmd.segment_id, std::move(segment_entry));
+    // ATTENTION: focusing on the segment id
+    table_entry->next_segment_id_++;
 }
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) {
     Error<NotImplementException>("WalCmdDelete Replay Not implemented", __FILE_NAME__, __LINE__);

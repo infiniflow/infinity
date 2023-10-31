@@ -139,7 +139,7 @@ void DataBlock::AppendValue(SizeT column_index, const Value &value) {
     finalized = false;
 }
 
-void DataBlock::AppendValueByPtr(SizeT column_index, const ptr_t value_ptr) {
+void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
     Assert<StorageException>(column_index < column_count_,
                              Format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_),
                              __FILE_NAME__,

@@ -2,6 +2,9 @@
 # description: Test insert
 # group: [dml, insert]
 
+statement ok
+DROP TABLE IF EXISTS products;
+
 # Parse only support
 statement ok
 CREATE TABLE products (product_no integer, price integer);

@@ -4,13 +4,14 @@
 
 module;
 
-#include <memory>
 #include <filesystem>
+#include <memory>
 
 import stl;
 import base_entry;
 import segment_entry;
 import default_values;
+import block_entry;
 import block_column_entry;
 import logger;
 import third_party;
@@ -23,7 +24,7 @@ import infinity_exception;
 module block_entry;
 namespace infinity {
 
-int32_t BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
+i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
     if (created_.empty())
         return 0;
     int idx = created_.size() - 1;
@@ -42,6 +43,7 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     std::ifstream ifs(version_path);
     if (!ifs.is_open()) {
         LOG_WARN(Format("Failed to open block_version file: {}", version_path));
+        // load the block_version file not exist return and create version
         return;
     }
     int buf_len = std::filesystem::file_size(version_path);
@@ -89,7 +91,35 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeS
     block_version_ = MakeUnique<BlockVersion>(row_capacity_);
 }
 
-i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows) {
+BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
+                       i16 block_id,
+                       TxnTimeStamp checkpoint_ts,
+                       u64 column_count,
+                       BufferManager *buffer_mgr,
+                       i16 row_count_,
+                       i16 min_row_ts_,
+                       i16 max_row_ts_)
+    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), checkpoint_ts_(checkpoint_ts),
+      row_capacity_(DEFAULT_VECTOR_SIZE), row_count_(row_count_), min_row_ts_(min_row_ts_), max_row_ts_(max_row_ts_) {
+
+    base_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir_, block_id);
+
+    columns_.reserve(column_count);
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        // For replay purposes not create a new column buffer handler
+        columns_.emplace_back(BlockColumnEntry::MakeNewBlockColumnEntry(this, column_id, buffer_mgr, true));
+    }
+
+    block_version_ = MakeUnique<BlockVersion>(row_capacity_);
+    block_version_->created_.emplace_back(std::make_pair(min_row_ts_, row_count_));
+}
+
+i16 BlockEntry::AppendData(BlockEntry *block_entry,
+                           Txn *txn_ptr,
+                           DataBlock *input_data_block,
+                           offset_t input_offset,
+                           i16 append_rows,
+                           BufferManager *buffer_mgr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
         block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
@@ -123,10 +153,11 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *inp
 
 void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-                  Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                              block_entry->segment_entry_->segment_id_,
-                              block_entry->block_id_), __FILE_NAME__, __LINE__);
+    Assert<StorageException>(
+        block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
+        Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
+        __FILE_NAME__,
+        __LINE__);
     block_entry->txn_ptr_ = txn_ptr;
     auto &block_version = block_entry->block_version_;
     block_version->deleted_[block_offset] = txn_ptr->CommitTS();
@@ -135,10 +166,11 @@ void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_off
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
 void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(block_entry->txn_ptr_ == txn_ptr,
-                  Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                              block_entry->segment_entry_->segment_id_,
-                              block_entry->block_id_), __FILE_NAME__, __LINE__);
+    Assert<StorageException>(
+        block_entry->txn_ptr_ == txn_ptr,
+        Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
+        __FILE_NAME__,
+        __LINE__);
     block_entry->txn_ptr_ = nullptr;
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     if (block_entry->min_row_ts_ == 0) {
@@ -154,7 +186,9 @@ void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
         block_entry->txn_ptr_ != nullptr,
-        Format("Expect txn_ptr_ not be nullptr of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_), __FILE_NAME__, __LINE__);
+        Format("Expect txn_ptr_ not be nullptr of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
+        __FILE_NAME__,
+        __LINE__);
     block_entry->txn_ptr_ = nullptr;
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     if (block_entry->min_row_ts_ == 0) {
@@ -253,9 +287,11 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const Json &block_entry_json, Segm
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
     block_entry->block_version_->LoadFromFile(*block_entry->base_dir_ + "/version");
+    // if not found version file
     if (block_entry->block_version_->created_.empty()) {
-        block_entry->block_version_->created_.push_back({block_entry->max_row_ts_, block_entry->row_count_});
-        FlushVersion(block_entry.get(), *block_entry->block_version_);
+        block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);
+        // FIXME Need to flush the version file?
+        // FlushVersion(block_entry.get(), *block_entry->block_version_);
     }
 
     return block_entry;
@@ -280,8 +316,14 @@ void BlockEntry::MergeFrom(BaseEntry &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(*this->base_dir_ == *block_entry2->base_dir_, "BlockEntry::MergeFrom requires base_dir_ match", __FILE_NAME__, __LINE__);
     Assert<StorageException>(this->block_id_ == block_entry2->block_id_, "BlockEntry::MergeFrom requires block_id_ match", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_, "BlockEntry::MergeFrom requires row_capacity_ match", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_, "BlockEntry::MergeFrom requires min_row_ts_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_,
+                             "BlockEntry::MergeFrom requires row_capacity_ match",
+                             __FILE_NAME__,
+                             __LINE__);
+    Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_,
+                             "BlockEntry::MergeFrom requires min_row_ts_ match",
+                             __FILE_NAME__,
+                             __LINE__);
 
     if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
         return;

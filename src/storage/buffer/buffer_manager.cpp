@@ -1,36 +1,20 @@
-//
-// Created by jinhai on 23-7-2.
-//
-
 module;
 
 #include "concurrentqueue.h"
 
 import stl;
-import buffer_handle;
-import logger;
+import file_worker;
 import third_party;
+import local_file_system;
 import infinity_assert;
 import infinity_exception;
-import default_values;
-import async_batch_processor;
-import buffer_task;
-import local_file_system;
+import buffer_obj;
 
 module buffer_manager;
 
 namespace infinity {
-
-BufferManager::BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
-    : mem_limit_(mem_limit), base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)) {}
-
-void BufferManager::Init() {
-    reader_ =
-        MakeUnique<AsyncBatchProcessor>(DEFAULT_READER_PREPARE_QUEUE_SIZE, DEFAULT_READER_COMMIT_QUEUE_SIZE, BufferIO::OnPrepare, BufferIO::OnCommit);
-
-    writer_ =
-        MakeUnique<AsyncBatchProcessor>(DEFAULT_WRITER_PREPARE_QUEUE_SIZE, DEFAULT_WRITER_COMMIT_QUEUE_SIZE, BufferIO::OnPrepare, BufferIO::OnCommit);
-
+BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
+    : memory_limit_(memory_limit), base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)), current_memory_size_(0) {
     LocalFileSystem fs;
     if (!fs.Exists(*base_dir_)) {
         fs.CreateDirectory(*base_dir_);
@@ -40,231 +24,64 @@ void BufferManager::Init() {
     }
 }
 
-BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, BufferType buffer_type) {
-    SharedPtr<String> full_name{};
-    if (file_dir.get() == nullptr or file_dir->empty()) {
-        full_name = filename;
-    } else {
-        full_name = MakeShared<String>(Format("{}/{}", *file_dir, *filename));
-    }
+BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
+    String file_path = file_worker->GetFilePath();
+    auto buffer_obj = MakeUnique<BufferObj>(this, true, Move(file_worker));
 
-    {
-        SharedLock<RWMutex> r_locker(rw_locker_);
-        if (buffer_map_.find(*full_name) != buffer_map_.end()) {
-            return &buffer_map_.at(*full_name);
-        }
-    }
+    rw_locker_.lock();
+    auto [iter, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
+    rw_locker_.unlock();
 
-    switch (buffer_type) {
-        case BufferType::kFaissIndex: {
-            LOG_TRACE("Read index file, Generate Buffer Handle");
-            UniqueLock<RWMutex> w_locker(rw_locker_);
-            const auto &[iter, insert_ok] = buffer_map_.emplace(*full_name, this);
-            Assert<StorageException>(insert_ok, "Insert buffer handle failed", __FILE_NAME__, __LINE__);
-            auto &[_full_name, buffer_handle] = *iter;
-            buffer_handle.id_ = next_buffer_id_++;
-            buffer_handle.base_dir_ = base_dir_;
-            buffer_handle.temp_dir_ = temp_dir_;
-            buffer_handle.current_dir_ = file_dir;
-            buffer_handle.file_name_ = filename;
-            buffer_handle.buffer_type_ = buffer_type;
-
-            return &buffer_handle;
-        }
-        case BufferType::kTempFaissIndex:
-        case BufferType::kTempFile: {
-            LOG_ERROR("Temp file meta data should be stored in buffer manager");
-            Error<NotImplementException>("Not implemented here", __FILE_NAME__, __LINE__);
-            break;
-        }
-        case BufferType::kFile: {
-            LOG_TRACE("Read file, Generate Buffer Handle");
-            UniqueLock<RWMutex> w_locker(rw_locker_);
-            auto iter = buffer_map_.emplace(*full_name, this);
-            iter.first->second.id_ = next_buffer_id_++;
-            iter.first->second.base_dir_ = this->base_dir_;
-            iter.first->second.temp_dir_ = this->temp_dir_;
-            iter.first->second.current_dir_ = file_dir;
-            iter.first->second.file_name_ = filename;
-            iter.first->second.buffer_type_ = buffer_type;
-
-            return &(iter.first->second);
-        }
-        case BufferType::kExtraBlock: {
-            LOG_TRACE("Read extra block, Generate Buffer Handle");
-            UniqueLock<RWMutex> w_locker(rw_locker_);
-            auto iter = buffer_map_.emplace(*full_name, this);
-            iter.first->second.base_dir_ = this->base_dir_;
-            iter.first->second.temp_dir_ = this->temp_dir_;
-            iter.first->second.current_dir_ = file_dir;
-            iter.first->second.file_name_ = filename;
-            iter.first->second.buffer_type_ = buffer_type;
-
-            return &(iter.first->second);
-        }
-        case BufferType::kInvalid: {
-            LOG_ERROR("Buffer type is invalid");
-            break;
-        }
-    }
-    return nullptr;
-}
-
-// BufferHandle *BufferManager::GetBufferHandle(const SharedPtr<String> &file_dir,
-//                                              const SharedPtr<String> &filename,
-//                                              offset_t offset,
-//                                              SizeT buffer_size,
-//                                              BufferType buffer_type) {
-//     SharedPtr<String> full_name{};
-//     if (file_dir == nullptr or file_dir->empty()) {
-//         full_name = filename;
-//     } else {
-//         full_name = MakeShared<String>(*file_dir + '/' + *filename);
-//     }
-
-//     {
-//         std::shared_lock<RWMutex> r_locker(rw_locker_);
-//         if (buffer_map_.find(*full_name) != buffer_map_.end()) {
-//             return &buffer_map_.at(*full_name);
-//         }
-//     }
-
-//     switch (buffer_type) {
-//         case BufferType::kTempFile: {
-//             LOG_ERROR("Temp file meta data should be stored in buffer manager")
-//             NotImplementError("Not implemented here") break;
-//         }
-//         case BufferType::kFile: {
-//             LOG_TRACE("Read file, Generate Buffer Handle");
-//             std::unique_lock<RWMutex> w_locker(rw_locker_);
-//             auto iter = buffer_map_.emplace(*full_name, this);
-//             iter.first->second.id_ = next_buffer_id_++;
-//             iter.first->second.base_dir_ = this->base_dir_;
-//             iter.first->second.temp_dir_ = this->temp_dir_;
-//             iter.first->second.current_dir_ = file_dir;
-//             iter.first->second.file_name_ = filename;
-//             iter.first->second.buffer_type_ = buffer_type;
-//             iter.first->second.offset_ = offset;
-//             iter.first->second.buffer_size_ = buffer_size;
-
-//             return &(iter.first->second);
-//         }
-//         case BufferType::kExtraBlock: {
-//             NotImplementError("Not implemented here")
-//                 //            LOG_TRACE("Read extra block, Generate Buffer Handle");
-//                 //            std::unique_lock<RWMutex> w_locker(rw_locker_);
-//                 //            auto iter = buffer_map_.emplace(*full_name, this);
-//                 //            iter.first->second.base_dir_ = this->base_dir_;
-//                 //            iter.first->second.temp_dir_ = this->temp_dir_;
-//                 //            iter.first->second.current_dir_ = file_dir;
-//                 //            iter.first->second.file_name_ = filename;
-//                 //            iter.first->second.buffer_type_ = buffer_type;
-//                 //
-//                 //            return &(iter.first->second);
-//                 break;
-//         }
-//         case BufferType::kInvalid:
-//         case BufferType::kTempFaissIndex:
-//         case BufferType::kFaissIndex: // Cannot load index file with offset
-//         {
-//             LOG_ERROR("Buffer type is invalid")
-//             break;
-//         }
-//     }
-//     return nullptr;
-// }
-/**
- *
- * @param file_dir  current dir i.e. table/segment
- * @param filename
- * @param buffer_size
- * @return
- */
-BufferHandle *
-BufferManager::AllocateBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, SizeT buffer_size, BufferType buffer_type) {
-    if (buffer_type != BufferType::kTempFile && buffer_type != BufferType::kTempFaissIndex) {
-        Error<StorageException>("Invalid buffer type.", __FILE_NAME__, __LINE__);
-    }
-    SharedPtr<String> full_name{};
-    if (file_dir.get() == nullptr or file_dir->empty()) {
-        full_name = filename;
-    } else {
-        full_name = MakeShared<String>(Format("{}/{}", *file_dir, *filename));
-    }
-
-    UniqueLock<RWMutex> w_locker(rw_locker_);
-    // call BufferHandle constructor here implicitly.
-    // `buffer_handle` here is newly constructed if `full_name` is not in buffer_map, or the existing one.
-    const auto &[iter, insert_ok] = buffer_map_.emplace(*full_name, this);
     if (!insert_ok) {
-        LOG_WARN("Buffer handle already exists. Get original one.");
-        return &iter->second;
+        Error<StorageException>("Buffer handle already exists. Use GET instead.", __FILE_NAME__, __LINE__);
     }
-
-    auto &buffer_handle = iter->second;
-
-    buffer_handle.id_ = next_buffer_id_++;
-    buffer_handle.base_dir_ = this->base_dir_;
-    buffer_handle.temp_dir_ = this->temp_dir_;
-    buffer_handle.current_dir_ = file_dir;
-    buffer_handle.file_name_ = filename;
-    buffer_handle.buffer_type_ = buffer_type;
-    buffer_handle.status_ = BufferStatus::kFreed;
-    buffer_handle.offset_ = 0;
-
-    // need to set the buffer size
-    buffer_handle.buffer_size_ = buffer_size;
-    return &buffer_handle;
+    return iter->second.get();
 }
 
+BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
+    String file_path = file_worker->GetFilePath();
 
-void BufferManager::PushGCQueue(BufferHandle *buffer_handle) { queue_.enqueue(buffer_handle); }
-// BufferHandle *
-// BufferManager::AllocateBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, offset_t offset, SizeT buffer_size) {
-//     SharedPtr<String> full_name{};
-//     if (file_dir == nullptr or file_dir->empty()) {
-//         full_name = filename;
-//     } else {
-//         full_name = MakeShared<String>(*file_dir + '/' + *filename);
-//     }
+    rw_locker_.lock_shared();
+    auto iter1 = buffer_map_.find(file_path);
+    rw_locker_.unlock_shared();
 
-//     std::unique_lock<RWMutex> w_locker(rw_locker_);
-//     // call BufferHandle constructor here.
-//     auto iter = buffer_map_.emplace(*full_name, this);
-//     // `buffer_handle` here is newly constructed if `full_name` is not in buffer_map, or the existing one.
-//     BufferHandle *buffer_handle = &iter.first->second;
-//     bool success = iter.second;
-//     buffer_handle->id_ = next_buffer_id_++;
-//     buffer_handle->base_dir_ = this->base_dir_;
-//     buffer_handle->temp_dir_ = this->temp_dir_;
-//     buffer_handle->current_dir_ = file_dir; // TODO: need to set the current dir table /segment
-//     buffer_handle->file_name_ = filename;
-//     buffer_handle->buffer_type_ = BufferType::kTempFile;
-//     buffer_handle->status_ = success ? BufferStatus::kFreed : BufferStatus::kLoaded;
-//     buffer_handle->offset_ = offset;
+    if (iter1 != buffer_map_.end()) {
+        return iter1->second.get();
+    }
 
-//     // need to set the buffer size
-//     buffer_handle->buffer_size_ = buffer_size;
-//     return buffer_handle;
-// }
+    // Cannot find BufferHandle in buffer_map, read from disk
+    auto buffer_obj = MakeUnique<BufferObj>(this, false, Move(file_worker));
 
-UniquePtr<String> BufferManager::Free(SizeT need_memory_size) {
-    while (current_memory_size_ + need_memory_size >= mem_limit_) {
-        // Need to GC
-        BufferHandle *dequeued_buffer_handle;
-        if (queue_.try_dequeue(dequeued_buffer_handle)) {
-            if (dequeued_buffer_handle == nullptr) {
-                Error<StorageException>("Null buffer handle", __FILE_NAME__, __LINE__);
-            } else {
-                dequeued_buffer_handle->FreeData();
+    rw_locker_.lock();
+    auto [iter2, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
+    // If insert_ok is false, it means another thread has inserted the same buffer handle. Return it.
+    rw_locker_.unlock();
+
+    return iter2->second.get();
+}
+
+void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
+    while (current_memory_size_ + need_size > memory_limit_) {
+        BufferObj *buffer_obj1 = nullptr;
+        if (gc_queue_.try_dequeue(buffer_obj1)) {
+            if (buffer_obj == buffer_obj1) {
+                Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.", __FILE_NAME__, __LINE__);
+                // prevent dead lock
+                continue;
+            }
+            if (buffer_obj1->Free()) {
+                current_memory_size_ -= buffer_obj1->GetBufferSize();
             }
         } else {
-            UniquePtr<String> err_msg = MakeUnique<String>("Out of memory");
-            LOG_ERROR(*err_msg);
-            return err_msg;
+            throw StorageException("Out of memory.");
         }
     }
-    return nullptr;
+    current_memory_size_ += need_size;
+}
+
+void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
+    // gc_queue_ is lock-free. No lock is needed.
+    gc_queue_.enqueue(buffer_obj);
 }
 
 } // namespace infinity

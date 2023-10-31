@@ -8,7 +8,6 @@ import stl;
 import base_entry;
 import parser;
 
-
 export module view_meta;
 
 namespace infinity {
@@ -16,8 +15,6 @@ namespace infinity {
 class TxnManager;
 
 class DBEntry;
-
-class BufferManager;
 
 export struct ViewMeta {
 public:

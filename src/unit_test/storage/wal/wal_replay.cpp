@@ -21,14 +21,14 @@ import table_collection_entry;
 import wal_entry;
 import infinity_exception;
 import infinity_assert;
+import column_vector;
+import physical_import;
+import txn;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override {
-        system("tree  /tmp/infinity");
-        system("rm -rf /tmp/infinity");
-    }
+    void TearDown() override { system("tree  /tmp/infinity"); }
 };
 
 using namespace infinity;
@@ -39,7 +39,7 @@ void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str
     T ele = DataType::StringToValue<T>(str_view);
     BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
 }
-}
+} // namespace
 
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {
@@ -354,6 +354,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
 
             txn->GetMetaTableState(read_table_meta.get(), "default", "tbl4", column_ids);
+            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
 
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
             EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
@@ -449,111 +450,107 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(result.entry_, nullptr);
             txn->CommitTxn();
         }
+
+        auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+        auto *txn2 = txn_mgr->CreateTxn();
+        txn2->BeginTxn();
+        auto result2 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
+        EXPECT_NE(result2.entry_, nullptr);
+        txn2->CommitTxn();
+
+        TxnTimeStamp tx4_commit_ts = txn2->CommitTS();
         {
-            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-            auto *txn2 = txn_mgr->CreateTxn();
-            txn2->BeginTxn();
-            auto result3 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
-            EXPECT_NE(result3.entry_, nullptr);
-            txn2->CommitTxn();
+            auto txn = txn_mgr->CreateTxn();
+            txn->BeginTxn();
+            txn->Checkpoint(tx4_commit_ts, true);
+            txn->CommitTxn();
         }
 
         {
-            auto *txn3 = txn_mgr->CreateTxn();
+            auto *txn = txn_mgr->CreateTxn();
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
 
-            txn3->BeginTxn();
-            auto result3 = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
+            txn->BeginTxn();
+            auto result3 = txn->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
             EXPECT_NE(result3.entry_, nullptr);
-            txn3->CommitTxn();
+            txn->CommitTxn();
         }
 
-        auto *txn4 = txn_mgr->CreateTxn();
-
         {
+            auto txn4 = txn_mgr->CreateTxn();
             txn4->BeginTxn();
 
             TableCollectionEntry *table_collection_entry = nullptr;
-            txn4->GetTableEntry("default", "tbl1", table_collection_entry);
+            auto table_collection_entry_result = txn4->GetTableEntry("default", "tbl1", table_collection_entry);
             EXPECT_NE(table_collection_entry, nullptr);
+            const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry)->db_name_;
+            const String &table_name = *table_collection_entry->table_collection_name_;
+            u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry);
+            EXPECT_EQ(segment_id, 0);
+            auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry, segment_id, buffer_manager);
+            EXPECT_EQ(segment_entry->segment_id_, 0);
+            auto last_block_entry = segment_entry->block_entries_.back().get();
             txn4->AddTxnTableStore("tbl1", MakeUnique<TxnTableStore>("tbl1", table_collection_entry, txn4));
 
-            TxnTableStore *txn_store = txn4->GetTxnTableStore("tbl1");
-            EXPECT_NE(txn_store, nullptr);
-
-            u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry);
-            auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry, segment_id, buffer_manager);
-
-            // process segment entry
-
-            BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-
-            SizeT need_write_row = 1;
-            Vector<StringView> write_data{"1", "22", "3.33"};
-            for (SizeT column_idx = 0; column_idx < /*column_count*/ 3; ++column_idx) {
-                BlockColumnEntry *block_column_entry = last_block_entry->columns_[column_idx].get();
-                auto column_type = block_column_entry->column_type_.get();
-                SizeT dst_offset = need_write_row * column_type->Size();
-                // test data
-                // 1 22 3.33
-                switch (column_type->type()) {
-                    case kBoolean: {
-                        AppendSimpleData<BooleanT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kTinyInt: {
-                        AppendSimpleData<TinyIntT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kSmallInt: {
-                        AppendSimpleData<SmallIntT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kInteger: {
-                        AppendSimpleData<IntegerT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kBigInt: {
-                        AppendSimpleData<BigIntT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kFloat: {
-                        AppendSimpleData<FloatT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kDouble: {
-                        AppendSimpleData<DoubleT>(block_column_entry, write_data[column_idx], dst_offset);
-                        break;
-                    }
-                    case kMissing:
-                    case kInvalid: {
-                        Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
-                    }
-                    default: {
-                        Error<NotImplementException>("Not supported now in append data in column", __FILE_NAME__, __LINE__);
-                    }
-                }
+            Vector<SharedPtr<ColumnVector>> columns_vector;
+            {
+                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(LogicalType::kTinyInt));
+                column_vector->Initialize();
+                Value v = Value::MakeTinyInt(static_cast<TinyIntT>(1));
+                column_vector->AppendValue(v);
+                columns_vector.push_back(column_vector);
+            }
+            {
+                SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kBigInt));
+                column->Initialize();
+                Value v = Value::MakeBigInt(static_cast<BigIntT>(22));
+                column->AppendValue(v);
+                columns_vector.push_back(column);
+            }
+            {
+                SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kDouble));
+                column->Initialize();
+                Value v = Value::MakeDouble(static_cast<DoubleT>(f64(3)) + 0.33f);
+                column->AppendValue(v);
+                columns_vector.push_back(column);
             }
 
-            ++last_block_entry->row_count_;
-            ++segment_entry->row_count_;
+            {
+                auto block_column_entry1 = last_block_entry->columns_[0].get();
+                auto column_type1 = block_column_entry1->column_type_.get();
+                EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
+                SizeT data_type_size = columns_vector[0]->data_type_size_;
+                EXPECT_EQ(data_type_size, 1);
+                ptr_t src_ptr = columns_vector[0].get()->data();
+                SizeT data_size = 1 * data_type_size;
+                BlockColumnEntry::AppendRaw(block_column_entry1, 0, src_ptr, data_size);
+            }
+            {
+                auto block_column_entry2 = last_block_entry->columns_[1].get();
+                auto column_type2 = block_column_entry2->column_type_.get();
+                EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
+                SizeT data_type_size = columns_vector[1]->data_type_size_;
+                EXPECT_EQ(data_type_size, 8);
+                ptr_t src_ptr = columns_vector[1].get()->data();
+                SizeT data_size = 1 * data_type_size;
+                BlockColumnEntry::AppendRaw(block_column_entry2, 0, src_ptr, data_size);
+            }
+            {
+                auto block_column_entry3 = last_block_entry->columns_[2].get();
+                auto column_type3 = block_column_entry3->column_type_.get();
+                EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
+                SizeT data_type_size = columns_vector[2]->data_type_size_;
+                EXPECT_EQ(data_type_size, 8);
+                ptr_t src_ptr = columns_vector[2].get()->data();
+                SizeT data_size = 1 * data_type_size;
+                BlockColumnEntry::AppendRaw(block_column_entry3, 0, src_ptr, data_size);
+            }
 
-            txn4->AddWalCmd(MakeShared<WalCmdImport>("default",
-                                                     "tbl1",
-                                                     *segment_entry->segment_dir_,
-                                                     segment_entry->segment_id_,
-                                                     segment_entry->block_entries_.size()));
-            txn_store->Import(segment_entry);
+            last_block_entry->row_count_ = 1;
+            segment_entry->row_count_ = 1;
+
+            PhysicalImport::SaveSegmentData(txn4, segment_entry, "default", "tbl1");
             txn4->CommitTxn();
-        }
-
-        i64 tx4_commit_ts = txn4->CommitTS();
-
-        {
-            auto *txn6 = txn_mgr->CreateTxn();
-            txn6->BeginTxn();
-            txn6->Checkpoint(tx4_commit_ts, true);
-            txn6->CommitTxn();
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -572,71 +569,42 @@ TEST_F(WalReplayTest, WalReplayImport) {
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
 
-        Vector<SharedPtr<ColumnDef>> columns;
         {
-            i64 column_id = 0;
-            {
-                HashSet<ConstraintType> constraints;
-                constraints.insert(ConstraintType::kUnique);
-                constraints.insert(ConstraintType::kNotNull);
-                auto column_def_ptr =
-                    MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
-                columns.emplace_back(column_def_ptr);
-            }
-        }
-        {
-            auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
-            auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
-            auto result = txn->CreateTable("default", Move(tbl5_def), ConflictType::kIgnore);
-            EXPECT_NE(result.entry_, nullptr);
-            txn->CommitTxn();
-        }
-        {
-            auto *txn = txn_mgr->CreateTxn();
+            auto txn = txn_mgr->CreateTxn();
             txn->BeginTxn();
             Vector<ColumnID> column_ids{0, 1, 2};
-            UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
+            TableCollectionEntry *table_collection_entry = nullptr;
+            txn->GetTableEntry("default", "tbl1", table_collection_entry);
+            EXPECT_NE(table_collection_entry, nullptr);
+            auto segment_entry = table_collection_entry->segments_[0].get();
+            EXPECT_EQ(segment_entry->segment_id_, 0);
+            auto block_id = segment_entry->block_entries_[0]->block_id_;
+            EXPECT_EQ(block_id, 0);
+            auto block_entry = segment_entry->block_entries_[0].get();
+            EXPECT_EQ(block_entry->row_count_, 1);
 
-            txn->GetMetaTableState(read_table_meta.get(), "default", "tbl1", column_ids);
+            BlockColumnEntry *column0 = block_entry->columns_[0].get();
+            BlockColumnEntry *column1 = block_entry->columns_[1].get();
+            BlockColumnEntry *column2 = block_entry->columns_[2].get();
 
-            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
-            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
-            for (const auto &segment_pair : read_table_meta->segment_map_) {
-                EXPECT_EQ(segment_pair.first, 0);
-                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-                for (const auto &block_pair : segment_pair.second.block_map_) {
-                    EXPECT_NE(block_pair.second.block_entry_, nullptr);
+            ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_manager);
+            col0_obj.GetAll();
+            DataType *col0_type = column0->column_type_.get();
+            i8 *col0_ptr = (i8 *)(col0_obj.GetValueAt(0, *col0_type));
+            EXPECT_EQ(*col0_ptr, (1));
 
-                    EXPECT_EQ(block_pair.second.column_data_map_.size(), 3);
-                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(0));
-                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(1));
-                    EXPECT_TRUE(block_pair.second.column_data_map_.contains(2));
+            ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_manager);
+            DataType *col1_type = column1->column_type_.get();
+            i8 *col1_ptr = (i8 *)(col1_obj.GetValueAt(0, *col1_type));
+            EXPECT_EQ(*col1_ptr, (i64)(22));
 
-                    BlockColumnEntry *column0 = block_pair.second.column_data_map_.at(0).block_column_;
-                    BlockColumnEntry *column1 = block_pair.second.column_data_map_.at(1).block_column_;
-                    BlockColumnEntry *column2 = block_pair.second.column_data_map_.at(2).block_column_;
+            ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_manager);
+            DataType *col2_type = column2->column_type_.get();
+            EXPECT_EQ(col2_type->type(), LogicalType::kDouble);
+            f64 *col2_ptr = (f64 *)(col2_obj.GetValueAt(0, *col2_type));
+            EXPECT_EQ(col2_ptr[0], (f64)(3) + 0.33f);
 
-                    SizeT row_count = block_pair.second.block_entry_->row_count_;
-                    ColumnBuffer col0_obj = BlockColumnEntry::GetColumnData(column0, buffer_manager);
-                    i8 *col0_ptr = (i8 *)(col0_obj.GetAll());
-                    for (SizeT row = 0; row < row_count; ++row) {
-                        EXPECT_EQ(col0_ptr[row], (i8)(row));
-                    }
-
-                    ColumnBuffer col1_obj = BlockColumnEntry::GetColumnData(column1, buffer_manager);
-                    i64 *col1_ptr = (i64 *)(col1_obj.GetAll());
-                    for (SizeT row = 0; row < row_count; ++row) {
-                        EXPECT_EQ(col1_ptr[row], (i64)(row));
-                    }
-
-                    ColumnBuffer col2_obj = BlockColumnEntry::GetColumnData(column2, buffer_manager);
-                    f64 *col2_ptr = (f64 *)(col2_obj.GetAll());
-                    for (SizeT row = 0; row < row_count; ++row) {
-                        EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);
-                    }
-                }
-            }
+            txn->CommitTxn();
         }
 
         infinity::InfinityContext::instance().UnInit();

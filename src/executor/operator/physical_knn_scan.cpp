@@ -46,15 +46,11 @@ void PhysicalKnnScan::Execute(QueryContext *query_context, InputState *input_sta
             break;
         }
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid element data type",
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented",
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
         }
     }
 }
@@ -153,7 +149,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
-                    ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
+                    const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
                     output_state->data_block_->AppendValueByPtr(column_id, ptr);
                 }
 

@@ -629,91 +629,91 @@ String ColumnVector::ToString() const {
     switch (data_type_->type()) {
         case kBoolean: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((BooleanT *)data_ptr_)[row_index] ? "true" : "false") << std::endl;;
+                ss << (((BooleanT *)data_ptr_)[row_index] ? "true" : "false") << std::endl;
             }
             break;
         }
         case kTinyInt: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((TinyIntT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((TinyIntT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kSmallInt: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((SmallIntT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((SmallIntT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kInteger: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((IntegerT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((IntegerT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kBigInt: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((BigIntT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((BigIntT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kHugeInt: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((HugeIntT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((HugeIntT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kFloat: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((FloatT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((FloatT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kDouble: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((DoubleT *)data_ptr_)[row_index]) << std::endl;;
+                ss << (((DoubleT *)data_ptr_)[row_index]) << std::endl;
             }
             break;
         }
         case kDecimal: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DecimalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((DecimalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kVarchar: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((VarcharT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((VarcharT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kDate: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kTime: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((TimeT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((TimeT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kDateTime: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kTimestamp: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((TimestampT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((TimestampT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kInterval: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((IntervalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((IntervalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
@@ -725,79 +725,79 @@ String ColumnVector::ToString() const {
         }
         case kPoint: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((PointT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((PointT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kLine: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((LineT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((LineT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kLineSeg: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((LineSegT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((LineSegT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kBox: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((BoxT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((BoxT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kPath: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((PathT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((PathT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kPolygon: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((PolygonT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((PolygonT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kCircle: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((CircleT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((CircleT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kBitmap: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((BitmapT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((BitmapT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kUuid: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((UuidT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((UuidT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kBlob: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((BlobT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((BlobT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kEmbedding: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((EmbeddingT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((EmbeddingT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kRowID: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((RowT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((RowT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
         case kMixed: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((MixedT *)data_ptr_)[row_index].ToString().c_str() << std::endl;;
+                ss << ((MixedT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
             }
             break;
         }
@@ -1238,7 +1238,7 @@ void ColumnVector::Finalize(SizeT index) {
     tail_index_ = index;
 }
 
-void ColumnVector::SetByRawPtr(SizeT index, const ptr_t raw_ptr) {
+void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
     Assert<StorageException>(index <= capacity_,
                              Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_),
@@ -1436,7 +1436,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const ptr_t raw_ptr) {
     }
 }
 
-void ColumnVector::SetByPtr(SizeT index, const ptr_t value_ptr) {
+void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
     // We assume the value_ptr point to the same type data.
     if (data_type()->type() == LogicalType::kEmbedding) {
         auto *embedding_ptr = (EmbeddingT *)(value_ptr);
@@ -1461,7 +1461,7 @@ void ColumnVector::AppendValue(const Value &value) {
     SetValue(tail_index_++, value);
 }
 
-void ColumnVector::AppendByRawPtr(const ptr_t raw_ptr) {
+void ColumnVector::AppendByRawPtr(const_ptr_t raw_ptr) {
     Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
     if (vector_type_ == ColumnVectorType::kConstant) {
         Assert<StorageException>(tail_index_ < 1,
@@ -1475,7 +1475,7 @@ void ColumnVector::AppendByRawPtr(const ptr_t raw_ptr) {
     SetByRawPtr(tail_index_++, raw_ptr);
 }
 
-void ColumnVector::AppendByPtr(const ptr_t value_ptr) {
+void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
 
     if (data_type_->type() == LogicalType::kEmbedding) {
         AppendByRawPtr(value_ptr);
@@ -1849,8 +1849,8 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
         case kUuid:
         case kEmbedding:
         case kRowID: {
-            ptr_t ptr = column_buffer.GetAll();
-            ptr_t src_ptr = ptr + start_row * data_type_size_;
+            const_ptr_t ptr = column_buffer.GetAll();
+            const_ptr_t src_ptr = ptr + start_row * data_type_size_;
             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
             Memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
             this->tail_index_ += appended_rows;
@@ -2051,9 +2051,9 @@ i32 ColumnVector::GetSizeInBytes() const {
 void ColumnVector::WriteAdv(char *&ptr) const {
     Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
     Assert<NotImplementException>(vector_type_ == ColumnVectorType::kFlat || vector_type_ == ColumnVectorType::kConstant,
-                                 Format("Not supported vector_type {}", int(vector_type_)),
-                                 __FILE_NAME__,
-                                 __LINE__);
+                                  Format("Not supported vector_type {}", int(vector_type_)),
+                                  __FILE_NAME__,
+                                  __LINE__);
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     switch (data_type_->type()) {
