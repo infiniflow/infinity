@@ -185,7 +185,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-                auto block_data_ptr = reinterpret_cast<float *>(buffer_handle.GetDataMut());
+                auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);
