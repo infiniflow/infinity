@@ -111,8 +111,20 @@ QueryResult Infinity::ListDatabases() {
 QueryResult Infinity::DescribeDatabase(const String &db_name) {}
 
 SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
-
-    return MakeShared<Database>("db_name");
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+//    query_context_ptr->set_current_schema(session_->current_database());
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
+    QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
+    if(response.result_msg_.get() == nullptr) {
+        return MakeShared<Database>(db_name);
+    } else {
+        return nullptr;
+    }
 }
 
 } // namespace infinity

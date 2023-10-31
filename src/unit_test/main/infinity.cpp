@@ -70,6 +70,12 @@ TEST_F(InfinityTest, test1) {
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
 
+        SharedPtr<Database> db1_ptr = infinity->GetDatabase("db1");
+        EXPECT_EQ(db1_ptr->db_name(), "db1");
+
+        SharedPtr<Database> db2_ptr = infinity->GetDatabase("db2");
+        EXPECT_EQ(db2_ptr, nullptr);
+
         DropDatabaseOptions drop_db_opts;
         result = infinity->DropDatabase("db1", drop_db_opts);
         EXPECT_TRUE(result.IsOk());

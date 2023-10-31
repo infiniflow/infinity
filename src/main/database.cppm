@@ -26,6 +26,8 @@ public:
 
     SharedPtr<Table> GetDatabase(const String &table_name);
 
+    [[nodiscard]] const String &db_name() const { return db_name_; }
+
 private:
     String db_name_{};
 };
