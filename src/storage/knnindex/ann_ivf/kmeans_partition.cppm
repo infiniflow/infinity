@@ -1,6 +1,7 @@
 
 module;
 
+#include <bits/random.h>
 #include <cstring>
 #include <mm_malloc.h>
 
@@ -22,15 +23,6 @@ export module kmeans_partition;
 
 namespace infinity {
 
-template <typename DistType>
-void random_fill_centroid(i32 dimension, i32 vector_count, const DistType *vectors_ptr, i32 partition_num, DistType *centroids_ptr) {
-    for (i32 i = 0; i < partition_num; ++i) {
-        // TODO: choose wisely. maybe the same?
-        i32 random_index = rand() % vector_count;
-        memcpy(centroids_ptr + i * dimension, vectors_ptr + random_index * dimension, dimension * sizeof(DistType));
-    }
-}
-
 template <typename DiffType, typename DistType>
 Pair<i32, DiffType> l2_find_nearest_centroid(i32 dimension, const DistType *vector_ptr, i32 partition_num, const DistType *centroids_ptr) {
     i32 nearest_centroid_id = -1;
@@ -43,6 +35,39 @@ Pair<i32, DiffType> l2_find_nearest_centroid(i32 dimension, const DistType *vect
         }
     }
     return {nearest_centroid_id, nearest_distance};
+}
+
+template <typename DistType>
+void random_fill_centroid(i32 dimension, i32 vector_count, const DistType *vectors_ptr, i32 partition_num, DistType *centroids_ptr) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<i32> dis(0, vector_count - 1);
+    std::uniform_real_distribution<f32> choose_bar(0.0, 1.0);
+    Vector<f32> dist_v(vector_count);
+    i32 first_index = dis(gen);
+    memcpy(centroids_ptr, vectors_ptr + first_index * dimension, dimension * sizeof(DistType));
+    for (i32 i = 1; i < partition_num; ++i) {
+        f32 total_dist = 0;
+        f32 random_bar = choose_bar(gen);
+        for (i32 j = 0; j < vector_count; ++j) {
+            auto [_, distance] = l2_find_nearest_centroid<f32>(dimension, vectors_ptr + j * dimension, i, centroids_ptr);
+            dist_v[j] = distance;
+            total_dist += distance;
+        }
+        f32 partial_dist = 0;
+        i32 random_index = -1;
+        for (i32 j = 0; j < vector_count; ++j) {
+            partial_dist += dist_v[j] / total_dist;
+            if (partial_dist >= random_bar) {
+                random_index = j;
+                break;
+            }
+        }
+        if (random_index == -1) {
+            random_index = vector_count - 1;
+        }
+        memcpy(centroids_ptr + i * dimension, vectors_ptr + random_index * dimension, dimension * sizeof(DistType));
+    }
 }
 
 export template <typename DistType>
