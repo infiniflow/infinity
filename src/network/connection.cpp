@@ -69,7 +69,7 @@ void Connection::HandleConnection() {
 void Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
-// FIXME
+    // FIXME
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().fragment_scheduler(),
@@ -299,10 +299,6 @@ void Connection::SendQueryResponse(const QueryResponse &query_response) {
         }
         case LogicalNodeType::kUpdate: {
             message = "UPDATE -1";
-            break;
-        }
-        case LogicalNodeType::kDelete: {
-            message = "DELETE -1";
             break;
         }
         case LogicalNodeType::kImport: {

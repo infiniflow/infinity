@@ -12,6 +12,7 @@ import bind_context;
 import infinity_assert;
 import infinity_exception;
 import query_binder;
+import bound_delete_statement;
 import bound_select_statement;
 import insert_binder;
 import logical_insert;
@@ -31,6 +32,7 @@ import logical_create_collection;
 import logical_create_schema;
 import logical_create_view;
 import logical_create_index;
+import logical_delete;
 import logical_drop_table;
 import logical_drop_collection;
 import logical_drop_schema;
@@ -275,7 +277,20 @@ void LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<Bin
 }
 
 void LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
+    if (statement->where_expr_ == nullptr) {
+        // Rewrite to a DropStatement
+        DropStatement statement2;
+        auto drop_table_info = MakeShared<DropTableInfo>();
+        drop_table_info->schema_name_ = statement->schema_name_;
+        drop_table_info->table_name_ = statement->table_name_;
+        drop_table_info->conflict_type_ = ConflictType::kError;
+        statement2.drop_info_ = drop_table_info;
+        LogicalPlanner::BuildDrop(&statement2, bind_context_ptr);
+        return;
+    }
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    SharedPtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
+    this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
 }
 
 void LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {

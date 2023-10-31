@@ -119,6 +119,12 @@ public:
     // return value: appended rows actually
     SizeT AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count);
 
+    // input parameter:
+    // from - start RowID
+    // count - total row count to be copied. These rows shall be in the same BlockEntry.
+    // return value: appended rows actually
+    SizeT AppendWith(RowT from, SizeT count);
+
     void ShallowCopy(const ColumnVector &other);
 
     // Enlarge the column vector capacity.

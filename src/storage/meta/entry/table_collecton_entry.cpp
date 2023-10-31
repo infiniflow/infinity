@@ -4,10 +4,8 @@
 
 module;
 
-#include <string>
-#include <vector>
-
 import stl;
+import std;
 import parser;
 import base_entry;
 import table_collection_meta;
@@ -168,7 +166,7 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
                     SegmentEntry::MakeNewSegmentEntry(table_entry, TableCollectionEntry::GetNextSegmentID(table_entry), buffer_mgr);
                 table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
                 table_entry->unsealed_segment_ = new_segment.get();
-                LOG_TRACE("Add a new segment");
+                LOG_TRACE(Format("Created a new segment {}", new_segment->segment_id_));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
@@ -221,16 +219,19 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     }
 }
 
-UniquePtr<String>
-TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
+UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
     for (auto it = delete_state.rows_.begin(); it != delete_state.rows_.end(); ++it) {
-        u64 segment_id = it->first;
-        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        RowID key(it->first);
+        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, key.segment_id_);
         if (segment == nullptr)
             continue;
-        const auto &rows = it->second;
-        SegmentEntry::DeleteData(segment, txn_ptr, rows, buffer_mgr);
-        LOG_TRACE(Format("Table {} Segment {} is deleted {} rows", *table_entry->table_collection_name_, segment->segment_id_, rows.size()));
+        auto &rows = it->second;
+        SegmentEntry::DeleteData(segment, txn_ptr, key.block_id_, rows);
+        LOG_TRACE(Format("Table {} Segment {} Block {} has deleted {} rows",
+                         *table_entry->table_collection_name_,
+                         key.segment_id_,
+                         key.block_id_,
+                         rows.size()));
     }
     return nullptr;
 }
@@ -247,7 +248,6 @@ TableCollectionEntry::Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, cons
 }
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
-
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE(
             Format("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_));
@@ -269,10 +269,14 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
     Error<NotImplementException>("TableCollectionEntry::RollbackAppend", __FILE_NAME__, __LINE__);
 }
 
-UniquePtr<String>
-TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
-    Error<StorageException>("TableCollectionEntry::CommitDelete", __FILE_NAME__, __LINE__);
-    return nullptr;
+void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
+    for (auto it = delete_state.rows_.begin(); it != delete_state.rows_.end(); ++it) {
+        RowID key(it->first);
+        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, key.segment_id_);
+        if (segment == nullptr)
+            continue;
+        SegmentEntry::CommitDelete(segment, txn_ptr, key.block_id_);
+    }
 }
 
 UniquePtr<String>
@@ -412,10 +416,13 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
     table_entry->table_entry_dir_ = table_entry_dir;
     if (table_entry_json.contains("segments")) {
+        i32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
+            max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
+        table_entry->unsealed_segment_ = table_entry->segments_[max_segment_id].get();
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
@@ -457,13 +464,18 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
                              __LINE__);
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
+    u64 max_segment_id = 0;
     for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
+        max_segment_id = Max(max_segment_id, seg_id);
         auto it = this->segments_.find(seg_id);
         if (it == this->segments_.end()) {
             this->segments_.emplace(seg_id, sgement_entry2);
         } else {
             it->second->MergeFrom(*sgement_entry2.get());
         }
+    }
+    if (this->unsealed_segment_ == nullptr) {
+        this->unsealed_segment_ = this->segments_[max_segment_id].get();
     }
 }
 

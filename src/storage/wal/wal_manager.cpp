@@ -486,7 +486,10 @@ int64_t WalManager::ReplayWalFile() {
     }
 
     for (; replay_count < replay_entries.size(); ++replay_count) {
-        Assert<StorageException>(replay_entries[replay_count]->commit_ts > max_commit_ts, "Wal Replay: Commit ts should be greater than max commit ts", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(replay_entries[replay_count]->commit_ts > max_commit_ts,
+                                 "Wal Replay: Commit ts should be greater than max commit ts",
+                                 __FILE_NAME__,
+                                 __LINE__);
         last_commit_ts = replay_entries[replay_count]->commit_ts;
         last_txn_id = replay_entries[replay_count]->txn_id;
         if (replay_entries[replay_count]->IsCheckPoint()) {
@@ -690,8 +693,24 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
     table_entry->next_segment_id_++;
 }
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) {
-    Error<NotImplementException>("WalCmdDelete Replay Not implemented", __FILE_NAME__, __LINE__);
+    auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts);
+    if (!db_entry_result.Success()) {
+        Error<StorageException>("Wal Replay: Get database failed", __FILE_NAME__, __LINE__);
+    }
+    auto db_entry = dynamic_cast<DBEntry *>(db_entry_result.entry_);
+    auto table_entry_result = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
+    if (!table_entry_result.Success()) {
+        Error<StorageException>("Wal Replay: Get table failed", __FILE_NAME__, __LINE__);
+    }
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
+    auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto table_store = MakeShared<TxnTableStore>(cmd.table_name, table_entry, fake_txn.get());
+    table_store->Delete(cmd.row_ids);
+    fake_txn->FakeCommit(commit_ts);
+    TableCollectionEntry::Delete(table_store->table_entry_, table_store->txn_, table_store->delete_state_);
+    TableCollectionEntry::CommitDelete(table_store->table_entry_, table_store->txn_, table_store->delete_state_);
 }
+
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts) {
     auto db_entry_result = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts);
     if (!db_entry_result.Success()) {
@@ -712,6 +731,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
     table_store->append_state_ = Move(append_state);
 
+    fake_txn->FakeCommit(commit_ts);
     TableCollectionEntry::Append(table_store->table_entry_, table_store->txn_, table_store.get(), storage_->buffer_manager());
     TableCollectionEntry::CommitAppend(table_store->table_entry_, table_store->txn_, table_store->append_state_.get());
 }

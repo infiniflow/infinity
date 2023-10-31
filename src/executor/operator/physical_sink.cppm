@@ -56,6 +56,8 @@ private:
 
     void FillSinkStateFromLastOutputState(MessageSinkState *message_sink_state, OutputState *task_output_state);
 
+    void FillSinkStateFromLastOutputState(SummarySinkState *message_sink_state, OutputState *task_output_state);
+
     void FillSinkStateFromLastOutputState(QueueSinkState *queue_sink_state, OutputState *task_output_state);
 
 private:

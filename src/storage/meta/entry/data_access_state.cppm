@@ -26,7 +26,7 @@ export struct AppendRange {
 export struct AppendState {
     explicit AppendState(const Vector<SharedPtr<DataBlock>> &blocks) : blocks_(blocks), current_count_(0) {
         SizeT block_count = blocks.size();
-        for(SizeT idx = 0; idx < block_count; ++ idx) {
+        for (SizeT idx = 0; idx < block_count; ++idx) {
             total_count_ += blocks[idx]->row_count();
         }
     }
@@ -48,7 +48,7 @@ export struct ImportState {
 };
 
 export struct DeleteState {
-    HashMap<u64, Vector<RowID>> rows_;
+    HashMap<u64, Vector<RowID>> rows_; // key is pair<segment_id, block_id>
 };
 
 export struct GetState {};

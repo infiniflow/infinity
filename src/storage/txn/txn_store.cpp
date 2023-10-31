@@ -84,12 +84,13 @@ UniquePtr<String> TxnTableStore::CreateIndexFile(u64 segment_id, SharedPtr<Index
 UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
     auto &rows = delete_state_.rows_;
     for (auto row_id : row_ids) {
-        auto it = rows.find(row_id.segment_id_);
+        u64 key = RowID(row_id.segment_id_, row_id.block_id_, 0).ToUint64();
+        auto it = rows.find(key);
         if (it != rows.end()) {
             it->second.push_back(row_id);
         } else {
             Vector<RowID> tmp_rows = {row_id};
-            rows.emplace(row_id.segment_id_, tmp_rows);
+            rows.emplace(key, tmp_rows);
         }
     }
     return nullptr;
@@ -118,13 +119,13 @@ void TxnTableStore::PrepareCommit() {
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
     SizeT segment_count = uncommitted_segments_.size();
-    for(SizeT seg_idx = 0; seg_idx < segment_count; ++ seg_idx) {
+    for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
         const auto &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
         TableCollectionEntry::ImportSegment(table_entry_, txn_, uncommitted);
     }
 
-    TableCollectionEntry::Delete(table_entry_, txn_, delete_state_, txn_ptr->GetBufferMgr());
+    TableCollectionEntry::Delete(table_entry_, txn_, delete_state_);
 
     TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
 
@@ -136,6 +137,7 @@ void TxnTableStore::PrepareCommit() {
  */
 void TxnTableStore::Commit() const {
     TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
+    TableCollectionEntry::CommitDelete(table_entry_, txn_, delete_state_);
 }
 
 } // namespace infinity

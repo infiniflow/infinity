@@ -2,7 +2,6 @@
 // Created by JinHai on 2022/9/15.
 //
 
-
 module;
 
 import stl;
@@ -22,11 +21,13 @@ export module operator_state;
 namespace infinity {
 
 export struct OutputState {
-    inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
+    inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type), count_(0), sum_(0) {}
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
     UniquePtr<String> error_message_{};
+    u64 count_;
+    u64 sum_;
 
     bool complete_{false};
 
@@ -335,13 +336,11 @@ export struct CreateTableOutputState : public OutputState {
 };
 
 export struct CreateIndexInputState : public InputState {
-    inline explicit
-    CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
+    inline explicit CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
 };
 
 export struct CreateIndexOutputState : public OutputState {
-    inline explicit
-    CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
+    inline explicit CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
 };
 
 // Create Collection
@@ -459,10 +458,12 @@ export enum class SinkStateType {
     kMaterialize,
     kResult,
     kMessage,
+    kSummary,
     kQueue,
 };
 
 export struct SinkState {
+    virtual ~SinkState(){};
     inline explicit SinkState(SinkStateType state_type) : state_type_(state_type) {}
 
     inline void SetPrevState(OutputState *prev_state) { prev_output_state_ = prev_state; }
@@ -499,6 +500,13 @@ export struct MessageSinkState : public SinkState {
     inline explicit MessageSinkState() : SinkState(SinkStateType::kMessage) {}
 
     UniquePtr<String> message_{};
+};
+
+export struct SummarySinkState : public SinkState {
+    inline explicit SummarySinkState() : SinkState(SinkStateType::kSummary), count_(0), sum_(0) {}
+
+    u64 count_;
+    u64 sum_;
 };
 
 // Source

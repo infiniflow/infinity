@@ -40,13 +40,10 @@ void ExplainFragment::Explain(PlanFragment *fragment_ptr, SharedPtr<Vector<Share
         ExplainPhysicalPlan::Explain(fragment_ptr->GetSourceNode(), result, false, intent_size);
     }
 
-    intent_size += 2;
-
     // NOTE: recursive call this function to explain child fragment
     if (!fragment_ptr->Children().empty()) {
         for (auto &child : fragment_ptr->Children()) {
-            intent_size += 2;
-            ExplainFragment::Explain(child.get(), result, intent_size);
+            ExplainFragment::Explain(child.get(), result, intent_size + 2);
         }
     }
 }

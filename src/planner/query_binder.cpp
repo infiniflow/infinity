@@ -17,6 +17,7 @@ import query_context;
 import binding;
 import table_collection_entry;
 import bound_select_statement;
+import bound_delete_statement;
 import table_ref;
 import bind_alias_proxy;
 import base_expression;
@@ -269,6 +270,7 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     }
 
     Error<PlannerException>("Table or View: " + from_table->table_name_ + " is not found in catalog.", __FILE_NAME__, __LINE__);
+    return nullptr;
 }
 
 SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *query_context, const SubqueryReference *subquery_ref) {
@@ -902,6 +904,26 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
             Error<PlannerException>("Invalid KNN distance type", __FILE_NAME__, __LINE__);
         }
     }
+}
+
+SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
+    // refers to QueryBinder::BindSelect
+    SharedPtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
+    TableReference from_table;
+    from_table.db_name_ = statement.schema_name_;
+    from_table.table_name_ = statement.table_name_;
+    SharedPtr<TableRef> base_table_ref = QueryBinder::BuildBaseTable(this->query_context_ptr_, &from_table);
+    bound_delete_statement->table_ref_ptr_ = base_table_ref;
+    Assert<PlannerException>(base_table_ref.get() != nullptr,
+                             Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_),
+                             __FILE_NAME__,
+                             __LINE__);
+
+    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
+    SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+    bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+    return bound_delete_statement;
 }
 
 } // namespace infinity
