@@ -1,60 +1,49 @@
-//
-// Created by jinhai on 23-7-2.
-//
-
 module;
 
 import stl;
-import buffer_handle;
+import file_worker;
 import third_party;
-import async_batch_processor;
 
 export module buffer_manager;
 
 namespace infinity {
 
+class BufferObj;
+
 export class BufferManager {
 public:
-    explicit BufferManager(SizeT mem_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
+    explicit BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir);
 
-    void Init();
+public:
+    // Create a new BufferHandle, or in replay process. (read data block from wal)
+    BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
 
-    BufferHandle *GetBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, BufferType buffer_type);
+    // BufferObj *
 
-    // BufferHandle *
-    // GetBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, offset_t offset, SizeT buffer_size, BufferType
-    // buffer_type);
+    // Get an existing BufferHandle from memory or disk.
+    BufferObj *Get(UniquePtr<FileWorker> file_worker);
 
-    BufferHandle *AllocateBufferHandle(const SharedPtr<String> &file_dir,
-                                       const SharedPtr<String> &filename,
-                                       SizeT buffer_size,
-                                       BufferType buffer_type = BufferType::kTempFile);
+    SharedPtr<String> BaseDir() const { return base_dir_; }
 
-    // BufferHandle *AllocateBufferHandle(const SharedPtr<String> &file_dir, const SharedPtr<String> &filename, offset_t offset, SizeT buffer_size);
+    SharedPtr<String> GetTempDir() const { return temp_dir_; }
 
-    void PushGCQueue(BufferHandle *buffer_handle);
+private:
+    friend class BufferObj;
 
-    UniquePtr<String> Free(SizeT need_memory_size);
+    // BufferHandle calls it, before allocate memory. It will start GC if necessary.
+    void RequestSpace(SizeT need_size, BufferObj *buffer_obj);
 
-    inline const SharedPtr<String> &BaseDir() const { return base_dir_; }
-
-    inline const SharedPtr<String> &TempDir() const { return temp_dir_; }
-
-    au64 mem_limit_{};
-    au64 current_memory_size_{};
-
-    UniquePtr<AsyncBatchProcessor> reader_{}, writer_{};
+    // BufferHandle calls it, after unload.
+    void PushGCQueue(BufferObj *buffer_handle);
 
 private:
     RWMutex rw_locker_{};
 
-    u64 next_buffer_id_{1};
-
     SharedPtr<String> base_dir_;
     SharedPtr<String> temp_dir_;
-    HashMap<String, BufferHandle> buffer_map_;
-
-    ConcurrentQueue<BufferHandle*> queue_{};
+    const u64 memory_limit_{};
+    au64 current_memory_size_{}; // TODO: need to be atomic
+    HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
+    ConcurrentQueue<BufferObj *> gc_queue_{};
 };
-
 } // namespace infinity

@@ -23,13 +23,13 @@ import infinity_assert;
 import infinity_exception;
 import defer_op;
 import ivfflat_index_def;
-import object_handle;
+import buffer_handle;
+import faiss_index_file_worker;
 import logger;
 import local_file_system;
 import random;
 import parser;
 import index_entry;
-import faiss_index_ptr;
 import txn_store;
 
 module segment_entry;
@@ -184,8 +184,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
-                ObjectHandle object_handle(block_column_entry->buffer_handle_);
-                auto block_data_ptr = reinterpret_cast<float *>(object_handle.GetData());
+                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+                auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
                 try {
                     index->train(block_row_cnt, block_data_ptr);

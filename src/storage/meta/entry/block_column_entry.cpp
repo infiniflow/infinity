@@ -13,17 +13,17 @@ import segment_entry;
 import outline_info;
 import parser;
 import column_buffer;
+import buffer_obj;
 import buffer_handle;
 import column_vector;
-import object_handle;
 import default_values;
 import third_party;
 import table_collection_entry;
 import infinity_assert;
 import infinity_exception;
-import segment_column_entry;
 import varchar_layout;
 import logger;
+import data_file_worker;
 
 module block_column_entry;
 
@@ -42,12 +42,11 @@ BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 col
     SizeT row_capacity = block_entry->row_capacity_;
     SizeT total_data_size = row_capacity * column_type->Size();
 
+    auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
     if (!is_replay) {
-        block_column_entry->buffer_handle_ =
-            buffer_manager->AllocateBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+        block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
     } else {
-        block_column_entry->buffer_handle_ =
-            buffer_manager->GetBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, BufferType::kFile);
+        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     if (block_column_entry->column_type_->type() == kVarchar) {
@@ -58,14 +57,15 @@ BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 col
 }
 
 ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entry, BufferManager *buffer_manager) {
-    if (block_column_entry->buffer_handle_ == nullptr) {
+    if (block_column_entry->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
-        block_column_entry->buffer_handle_ =
-            buffer_manager->GetBufferHandle(block_column_entry->base_dir_, block_column_entry->file_name_, BufferType::kFile);
+        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, 0);
+        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     bool outline = block_column_entry->column_type_->type() == kVarchar;
-    return ColumnBuffer(block_column_entry->buffer_handle_, buffer_manager, outline);
+    return outline ? ColumnBuffer(block_column_entry->buffer_, buffer_manager, block_column_entry->base_dir_)
+                   : ColumnBuffer(block_column_entry->buffer_);
 }
 
 void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
@@ -73,7 +73,7 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
                               ColumnVector *input_column_vector,
                               offset_t input_offset,
                               SizeT append_rows) {
-    if (column_entry->buffer_handle_ == nullptr) {
+    if (column_entry->buffer_ == nullptr) {
         Error<StorageException>("Not initialize buffer handle", __FILE_NAME__, __LINE__);
     }
     SizeT data_type_size = input_column_vector->data_type_size_;
@@ -85,8 +85,8 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
 }
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
-    ObjectHandle object_handle(block_column_entry->buffer_handle_);
-    ptr_t dst_p = object_handle.GetData() + dst_offset;
+    BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+    ptr_t dst_p = static_cast<ptr_t>(buffer_handle.GetDataMut()) + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
@@ -117,14 +117,14 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                     auto outline_info = block_column_entry->outline_info_.get();
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
-                        auto file_name = SegmentColumnEntry::OutlineFilename(outline_info->next_file_idx++);
-                        auto buffer_handle =
-                            outline_info->buffer_mgr_->AllocateBufferHandle(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
-                        outline_info->written_buffers_.emplace_back(buffer_handle, 0);
+                        auto file_name = BlockColumnEntry::OutlineFilename(outline_info->next_file_idx++);
+                        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
+                        outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
-                    auto &[current_buffer_handle, current_buffer_offset] = outline_info->written_buffers_.back();
-                    ObjectHandle out_object_handle(current_buffer_handle);
-                    ptr_t outline_dst_ptr = out_object_handle.GetData() + current_buffer_offset;
+                    auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
+                    BufferHandle out_buffer_handle = current_buffer_obj->Load();
+                    ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
                     u16 outline_data_size = varchar_type->length;
                     ptr_t outline_src_ptr = varchar_type->ptr;
                     Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
@@ -176,21 +176,25 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kEmbedding:
         case kRowID: {
             SizeT buffer_size = row_count * column_type->Size();
-            block_column_entry->buffer_handle_->WriteFile(buffer_size);
-            block_column_entry->buffer_handle_->SyncFile();
-            block_column_entry->buffer_handle_->CloseFile();
+            if (block_column_entry->buffer_->Save()) {
+                block_column_entry->buffer_->Sync();
+                block_column_entry->buffer_->CloseFile();
+            }
+
             break;
         }
         case kVarchar: {
             SizeT buffer_size = row_count * column_type->Size();
-            block_column_entry->buffer_handle_->WriteFile(buffer_size);
-            block_column_entry->buffer_handle_->SyncFile();
-            block_column_entry->buffer_handle_->CloseFile();
+            if (block_column_entry->buffer_->Save()) {
+                block_column_entry->buffer_->Sync();
+                block_column_entry->buffer_->CloseFile();
+            }
             auto outline_info = block_column_entry->outline_info_.get();
             for (auto [outline_buffer_handle, outline_size] : outline_info->written_buffers_) {
-                outline_buffer_handle->WriteFile(outline_size);
-                outline_buffer_handle->SyncFile();
-                outline_buffer_handle->CloseFile();
+                if (outline_buffer_handle->Save()) {
+                    outline_buffer_handle->Sync();
+                    outline_buffer_handle->CloseFile();
+                }
             }
             break;
         }

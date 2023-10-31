@@ -39,7 +39,7 @@ void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str
     T ele = DataType::StringToValue<T>(str_view);
     BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
 }
-}
+} // namespace
 
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {

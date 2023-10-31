@@ -83,3 +83,6 @@ clang-format-all
 
 #a place for any file unwant to commit
 tmp/
+
+benchmark/toml/toml_config.h
+benchmark/csv/csv_config.h

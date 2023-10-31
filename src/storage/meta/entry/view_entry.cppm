@@ -16,8 +16,6 @@ namespace infinity {
 
 class ViewMeta;
 
-class BufferManager;
-
 class Txn;
 
 export struct ViewEntry : public BaseEntry {

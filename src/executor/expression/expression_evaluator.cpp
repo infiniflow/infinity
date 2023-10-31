@@ -99,7 +99,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
 
     // 3. Get the aggregate result and append to output column vector.
 
-    ptr_t result_ptr = expr->aggregate_function_.finalize_func_(expr->aggregate_function_.GetState());
+    const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(expr->aggregate_function_.GetState());
     output_column_vector->AppendByPtr(result_ptr);
 
     in_aggregate_ = false;

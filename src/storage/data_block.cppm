@@ -14,7 +14,6 @@ import infinity_exception;
 
 export module data_block;
 
-
 namespace infinity {
 
 // Intermediate data structure transferred between operator.
@@ -51,7 +50,7 @@ public:
 
     void AppendValue(SizeT column_index, const Value &value);
 
-    void AppendValueByPtr(SizeT column_index, const ptr_t value_ptr);
+    void AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr);
 
     void Finalize();
 
@@ -104,4 +103,3 @@ private:
     bool finalized = false;
 };
 } // namespace infinity
-
