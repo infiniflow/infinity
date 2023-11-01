@@ -13,8 +13,11 @@ namespace infinity {
 export class GlobalResourceUsage {
 public:
     static inline void Init() {
-        if (initialized_)
+        if (initialized_) {
             return;
+        }
+        object_count_ = 0;
+        raw_memory_count_ = 0;
         initialized_ = true;
     }
 

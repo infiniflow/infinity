@@ -33,8 +33,6 @@ public:
 
     QueryResult ListDatabases();
 
-    QueryResult DescribeDatabase(const String &db_name);
-
     SharedPtr<Database> GetDatabase(const String &db_name);
 
     ~Infinity();

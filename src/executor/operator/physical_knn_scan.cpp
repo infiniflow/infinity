@@ -7,13 +7,9 @@ module;
 #include <vector>
 
 import stl;
-// import txn;
 import query_context;
-// import table_def;
-// import data_table;
 import parser;
 import logger;
-// import physical_operator_type;
 import operator_state;
 import global_block_id;
 import block_index;

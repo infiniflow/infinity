@@ -11,6 +11,7 @@ import logger;
 class LoggerTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
@@ -21,6 +22,7 @@ class LoggerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
         BaseTest::TearDown();
     }
 };

@@ -7,22 +7,10 @@ module;
 module table;
 
 import stl;
-// import std;
-//// import logger;
-//// import config;
-//// import resource_manager;
-//// import fragment_scheduler;
-//// import storage;
-//// import local_file_system;
-//// import std;
-//// import third_party;
 import query_options;
 import query_result;
-// import table;
 import infinity_context;
-// import session;
 import query_context;
-//// import database_object;
 import parser;
 
 namespace infinity {
@@ -110,9 +98,9 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
     import_statement->schema_name_ = session_->current_database();
     import_statement->table_name_ = table_name_;
 
-//    bool header_{false};
-//    CopyFileType copy_file_type_{CopyFileType::kCSV};
-//    char delimiter_{','};
+    import_statement->header_ = false;
+    import_statement->copy_file_type_ = CopyFileType::kCSV;
+    import_statement->delimiter_ = ',';
 
     QueryResponse response = query_context_ptr->QueryStatement(import_statement.get());
     QueryResult result;
@@ -124,9 +112,46 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
     return result;
 }
 
-QueryResult Table::Delete(const String &condition) {}
+QueryResult Table::Delete(ParsedExpr *filter) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    UniquePtr<DeleteStatement> delete_statement = MakeUnique<DeleteStatement>();
+    delete_statement->schema_name_ = session_->current_database();
+    delete_statement->table_name_ = table_name_;
+    delete_statement->where_expr_ = filter;
+    QueryResponse response = query_context_ptr->QueryStatement(delete_statement.get());
+    QueryResult result;
+    result.result_table_ = response.result_;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
+    return result;
+}
 
-QueryResult Table::Update(const String &condition, Vector<Pair<String, ParsedExpr *>> &set_lists) {}
+QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
+    update_statement->schema_name_ = session_->current_database();
+    update_statement->table_name_ = table_name_;
+    update_statement->where_expr_ = filter;
+    update_statement->update_expr_array_ = update_list;
+    QueryResponse response = query_context_ptr->QueryStatement(update_statement.get());
+    QueryResult result;
+    result.result_table_ = response.result_;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
+    return result;
+}
 
 QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,

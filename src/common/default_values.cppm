@@ -4,10 +4,9 @@
 
 module;
 
-#include <string>
-
 export module default_values;
 
+import std;
 import stl;
 
 namespace infinity {
