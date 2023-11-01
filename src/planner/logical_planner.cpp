@@ -521,6 +521,9 @@ void LogicalPlanner::BuildDropCollection(const DropStatement *statement, SharedP
 
 void LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
+    if(drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
+        Error<PlannerException>(Format("Can't drop using database: {}", drop_schema_info->schema_name_), __FILE_NAME__, __LINE__);
+    }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
 
@@ -647,6 +650,19 @@ void LogicalPlanner::BuildCommand(const CommandStatement* statement, SharedPtr<B
         case CommandType::kUse: {
             UseCmd* use_command_info = (UseCmd*)(command_statement->command_info_.get());
             EntryResult result = txn->GetDatabase(use_command_info->db_name());
+            if(result.Success()) {
+                SharedPtr<LogicalNode> logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                                    command_statement->command_info_);
+
+                this->logical_plan_ = logical_command;
+            } else {
+                Error<PlannerException>("Invalid command type.", __FILE_NAME__, __LINE__);
+            }
+            break;
+        }
+        case CommandType::kCheckTable: {
+            CheckTable* check_table = (CheckTable*)(command_statement->command_info_.get());
+            EntryResult result = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if(result.Success()) {
                 SharedPtr<LogicalNode> logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                                     command_statement->command_info_);

@@ -27,7 +27,7 @@ public:
     inline Txn*& txn() { return txn_; }
 protected:
     // Current schema
-    String current_database_;
+    String current_database_{};
 
     // Txn is session level.
     Txn *txn_{};
@@ -56,12 +56,9 @@ public:
     }
 
 private:
-    // Current schema
-    String current_database_;
-
     // User / Tenant information
-    String tenant_name_;
-    String user_name_;
+    String tenant_name_{};
+    String user_name_{};
 
     u64 user_id_{0};
 

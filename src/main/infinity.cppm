@@ -40,7 +40,7 @@ public:
     ~Infinity();
 
 private:
-    UniquePtr<EmbeddedSession> session_{};
+    SharedPtr<EmbeddedSession> session_{};
 
     bool initialized_{false};
 };

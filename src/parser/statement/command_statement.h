@@ -13,6 +13,7 @@ namespace infinity {
 enum class CommandType {
     kInvalid,
     kUse,
+    kCheckTable,
 };
 
 class CommandInfo {
@@ -43,6 +44,21 @@ public:
 
 private:
     std::string db_name_;
+};
+
+class CheckTable final: public CommandInfo {
+public:
+    explicit
+    CheckTable(const char* table_name): CommandInfo(CommandType::kCheckTable), table_name_(table_name) {}
+
+    ~CheckTable() final = default;
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string& table_name() const { return table_name_; }
+
+private:
+    std::string table_name_;
 };
 
 class CommandStatement final : public BaseStatement {

@@ -28,6 +28,10 @@ void PhysicalCommand::Execute(QueryContext *query_context, InputState *input_sta
             output_state->SetComplete();
             break;
         }
+        case CommandType::kCheckTable: {
+            output_state->SetComplete();
+            break;
+        }
         case CommandType::kInvalid: {
             Error<ExecutorException>("Invalid command type.", __FILE_NAME__, __LINE__);
         }

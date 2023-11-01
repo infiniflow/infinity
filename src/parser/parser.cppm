@@ -134,6 +134,7 @@ export using DropSchemaInfo = DropSchemaInfo;
 export using DropViewInfo = DropViewInfo;
 export using CommandInfo = CommandInfo;
 export using UseCmd = UseCmd;
+export using CheckTable = CheckTable;
 
 export using InitParameter = InitParameter;
 
@@ -187,6 +188,7 @@ export using InExpr = InExpr;
 export using OrderByExpr = OrderByExpr;
 
 export using ColumnDef = ColumnDef;
+export using TableConstraint = TableConstraint;
 
 export inline std::string ConflictType2Str(ConflictType type) {
     return ConflictTypeToStr(type);

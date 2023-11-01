@@ -26,7 +26,7 @@ import parser;
 
 namespace infinity {
 
-Infinity::Infinity() : DatabaseObject(ObjectType::kDatabase), session_(std::move(MakeUnique<EmbeddedSession>())) {}
+Infinity::Infinity() : DatabaseObject(ObjectType::kDatabase), session_(std::move(MakeShared<EmbeddedSession>())) {}
 
 Infinity::~Infinity() { Disconnect(); }
 
@@ -59,7 +59,6 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
                             InfinityContext::instance().fragment_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
-    query_context_ptr->set_current_schema(session_->current_database());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
     create_schema_info->schema_name_ = db_name;
@@ -67,8 +66,10 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    result.error_message_ = response.result_msg_;
-    result.error_code_ = 0;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
     return result;
 }
 
@@ -78,7 +79,6 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
                             InfinityContext::instance().fragment_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
-    query_context_ptr->set_current_schema(session_->current_database());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
     SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
     drop_schema_info->schema_name_ = db_name;
@@ -86,8 +86,10 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    result.error_message_ = response.result_msg_;
-    result.error_code_ = 0;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
     return result;
 }
 
@@ -97,14 +99,15 @@ QueryResult Infinity::ListDatabases() {
                             InfinityContext::instance().fragment_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
-    query_context_ptr->set_current_schema(session_->current_database());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabases;
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    result.error_message_ = response.result_msg_;
-    result.error_code_ = 0;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
     return result;
 }
 
@@ -116,12 +119,11 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
                             InfinityContext::instance().fragment_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
-//    query_context_ptr->set_current_schema(session_->current_database());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
     QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
     if(response.result_msg_.get() == nullptr) {
-        return MakeShared<Database>(db_name);
+        return MakeShared<Database>(db_name, session_);
     } else {
         return nullptr;
     }
