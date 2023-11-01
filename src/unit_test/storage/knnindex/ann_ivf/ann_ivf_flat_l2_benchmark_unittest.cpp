@@ -31,6 +31,7 @@ import knn_flat_ip;
 import infinity;
 import index_data;
 import ann_ivf_flat;
+#include <omp.h>
 
 using namespace infinity;
 
@@ -86,6 +87,7 @@ double elapsed() {
 }
 
 void benchmark_faiss_ivfflatl2() {
+    omp_set_num_threads(1);
     double t0 = elapsed();
 
     // this is typically the fastest one.
@@ -309,6 +311,8 @@ void benchmark_annivfflatl2() {
 class AnnIVFFlatL2Benchmark : public BaseTest {};
 
 TEST_F(AnnIVFFlatL2Benchmark, test1) {
+    omp_set_num_threads(1);
     // benchmark_faiss_ivfflatl2();
+    std::cout << "Hello ?" << std::endl;
     benchmark_annivfflatl2();
 }
