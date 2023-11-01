@@ -3,8 +3,6 @@
 //
 module;
 
-#include <utility>
-
 export module infinity_exception;
 
 import stl;
