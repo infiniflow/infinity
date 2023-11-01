@@ -181,15 +181,16 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
         // memset(partition_element_count.data(), 0, sizeof(i32) * partition_element_count.size());
         std::fill(partition_element_count.begin(), partition_element_count.end(), 0);
         for (i32 i = 0; i < vector_count; ++i) {
-            if (i % 100000 == 0) {
-                std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
-                          << "vector id: " << i << std::endl;
-            }
             auto vector_pos_i = vectors_ptr + i * dimension;
             auto [centroid_id, distance] = l2_find_nearest_centroid<f32>(dimension, vector_pos_i, partition_num, centroids.data());
             vector_partition_num[i] = centroid_id;
             this_iter_distance += distance;
             ++partition_element_count[centroid_id];
+            // TODO: record time
+            if ((i + 1) % 100000 == 0) {
+                std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "vector id: " << i << std::endl;
+            }
         }
         if (this_iter_distance >= total_distance) {
             break;
@@ -211,6 +212,8 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
         }
     }
     // TODO: now add data, maybe need to separate this function?
+    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+              << "Now add " << vector_count << " data." << std::endl;
     for (i32 i = 0; i < partition_num; ++i) {
         vectors[i].reserve(partition_element_count[i] * dimension);
         ids[i].reserve(partition_element_count[i]);
@@ -222,6 +225,8 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
         vectors[centroid_id].insert(vectors[centroid_id].end(), vector_pos_i, vector_pos_i + dimension);
         ids[centroid_id].emplace_back(segment_id, block_id, i);
     }
+    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+              << "Now " << vector_count << " data added." << std::endl;
 }
 
 } // namespace infinity
