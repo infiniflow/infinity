@@ -155,7 +155,7 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
                                      i32 iteration_max = 1) {
     // TODO:time
     auto t0 = elapsed();
-    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+    std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
               << "kmeans begin." << std::endl;
     // assert dimension, vector_count, partition_num, iteration_max > 0
     if (dimension <= 0 || vector_count <= 0 || partition_num <= 0 || iteration_max <= 0) {
@@ -170,7 +170,7 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
     f32 total_distance = std::numeric_limits<f32>::max();
     // TODO: generate random centroids, now use permutation
     vector_element_random_permutation_output_to_centroids(dimension, vector_count, vectors_ptr, centroids.data(), partition_num);
-    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+    std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
               << "random centroids choosen." << std::endl;
     Vector<i32> vector_partition_num(vector_count);
     Vector<i32> partition_element_count(partition_num, 0);
@@ -188,7 +188,7 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
             ++partition_element_count[centroid_id];
             // TODO: record time
             if ((i + 1) % 100000 == 0) {
-                std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                           << "vector id: " << i << std::endl;
             }
         }
@@ -196,8 +196,8 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
             break;
         }
         total_distance = this_iter_distance;
-        // memset(centroids.data(), 0, sizeof(DistType) * centroids.size());
-        std::fill(centroids.begin(), centroids.end(), 0);
+        memset(centroids.data(), 0, sizeof(DistType) * centroids.size());
+        // std::fill(centroids.begin(), centroids.end(), 0);
         for (i32 i = 0; i < vector_count; ++i) {
             auto partition_of_i = vector_partition_num[i];
             for (i32 j = 0; j < dimension; ++j) {
@@ -212,7 +212,7 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
         }
     }
     // TODO: now add data, maybe need to separate this function?
-    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+    std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
               << "Now add " << vector_count << " data." << std::endl;
     for (i32 i = 0; i < partition_num; ++i) {
         vectors[i].reserve(partition_element_count[i] * dimension);
@@ -225,7 +225,7 @@ void l2_kmeans_partition_inplace_f32(i32 dimension,
         vectors[centroid_id].insert(vectors[centroid_id].end(), vector_pos_i, vector_pos_i + dimension);
         ids[centroid_id].emplace_back(segment_id, block_id, i);
     }
-    std::cout << "[" << std::setprecision(3) << elapsed() - t0 << " s] "
+    std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
               << "Now " << vector_count << " data added." << std::endl;
 }
 
