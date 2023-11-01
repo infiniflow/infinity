@@ -19,6 +19,10 @@ class InfinityTest : public BaseTest {
         BaseTest::SetUp();
         system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
     }
+    void TearDown() override {
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        BaseTest::TearDown();
+    }
 };
 
 TEST_F(InfinityTest, test1) {
