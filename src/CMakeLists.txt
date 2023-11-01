@@ -47,6 +47,20 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        network_h
+        CONFIGURE_DEPENDS
+        network/*.h
+)
+
+
+file(GLOB_RECURSE
+        grpc_cpp
+        CONFIGURE_DEPENDS
+        network/*.cpp
+        network/*.cc
+)
+
+file(GLOB_RECURSE
         function_cpp
         CONFIGURE_DEPENDS
         function/*.cpp
@@ -153,6 +167,7 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
+        ${grpc_cpp}
 )
 
 target_sources(infinity_core
@@ -211,6 +226,12 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
+
+        protobuf
+        grpc
+        grpc++
+        gpr
+        absl_synchronization
         iresearch
 #        profiler
 )
@@ -326,6 +347,11 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
+        protobuf
+        grpc
+        grpc++
+        gpr
+        absl_synchronization
         iresearch
 #        profiler
 )
