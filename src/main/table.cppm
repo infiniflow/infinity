@@ -27,9 +27,9 @@ public:
 
     QueryResult Import(const String &path, ImportOptions import_options);
 
-    QueryResult Delete(const String &condition);
+    QueryResult Delete(ParsedExpr *filter);
 
-    QueryResult Update(const String &condition, Vector<Pair<String, ParsedExpr *>> &set_lists);
+    QueryResult Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
 
     QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
                        Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,

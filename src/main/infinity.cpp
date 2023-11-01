@@ -111,8 +111,6 @@ QueryResult Infinity::ListDatabases() {
     return result;
 }
 
-QueryResult Infinity::DescribeDatabase(const String &db_name) {}
-
 SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),

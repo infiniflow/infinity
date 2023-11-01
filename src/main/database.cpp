@@ -8,21 +8,11 @@ module database;
 
 import stl;
 import std;
-// import logger;
-// import config;
-// import resource_manager;
-// import fragment_scheduler;
-// import storage;
-// import local_file_system;
-// import std;
-// import third_party;
 import query_options;
 import query_result;
 import table;
 import infinity_context;
-// import session;
 import query_context;
-// import database_object;
 import parser;
 
 namespace infinity {
@@ -91,7 +81,22 @@ QueryResult Database::ListTables() {
     return result;
 }
 
-QueryResult Database::DescribeTable(const String &db_name) {}
+QueryResult Database::DescribeTable(const String &db_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kColumns;
+    QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
+    QueryResult result;
+    result.result_table_ = response.result_;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
+}
 
 SharedPtr<Table> Database::GetTable(const String &table_name) {
         UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
