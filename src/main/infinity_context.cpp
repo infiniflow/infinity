@@ -1,0 +1,65 @@
+//
+// Created by jinhai on 23-10-31.
+//
+
+module;
+
+module infinity_context;
+
+import stl;
+import logger;
+import config;
+import resource_manager;
+import fragment_scheduler;
+import storage;
+//import local_file_system;
+//import std;
+//import third_party;
+//import query_options;
+//import query_result;
+//import database;
+
+namespace infinity {
+
+void
+InfinityContext::Init(const SharedPtr <String>& config_path) {
+    if(initialized_) {
+        return;
+    } else {
+        // Config
+        config_ = MakeUnique<Config>();
+        config_->Init(config_path);
+
+        Logger::Initialize(config_.get());
+
+        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
+
+        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
+
+        storage_ = MakeUnique<Storage>(config_.get());
+        storage_->Init();
+
+        initialized_ = true;
+    }
+}
+
+void
+InfinityContext::UnInit() {
+    if(!initialized_) {
+        return;
+    }
+    initialized_ = false;
+
+    storage_->UnInit();
+    storage_.reset();
+
+    fragment_scheduler_->UnInit();
+
+    resource_manager_.reset();
+
+    Logger::Shutdown();
+
+    config_.reset();
+}
+
+}

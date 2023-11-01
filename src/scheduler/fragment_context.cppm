@@ -25,7 +25,7 @@ import query_context;
 import physical_operator;
 import physical_source;
 import physical_sink;
-import table;
+import data_table;
 import data_block;
 
 export module fragment_context;
@@ -78,7 +78,7 @@ public:
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
 
-    inline SharedPtr<Table> GetResult() {
+    inline SharedPtr<DataTable> GetResult() {
         UniqueLock<Mutex> lk(locker_);
         cv_.wait(lk, [&] { return completed_; });
 
@@ -96,7 +96,7 @@ public:
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
 protected:
-    virtual SharedPtr<Table> GetResultInternal() = 0;
+    virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
 protected:
     au64 task_n_{0};
@@ -121,7 +121,7 @@ export class SerialMaterializedFragmentCtx final : public FragmentContext {
 public:
     explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context) : FragmentContext(fragment_ptr, query_context) {}
 
-    SharedPtr<Table> GetResultInternal() final;
+    SharedPtr<DataTable> GetResultInternal() final;
 
 protected:
     Vector<SharedPtr<DataBlock>> task_result_{};
@@ -132,7 +132,7 @@ public:
     explicit inline ParallelMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
         : FragmentContext(fragment_ptr, query_context) {}
 
-    SharedPtr<Table> GetResultInternal() final;
+    SharedPtr<DataTable> GetResultInternal() final;
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};
@@ -142,7 +142,7 @@ export class ParallelStreamFragmentCtx : public FragmentContext {
 public:
     explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context) : FragmentContext(fragment_ptr, query_context) {}
 
-    SharedPtr<Table> GetResultInternal() final;
+    SharedPtr<DataTable> GetResultInternal() final;
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

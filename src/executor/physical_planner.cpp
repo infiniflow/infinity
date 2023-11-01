@@ -60,6 +60,7 @@ import physical_top;
 import physical_union_all;
 import physical_update;
 import physical_drop_index;
+import physical_command;
 
 import logical_node;
 import logical_node_type;
@@ -89,6 +90,7 @@ import logical_import;
 import logical_dummy_scan;
 import logical_explain;
 import logical_drop_index;
+import logical_command;
 
 import parser;
 import explain_physical_plan;
@@ -236,6 +238,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kKnnScan: {
             result = BuildKnn(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCommand: {
+            result = BuildCommand(logical_operator);
             break;
         }
         case LogicalNodeType::kExplain: {
@@ -404,7 +410,10 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Aggregate project node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->right_node() == nullptr,
+                             "Aggregate project node shouldn't have right child.",
+                             __FILE_NAME__,
+                             __LINE__);
     SharedPtr<LogicalAggregate> logical_aggregate = std::static_pointer_cast<LogicalAggregate>(logical_operator);
     SharedPtr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node != nullptr) {
@@ -507,7 +516,6 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<Logical
     Assert<PlannerException>(input_logical_node != nullptr, "Logical filter node has no input node.", __FILE_NAME__, __LINE__);
     Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.", __FILE_NAME__, __LINE__);
 
-
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
     SharedPtr<LogicalFilter> logical_filter = std::static_pointer_cast<LogicalFilter>(logical_operator);
@@ -592,6 +600,14 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                         logical_knn_scan->limit_expression_,
                                         logical_knn_scan->order_by_type_,
                                         logical_knn_scan->knn_table_index_);
+}
+
+SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto *logical_command = (LogicalCommand *)(logical_operator.get());
+    return MakeShared<PhysicalCommand>(logical_command->node_id(),
+                                       logical_command->command_info(),
+                                       logical_command->GetOutputNames(),
+                                       logical_command->GetOutputTypes());
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

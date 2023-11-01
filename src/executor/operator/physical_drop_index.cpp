@@ -6,7 +6,7 @@ import query_context;
 import operator_state;
 import parser;
 import table_def;
-import table;
+import data_table;
 import infinity_assert;
 import infinity_exception;
 
@@ -32,7 +32,7 @@ void PhysicalDropIndex::Execute(QueryContext *query_context, InputState *input_s
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
     auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     output_state->SetComplete();
 }
 } // namespace infinity

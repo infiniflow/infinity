@@ -5,11 +5,11 @@
 module;
 
 import stl;
-import table;
+import data_table;
 import logger;
 import session;
 import query_context;
-import infinity;
+import infinity_context;
 import third_party;
 import parser;
 import logical_planner;
@@ -36,18 +36,17 @@ namespace infinity {
  * @param print
  * @return Table
  */
-SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
+SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 //    if (print) {
 //        LOG_TRACE(Format("{}", sql_text));
 //    }
 
-    SharedPtr<Session> session_ptr = MakeShared<Session>();
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
-    query_context_ptr->Init(session_ptr.get(),
-                            Infinity::instance().config(),
-                            Infinity::instance().fragment_scheduler(),
-                            Infinity::instance().storage(),
-                            Infinity::instance().resource_manager());
+    SharedPtr<RemoteSession> session_ptr = MakeShared<RemoteSession>();
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
@@ -61,38 +60,38 @@ SharedPtr<Table> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
-    LogicalPlanner logical_planner(query_context_ptr.get());
-    Optimizer optimizer(query_context_ptr.get());
-    PhysicalPlanner physical_planner(query_context_ptr.get());
-    FragmentBuilder fragment_builder(query_context_ptr.get());
+//    LogicalPlanner logical_planner(query_context_ptr.get());
+//    Optimizer optimizer(query_context_ptr.get());
+//    PhysicalPlanner physical_planner(query_context_ptr.get());
+//    FragmentBuilder fragment_builder(query_context_ptr.get());
     BaseStatement *statement = (*parsed_result->statements_ptr_)[0];
 
     SharedPtr<BindContext> bind_context;
-    logical_planner.Build(statement, bind_context);
+    query_context_ptr->logical_planner()->Build(statement, bind_context);
     query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
 
-    SharedPtr<LogicalNode> unoptimized_plan = logical_planner.LogicalPlan();
+    SharedPtr<LogicalNode> unoptimized_plan = query_context_ptr->logical_planner()->LogicalPlan();
 
     // Apply optimized rule to the logical plan
-    SharedPtr<LogicalNode> optimized_plan = optimizer.optimize(unoptimized_plan);
+    SharedPtr<LogicalNode> optimized_plan = query_context_ptr->optimizer()->optimize(unoptimized_plan);
 
     // Build physical plan
-    SharedPtr<PhysicalOperator> physical_plan = physical_planner.BuildPhysicalOperator(optimized_plan);
+    SharedPtr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(optimized_plan);
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
-    auto plan_fragment = fragment_builder.BuildFragment(physical_plan.get());
+    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment(physical_plan.get());
 
     // Schedule the query pipeline
     query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
-    QueryResult query_result;
-    query_result.result_ = plan_fragment->GetResult();
-    query_result.root_operator_type_ = unoptimized_plan->operator_type();
+    QueryResponse query_response;
+    query_response.result_ = plan_fragment->GetResult();
+    query_response.root_operator_type_ = unoptimized_plan->operator_type();
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();
-    return query_result.result_;
+    return query_response.result_;
 }
 } // namespace infinity

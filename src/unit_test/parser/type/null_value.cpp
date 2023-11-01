@@ -12,7 +12,7 @@ import parser;
 import logger;
 import null_value;
 import stl;
-import infinity;
+import infinity_context;
 
 class NullValueTest : public BaseTest {
 };

@@ -11,7 +11,7 @@ template <typename T>
 class BaseTestWithParam : public std::conditional_t<std::is_same_v<T, void>, ::testing::Test, ::testing::TestWithParam<T>> {
 public:
     ~BaseTestWithParam() override = default;
-    void SetUp() override { system("rm -rf /tmp/infinity/"); }
+    void SetUp() override {}
 
     void TearDown() override {}
 };

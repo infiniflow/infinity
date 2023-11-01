@@ -9,7 +9,7 @@ import stl;
 import session;
 import pg_protocol_handler;
 import query_context;
-import table;
+import data_table;
 
 export module connection;
 
@@ -40,18 +40,18 @@ private:
 
     void HandlerSimpleQuery(QueryContext *query_context);
 
-    void SendTableDescription(const SharedPtr<Table> &result_table);
+    void SendTableDescription(const SharedPtr<DataTable> &result_table);
 
-    void SendQueryResponse(const QueryResult &query_result);
+    void SendQueryResponse(const QueryResponse &query_response);
 
 private:
-    const SharedPtr<AsioSocket> socket_;
+    const SharedPtr<AsioSocket> socket_{};
 
-    const SharedPtr<PGProtocolHandler> pg_handler_;
+    const SharedPtr<PGProtocolHandler> pg_handler_{};
 
     bool terminate_connection_ = false;
 
-    SharedPtr<Session> session_;
+    SharedPtr<RemoteSession> session_{};
 };
 
 } // namespace infinity

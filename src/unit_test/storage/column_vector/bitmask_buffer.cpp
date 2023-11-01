@@ -12,7 +12,7 @@ import bitmask;
 import third_party;
 import stl;
 
-import infinity;
+import infinity_context;
 import global_resource_usage;
 
 class BitmaskBufferTest : public BaseTest {

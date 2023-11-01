@@ -8,7 +8,7 @@ module;
 //import txn;
 import query_context;
 //import table_def;
-//import table;
+//import data_table;
 //import parser;
 //import physical_operator_type;
 import operator_state;

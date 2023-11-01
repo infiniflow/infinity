@@ -8,7 +8,7 @@ module;
 #include <boost/bind.hpp>
 
 module db_server;
-import infinity;
+import infinity_context;
 import stl;
 import boost;
 import third_party;
@@ -27,9 +27,9 @@ void DBServer::Run() {
 
     initialized = true;
 
-    Infinity::instance().Init(config_path_);
-    u16 pg_port = Infinity::instance().config()->pg_port();
-    const String &listen_address_ref = Infinity::instance().config()->listen_address();
+    InfinityContext::instance().Init(config_path_);
+    u16 pg_port = InfinityContext::instance().config()->pg_port();
+    const String &listen_address_ref = InfinityContext::instance().config()->listen_address();
 
     BoostErrorCode error;
     AsioIpAddr address = asio_make_address(listen_address_ref, error);
@@ -46,7 +46,7 @@ void DBServer::Run() {
         Printf("Startup database server, at: {} and port: {}\n", listen_address_ref, pg_port);
     }
 
-    Infinity::instance().config()->PrintAll();
+    InfinityContext::instance().config()->PrintAll();
 
     Printf("Run 'psql -h {} -p {}' to connect to the server.\n", listen_address_ref, pg_port);
 
@@ -62,7 +62,7 @@ void DBServer::Shutdown() {
     io_service_.stop();
     initialized = false;
     acceptor_ptr_->close();
-    infinity::Infinity::instance().UnInit();
+    infinity::InfinityContext::instance().UnInit();
 }
 
 void DBServer::CreateConnection() {

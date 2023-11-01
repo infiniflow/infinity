@@ -15,9 +15,9 @@ import infinity_assert;
 import pg_message;
 import logger;
 import query_context;
-import infinity;
+import infinity_context;
 import third_party;
-import table;
+import data_table;
 import parser;
 import logical_node_type;
 
@@ -27,7 +27,7 @@ namespace infinity {
 
 Connection::Connection(AsioIOService &io_service)
     : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())),
-      session_(MakeUnique<Session>()) {}
+      session_(MakeUnique<RemoteSession>()) {}
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
@@ -70,12 +70,11 @@ void Connection::HandleRequest() {
     const auto cmd_type = pg_handler_->read_command_type();
 
 // FIXME
-    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>();
-    query_context_ptr->Init(session_.get(),
-                            Infinity::instance().config(),
-                            Infinity::instance().fragment_scheduler(),
-                            Infinity::instance().storage(),
-                            Infinity::instance().resource_manager());
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
     query_context_ptr->set_current_schema(session_->current_database());
 
     switch (cmd_type) {
@@ -118,7 +117,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     LOG_TRACE(Format("Query: {}", query));
 
     // Start to execute the query.
-    QueryResult result = query_context->Query(query);
+    QueryResponse result = query_context->Query(query);
 
     // Response to the result message to client
     if (result.result_.get() == nullptr) {
@@ -135,7 +134,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     pg_handler_->send_ready_for_query();
 }
 
-void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
+void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) {
     u32 column_name_length_sum = 0;
     SizeT column_count = result_table->ColumnCount();
     for (SizeT idx = 0; idx < column_count; ++idx) {
@@ -268,9 +267,9 @@ void Connection::SendTableDescription(const SharedPtr<Table> &result_table) {
     }
 }
 
-void Connection::SendQueryResponse(const QueryResult &query_result) {
+void Connection::SendQueryResponse(const QueryResponse &query_response) {
 
-    const SharedPtr<Table> &result_table = query_result.result_;
+    const SharedPtr<DataTable> &result_table = query_response.result_;
     SizeT column_count = result_table->ColumnCount();
     auto values_as_strings = Vector<Optional<String>>(column_count);
     SizeT block_count = result_table->DataBlockCount();
@@ -293,7 +292,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
     }
 
     String message;
-    switch (query_result.root_operator_type_) {
+    switch (query_response.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
             break;
@@ -307,11 +306,11 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             break;
         }
         case LogicalNodeType::kImport: {
-            message = *query_result.result_->result_msg();
+            message = *query_response.result_->result_msg();
             break;
         }
         default: {
-            message = Format("SELECT {}", ToStr(query_result.result_->row_count()));
+            message = Format("SELECT {}", ToStr(query_response.result_->row_count()));
         }
     }
 

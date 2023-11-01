@@ -23,13 +23,14 @@ import base_entry;
 import value;
 import table_collection_entry;
 import table_def;
-import table;
+import data_table;
 import third_party;
 import index_def_meta;
 import index_def_entry;
 import index_def;
 import index_entry;
 import ivfflat_index_def;
+import database_detail;
 
 module physical_show;
 
@@ -43,6 +44,13 @@ void PhysicalShow::Init() {
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
     switch (scan_type_) {
+        case ShowType::kShowDatabases: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("database");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowType::kShowTables: {
 
             output_names_->reserve(8);
@@ -109,6 +117,10 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
     auto show_output_state = (ShowOutputState *)(output_state);
 
     switch (scan_type_) {
+        case ShowType::kShowDatabases: {
+            ExecuteShowDatabases(query_context, show_input_state, show_output_state);
+            break;
+        }
         case ShowType::kShowTables: {
             ExecuteShowTable(query_context, show_input_state, show_output_state);
             break;
@@ -127,6 +139,43 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
     }
 
     output_state->SetComplete();
+}
+
+/**
+ * @brief Execute show table
+ * @param query_context
+ * @param input_state
+ * @param output_state
+ */
+void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+    // Define output table schema
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    Vector<DatabaseDetail> databases_detail = txn->ListDatabases();
+
+    // Prepare the output data block
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types{varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    for (auto &database_detail : databases_detail) {
+
+        SizeT column_id = 0;
+        {
+            // Append schema name to the 0 column
+            const String *db_name = database_detail.db_name_.get();
+            Value value = Value::MakeVarchar(*db_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    output_state->output_.emplace_back(output_block_ptr);
 }
 
 /**
@@ -496,7 +545,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
     };
 
     auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
@@ -632,7 +681,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context) {
     };
 
     SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     // Get tables from catalog
     // TODO: Use context to carry runtime information, such as current schema
@@ -718,7 +767,7 @@ void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vec
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
     Vector<SharedPtr<DataType>> column_types{
@@ -776,7 +825,7 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
     };
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), output_column_defs);
-    output_ = MakeShared<Table>(table_def, TableType::kResult);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
     Vector<SharedPtr<DataType>> output_column_types{

@@ -15,7 +15,7 @@ import data_block;
 import table_def;
 import table_collection_type;
 
-module table;
+module data_table;
 
 namespace infinity {
 
@@ -41,7 +41,7 @@ static String TableTypeToString(TableType type) {
     Error<TypeException>("Unexpected error.", __FILE_NAME__, __LINE__);
 }
 
-String Table::ToString() const {
+String DataTable::ToString() const {
     std::stringstream ss;
     ss << definition_ptr_->ToString();
     ss << "Table type: " << TableTypeToString(type_) << " Row count: " << row_count_ << std::endl;
@@ -55,7 +55,7 @@ String Table::ToString() const {
     return ss.str();
 }
 
-SharedPtr<Vector<RowID>> Table::GetRowIDVector() const {
+SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
     SizeT block_count = data_blocks_.size();
     SharedPtr<Vector<RowID>> result = MakeShared<Vector<RowID>>();
     result->reserve(row_count_);
@@ -65,7 +65,7 @@ SharedPtr<Vector<RowID>> Table::GetRowIDVector() const {
     return result;
 }
 
-void Table::UnionWith(const SharedPtr<Table> &other) {
+void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
     Assert<StorageException>(this->row_count_ == other->row_count_,
                              Format("Can't union two table with different row count {}:{}", this->row_count_, other->row_count_),
                              __FILE_NAME__,
@@ -82,37 +82,37 @@ void Table::UnionWith(const SharedPtr<Table> &other) {
     this->definition_ptr_->UnionWith(other->definition_ptr_);
 }
 
-void Table::Append(const SharedPtr<DataBlock> &data_block) {
+void DataTable::Append(const SharedPtr<DataBlock> &data_block) {
     data_blocks_.emplace_back(data_block);
     UpdateRowCount(data_block->row_count());
 }
 
-SharedPtr<Table> Table::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<Table>(Move(table_def_ptr), type); }
+SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<DataTable>(Move(table_def_ptr), type); }
 
-SharedPtr<Table> Table::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
+SharedPtr<DataTable> DataTable::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
     SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
     return Make(result_table_def_ptr, TableType::kResult);
 }
 
-SharedPtr<Table> Table::MakeEmptyResultTable() {
+SharedPtr<DataTable> DataTable::MakeEmptyResultTable() {
     SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
     return Make(result_table_def_ptr, TableType::kResult);
 }
 
-Table::Table(SharedPtr<TableDef> table_def_ptr, TableType type)
-    : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()),
-      definition_ptr_(Move(table_def_ptr)), row_count_(0), type_(type) {}
+DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)
+    : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(Move(table_def_ptr)),
+      row_count_(0), type_(type) {}
 
-SizeT Table::ColumnCount() const { return definition_ptr_->column_count(); }
+SizeT DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
 
-SharedPtr<String> Table::TableName() const { return definition_ptr_->table_name(); }
+SharedPtr<String> DataTable::TableName() const { return definition_ptr_->table_name(); }
 
-const SharedPtr<String> &Table::SchemaName() const { return definition_ptr_->schema_name(); }
+const SharedPtr<String> &DataTable::SchemaName() const { return definition_ptr_->schema_name(); }
 
-SizeT Table::GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
+SizeT DataTable::GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
 
-String &Table::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
+String &DataTable::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
 
-SharedPtr<DataType> Table::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
+SharedPtr<DataType> DataTable::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
 
 } // namespace infinity

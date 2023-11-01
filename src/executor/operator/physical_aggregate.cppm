@@ -10,7 +10,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table;
+import data_table;
 import hash_table;
 import base_expression;
 
@@ -42,15 +42,15 @@ public:
 
     virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
 
-    void GroupByInputTable(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table);
+    void GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
 
-    void GenerateGroupByResult(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table);
+    void GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
 
     Vector<SharedPtr<BaseExpression>> groups_{};
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    void SimpleAggregate(SharedPtr<Table> &output_table);
+    void SimpleAggregate(SharedPtr<DataTable> &output_table);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 
@@ -65,7 +65,7 @@ public:
     Vector<HashRange> GetHashRanges(i64 parallel_count) const;
 
 private:
-    SharedPtr<Table> input_table_{};
+    SharedPtr<DataTable> input_table_{};
     u64 groupby_index_{};
     u64 aggregate_index_{};
 };

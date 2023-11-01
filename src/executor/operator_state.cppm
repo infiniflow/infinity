@@ -415,6 +415,15 @@ export struct DropViewOutputState : public OutputState {
     inline explicit DropViewOutputState() : OutputState(PhysicalOperatorType::kDropView) {}
 };
 
+// Command
+export struct CommandInputState : public InputState {
+    inline explicit CommandInputState() : InputState(PhysicalOperatorType::kCommand) {}
+};
+
+export struct CommandOutputState : public OutputState {
+    inline explicit CommandOutputState() : OutputState(PhysicalOperatorType::kCommand) {}
+};
+
 // Explain
 export struct ExplainInputState : public InputState {
     inline explicit ExplainInputState() : InputState(PhysicalOperatorType::kExplain) {}

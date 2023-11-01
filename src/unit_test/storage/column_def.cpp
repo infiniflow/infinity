@@ -11,7 +11,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 import parser;
-import infinity;
+import infinity_context;
 
 class ColumnDefTest : public BaseTest {};
 

@@ -110,6 +110,8 @@ public:
 
     void BuildShowViews(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    void BuildShowDatabases(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Flush
     void BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -118,6 +120,8 @@ public:
     void BuildFlushLog(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     void BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    void BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Explain
     void BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

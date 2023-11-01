@@ -29,7 +29,7 @@ import third_party;
 import query_context;
 import physical_source;
 import physical_sink;
-import table;
+import data_table;
 import data_block;
 import physical_merge_knn;
 import merge_knn_data;
@@ -280,6 +280,10 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
         }
         case PhysicalOperatorType::kDropView: {
             MakeTaskStateTemplate<DropViewInputState, DropViewOutputState>(input_state, output_state, physical_ops[operator_id]);
+            break;
+        }
+        case PhysicalOperatorType::kCommand: {
+            MakeTaskStateTemplate<CommandInputState, CommandOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
         }
         case PhysicalOperatorType::kExplain: {
@@ -648,6 +652,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
@@ -853,6 +858,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
             break;
         }
+        case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateCollection:
@@ -887,7 +893,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     }
 }
 
-SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
+SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 
     // Only one sink state
     if (tasks_.size() != 1) {
@@ -912,14 +918,14 @@ SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
                                                                HashSet<ConstraintType>()));
             }
 
-            SharedPtr<Table> result_table = Table::MakeResultTable(column_defs);
+            SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
             result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {
             auto *result_sink_state = static_cast<ResultSinkState *>(tasks_[0]->sink_state_.get());
             if (result_sink_state->error_message_ == nullptr) {
-                SharedPtr<Table> result_table = Table::MakeResultTable({result_sink_state->result_def_});
+                SharedPtr<DataTable> result_table = DataTable::MakeResultTable({result_sink_state->result_def_});
                 return result_table;
             }
             Error<ExecutorException>(*result_sink_state->error_message_, __FILE_NAME__, __LINE__);
@@ -934,7 +940,7 @@ SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
                 Error<SchedulerException>("No response message", __FILE_NAME__, __LINE__);
             }
 
-            SharedPtr<Table> result_table = Table::MakeEmptyResultTable();
+            SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
             result_table->SetResultMsg(Move(message_sink_state->message_));
             return result_table;
         }
@@ -945,9 +951,9 @@ SharedPtr<Table> SerialMaterializedFragmentCtx::GetResultInternal() {
     Error<SchedulerException>("Unreachable", __FILE_NAME__, __LINE__);
 }
 
-SharedPtr<Table> ParallelMaterializedFragmentCtx::GetResultInternal() {
+SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 
-    SharedPtr<Table> result_table = nullptr;
+    SharedPtr<DataTable> result_table = nullptr;
 
     auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
     if (first_materialize_sink_state->error_message_ != nullptr) {
@@ -975,7 +981,7 @@ SharedPtr<Table> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         if (result_table == nullptr) {
-            result_table = Table::MakeResultTable(column_defs);
+            result_table = DataTable::MakeResultTable(column_defs);
         }
 
         for (const auto &result_data_block : materialize_sink_state->data_block_array_) {
@@ -986,8 +992,8 @@ SharedPtr<Table> ParallelMaterializedFragmentCtx::GetResultInternal() {
     return result_table;
 }
 
-SharedPtr<Table> ParallelStreamFragmentCtx::GetResultInternal() {
-    SharedPtr<Table> result_table = nullptr;
+SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
+    SharedPtr<DataTable> result_table = nullptr;
 
     auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
 
@@ -1009,7 +1015,7 @@ SharedPtr<Table> ParallelStreamFragmentCtx::GetResultInternal() {
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
 
         if (result_table == nullptr) {
-            result_table = Table::MakeResultTable(column_defs);
+            result_table = DataTable::MakeResultTable(column_defs);
         }
 
         for (const auto &result_data_block : materialize_sink_state->data_block_array_) {

@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import operator_state;
 import data_block;
@@ -62,7 +62,7 @@ void PhysicalAggregate::Execute(QueryContext *query_context) {
     }
 
     SharedPtr<TableDef> groupby_tabledef = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("groupby"), groupby_columns);
-    SharedPtr<Table> groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
+    SharedPtr<DataTable> groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
 
     groupby_executor.Execute(input_table_, groupby_table);
 
@@ -76,12 +76,12 @@ void PhysicalAggregate::Execute(QueryContext *query_context) {
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
-    SharedPtr<Table> output_groupby_table = Table::Make(groupby_tabledef, TableType::kIntermediate);
+    SharedPtr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
     GenerateGroupByResult(groupby_table, output_groupby_table);
 
 
     // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
-    SharedPtr<Table> grouped_input_table;
+    SharedPtr<DataTable> grouped_input_table;
     {
         SizeT column_count = input_table_->ColumnCount();
         Vector<SharedPtr<ColumnDef>> columns;
@@ -96,14 +96,14 @@ void PhysicalAggregate::Execute(QueryContext *query_context) {
 
         SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("grouped_input"), columns);
 
-        grouped_input_table = Table::Make(table_def, TableType::kGroupBy);
+        grouped_input_table = DataTable::Make(table_def, TableType::kGroupBy);
     }
     GroupByInputTable(input_table_, grouped_input_table);
 
     // generate output aggregate table
     SizeT aggregates_count = aggregates_.size();
     if(aggregates_count > 0) {
-        SharedPtr<Table> output_aggregate_table{};
+        SharedPtr<DataTable> output_aggregate_table{};
 
         // Prepare the output table columns
         Vector<SharedPtr<ColumnDef>> aggregate_columns;
@@ -139,7 +139,7 @@ void PhysicalAggregate::Execute(QueryContext *query_context) {
         SharedPtr<TableDef> aggregate_tabledef = TableDef::Make(MakeShared<String>("default"),
                                                                 MakeShared<String>("aggregate"),
                                                                 aggregate_columns);
-        output_aggregate_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
+        output_aggregate_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
 
         // Loop blocks
         HashMap<u64, SharedPtr<DataBlock>> block_map;
@@ -179,7 +179,7 @@ void PhysicalAggregate::Execute(QueryContext *query_context) {
 #endif
 }
 
-void PhysicalAggregate::GroupByInputTable(const SharedPtr<Table> &input_table, SharedPtr<Table> &grouped_input_table) {
+void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &grouped_input_table) {
     SizeT column_count = input_table->ColumnCount();
 
     // 1. Get output table column types.
@@ -319,7 +319,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<Table> &input_table, S
     }
 }
 
-void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table> &input_table, SharedPtr<Table> &output_table) {
+void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table) {
 
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
@@ -548,7 +548,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<Table> &input_tabl
 #endif
 }
 
-void PhysicalAggregate::SimpleAggregate(SharedPtr<Table> &output_table) {
+void PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table) {
 #if 0
     SizeT aggregates_count = aggregates_.size();
     ExecutorAssert(aggregates_count > 0, "Simple Aggregate without aggregate expression");
@@ -590,7 +590,7 @@ void PhysicalAggregate::SimpleAggregate(SharedPtr<Table> &output_table) {
                                                             MakeShared<String>("aggregate"),
                                                             aggregate_columns);
 
-    output_table = Table::Make(aggregate_tabledef, TableType::kAggregate);
+    output_table = DataTable::Make(aggregate_tabledef, TableType::kAggregate);
 
     SharedPtr<DataBlock> output_data_block = DataBlock::Make();
     output_data_block->Init(output_types);

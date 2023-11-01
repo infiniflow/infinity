@@ -31,6 +31,7 @@ import table_collection_entry;
 import table_collection_detail;
 import table_collection_type;
 import new_catalog;
+import database_detail;
 
 import table_def;
 import index_def;
@@ -318,6 +319,19 @@ EntryResult Txn::GetDatabase(const String &db_name) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     return NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts);
+}
+
+Vector<DatabaseDetail> Txn::ListDatabases() {
+    Vector<DatabaseDetail> res;
+
+    Vector<DBEntry *> db_entries = NewCatalog::Databases(catalog_, txn_id_, txn_context_.GetBeginTS());
+    SizeT db_count = db_entries.size();
+    for(SizeT idx = 0; idx < db_count; ++ idx) {
+        DBEntry* db_entry = db_entries[idx];
+        res.emplace_back(DatabaseDetail{db_entry->db_name_});
+    }
+
+    return res;
 }
 
 Vector<TableCollectionDetail> Txn::GetTableCollections(const String &db_name) {

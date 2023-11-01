@@ -9,7 +9,9 @@ import buffer_handle;
 import buffer_obj;
 import data_file_worker;
 
-class BufferObjTest : public BaseTest {};
+class BufferObjTest : public BaseTest {
+    void SetUp() override { system("rm -rf /tmp/infinity"); }
+};
 
 // Test status transfer of buffer handle.
 // ?? status transfer in all

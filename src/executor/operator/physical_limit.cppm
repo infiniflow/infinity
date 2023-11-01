@@ -11,7 +11,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
-import table;
+import data_table;
 
 export module physical_limit;
 
@@ -39,13 +39,13 @@ public:
 
     inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
 
-    static SharedPtr<Table> GetLimitOutput(const SharedPtr<Table> &input_table, i64 limit, i64 offset);
+    static SharedPtr<DataTable> GetLimitOutput(const SharedPtr<DataTable> &input_table, i64 limit, i64 offset);
 
 private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
 
-    SharedPtr<Table> input_table_{};
+    SharedPtr<DataTable> input_table_{};
     u64 input_table_index_{};
 };
 
