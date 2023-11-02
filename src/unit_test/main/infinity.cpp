@@ -237,5 +237,49 @@ TEST_F(InfinityTest, test1) {
         EXPECT_TRUE(result.IsOk());
     }
 
+    {
+        infinity->Query("create database db1;");
+        QueryResult result = infinity->Query("show databases;");
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        EXPECT_EQ(data_block->row_count(), 2);
+        Value value = data_block->GetValue(0, 0);
+        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
+        if (value.value_.varchar.IsInlined()) {
+            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), "db1");
+        } else {
+            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), "db1");
+        }
+
+        value = data_block->GetValue(0, 1);
+        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
+        if (value.value_.varchar.IsInlined()) {
+            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), "default");
+        } else {
+            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), "default");
+        }
+
+        result = infinity->Query("drop database db1");
+        EXPECT_TRUE(result.IsOk());
+
+        result = infinity->ListDatabases();
+        data_block = result.result_table_->GetDataBlockById(0);
+        EXPECT_EQ(data_block->row_count(), 1);
+        value = data_block->GetValue(0, 0);
+        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
+        if (value.value_.varchar.IsInlined()) {
+            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            EXPECT_STREQ(prefix.c_str(), "default");
+        } else {
+            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_STREQ(whole_str.c_str(), "default");
+        }
+
+        SharedPtr<Database> db_instance = infinity->GetDatabase("default");
+    }
+
     infinity->Disconnect();
 }

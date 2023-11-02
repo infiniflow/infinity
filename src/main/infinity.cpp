@@ -127,4 +127,20 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
     }
 }
 
+QueryResult Infinity::Query(const String& query_text) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    QueryResponse response = query_context_ptr->Query(query_text);
+    QueryResult result;
+    result.result_table_ = response.result_;
+    if(response.result_msg_.get() != nullptr) {
+        result.error_message_ = response.result_msg_;
+        result.error_code_ = -1;
+    }
+    return result;
+}
+
 } // namespace infinity
