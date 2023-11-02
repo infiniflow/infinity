@@ -79,6 +79,7 @@ FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
 FORMAT          { return FORMAT; }
+FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
 FULL            { return FULL; }
 GROUP           { return GROUP; }

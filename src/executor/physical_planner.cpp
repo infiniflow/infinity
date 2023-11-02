@@ -628,6 +628,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
             explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(), logical_explain->explain_type(), texts_ptr, nullptr);
             break;
         }
+        case ExplainType::kFragment:
         case ExplainType::kPipeline: {
             explain_node = MakeShared<PhysicalExplain>(logical_explain->node_id(), logical_explain->explain_type(), nullptr, input_physical_operator);
             break;
