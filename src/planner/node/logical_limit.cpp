@@ -4,9 +4,9 @@
 
 module;
 
-#include <sstream>
 #include <memory>
 
+import std;
 import stl;
 import column_binding;
 import parser;

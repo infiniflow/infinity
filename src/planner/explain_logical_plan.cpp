@@ -4,8 +4,7 @@
 
 module;
 
-#include <string>
-
+import std;
 import stl;
 import logical_node;
 import logical_node_type;

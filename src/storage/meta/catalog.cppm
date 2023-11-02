@@ -19,13 +19,6 @@ export module new_catalog;
 
 namespace infinity {
 
-//class Txn;
-//class TxnManager;
-//class FunctionSet;
-//class TableFunction;
-//class DBEntry;
-//class BufferManager;
-
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);

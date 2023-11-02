@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
 import column_binding;
 import parser;
@@ -30,8 +29,8 @@ String LogicalSort::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "Order by: ";
-    size_t expression_count = expressions_.size();
-    for (size_t i = 0; i < expression_count - 1; ++i) {
+    SizeT expression_count = expressions_.size();
+    for (SizeT i = 0; i < expression_count - 1; ++i) {
         ss << expressions_[i]->Name() << " " << OrderBy2Str(order_by_types_[i]) << ", ";
     }
     ss << expressions_.back()->Name() << " " << OrderBy2Str(order_by_types_.back());

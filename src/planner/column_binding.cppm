@@ -4,7 +4,7 @@
 
 module;
 
-#include <bits/functional_hash.h>
+#include <functional>
 
 import stl;
 
@@ -31,8 +31,8 @@ namespace std {
 template <>
 class hash<infinity::ColumnBinding> {
 public:
-    size_t operator()(const infinity::ColumnBinding &rhs) const {
-        return hash<size_t>().operator()(rhs.table_idx) ^ hash<size_t>().operator()(rhs.column_idx);
+    std::size_t operator()(const infinity::ColumnBinding &rhs) const {
+        return hash<std::size_t>().operator()(rhs.table_idx) ^ hash<std::size_t>().operator()(rhs.column_idx);
     }
 };
 

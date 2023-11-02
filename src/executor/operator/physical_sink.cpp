@@ -4,20 +4,15 @@
 
 module;
 
-#include <vector>
-
+import std;
 import stl;
-// import txn;
 import query_context;
-// import table_def;
-// import data_table;
 import parser;
 import operator_state;
 import physical_operator_type;
 import third_party;
 import fragment_data;
 import data_block;
-// import column_vector;
 import infinity_assert;
 import infinity_exception;
 

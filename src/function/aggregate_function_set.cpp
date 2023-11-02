@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
 import base_expression;
 import aggregate_function;

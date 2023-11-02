@@ -23,8 +23,6 @@ export module scalar_function;
 
 namespace infinity {
 
-//class BaseExpression;
-
 struct ScalarFunctionData {
     explicit ScalarFunctionData(ColumnVector *column_vector_ptr) : column_vector_ptr_(column_vector_ptr) {}
 

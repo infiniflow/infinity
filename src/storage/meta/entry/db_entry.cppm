@@ -14,13 +14,10 @@ import table_collection_detail;
 import table_collection_meta;
 import buffer_manager;
 import txn_manager;
-#include "statement/extra/extra_ddl_info.h"
 
 export module db_entry;
 
 namespace infinity {
-
-//class TxnManager;
 
 export class DBEntry : public BaseEntry {
 public:
@@ -67,7 +64,7 @@ public:
     RWMutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{}; // NOTE : can use SharedPtr<STring> as key.
+    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{}; // NOTE : can use SharedPtr<String> as key.
 };
 
 } // namespace infinity

@@ -13,10 +13,6 @@ export module binding;
 
 namespace infinity {
 
-//class TableCollectionEntry;
-//class BlockIndex;
-//class DataType;
-
 export enum class BindingType { kInvalid, kTable, kSubquery, kCTE, kView };
 
 export class Binding {

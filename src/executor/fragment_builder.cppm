@@ -2,13 +2,6 @@
 // Created by jinhai on 23-4-27.
 //
 
-//#include "executor/fragment/plan_fragment.h"
-//#include "executor/operator/physical_table_scan.h"
-//#include "main/query_context.h"
-//#include "physical_operator.h"
-//
-//#include <memory>
-
 module;
 
 import stl;

@@ -16,8 +16,6 @@ export module function_set;
 namespace infinity {
 
 class NewCatalog;
-//class FunctionExpr;
-//class BaseExpression;
 
 export class FunctionSet {
 public:

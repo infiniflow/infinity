@@ -2,14 +2,6 @@
 // Created by jinhai on 23-9-8.
 //
 
-//#pragma once
-//
-//#include "executor/operator_state.h"
-//
-//#include <atomic>
-
-//#include "storage/meta/entry/segment_entry.h"
-
 module;
 
 import stl;

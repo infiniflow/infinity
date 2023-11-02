@@ -3,9 +3,9 @@
 //
 module;
 
-#include <sstream>
 #include "magic_enum.hpp"
 
+import std;
 import stl;
 import third_party;
 import infinity_assert;

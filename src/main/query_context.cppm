@@ -21,17 +21,10 @@ export module query_context;
 
 namespace infinity {
 
-//class Session;
-//class Storage;
-//class ResourceManager;
 class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
 class FragmentScheduler;
-//class QueryProfiler;
-//class Table;
-//class Txn;
-//class Config;
 
 export struct QueryResponse {
     SharedPtr<DataTable> result_{};

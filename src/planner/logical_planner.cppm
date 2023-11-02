@@ -14,25 +14,6 @@ export module logical_planner;
 
 namespace infinity {
 
-//class BindContext;
-//class QueryContext;
-//class BaseStatement;
-//class SelectStatement;
-//class InsertStatement;
-//class UpdateStatement;
-//class DeleteStatement;
-//class CreateStatement;
-//class DropStatement;
-//class CopyStatement;
-//class PrepareStatement;
-//class ExecuteStatement;
-//class AlterStatement;
-//class ShowStatement;
-//class FlushStatement;
-//class ExplainStatement;
-//class LogicalNode;
-
-
 export class LogicalPlanner {
 public:
     explicit LogicalPlanner(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {

@@ -4,8 +4,7 @@
 
 module;
 
-#include <vector>
-
+import std;
 import query_context;
 import operator_state;
 import stl;

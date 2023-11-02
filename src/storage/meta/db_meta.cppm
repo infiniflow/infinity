@@ -14,8 +14,6 @@ export module db_meta;
 
 namespace infinity {
 
-//class TxnManager;
-
 export struct DBMeta {
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(Move(name)), data_dir_(data_dir) {}

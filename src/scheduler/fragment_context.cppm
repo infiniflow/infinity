@@ -2,21 +2,6 @@
 // Created by jinhai on 23-9-8.
 //
 
-// #pragma once
-//
-////#include "executor/operator/physical_sink.h"
-////#include "executor/operator/physical_source.h"
-////#include "executor/physical_operator.h"
-////#include "main/query_context.h"
-// #include "scheduler/fragment_task.h"
-//
-// #include "common/types/alias/primitives.h"
-// #include "common/types/alias/smart_ptr.h"
-// #include "common/types/alias/containers.h"
-//
-// #include <mutex>
-// #include <condition_variable>
-
 module;
 
 import stl;
