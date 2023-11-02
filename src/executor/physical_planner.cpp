@@ -75,6 +75,7 @@ import logical_drop_collection;
 import logical_drop_view;
 import logical_flush;
 import logical_insert;
+import logical_delete;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
@@ -376,7 +377,13 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalDelete>(logical_operator->node_id());
+    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical delete node has no input node.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical delete node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    SharedPtr<LogicalDelete> logical_delete = std::dynamic_pointer_cast<LogicalDelete>(logical_operator);
+    auto input_logical_node = logical_operator->left_node();
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    auto physical_delete = MakeShared<PhysicalDelete>(logical_operator->node_id(), input_physical_operator, logical_delete->table_entry_ptr_);
+    return physical_delete;
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -546,24 +553,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalTableScan> logical_table_scan = std::static_pointer_cast<LogicalTableScan>(logical_operator);
-
-    //    HashMap<String, size_t> name2index;
-    //    size_t column_count = logical_table_scan->table_ptr()->ColumnCount();
-    //    for(size_t idx = 0; idx < column_count; ++ idx) {
-    //        name2index.emplace(logical_table_scan->table_ptr()->GetColumnNameById(idx), idx);
-    //    }
-    //
-    //    Vector<size_t> column_ids;
-    //    column_ids.reserve(logical_table_scan->column_names_.size());
-    //    for(const auto& column_name: logical_table_scan->column_names_) {
-    //        if(name2index.contains(column_name)) {
-    //            column_ids.emplace_back(name2index[column_name]);
-    //        } else {
-    //            PlannerError("Unknown column table_name: " + column_name + " when building physical plan.");
-    //        }
-    //    }
-
-    return MakeShared<PhysicalTableScan>(logical_operator->node_id(), logical_table_scan->base_table_ref_);
+    return MakeShared<PhysicalTableScan>(logical_operator->node_id(), logical_table_scan->base_table_ref_, logical_table_scan->add_row_id_);
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {

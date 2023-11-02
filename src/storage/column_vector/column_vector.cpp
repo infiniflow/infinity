@@ -1889,6 +1889,27 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
     return appended_rows;
 }
 
+SizeT ColumnVector::AppendWith(RowT from, SizeT row_count) {
+    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only kRowID column vector supports this method", __FILE_NAME__, __LINE__);
+    if (row_count == 0) {
+        return 0;
+    }
+
+    SizeT appended_rows = row_count;
+    if (tail_index_ + row_count > capacity_) {
+        // attempt to append data rows more than the capacity;
+        appended_rows = capacity_ - tail_index_;
+    }
+
+    ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
+    for (SizeT i = 0; i < row_count; i++) {
+        *(RowID *)dst_ptr = RowID(from.segment_id_, from.block_id_, from.block_offset_ + i);
+        dst_ptr += data_type_size_;
+    }
+    this->tail_index_ += appended_rows;
+    return appended_rows;
+}
+
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
         LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));

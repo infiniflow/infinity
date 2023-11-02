@@ -647,6 +647,13 @@ void Txn::CancelCommitTxnBottom() {
     cv.notify_one();
 }
 
+// Dangerous! only used during replaying wal.
+void Txn::FakeCommit(TxnTimeStamp commit_ts) {
+    txn_context_.begin_ts_ = commit_ts;
+    txn_context_.commit_ts_ = commit_ts;
+    txn_context_.state_ = TxnState::kCommitted;
+}
+
 void Txn::RollbackTxn() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);

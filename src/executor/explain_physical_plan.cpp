@@ -843,8 +843,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
 
     // Aggregate Table index
     {
-        String aggregate_table_index =
-            String(intent_size, ' ') + " - aggregate table index: #" + ToStr(aggregate_node->AggregateTableIndex());
+        String aggregate_table_index = String(intent_size, ' ') + " - aggregate table index: #" + ToStr(aggregate_node->AggregateTableIndex());
         result->emplace_back(MakeShared<String>(aggregate_table_index));
     }
 
@@ -1196,14 +1195,27 @@ void ExplainPhysicalPlan::Explain(const PhysicalTop *create_node, SharedPtr<Vect
     Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDelete *create_node,
+void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
                                   bool is_recursive,
                                   i64 intent_size) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    String header;
+    if (intent_size != 0) {
+        header = String(intent_size - 2, ' ') + "-> DELETE FROM ";
+    } else {
+        header = "DELETE FROM ";
+    }
+
+    TableCollectionEntry *table_entry = delete_node->table_entry_ptr_;
+    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
+    header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
+    result->emplace_back(MakeShared<String>(header));
+    if (delete_node->left().get() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(delete_node->left().get(), result, is_recursive, intent_size + 2);
+    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUpdate *create_node,
+void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
                                   bool is_recursive,
                                   i64 intent_size) {

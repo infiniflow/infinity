@@ -2,20 +2,20 @@
 // Created by jinhai on 23-9-8.
 //
 
-//#pragma once
+// #pragma once
 //
 ////#include "executor/operator/physical_sink.h"
 ////#include "executor/operator/physical_source.h"
 ////#include "executor/physical_operator.h"
 ////#include "main/query_context.h"
-//#include "scheduler/fragment_task.h"
+// #include "scheduler/fragment_task.h"
 //
-//#include "common/types/alias/primitives.h"
-//#include "common/types/alias/smart_ptr.h"
-//#include "common/types/alias/containers.h"
+// #include "common/types/alias/primitives.h"
+// #include "common/types/alias/smart_ptr.h"
+// #include "common/types/alias/containers.h"
 //
-//#include <mutex>
-//#include <condition_variable>
+// #include <mutex>
+// #include <condition_variable>
 
 module;
 
@@ -119,7 +119,8 @@ protected:
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {
 public:
-    explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context) : FragmentContext(fragment_ptr, query_context) {}
+    explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
+        : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<DataTable> GetResultInternal() final;
 
@@ -140,7 +141,8 @@ protected:
 
 export class ParallelStreamFragmentCtx : public FragmentContext {
 public:
-    explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context) : FragmentContext(fragment_ptr, query_context) {}
+    explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
+        : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<DataTable> GetResultInternal() final;
 

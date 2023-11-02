@@ -23,6 +23,7 @@ import column_buffer;
 import block_column_entry;
 import block_index;
 import table_collection_entry;
+import default_values;
 
 module physical_table_scan;
 
@@ -35,18 +36,6 @@ void PhysicalTableScan::Execute(QueryContext *query_context, InputState *input_s
     auto *table_scan_output_state = static_cast<TableScanOutputState *>(output_state);
 
     ExecuteInternal(query_context, table_scan_input_state, table_scan_output_state);
-
-    //    const MultiIndex<u64, u64, SegmentEntry*>* segment_entry_index_array = *table_scan_input_state->table_scan_function_data_->segment_index_;
-    //    for(const u64 segment_idx: segment_entry_index_array) {
-    //        SegmentEntry* segment_entry = base_table_ref_->segment_entries_->at(segment_idx);
-    //        LOG_TRACE("Segment Entry ID: {}", segment_entry->segment_id_);
-    //    }
-
-    //    table_scan_output_state->data_block_->Reset();
-    //
-    //    base_table_ref_->table_func_->main_function_(query_context,
-    //                                                 table_scan_input_state->table_scan_function_data_.get(),
-    //                                                 *table_scan_output_state->data_block_);
 }
 
 void PhysicalTableScan::Execute(QueryContext *query_context) {
@@ -78,9 +67,27 @@ void PhysicalTableScan::Execute(QueryContext *query_context) {
     }
 }
 
-SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const { return base_table_ref_->column_names_; }
+SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
+    if (!add_row_id_)
+        return base_table_ref_->column_names_;
+    auto dst = MakeShared<Vector<String>>();
+    dst->reserve(base_table_ref_->column_names_->size() + 1);
+    for (auto &name : *base_table_ref_->column_names_)
+        dst->emplace_back(name);
+    dst->emplace_back("__rowid");
+    return dst;
+}
 
-SharedPtr<Vector<SharedPtr<DataType>>> PhysicalTableScan::GetOutputTypes() const { return base_table_ref_->column_types_; }
+SharedPtr<Vector<SharedPtr<DataType>>> PhysicalTableScan::GetOutputTypes() const {
+    if (!add_row_id_)
+        return base_table_ref_->column_types_;
+    auto dst = MakeShared<Vector<SharedPtr<DataType>>>();
+    dst->reserve(base_table_ref_->column_types_->size() + 1);
+    for (auto &type : *base_table_ref_->column_types_)
+        dst->emplace_back(type);
+    dst->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    return dst;
+}
 
 String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; }
 
@@ -92,7 +99,15 @@ SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block
 
 BlockIndex *PhysicalTableScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
-Vector<SizeT> &PhysicalTableScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
+Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
+    if (!add_row_id_)
+        return base_table_ref_->column_ids_;
+    if (!column_ids_.empty())
+        return column_ids_;
+    column_ids_ = base_table_ref_->column_ids_;
+    column_ids_.push_back(COLUMN_IDENTIFIER_ROW_ID);
+    return column_ids_;
+}
 
 Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64 parallel_count) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -132,6 +147,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
         return;
     }
 
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
 
     // Here we assume output is a fresh data block, we have never written anything into it.
@@ -141,24 +157,27 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
         i16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+        auto [row_begin, row_end] = BlockEntry::VisibleRange(current_block_entry, begin_ts, read_offset);
+        auto write_size = Min(write_capacity, SizeT(row_end - row_begin));
 
-        auto remaining_rows = current_block_entry->row_count_ - read_offset;
-        auto write_size = Min(write_capacity, remaining_rows);
+        if (write_size > 0) {
+            read_offset = row_begin;
+            SizeT output_column_id{0};
+            for (auto column_id : column_ids) {
+                if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, block_id, read_offset), write_size);
+                } else {
+                    ColumnBuffer column_buffer =
+                        BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
+                }
+            }
 
-        SizeT output_column_id{0};
-        for (auto column_id : column_ids) {
-            ColumnBuffer column_buffer =
-                BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
-            output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
-        }
-
-        // write_size = already read size = already write size
-        write_capacity -= write_size;
-        remaining_rows -= write_size;
-        read_offset += write_size;
-
-        // we have read all data from current segment, move to next block
-        if (remaining_rows == 0) {
+            // write_size = already read size = already write size
+            write_capacity -= write_size;
+            read_offset += write_size;
+        } else {
+            // we have read all data from current block, move to next block
             ++block_ids_idx;
             read_offset = 0;
         }

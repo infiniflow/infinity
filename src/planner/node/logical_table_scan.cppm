@@ -19,7 +19,7 @@ class TableCollectionEntry;
 
 export class LogicalTableScan : public LogicalNode {
 public:
-    explicit LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref);
+    explicit LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = false);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -38,6 +38,8 @@ public:
     inline String name() final { return "LogicalTableScan"; }
 
     SharedPtr<BaseTableRef> base_table_ref_{};
+
+    bool add_row_id_;
 };
 
 } // namespace infinity

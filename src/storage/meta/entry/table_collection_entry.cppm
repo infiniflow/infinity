@@ -6,7 +6,7 @@ module;
 
 import stl;
 import parser;
-//import txn;
+// import txn;
 import buffer_manager;
 import third_party;
 import table_collection_type;
@@ -27,14 +27,14 @@ export module table_collection_entry;
 namespace infinity {
 
 class DBEntry;
-//class TableCollectionMeta;
-//class BufferManager;
-//class Txn;
-//class BlockIndex;
-//class ColumnDef;
-//class DeleteState;
-//class ScanState;
-//class AppendState;
+// class TableCollectionMeta;
+// class BufferManager;
+// class Txn;
+// class BlockIndex;
+// class ColumnDef;
+// class DeleteState;
+// class ScanState;
+// class AppendState;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
@@ -71,7 +71,7 @@ public:
     static void
     CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
 
-    static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr);
+    static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state);
 
     static UniquePtr<String> InitScan(TableCollectionEntry *table_entry, Txn *txn_ptr, ScanState &scan_state, BufferManager *buffer_mgr);
 
@@ -83,7 +83,7 @@ public:
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 
-    static UniquePtr<String> CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
+    static void CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &append_state);
 
     static UniquePtr<String> RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
 
@@ -103,8 +103,7 @@ public:
 
     static Json Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<TableCollectionEntry>
-    Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
+    static UniquePtr<TableCollectionEntry> Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
 
     virtual void MergeFrom(BaseEntry &other);
 

@@ -20,15 +20,15 @@ export module physical_table_scan;
 
 namespace infinity {
 
-//class TableScanFunction;
-//class BaseTableRef;
-//class TableCollectionEntry;
-//class BlockIndex;
+// class TableScanFunction;
+// class BaseTableRef;
+// class TableCollectionEntry;
+// class BlockIndex;
 
 export class PhysicalTableScan : public PhysicalOperator {
 public:
-    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref)
-        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)) {}
+    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = false)
+        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)), add_row_id_(add_row_id) {}
 
     ~PhysicalTableScan() override = default;
 
@@ -65,6 +65,9 @@ private:
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};
+
+    bool add_row_id_;
+    mutable Vector<SizeT> column_ids_;
 };
 
 } // namespace infinity

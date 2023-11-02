@@ -128,15 +128,11 @@ int SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const Vector<RowID> &rows, BufferManager *buffer_mgr) {
+void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
+    BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
+    Assert<StorageException>(block_entry != nullptr, "The segment doesn't contain the given block.", __FILE_NAME__, __LINE__);
     for (RowID row_id : rows) {
-        Assert<StorageException>(row_id.segment_id_ == segment_entry->segment_id_,
-                                 "The segment doesn't contain the given rows.",
-                                 __FILE_NAME__,
-                                 __LINE__);
-        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, row_id.block_id_);
-        Assert<StorageException>(block_entry != nullptr, "The segment doesn't contain the given block.", __FILE_NAME__, __LINE__);
         BlockEntry::DeleteData(block_entry, txn_ptr, row_id.block_offset_);
     }
 }
@@ -227,15 +223,12 @@ void SegmentEntry::CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<Inde
     segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
 }
 
-void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, u64 start_pos, u64 row_count) {
+void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id) {
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
-    if (segment_entry->min_row_ts_ == 0) {
-        segment_entry->min_row_ts_ = commit_ts;
-        // for (const auto &[index_name, index_entry] : segment_entry->index_entry_map_) {
-        //     IndexEntry::Flush(index_entry.get(), commit_ts);
-        // }
-    }
+    BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
+    Assert<StorageException>(block_entry != nullptr, "The segment doesn't contain the given block.", __FILE_NAME__, __LINE__);
+    BlockEntry::CommitDelete(block_entry, txn_ptr);
     segment_entry->max_row_ts_ = Max(segment_entry->max_row_ts_, commit_ts);
 }
 

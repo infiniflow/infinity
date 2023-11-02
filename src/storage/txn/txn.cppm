@@ -49,11 +49,7 @@ public:
 
     void BeginTxn();
 
-    void BeginTxn(TxnTimeStamp begin_ts);
-
     void CommitTxn();
-
-    void CommitTxn(TxnTimeStamp commit_ts);
 
     void CommitTxnBottom();
 
@@ -134,7 +130,8 @@ public:
 
     void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
 
-    void SetTxnCommitting(TxnTimeStamp commit_ts) { txn_context_.SetTxnCommitting(commit_ts); }
+    // Dangerous! only used during replaying wal.
+    void FakeCommit(TxnTimeStamp commit_ts);
 
     void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
 

@@ -76,6 +76,11 @@ TEST_F(SQLParserTest, good_test1) {
     inputs.emplace_back("SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 32, 'bit', 'hamming') AS distance1 FROM "
                         "t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
 
+    inputs.emplace_back("DELETE FROM products");
+    inputs.emplace_back("DELETE FROM products WHERE price = 10");
+    inputs.emplace_back("delete from s1.products where obsoletion_date = 'today'");
+    inputs.emplace_back("UPDATE products SET price = price * 1.10 WHERE price <= 99.99;");
+
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 

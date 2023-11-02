@@ -10,6 +10,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import table_collection_entry;
 
 export module physical_delete;
 
@@ -17,7 +18,8 @@ namespace infinity {
 
 export class PhysicalDelete final : public PhysicalOperator {
 public:
-    explicit PhysicalDelete(u64 id) : PhysicalOperator(PhysicalOperatorType::kDelete, nullptr, nullptr, id) {}
+    explicit PhysicalDelete(u64 id, SharedPtr<PhysicalOperator> left, TableCollectionEntry *table_entry_ptr)
+        : PhysicalOperator(PhysicalOperatorType::kDelete, left, nullptr, id), table_entry_ptr_(table_entry_ptr) {}
 
     ~PhysicalDelete() override = default;
 
@@ -30,6 +32,8 @@ public:
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+
+    TableCollectionEntry *table_entry_ptr_{};
 
 private:
     SharedPtr<Vector<String>> output_names_{};

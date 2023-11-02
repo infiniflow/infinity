@@ -20,7 +20,7 @@ SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_sel
 
 String SubqueryExpression::ToString() const {
     std::stringstream ss;
-    ss << "Substring: " << std::endl;
+    ss << "Subquery: " << std::endl;
     return ss.str();
 }
 

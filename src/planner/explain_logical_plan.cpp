@@ -17,6 +17,7 @@ import logical_drop_schema;
 import logical_drop_table;
 import logical_drop_collection;
 import logical_drop_view;
+import logical_delete;
 import logical_flush;
 import logical_insert;
 import logical_project;
@@ -95,6 +96,7 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
             break;
         }
         case LogicalNodeType::kDelete:
+            Explain((LogicalDelete *)statement, result, intent_size);
             break;
         case LogicalNodeType::kUpdate:
             break;
@@ -609,6 +611,25 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
     if (insert_node->left_node().get() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(insert_node->left_node().get(), result, intent_size);
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String header;
+    if (intent_size != 0) {
+        header = String(intent_size - 2, ' ') + "-> DELETE FROM ";
+    } else {
+        header = "DELETE FROM ";
+    }
+
+    TableCollectionEntry *table_entry = delete_node->table_entry_ptr_;
+    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
+    header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
+    result->emplace_back(MakeShared<String>(header));
+
+    if (delete_node->left_node().get() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(delete_node->left_node().get(), result, intent_size);
     }
 }
 

@@ -13,8 +13,12 @@ export module txn_context;
 
 namespace infinity {
 
+class Txn;
+
 export class TxnContext {
 public:
+    friend class Txn;
+
     inline void BeginCommit(TxnTimeStamp begin_ts) {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kNotStarted) {

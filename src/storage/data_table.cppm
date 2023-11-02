@@ -37,6 +37,8 @@ public:
 
     static SharedPtr<DataTable> MakeEmptyResultTable();
 
+    static SharedPtr<DataTable> MakeSummaryResultTable(u64 counter, u64 sum);
+
 public:
     explicit DataTable(SharedPtr<TableDef> table_def_ptr, TableType type);
 
@@ -57,7 +59,9 @@ public:
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
         Assert<StorageException>(idx < data_blocks_.size(),
-                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()), __FILE_NAME__, __LINE__);
+                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()),
+                                 __FILE_NAME__,
+                                 __LINE__);
         return data_blocks_[idx];
     }
 
@@ -90,4 +94,3 @@ public:
 };
 
 } // namespace infinity
-

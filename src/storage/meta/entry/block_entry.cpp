@@ -24,6 +24,20 @@ import infinity_exception;
 module block_entry;
 namespace infinity {
 
+bool BlockVersion::operator==(const BlockVersion &rhs) const {
+    if (this->created_.size() != rhs.created_.size() || this->deleted_.size() != rhs.deleted_.size())
+        return false;
+    for (SizeT i = 0; i < this->created_.size(); i++) {
+        if (this->created_[i] != rhs.created_[i])
+            return false;
+    }
+    for (SizeT i = 0; i < this->deleted_.size(); i++) {
+        if (this->deleted_[i] != rhs.deleted_[i])
+            return false;
+    }
+    return true;
+}
+
 i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
     if (created_.empty())
         return 0;
@@ -38,8 +52,6 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
 }
 
 void BlockVersion::LoadFromFile(const String &version_path) {
-    created_.clear();
-    deleted_.clear();
     std::ifstream ifs(version_path);
     if (!ifs.is_open()) {
         LOG_WARN(Format("Failed to open block_version file: {}", version_path));
@@ -53,11 +65,13 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     char *ptr = buf.data();
     int32_t created_size = ReadBufAdv<int32_t>(ptr);
     int32_t deleted_size = ReadBufAdv<int32_t>(ptr);
-    created_.reserve(created_size);
-    deleted_.reserve(deleted_size);
-    Memcpy(created_.data(), ptr, created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>));
-    ptr += created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
-    Memcpy(deleted_.data(), ptr, deleted_.size() * sizeof(TxnTimeStamp));
+    created_.resize(created_size);
+    deleted_.resize(deleted_size);
+    Memcpy(created_.data(), ptr, created_size * sizeof(Pair<TxnTimeStamp, int32_t>));
+    ptr += created_size * sizeof(Pair<TxnTimeStamp, int32_t>);
+    Memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
+    ptr += deleted_.size() * sizeof(TxnTimeStamp);
+    Assert<StorageException>(ptr - buf.data() == buf_len, "Failed to load block_version file: " + version_path, __FILE_NAME__, __LINE__);
 }
 
 void BlockVersion::SaveToFile(const String &version_path) {
@@ -70,6 +84,8 @@ void BlockVersion::SaveToFile(const String &version_path) {
     Memcpy(ptr, created_.data(), created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>));
     ptr += created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     Memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
+    ptr += deleted_.size() * sizeof(TxnTimeStamp);
+    Assert<StorageException>(ptr - buf.data() == exp_size, "Failed to save block_version file: " + version_path, __FILE_NAME__, __LINE__);
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
         Error<StorageException>("Failed to open block_version file: " + version_path, __FILE_NAME__, __LINE__);
@@ -112,6 +128,22 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
 
     block_version_ = MakeUnique<BlockVersion>(row_capacity_);
     block_version_->created_.emplace_back(std::make_pair(min_row_ts_, row_count_));
+}
+
+Pair<i16, i16> BlockEntry::VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, i16 block_offset_begin) {
+    auto &block_version = block_entry->block_version_;
+    auto &deleted = block_version->deleted_;
+    i16 block_offset_end = block_version->GetRowCount(begin_ts);
+    while (block_offset_begin < block_offset_end && deleted[block_offset_begin] != 0 && deleted[block_offset_begin] <= begin_ts) {
+        block_offset_begin++;
+    }
+    i16 i;
+    for (i = block_offset_begin; i < block_offset_end; i++) {
+        if (deleted[i] != 0 && deleted[i] <= begin_ts) {
+            break;
+        }
+    }
+    return {block_offset_begin, i};
 }
 
 i16 BlockEntry::AppendData(BlockEntry *block_entry,
@@ -185,10 +217,12 @@ void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
 void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
-        block_entry->txn_ptr_ != nullptr,
+        block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
         Format("Expect txn_ptr_ not be nullptr of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
         __FILE_NAME__,
         __LINE__);
+    if (block_entry->txn_ptr_ == nullptr)
+        return;
     block_entry->txn_ptr_ = nullptr;
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     if (block_entry->min_row_ts_ == 0) {

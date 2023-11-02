@@ -19,8 +19,10 @@ class Txn;
 class SegmentEntry;
 class DataBlock;
 
-struct BlockVersion {
-    BlockVersion(SizeT capacity) : deleted_(capacity) {}
+export struct BlockVersion {
+    BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
+    bool operator==(const BlockVersion &rhs) const;
+    bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
     i32 GetRowCount(TxnTimeStamp begin_ts);
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
@@ -68,6 +70,8 @@ public:
     i16 checkpoint_row_count_{0};
 
 public:
+    // Get visible range of the BlockEntry since the given row number for a txn
+    static Pair<i16, i16> VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, i16 block_offset_begin = 0);
     static i16
     AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows, BufferManager *buffer_mgr);
 

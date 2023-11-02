@@ -4,9 +4,8 @@
 
 module;
 
-#include <sstream>
-
 import stl;
+import std;
 import column_binding;
 import parser;
 import base_expression;
@@ -17,18 +16,8 @@ module logical_table_scan;
 
 namespace infinity {
 
-LogicalTableScan::LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref)
-    : LogicalNode(node_id, LogicalNodeType::kTableScan), base_table_ref_(Move(base_table_ref)) {
-
-    // FIXME: Disable the code: initialize column names and columns ?
-    //    SizeT column_count = table_ptr_->table_def()->column_count();
-    //    columns_.reserve(column_count);
-    //    column_names_.reserve(column_count);
-    //    for(SizeT idx = 0; idx < column_count; ++ idx) {
-    //        columns_.emplace_back(idx);
-    //        column_names_.emplace_back(table_ptr_->table_def()->columns()[idx].name());
-    //    }
-}
+LogicalTableScan::LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id)
+    : LogicalNode(node_id, LogicalNodeType::kTableScan), base_table_ref_(Move(base_table_ref)), add_row_id_(add_row_id) {}
 
 Vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
@@ -58,8 +47,8 @@ String LogicalTableScan::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_entry_ptr_->table_collection_name_ << ", on: ";
-    size_t column_count = base_table_ref_->column_names_->size();
-    for (size_t i = 0; i < column_count - 1; ++i) {
+    SizeT column_count = base_table_ref_->column_names_->size();
+    for (SizeT i = 0; i < column_count - 1; ++i) {
         ss << base_table_ref_->column_names_->at(i) << " ";
     }
     ss << base_table_ref_->column_names_->back();
