@@ -47,6 +47,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
+        case ExplainType::kFragment:
         case ExplainType::kPipeline: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();

@@ -51,6 +51,10 @@ void PhysicalExplain::Init() {
             output_names_->emplace_back("Physical Plan");
             break;
         }
+        case ExplainType::kFragment: {
+            output_names_->emplace_back("Fragment");
+            break;
+        }
         case ExplainType::kPipeline: {
             output_names_->emplace_back("Pipeline");
             break;
@@ -85,6 +89,10 @@ void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_sta
         }
         case ExplainType::kPhysical: {
             title = "Physical Plan";
+            break;
+        }
+        case ExplainType::kFragment: {
+            title = "Fragment";
             break;
         }
         case ExplainType::kPipeline: {
@@ -135,6 +143,10 @@ void PhysicalExplain::Execute(QueryContext *query_context) {
         }
         case ExplainType::kPhysical: {
             title = "Physical Plan";
+            break;
+        }
+        case ExplainType::kFragment: {
+            title = "Fragment";
             break;
         }
         case ExplainType::kPipeline: {
