@@ -13,6 +13,7 @@ import infinity_assert;
 import infinity_exception;
 import query_binder;
 import bound_delete_statement;
+import bound_update_statement;
 import bound_select_statement;
 import insert_binder;
 import logical_insert;
@@ -114,7 +115,7 @@ void LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext
             break;
         }
         case StatementType::kCommand: {
-            BuildCommand(static_cast<const CommandStatement*>(statement), bind_context_ptr);
+            BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
             break;
         }
         case StatementType::kInvalidStmt: {
@@ -273,7 +274,9 @@ void LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, SharedP
 }
 
 void LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    Error<PlannerException>("Not supported", __FILE_NAME__, __LINE__);
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    SharedPtr<BoundUpdateStatement> bound_statement_ptr = query_binder_ptr->BindUpdate(*statement);
+    this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
 }
 
 void LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -536,7 +539,7 @@ void LogicalPlanner::BuildDropCollection(const DropStatement *statement, SharedP
 
 void LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
-    if(drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
+    if (drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
         Error<PlannerException>(Format("Can't drop using database: {}", drop_schema_info->schema_name_), __FILE_NAME__, __LINE__);
     }
 
@@ -658,16 +661,16 @@ void LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindC
     Error<PlannerException>("Alter statement isn't supported.", __FILE_NAME__, __LINE__);
 }
 
-void LogicalPlanner::BuildCommand(const CommandStatement* statement, SharedPtr<BindContext> &bind_context_ptr) {
-    Txn* txn = query_context_ptr_->GetTxn();
+void LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    Txn *txn = query_context_ptr_->GetTxn();
     auto *command_statement = (CommandStatement *)statement;
-    switch(command_statement->command_info_->type()) {
+    switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
-            UseCmd* use_command_info = (UseCmd*)(command_statement->command_info_.get());
+            UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
             EntryResult result = txn->GetDatabase(use_command_info->db_name());
-            if(result.Success()) {
-                SharedPtr<LogicalNode> logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                    command_statement->command_info_);
+            if (result.Success()) {
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -676,11 +679,11 @@ void LogicalPlanner::BuildCommand(const CommandStatement* statement, SharedPtr<B
             break;
         }
         case CommandType::kCheckTable: {
-            CheckTable* check_table = (CheckTable*)(command_statement->command_info_.get());
+            CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
             EntryResult result = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
-            if(result.Success()) {
-                SharedPtr<LogicalNode> logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                                    command_statement->command_info_);
+            if (result.Success()) {
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {

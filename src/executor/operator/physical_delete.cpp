@@ -13,7 +13,7 @@ import physical_operator;
 import physical_operator_type;
 import table_collection_entry;
 import query_context;
-//import data_table;
+// import data_table;
 import operator_state;
 import db_entry;
 import data_block;
@@ -39,8 +39,8 @@ void PhysicalDelete::Execute(QueryContext *query_context, InputState *input_stat
             break;
         }
     }
-    txn->Delete(*db_name, *table_name, row_ids);
     if (!row_ids.empty()) {
+        txn->Delete(*db_name, *table_name, row_ids);
         output_state->count_++;
         output_state->sum_ += row_ids.size();
     }

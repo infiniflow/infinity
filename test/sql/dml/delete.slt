@@ -1,6 +1,6 @@
-# name: test/sql/dml/insert.slt
-# description: Test insert
-# group: [dml, insert]
+# name: test/sql/dml/delete.slt
+# description: Test delete
+# group: [dml, delete]
 
 # Parse only support
 statement ok

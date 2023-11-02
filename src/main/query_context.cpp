@@ -31,7 +31,7 @@ module query_context;
 
 namespace infinity {
 
-QueryContext::QueryContext(SessionBase* session) : session_ptr_(session) {};
+QueryContext::QueryContext(SessionBase *session) : session_ptr_(session){};
 
 QueryContext::~QueryContext() { UnInit(); }
 
@@ -149,8 +149,6 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
         this->RollbackTxn();
         query_response.result_ = nullptr;
         query_response.result_msg_ = MakeShared<String>(e.what());
-    } catch (StlException &e) {
-        throw Exception(e.what());
     }
     return query_response;
 }

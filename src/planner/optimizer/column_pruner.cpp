@@ -106,7 +106,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             return;
         }
         case LogicalNodeType::kUpdate:
-            break;
+            // Need reading all columns
+            return;
         case LogicalNodeType::kInsert:
             break;
         case LogicalNodeType::kImport:

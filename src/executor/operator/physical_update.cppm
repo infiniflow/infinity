@@ -10,8 +10,8 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import table_collection_entry;
 import base_expression;
-import data_table;
 
 export module physical_update;
 
@@ -19,7 +19,11 @@ namespace infinity {
 
 export class PhysicalUpdate : public PhysicalOperator {
 public:
-    explicit PhysicalUpdate(u64 id) : PhysicalOperator(PhysicalOperatorType::kUpdate, nullptr, nullptr, id) {}
+    explicit PhysicalUpdate(u64 id,
+                            SharedPtr<PhysicalOperator> left,
+                            TableCollectionEntry *table_entry_ptr,
+                            const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
+        : PhysicalOperator(PhysicalOperatorType::kUpdate, left, nullptr, id), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
 
     ~PhysicalUpdate() override = default;
 
@@ -32,6 +36,9 @@ public:
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+
+    TableCollectionEntry *table_entry_ptr_;
+    const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns_;
 
 private:
     SharedPtr<Vector<String>> output_names_{};
