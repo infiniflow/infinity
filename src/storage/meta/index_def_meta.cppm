@@ -12,10 +12,7 @@ export module index_def_meta;
 
 namespace infinity {
 
-//class TxnManager;
-//class IndexDef;
 class TableCollectionEntry;
-//class BufferManager;
 
 export class IndexDefMeta {
 public:

@@ -15,8 +15,6 @@ export module logical_aggregate;
 
 namespace infinity {
 
-//class BaseExpression;
-
 export class LogicalAggregate : public LogicalNode {
 public:
     explicit LogicalAggregate(u64 node_id,

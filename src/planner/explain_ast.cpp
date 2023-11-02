@@ -4,8 +4,7 @@
 
 module;
 
-#include <string>
-
+import std;
 import stl;
 import parser;
 import infinity_assert;

@@ -21,15 +21,7 @@ export module bind_context;
 
 namespace infinity {
 
-//class Table;
-//class Binding;
 class ExpressionBinder;
-//class BaseExpression;
-//class TableCollectionEntry;
-//class BlockIndex;
-
-//class ColumnExpression;
-//class ColumnIdentifier;
 
 export struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement *select_stmt, HashSet<String> masked_name_set)

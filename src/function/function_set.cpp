@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
 import new_catalog;
 import parser;

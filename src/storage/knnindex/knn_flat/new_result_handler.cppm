@@ -2,12 +2,6 @@
 // Created by jinhai on 23-9-25.
 //
 
-//#pragma once
-//
-//#include "common/types/alias/containers.h"
-//#include "knn_heap.h"
-//#include "new_partitioning.h"
-
 module;
 
 import stl;

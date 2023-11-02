@@ -4,9 +4,9 @@
 
 module;
 
-#include <vector>
 #include <memory>
 
+import std;
 import stl;
 import table_function;
 import data_block;

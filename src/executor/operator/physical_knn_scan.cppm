@@ -20,10 +20,6 @@ export module physical_knn_scan;
 
 namespace infinity {
 
-//class BaseTableRef;
-//class TableCollectionEntry;
-//class BlockIndex;
-
 export class PhysicalKnnScan final : public PhysicalOperator {
 public:
     explicit PhysicalKnnScan(u64 id,

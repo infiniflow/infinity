@@ -18,7 +18,6 @@ export module table_collection_meta;
 
 namespace infinity {
 
-//class TxnManager;
 class DBEntry;
 
 export struct TableCollectionMeta {

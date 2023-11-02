@@ -5,7 +5,7 @@
 module;
 
 #include <vector>
-#include <sstream>
+import std;
 
 import stl;
 import column_binding;

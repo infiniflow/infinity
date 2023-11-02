@@ -22,11 +22,6 @@ export enum class SinkType {
     kResult,
 };
 
-//class MaterializeSinkState;
-//class ResultSinkState;
-//class MessageSinkState;
-//class QueueSinkState;
-
 export class PhysicalSink final : public PhysicalOperator {
 public:
     explicit PhysicalSink(u64 id, SinkType sink_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)

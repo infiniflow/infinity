@@ -11,10 +11,6 @@ export module merge_knn_data;
 
 namespace infinity {
 
-//class MergeKnnBase;
-//class ResultHandler;
-//class SingleResultHandler;
-
 export enum class MergeKnnHeapType {
     kMaxHeap,
     kMinHeap,

@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import base_expression;
 import infinity_assert;
 import infinity_exception;

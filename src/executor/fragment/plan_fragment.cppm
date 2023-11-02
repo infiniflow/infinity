@@ -2,12 +2,6 @@
 // Created by jinhai on 23-4-27.
 //
 
-//#pragma once
-//
-//#include "src/scheduler/fragment_context.h"
-//#include "executor/operator/physical_sink.h"
-//#include "executor/operator/physical_source.h"
-
 module;
 
 import stl;

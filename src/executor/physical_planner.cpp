@@ -7,7 +7,6 @@ module;
 #include <memory>
 
 import stl;
-
 import physical_operator;
 import physical_operator_type;
 import physical_aggregate;

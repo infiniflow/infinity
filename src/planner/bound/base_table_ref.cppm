@@ -33,7 +33,7 @@ public:
           column_ids_(Move(column_ids)), block_index_(Move(block_index)), column_names_(Move(column_names)),
           column_types_(Move(column_types)), table_index_(table_index) {}
 
-    void RetainColumnByIndices(const Vector<size_t> &&indices) {
+    void RetainColumnByIndices(const Vector<SizeT> &&indices) {
         Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order", __FILE_NAME__, __LINE__);
 
         replace_field<SizeT>(column_ids_, indices);
@@ -53,7 +53,7 @@ public:
 
 private:
     template <typename T>
-    void replace_field(Vector<T> &field, const Vector<size_t> &indices) {
+    void replace_field(Vector<T> &field, const Vector<SizeT> &indices) {
         Vector<T> items;
         items.reserve(field.size());
 
