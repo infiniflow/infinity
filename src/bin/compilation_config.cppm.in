@@ -4,8 +4,6 @@
 
 module;
 
-import stl;
-
 export module compilation_config;
 
 #define VERSION_MAJOR @infinity_VERSION_MAJOR@
@@ -22,15 +20,15 @@ export module compilation_config;
 
 namespace infinity {
 
-export i32 version_major() {
+export int version_major() {
     return VERSION_MAJOR;
 }
 
-export i32 version_minor() {
+export int version_minor() {
     return VERSION_MINOR;
 }
 
-export i32 version_patch() {
+export int version_patch() {
     return VERSION_PATCH;
 }
 

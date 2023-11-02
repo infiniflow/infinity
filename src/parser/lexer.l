@@ -130,7 +130,6 @@ PRIMARY         { return PRIMARY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
-DATABASE        { return DATABASE; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }
