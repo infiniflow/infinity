@@ -4,13 +4,13 @@
 
 module;
 
-#include <unistd.h>
+#include <algorithm>
+#include <cstring>
 #include <errno.h>
 #include <fcntl.h>
-#include <cstring>
-#include <sys/stat.h>
 #include <filesystem>
-#include <algorithm>
+#include <sys/stat.h>
+#include <unistd.h>
 
 import stl;
 import file_system;
@@ -99,6 +99,12 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
     }
 }
 
+void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
+    if (rename(old_path.c_str(), new_path.c_str()) != 0) {
+        Error<StorageException>(Format("Can't rename file: {}, {}", old_path, strerror(errno)), __FILE_NAME__, __LINE__);
+    }
+}
+
 i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     i64 read_count = read(fd, data, nbytes);
@@ -108,7 +114,7 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
     return read_count;
 }
 
-i64 LocalFileSystem::Write(FileHandler &file_handler, void *data, u64 nbytes) {
+i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     i64 write_count = write(fd, data, nbytes);
     if (write_count == -1) {

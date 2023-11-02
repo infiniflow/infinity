@@ -12,7 +12,7 @@ import third_party;
 import logger;
 import parser;
 import knn_flat_l2;
-import infinity;
+import infinity_context;
 
 class KnnFlatL2Test : public BaseTest {};
 

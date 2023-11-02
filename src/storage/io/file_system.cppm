@@ -23,7 +23,7 @@ public:
 
     i64 Read(void *data, u64 nbytes);
 
-    i64 Write(void *data, u64 nbytes);
+    i64 Write(const void *data, u64 nbytes);
 
     void Sync();
 
@@ -45,7 +45,9 @@ public:
 
     virtual i64 Read(FileHandler &file_handler, void *data, u64 nbytes) = 0;
 
-    virtual i64 Write(FileHandler &file_handler, void *data, u64 nbytes) = 0;
+    virtual i64 Write(FileHandler &file_handler, const void *data, u64 nbytes) = 0;
+
+    virtual void Rename(const String &old_path, const String &new_path) = 0;
 
     virtual void Seek(FileHandler &file_handler, i64 pos) = 0;
 

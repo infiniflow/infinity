@@ -10,7 +10,7 @@ import stl;
 import parser;
 import physical_source;
 import physical_sink;
-import table;
+import data_table;
 import query_context;
 
 module plan_fragment;
@@ -45,6 +45,6 @@ SharedPtr<Vector<String>> PlanFragment::ToString() {
     return result;
 }
 
-SharedPtr<Table> PlanFragment::GetResult() { return context_->GetResult(); }
+SharedPtr<DataTable> PlanFragment::GetResult() { return context_->GetResult(); }
 
 } // namespace infinity

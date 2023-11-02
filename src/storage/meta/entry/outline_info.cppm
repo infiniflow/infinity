@@ -5,16 +5,17 @@
 module;
 
 import stl;
-import buffer_handle;
 
 export module outline_info;
 
 namespace infinity {
 
+class BufferObj;
+
 class BufferManager;
 
 export struct OutlineInfo {
-    Vector<Pair<BufferHandle *, SizeT>> written_buffers_{};
+    Vector<Pair<BufferObj *, SizeT>> written_buffers_{};
 
     BufferManager *buffer_mgr_{};
 

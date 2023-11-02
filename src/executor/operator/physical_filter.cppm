@@ -11,7 +11,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
-import table;
+import data_table;
 import expression_evaluator;
 import expression_selector;
 
@@ -44,7 +44,7 @@ private:
     ExpressionEvaluator executor_;
     ExpressionSelector selector_;
 
-    SharedPtr<Table> input_table_{};
+    SharedPtr<DataTable> input_table_{};
 };
 
 } // namespace infinity

@@ -32,7 +32,9 @@ public:
 
     i64 Read(FileHandler &file_handler, void *data, u64 nbytes) final;
 
-    i64 Write(FileHandler &file_handler, void *data, u64 nbytes) final;
+    i64 Write(FileHandler &file_handler, const void *data, u64 nbytes) final;
+
+    void Rename(const String &old_path, const String &new_path) final;
 
     void Seek(FileHandler &file_handler, i64 pos) final;
 

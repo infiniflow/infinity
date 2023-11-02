@@ -26,6 +26,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/select_statement.h"
 #include "statement/show_statement.h"
 #include "statement/update_statement.h"
+#include "statement/command_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -110,6 +111,7 @@ struct SQL_LTYPE {
     infinity::ShowStatement*    show_stmt;
     infinity::ExplainStatement* explain_stmt;
     infinity::FlushStatement*  flush_stmt;
+    infinity::CommandStatement* command_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -340,8 +342,8 @@ struct SQL_LTYPE {
 /* SQL keywords */
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
-%token EXCEPT FLUSH
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL VIEW INDEX ANALYZE VIEWS
+%token EXCEPT FLUSH USE
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL VIEW INDEX ANALYZE VIEWS DATABASES
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -368,6 +370,7 @@ struct SQL_LTYPE {
 %type <insert_stmt>       insert_statement
 %type <explain_stmt>      explain_statement
 %type <flush_stmt>        flush_statement
+%type <command_stmt>      command_statement
 
 %type <stmt_array>        statement_list
 
@@ -468,6 +471,7 @@ statement : create_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
 | explain_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
+| command_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -478,6 +482,7 @@ explainable_statement : create_statement { $$ = $1; }
 | update_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
+| command_statement { $$ = $1; }
 
 /*
  * CREATE STATEMENT
@@ -1416,7 +1421,11 @@ join_type : INNER {
 /*
  * SHOW STATEMENT
  */
-show_statement: SHOW TABLES {
+show_statement: SHOW DATABASES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kDatabases;
+}
+| SHOW TABLES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kTables;
 }
@@ -1462,6 +1471,16 @@ flush_statement: FLUSH DATA {
     $$ = new infinity::FlushStatement();
     $$->type_ = infinity::FlushType::kBuffer;
 };
+
+/*
+ * Command
+ */
+command_statement: USE IDENTIFIER {
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
+    free($2);
+}
+
 
 /*
  * EXPRESSION

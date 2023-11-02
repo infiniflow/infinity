@@ -5,7 +5,7 @@
 module;
 
 import stl;
-import table;
+import data_table;
 
 export module sql_runner;
 
@@ -14,7 +14,7 @@ namespace infinity {
 export class SQLRunner {
 
 public:
-    static SharedPtr<Table> Run(const String &sql_text, bool print = true);
+    static SharedPtr<DataTable> Run(const String &sql_text, bool print = true);
 };
 
 } // namespace infinity

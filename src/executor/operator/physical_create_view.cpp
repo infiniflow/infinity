@@ -8,7 +8,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -30,7 +30,7 @@ void PhysicalCreateView::Execute(QueryContext *query_context) {
     //    SharedPtr<View> view_ptr = MakeShared<View>(create_view_info_,
     //                                                GetOutputNames(),
     //                                                GetOutputTypes());
-    //    Infinity::instance().catalog()->CreateView(create_view_info_->schema_name_,
+    //    InfinityContext::instance().catalog()->CreateView(create_view_info_->schema_name_,
     //                                               view_ptr,
     //                                               create_view_info_->conflict_type_);
     // Generate the result
@@ -38,7 +38,7 @@ void PhysicalCreateView::Execute(QueryContext *query_context) {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
     SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
 }
 
 } // namespace infinity

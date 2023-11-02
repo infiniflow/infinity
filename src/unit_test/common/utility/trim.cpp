@@ -8,22 +8,9 @@ import infinity_exception;
 import infinity_assert;
 import stl;
 import global_resource_usage;
-import infinity;
+import infinity_context;
 
-class TrimTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-        std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
-    }
-
-    void TearDown() override {
-        infinity::Infinity::instance().UnInit();
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-    }
-};
+class TrimTest : public BaseTest {};
 
 TEST_F(TrimTest, test1) {
     std::string path = "/usr/src/storage/db";

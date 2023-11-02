@@ -9,6 +9,7 @@
 namespace infinity {
 
 enum class ShowStmtType {
+    kDatabases,
     kColumns,
     kTables,
     kCollections,

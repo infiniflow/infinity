@@ -9,7 +9,7 @@ import physical_operator_type;
 import query_context;
 import operator_state;
 import parser;
-import table;
+import data_table;
 
 export module physical_operator;
 
@@ -37,7 +37,7 @@ public:
     /// for push based execution
     virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) = 0;
 
-    const SharedPtr<Table> &output() const { return output_; }
+    const SharedPtr<DataTable> &output() const { return output_; }
 
     inline PhysicalOperatorType operator_type() const { return operator_type_; }
 
@@ -53,7 +53,7 @@ protected:
     SharedPtr<PhysicalOperator> left_{nullptr};
     SharedPtr<PhysicalOperator> right_{nullptr};
 
-    SharedPtr<Table> output_{};
+    SharedPtr<DataTable> output_{};
 
 public:
     // Operator

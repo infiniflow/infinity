@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 #include <string>
 
-import infinity;
+import infinity_context;
 import infinity_exception;
 import infinity_assert;
 import stl;
@@ -33,13 +33,14 @@ import meta_state;
 class TableEntryTest  : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
-        infinity::Infinity::instance().Init(config_path);
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
-        infinity::Infinity::instance().UnInit();
+        infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
@@ -88,8 +89,8 @@ TEST_F(TableEntryTest, test1) {
 TEST_F(TableEntryTest, test2) {
     using namespace infinity;
 
-    TxnManager *txn_mgr = infinity::Infinity::instance().storage()->txn_manager();
-    BufferManager *buffer_mgr = infinity::Infinity::instance().storage()->buffer_manager();
+    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
+    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     EntryResult create1_res, table1_res, get_res;
 

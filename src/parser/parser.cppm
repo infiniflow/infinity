@@ -132,6 +132,9 @@ export using DropTableInfo = DropTableInfo;
 export using DropCollectionInfo = DropCollectionInfo;
 export using DropSchemaInfo = DropSchemaInfo;
 export using DropViewInfo = DropViewInfo;
+export using CommandInfo = CommandInfo;
+export using UseCmd = UseCmd;
+export using CheckTable = CheckTable;
 
 export using InitParameter = InitParameter;
 
@@ -159,6 +162,7 @@ export using ExecuteStatement = ExecuteStatement;
 export using FlushStatement = FlushStatement;
 export using AlterStatement = AlterStatement;
 export using ExplainStatement = ExplainStatement;
+export using CommandStatement = CommandStatement;
 
 export using ParsedExprType = ParsedExprType;
 export using OrderType = OrderType;
@@ -166,6 +170,7 @@ export using LiteralType = LiteralType;
 export using SubqueryType = SubqueryType;
 export using JoinType = JoinType;
 export using KnnDistanceType = KnnDistanceType;
+export using CommandType = CommandType;
 
 export using ParsedExpr = ParsedExpr;
 export using ColumnExpr = ColumnExpr;
@@ -183,6 +188,7 @@ export using InExpr = InExpr;
 export using OrderByExpr = OrderByExpr;
 
 export using ColumnDef = ColumnDef;
+export using TableConstraint = TableConstraint;
 
 export inline std::string ConflictType2Str(ConflictType type) {
     return ConflictTypeToStr(type);

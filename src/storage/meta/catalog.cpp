@@ -130,6 +130,21 @@ void NewCatalog::RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 t
     DBMeta::DeleteNewEntry(db_meta, txn_id, txn_mgr);
 }
 
+Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts) {
+    catalog->rw_locker_.lock_shared();
+
+    Vector<DBEntry*> res;
+    res.reserve(catalog->databases_.size());
+    for(const auto& db_meta: catalog->databases_) {
+        EntryResult entry_result = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts);
+        if(entry_result.Success()) {
+            res.emplace_back(static_cast<DBEntry*>(entry_result.entry_));
+        }
+    }
+    catalog->rw_locker_.unlock_shared();
+    return res;
+}
+
 SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);

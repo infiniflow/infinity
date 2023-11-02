@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -22,7 +22,7 @@ namespace infinity {
 
 class Comparator {
 public:
-    explicit Comparator(const SharedPtr<Table> &order_by_table, const Vector<OrderType> &order_by_types)
+    explicit Comparator(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types)
         : order_by_table_(order_by_table), order_by_types_(order_by_types) {}
 
     bool operator()(RowID left, RowID right) {
@@ -177,7 +177,7 @@ public:
     }
 
 private:
-    const SharedPtr<Table> &order_by_table_;
+    const SharedPtr<DataTable> &order_by_table_;
     const Vector<OrderType> &order_by_types_;
 };
 
@@ -210,10 +210,10 @@ void PhysicalSort::Execute(QueryContext *query_context) {
                                                    MakeShared<String>("sort"),
                                                    columns);
 
-    output_ = Table::Make(table_def, TableType::kIntermediate);
+    output_ = DataTable::Make(table_def, TableType::kIntermediate);
 
     // Generate table before getting the order of row id.
-    SharedPtr<Table> order_by_table = GetOrderTable();
+    SharedPtr<DataTable> order_by_table = GetOrderTable();
 
     // Fill the order by table
     this->executor_.Execute(input_table_, order_by_table);
@@ -222,7 +222,7 @@ void PhysicalSort::Execute(QueryContext *query_context) {
 #endif
 }
 
-SharedPtr<Table> PhysicalSort::GetOrderTable() const {
+SharedPtr<DataTable> PhysicalSort::GetOrderTable() const {
     SizeT column_count = this->expressions_.size();
     Vector<SharedPtr<ColumnDef>> columns;
     columns.reserve(column_count);
@@ -244,10 +244,10 @@ SharedPtr<Table> PhysicalSort::GetOrderTable() const {
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_key_table"), columns);
 
-    return Table::Make(table_def, TableType::kIntermediate);
+    return DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalSort::Sort(const SharedPtr<Table> &order_by_table, const Vector<OrderType> &order_by_types) {
+void PhysicalSort::Sort(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types) {
     // Generate row id vector
     SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
 
@@ -257,7 +257,7 @@ void PhysicalSort::Sort(const SharedPtr<Table> &order_by_table, const Vector<Ord
     output_ = GenerateOutput(input_table_, rowid_vector);
 }
 
-SharedPtr<Table> PhysicalSort::GenerateOutput(const SharedPtr<Table> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector) {
+SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector) {
     // output table definition is same as input
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
@@ -275,7 +275,7 @@ SharedPtr<Table> PhysicalSort::GenerateOutput(const SharedPtr<Table> &input_tabl
     }
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("sort"), columns);
-    SharedPtr<Table> output_table = Table::Make(table_def, TableType::kIntermediate);
+    SharedPtr<DataTable> output_table = DataTable::Make(table_def, TableType::kIntermediate);
 
     const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
 

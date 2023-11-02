@@ -10,13 +10,13 @@ import stl;
 // import txn;
 import query_context;
 // import table_def;
-// import table;
- import parser;
+// import data_table;
+import parser;
 import operator_state;
 import physical_operator_type;
 import third_party;
 import fragment_data;
- import data_block;
+import data_block;
 // import column_vector;
 import infinity_assert;
 import infinity_exception;
@@ -248,6 +248,16 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
         }
         case PhysicalOperatorType::kDropView: {
             auto *output_state = static_cast<DropViewOutputState *>(task_output_state);
+            if (output_state->error_message_.get() != nullptr) {
+                result_sink_state->error_message_ = Move(output_state->error_message_);
+            } else {
+                result_sink_state->result_def_ = {
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+            }
+            break;
+        }
+        case PhysicalOperatorType::kCommand: {
+            auto *output_state = static_cast<CommandOutputState *>(task_output_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {

@@ -4,9 +4,9 @@
 
 module;
 
-#include <iostream>
 #include <thread>
 
+import std;
 import stl;
 
 module threadutil;

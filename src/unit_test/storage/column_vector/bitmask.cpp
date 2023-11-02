@@ -10,7 +10,7 @@ import logger;
 import bitmask;
 import third_party;
 import stl;
-import infinity;
+import infinity_context;
 import global_resource_usage;
 
 class BitmaskTest : public BaseTest {};

@@ -19,7 +19,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -37,7 +37,7 @@ import table_collection_meta;
 import wal_entry;
 import file_system_type;
 import file_system;
-import object_handle;
+import buffer_handle;
 import infinity_assert;
 import infinity_exception;
 import table_collection_entry;
@@ -124,11 +124,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_name);
 
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_,
-                                                                              segment_id,
-                                                                              query_context->GetTxn()->GetBufferMgr());
+    SharedPtr<SegmentEntry> segment_entry =
+        SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    ObjectHandle object_handle(last_block_entry->columns_[0]->buffer_handle_);
+    BufferHandle buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
     SizeT row_idx = 0;
 
     while (true) {
@@ -139,7 +138,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
                                      __FILE_NAME__,
                                      __LINE__);
         }
-        ptr_t dst_ptr = object_handle.GetData() + row_idx * sizeof(FloatT) * dimension;
+        ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut()) + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
         ++segment_entry->row_count_;
         ++last_block_entry->row_count_;
@@ -165,7 +164,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
-            object_handle = ObjectHandle(last_block_entry->columns_[0]->buffer_handle_);
+            buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
         }
     }
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));

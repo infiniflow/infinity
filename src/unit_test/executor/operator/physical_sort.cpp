@@ -12,9 +12,9 @@ import third_party;
 import parser;
 import logger;
 import stl;
-import infinity;
+import infinity_context;
 import default_values;
-import table;
+import data_table;
 import table_def;
 import value;
 import data_block;
@@ -56,7 +56,7 @@ TEST_F(PhysicalSortTest, test1) {
                                                    MakeShared<String>("input_table"),
                                                    columns);
 
-    SharedPtr<Table> input_table = Table::Make(table_def, TableType::kIntermediate);
+    SharedPtr<DataTable> input_table = DataTable::Make(table_def, TableType::kIntermediate);
 
     for(SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<DataBlock> data_block = DataBlock::Make();
@@ -81,7 +81,7 @@ TEST_F(PhysicalSortTest, test1) {
         }
     }
 
-    SharedPtr<Table> output_table = PhysicalSort::GenerateOutput(input_table, rowid_vector);
+    SharedPtr<DataTable> output_table = PhysicalSort::GenerateOutput(input_table, rowid_vector);
     std::cout << output_table->ToString() << std::endl;
 }
 #endif

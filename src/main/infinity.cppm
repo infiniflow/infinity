@@ -5,38 +5,40 @@ module;
 
 export module infinity;
 
-import singleton;
 import stl;
 import config;
 import resource_manager;
 import fragment_scheduler;
 import storage;
+import database;
+import query_result;
+import query_options;
+import infinity_context;
+import session;
+import database_object;
 
 namespace infinity {
 
-export class Infinity : public Singleton<Infinity> {
+export class Infinity : public DatabaseObject {
 public:
-    [[nodiscard]] inline FragmentScheduler *fragment_scheduler() noexcept { return fragment_scheduler_.get(); }
+    Infinity();
 
-    [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
+    static SharedPtr<Infinity> Connect(const String &path);
 
-    [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
+    void Disconnect();
 
-    [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
+    QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options);
 
-    void Init(const SharedPtr<String> &config_path);
+    QueryResult DropDatabase(const String &db_name, const DropDatabaseOptions &options);
 
-    void UnInit();
+    QueryResult ListDatabases();
+
+    SharedPtr<Database> GetDatabase(const String &db_name);
+
+    ~Infinity();
 
 private:
-    friend class Singleton;
-
-    Infinity() = default;
-
-    UniquePtr<Config> config_{};
-    UniquePtr<ResourceManager> resource_manager_{};
-    UniquePtr<FragmentScheduler> fragment_scheduler_{};
-    UniquePtr<Storage> storage_{};
+    SharedPtr<EmbeddedSession> session_{};
 
     bool initialized_{false};
 };

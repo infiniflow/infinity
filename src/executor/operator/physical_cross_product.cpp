@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -59,7 +59,7 @@ void PhysicalCrossProduct::Execute(QueryContext *query_context) {
     }
 
     SharedPtr<TableDef> cross_product_table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("cross_product"), columns_def);
-    SharedPtr<Table> cross_product_table = Table::Make(cross_product_table_def, TableType::kCrossProduct);
+    SharedPtr<DataTable> cross_product_table = DataTable::Make(cross_product_table_def, TableType::kCrossProduct);
 
     // Loop left table and scan right table
     SizeT left_block_count = left_table_->DataBlockCount();

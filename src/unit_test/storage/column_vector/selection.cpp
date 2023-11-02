@@ -12,7 +12,7 @@ import default_values;
 import third_party;
 import stl;
 import global_resource_usage;
-import infinity;
+import infinity_context;
 
 class SelectionTest : public BaseTest {};
 

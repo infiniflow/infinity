@@ -10,7 +10,7 @@ import stl;
 import txn;
 import query_context;
 import table_def;
-import table;
+import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -73,7 +73,7 @@ void PhysicalInsert::Execute(QueryContext *query_context, InputState *input_stat
         // Generate the result table
         Vector<SharedPtr<ColumnDef>> column_defs;
         SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-        output_ = MakeShared<Table>(result_table_def_ptr, TableType::kDataTable);
+        output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         output_->SetResultMsg(Move(result_msg));
     } else {
         InsertOutputState *insert_output_state = static_cast<InsertOutputState *>(output_state);

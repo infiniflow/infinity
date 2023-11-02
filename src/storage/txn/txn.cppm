@@ -19,7 +19,7 @@ import txn_context;
 import wal_entry;
 import txn_store;
 import index_def_entry;
-#include "statement/extra/extra_ddl_info.h"
+import database_detail;
 
 export module txn;
 
@@ -68,6 +68,8 @@ public:
     EntryResult DropDatabase(const String &db_name, ConflictType conflict_type);
 
     EntryResult GetDatabase(const String &db_name);
+
+    Vector<DatabaseDetail> ListDatabases();
 
     Vector<TableCollectionDetail> GetTableCollections(const String &db_name);
 

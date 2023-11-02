@@ -13,7 +13,7 @@ import infinity_exception;
 import infinity_assert;
 import third_party;
 
-export module table;
+export module data_table;
 
 namespace infinity {
 
@@ -28,17 +28,17 @@ export enum class TableType {
     kResult,
 };
 
-export class Table : public BaseTable {
+export class DataTable : public BaseTable {
 
 public:
-    static SharedPtr<Table> Make(SharedPtr<TableDef> table_def_ptr, TableType type);
+    static SharedPtr<DataTable> Make(SharedPtr<TableDef> table_def_ptr, TableType type);
 
-    static SharedPtr<Table> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs);
+    static SharedPtr<DataTable> MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs);
 
-    static SharedPtr<Table> MakeEmptyResultTable();
+    static SharedPtr<DataTable> MakeEmptyResultTable();
 
 public:
-    explicit Table(SharedPtr<TableDef> table_def_ptr, TableType type);
+    explicit DataTable(SharedPtr<TableDef> table_def_ptr, TableType type);
 
 public:
     [[nodiscard]] SizeT ColumnCount() const;
@@ -79,7 +79,7 @@ public:
     [[nodiscard]] SharedPtr<Vector<RowID>> GetRowIDVector() const;
 
     // Currently this method is used in aggregate operator.
-    void UnionWith(const SharedPtr<Table> &other);
+    void UnionWith(const SharedPtr<DataTable> &other);
 
 public:
     SharedPtr<TableDef> definition_ptr_{};

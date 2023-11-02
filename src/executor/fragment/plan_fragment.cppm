@@ -12,7 +12,7 @@ module;
 
 import stl;
 import parser;
-import table;
+import data_table;
 import fragment_context;
 import physical_operator;
 import physical_source;
@@ -70,7 +70,7 @@ public:
 
     inline FragmentContext *GetContext() { return context_.get(); }
 
-    SharedPtr<Table> GetResult();
+    SharedPtr<DataTable> GetResult();
 
 private:
     u64 fragment_id_{};

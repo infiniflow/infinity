@@ -16,7 +16,7 @@ import data_block;
 import default_values;
 import profiler;
 import value;
-import infinity;
+import infinity_context;
 
 class DataBlockTest : public BaseTest {};
 

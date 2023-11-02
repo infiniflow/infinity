@@ -53,6 +53,8 @@ COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
 DATA            { return DATA; }
+DATABASE        { return DATABASE; }
+DATABASES       { return DATABASES; }
 DATE            { return DATE; }
 DATETIME        { return DATETIME; }
 DAY             { return DAY; }
@@ -148,6 +150,7 @@ UNIQUE          { return UNIQUE; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }
+USE             { return USE; }
 VALUES          { return VALUES; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }

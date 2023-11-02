@@ -10,7 +10,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table;
+import data_table;
 
 export module physical_cross_product;
 
@@ -34,8 +34,8 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
 private:
-    SharedPtr<Table> left_table_{};
-    SharedPtr<Table> right_table_{};
+    SharedPtr<DataTable> left_table_{};
+    SharedPtr<DataTable> right_table_{};
 };
 
 } // namespace infinity

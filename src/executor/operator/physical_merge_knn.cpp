@@ -109,7 +109,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
-                    ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
+                    const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
                     output_data.AppendValueByPtr(column_id, ptr);
                 }
                 output_data.AppendValueByPtr(column_id++, (ptr_t)&result_dists[top_idx]);

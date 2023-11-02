@@ -12,7 +12,7 @@ import third_party;
 import logger;
 import parser;
 import table_def;
-import infinity;
+import infinity_context;
 
 class TableDefTest : public BaseTest {};
 
