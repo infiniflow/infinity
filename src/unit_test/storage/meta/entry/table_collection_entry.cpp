@@ -278,7 +278,7 @@ TEST_F(TableCollectionEntryTest, test2) {
             EXPECT_EQ(read_table_meta->local_blocks_.size(), 1);
             for (const auto &local_block_state : read_table_meta->local_blocks_) {
                 EXPECT_NE(local_block_state.data_block_, nullptr);
-                SizeT row_count = local_block_state.data_block_->row_count();
+                u16 row_count = local_block_state.data_block_->row_count();
                 EXPECT_EQ(row_count, 8192);
                 EXPECT_EQ(local_block_state.column_vector_map_.size(), 3);
 

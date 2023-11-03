@@ -152,7 +152,7 @@ export struct WalCmdDropIndex : public WalCmd {
 };
 
 export struct WalCmdImport : public WalCmd {
-    WalCmdImport(String db_name_, String table_name_, String segment_dir_, i32 segment_id_, i32 block_entries_size_, Vector<i32> &row_counts_)
+    WalCmdImport(String db_name_, String table_name_, String segment_dir_, u32 segment_id_, u16 block_entries_size_, Vector<u16> &row_counts_)
         : db_name(Move(db_name_)), table_name(Move(table_name_)), segment_dir(Move(segment_dir_)), segment_id(segment_id_),
           block_entries_size(block_entries_size_), row_counts_(row_counts_) {}
 
@@ -164,10 +164,10 @@ export struct WalCmdImport : public WalCmd {
     String db_name;
     String table_name;
     String segment_dir;
-    i32 segment_id;
-    i32 block_entries_size;
+    u32 segment_id;
+    u16 block_entries_size;
     // row_counts_[i] means the number of rows in the i-th block entry
-    Vector<i32> row_counts_;
+    Vector<u16> row_counts_;
 };
 
 export struct WalCmdAppend : public WalCmd {

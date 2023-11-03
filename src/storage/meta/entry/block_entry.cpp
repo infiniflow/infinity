@@ -20,6 +20,8 @@ import local_file_system;
 import serialize;
 import infinity_assert;
 import infinity_exception;
+import table_collection_entry;
+import parser;
 
 module block_entry;
 namespace infinity {
@@ -95,7 +97,7 @@ void BlockVersion::SaveToFile(const String &version_path) {
     ofs.close();
 }
 
-BlockEntry::BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr)
+BlockEntry::BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr)
     : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), checkpoint_ts_(checkpoint_ts),
       row_capacity_(DEFAULT_VECTOR_SIZE), row_count_(0) {
     base_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir_, block_id);
@@ -108,11 +110,11 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeS
 }
 
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
-                       i16 block_id,
+                       u16 block_id,
                        TxnTimeStamp checkpoint_ts,
                        u64 column_count,
                        BufferManager *buffer_mgr,
-                       i16 row_count_,
+                       u16 row_count_,
                        i16 min_row_ts_,
                        i16 max_row_ts_)
     : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), checkpoint_ts_(checkpoint_ts),
@@ -130,27 +132,27 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
     block_version_->created_.emplace_back(std::make_pair(min_row_ts_, row_count_));
 }
 
-Pair<i16, i16> BlockEntry::VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, i16 block_offset_begin) {
+Pair<u16, u16> BlockEntry::VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin) {
     auto &block_version = block_entry->block_version_;
     auto &deleted = block_version->deleted_;
-    i16 block_offset_end = block_version->GetRowCount(begin_ts);
+    u16 block_offset_end = block_version->GetRowCount(begin_ts);
     while (block_offset_begin < block_offset_end && deleted[block_offset_begin] != 0 && deleted[block_offset_begin] <= begin_ts) {
         block_offset_begin++;
     }
-    i16 i;
-    for (i = block_offset_begin; i < block_offset_end; i++) {
-        if (deleted[i] != 0 && deleted[i] <= begin_ts) {
+    u16 row_idx;
+    for (row_idx = block_offset_begin; row_idx < block_offset_end; ++row_idx) {
+        if (deleted[row_idx] != 0 && deleted[row_idx] <= begin_ts) {
             break;
         }
     }
-    return {block_offset_begin, i};
+    return {block_offset_begin, row_idx};
 }
 
-i16 BlockEntry::AppendData(BlockEntry *block_entry,
+u16 BlockEntry::AppendData(BlockEntry *block_entry,
                            Txn *txn_ptr,
                            DataBlock *input_data_block,
-                           offset_t input_offset,
-                           i16 append_rows,
+                           u16 input_block_offset,
+                           u16 append_rows,
                            BufferManager *buffer_mgr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
@@ -159,7 +161,7 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry,
         __FILE_NAME__,
         __LINE__);
     block_entry->txn_ptr_ = txn_ptr;
-    i16 actual_copied = append_rows;
+    u16 actual_copied = append_rows;
     if (block_entry->row_count_ + append_rows > block_entry->row_capacity_) {
         actual_copied = block_entry->row_capacity_ - block_entry->row_count_;
     }
@@ -169,7 +171,7 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry,
         BlockColumnEntry::Append(block_entry->columns_[column_id].get(),
                                  block_entry->row_count_,
                                  input_data_block->column_vectors[column_id].get(),
-                                 input_offset,
+                                 input_block_offset,
                                  actual_copied);
 
         LOG_TRACE(Format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
@@ -183,16 +185,26 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry,
     return actual_copied;
 }
 
-void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset) {
+void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
         block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
         Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
         __FILE_NAME__,
         __LINE__);
+
+    String *table_collect_name_ptr = block_entry->segment_entry_->table_entry_->table_collection_name_.get();
+    u32 segment_id = block_entry->segment_entry_->segment_id_;
+    u16 block_id = block_entry->block_id_;
+
     block_entry->txn_ptr_ = txn_ptr;
     auto &block_version = block_entry->block_version_;
-    block_version->deleted_[block_offset] = txn_ptr->CommitTS();
+    for (RowID row_id : rows) {
+        u16 block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+        block_version->deleted_[block_offset] = txn_ptr->CommitTS();
+    }
+
+    LOG_TRACE(Format("Table {} Segment {} Block {} has deleted {} rows", *table_collect_name_ptr, segment_id, block_id, rows.size()));
 }
 
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.

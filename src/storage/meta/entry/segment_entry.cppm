@@ -59,7 +59,7 @@ public:
     const TableCollectionEntry *table_entry_{};
 
     SharedPtr<String> segment_dir_{};
-    i32 segment_id_{};
+    u32 segment_id_{};
 
     SizeT row_count_{};
     SizeT row_capacity_{};
@@ -74,14 +74,14 @@ public:
     HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
 
 public:
-    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u32 segment_id, BufferManager *buffer_mgr);
 
     static SharedPtr<SegmentEntry>
-    MakeReplaySegmentEntry(const TableCollectionEntry *table_entry, u64 segment_id, SharedPtr<String> segment_dir, TxnTimeStamp commit_ts);
+    MakeReplaySegmentEntry(const TableCollectionEntry *table_entry, u32 segment_id, SharedPtr<String> segment_dir, TxnTimeStamp commit_ts);
 
-    static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    static u64 AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, const Vector<RowID> &rows);
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
 
     static void CreateIndexScalar(SegmentEntry *segment_entry,
                                   Txn *txn_ptr,
@@ -98,17 +98,15 @@ public:
                                                       BufferManager *buffer_mgr,
                                                       TxnTableStore *txn_store);
 
-    static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, i16 start_pos, i16 row_count);
+    static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
     static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
-    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id);
+    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
 
-    static u64 GetBlockIDByRowID(SizeT row_id);
+    static u16 GetMaxBlockID(const SegmentEntry *segment_entry);
 
-    static i16 GetMaxBlockID(const SegmentEntry *segment_entry);
-
-    static BlockEntry *GetBlockEntryByID(const SegmentEntry *segment_entry, u64 block_id);
+    static BlockEntry *GetBlockEntryByID(const SegmentEntry *segment_entry, u16 block_id);
 
     static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -119,7 +117,7 @@ public:
     void MergeFrom(infinity::BaseEntry &other) override;
 
 private:
-    static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u64 seg_id);
+    static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u32 seg_id);
 };
 
 } // namespace infinity

@@ -100,24 +100,6 @@ public:
 
     void GetMetaTableState(MetaTableState *meta_table_state, const TableCollectionEntry *table_collection_entry, const Vector<ColumnID> &columns);
 
-    SharedPtr<GetState> InitializeGet(GetParam);
-
-    void TableGet();
-
-    void IndexGet();
-
-    SharedPtr<ScanState> InitializeScan(const String &db_name, const String &table_name, const Vector<ColumnID> &column_ids);
-
-    void Scan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void TableScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void IndexScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void AnnScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    UniquePtr<String> CompleteScan(const String &db_name, const String &table_name);
-
     BufferManager *GetBufferMgr() const;
 
     inline u64 TxnID() const { return txn_id_; }

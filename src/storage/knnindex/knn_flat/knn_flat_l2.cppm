@@ -14,6 +14,7 @@ import faiss;
 import parser;
 import infinity_assert;
 import infinity_exception;
+import default_values;
 
 export module knn_flat_l2;
 
@@ -41,14 +42,14 @@ public:
             return;
         }
 
-        for (SizeT i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_result_handler_->begin(i);
         }
 
         begin_ = true;
     }
 
-    void Search(const DistType *base, i16 base_count, i32 segment_id, i16 block_id) final {
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
             Error<ExecutorException>("KnnFlatL2 isn't begin", __FILE_NAME__, __LINE__);
         }
@@ -59,13 +60,15 @@ public:
             return;
         }
 
-        for (i64 i = 0; i < this->query_count_; i++) {
+        u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+
+        for (u64 i = 0; i < this->query_count_; ++i) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 DistType l2 = fvec_L2sqr(x_i, y_j, this->dimension_);
-                single_result_handler_->add_result(l2, RowID{segment_id, block_id, j}, i);
+                single_result_handler_->add_result(l2, RowID{segment_id, segment_offset_start + j}, i);
             }
         }
     }
@@ -74,7 +77,7 @@ public:
         if (!begin_)
             return;
 
-        for (i32 i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_result_handler_->end(i);
         }
 

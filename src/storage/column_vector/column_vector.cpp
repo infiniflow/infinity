@@ -1890,7 +1890,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 }
 
 SizeT ColumnVector::AppendWith(RowT from, SizeT row_count) {
-    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only kRowID column vector supports this method", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only RowID column vector supports this method", __FILE_NAME__, __LINE__);
     if (row_count == 0) {
         return 0;
     }
@@ -1903,7 +1903,7 @@ SizeT ColumnVector::AppendWith(RowT from, SizeT row_count) {
 
     ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
     for (SizeT i = 0; i < row_count; i++) {
-        *(RowID *)dst_ptr = RowID(from.segment_id_, from.block_id_, from.block_offset_ + i);
+        *(RowID *)dst_ptr = RowID(from.segment_id_, from.segment_offset_ + i);
         dst_ptr += data_type_size_;
     }
     this->tail_index_ += appended_rows;

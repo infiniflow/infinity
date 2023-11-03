@@ -11,8 +11,8 @@ export module global_block_id;
 namespace infinity {
 
 export struct GlobalBlockID {
-    i32 segment_id_{};
-    i16 block_id_{};
+    u32 segment_id_{};
+    u16 block_id_{};
 };
 
 } // namespace infinity

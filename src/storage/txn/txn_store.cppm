@@ -27,7 +27,7 @@ public:
 
     UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
 
-    UniquePtr<String> CreateIndexFile(u64 segment_id, SharedPtr<IndexEntry> index);
+    UniquePtr<String> CreateIndexFile(u32 segment_id, SharedPtr<IndexEntry> index);
 
     UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
@@ -42,7 +42,7 @@ public:
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
     Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
-    HashMap<u64, SharedPtr<IndexEntry>> uncommitted_indexes_{};
+    HashMap<u32, SharedPtr<IndexEntry>> uncommitted_indexes_{};
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 

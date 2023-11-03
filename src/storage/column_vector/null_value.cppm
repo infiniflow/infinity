@@ -183,9 +183,8 @@ inline EmbeddingT NullValue() {
 template <>
 inline RowT NullValue() {
     RowT row_id;
-    row_id.segment_id_ = i32_inf;
-    row_id.block_id_ = i32_inf;
-    row_id.block_offset_ = i32_inf;
+    row_id.segment_id_ = u32_inf;
+    row_id.segment_offset_ = u32_inf;
     return row_id;
 }
 

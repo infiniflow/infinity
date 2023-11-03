@@ -100,16 +100,16 @@ struct NewHeapResultHandler : public ResultHandler {
     }
 
     /// add results for query i0..i1 and j0..j1
-    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, i32 segment_id, i16 block_id) {
+    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id, u32 segment_offset_start) {
         for (i64 i = i_start; i < i_end; i++) {
             T *heap_dis = heap_dis_tab + i * k;
             TI *heap_ids = heap_ids_tab + i * k;
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
             T thresh = heap_dis[0];
-            for (i16 j = j0; j < j1; j++) {
+            for (u32 j = j0; j < j1; j++) {
                 T dis = dis_tab_i[j];
                 if (C::cmp(thresh, dis)) {
-                    heap_replace_top<C>(k, heap_dis, heap_ids, dis, RowID(segment_id, block_id, j));
+                    heap_replace_top<C>(k, heap_dis, heap_ids, dis, RowID(segment_id, segment_offset_start + j));
                     thresh = heap_dis[0];
                 }
             }
@@ -263,15 +263,15 @@ struct NewReservoirResultHandler : public ResultHandler {
     }
 
     /// add results for query i_start..i_end and j0..j1
-    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, i32 segment_id, i16 block_id) {
+    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id, u32 segment_offset_start) {
         // maybe parallel for
         // #pragma omp parallel for
         for (i64 i = i_start; i < i_end; i++) {
             ReservoirTopN<C> &reservoir = reservoirs[i - i_start];
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
-            for (i16 j = j0; j < j1; j++) {
+            for (u32 j = j0; j < j1; j++) {
                 T dis = dis_tab_i[j];
-                reservoir.add(dis, RowID(segment_id, block_id, j));
+                reservoir.add(dis, RowID(segment_id, segment_offset_start + j));
             }
         }
     }
@@ -342,19 +342,19 @@ struct SingleBestResultHandler : public ResultHandler {
     }
 
     /// add results for query i0..i1 and j0..j1
-    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, i32 segment_id, i16 block_id) {
+    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id, u32 segment_offset_start) {
         for (i64 i = i_start; i < i_end; i++) {
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
 
             auto &min_distance = this->dis_tab[i];
             auto &min_index = this->ids_tab[i];
 
-            for (i16 j = j0; j < j1; j++) {
+            for (u32 j = j0; j < j1; j++) {
                 const T distance = dis_tab_i[j];
 
                 if (C::cmp(min_distance, distance)) {
                     min_distance = distance;
-                    min_index = RowID(segment_id, block_id, j);
+                    min_index = RowID(segment_id, segment_offset_start + j);
                 }
             }
         }

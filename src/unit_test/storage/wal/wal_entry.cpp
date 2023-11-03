@@ -61,7 +61,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         auto entry = MakeShared<WalEntry>();
         entry->cmds.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
         entry->cmds.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
-        Vector<i32> row_counts{1, 2, 3};
+        Vector<u16> row_counts{1, 2, 3};
         entry->cmds.push_back(
             MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
 
@@ -143,7 +143,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    Vector<i32> row_counts{1, 2, 3};
+    Vector<u16> row_counts{1, 2, 3};
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
 
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
@@ -166,7 +166,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     data_block->Finalize();
 
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
-    Vector<RowID> row_ids = {RowID(1, 2, 3)};
+    Vector<RowID> row_ids = {RowID(1, 3)};
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
 
