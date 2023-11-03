@@ -134,14 +134,14 @@ EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
 query I
 EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;
 ----
- DELETE FROM default.t1
- -> FILTER (3)
-    - filter: CAST(c1 (#0) AS BigInt) = 1
-    - output columns: [c1]
-   -> TABLE SCAN (2)
-      - table name: t1(default.t1)
-      - table index: #1
-      - output columns: [c1]
+DELETE FROM default.t1
+-> FILTER (3)
+   - filter: CAST(c1 (#0) AS BigInt) = 1
+   - output columns: [c1]
+  -> TABLE SCAN (2)
+     - table name: t1(default.t1)
+     - table index: #1
+     - output columns: [c1]
 
 statement ok
 DROP TABLE t1;

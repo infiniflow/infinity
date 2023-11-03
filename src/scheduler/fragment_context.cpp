@@ -231,6 +231,10 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
             MakeTaskStateTemplate<DeleteInputState, DeleteOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
         }
+        case PhysicalOperatorType::kUpdate: {
+            MakeTaskStateTemplate<UpdateInputState, UpdateOutputState>(input_state, output_state, physical_ops[operator_id]);
+            break;
+        }
         case PhysicalOperatorType::kInsert: {
             MakeTaskStateTemplate<InsertInputState, InsertOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
@@ -304,7 +308,6 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kFlush:
@@ -608,6 +611,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
+        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kDelete: {
             Error<SchedulerException>(
                 Format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())),
@@ -646,7 +650,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kFlush: {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())),
@@ -944,10 +947,14 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 }
 
 SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
-
     // Only one sink state
     if (tasks_.size() != 1) {
         Error<SchedulerException>("There should be one sink state in serial materialized fragment", __FILE_NAME__, __LINE__);
+    }
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {
@@ -974,18 +981,11 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         }
         case SinkStateType::kResult: {
             auto *result_sink_state = static_cast<ResultSinkState *>(tasks_[0]->sink_state_.get());
-            if (result_sink_state->error_message_ == nullptr) {
-                SharedPtr<DataTable> result_table = DataTable::MakeResultTable({result_sink_state->result_def_});
-                return result_table;
-            }
-            Error<ExecutorException>(*result_sink_state->error_message_, __FILE_NAME__, __LINE__);
+            SharedPtr<DataTable> result_table = DataTable::MakeResultTable({result_sink_state->result_def_});
+            return result_table;
         }
         case SinkStateType::kMessage: {
             auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
-            if (message_sink_state->error_message_ != nullptr) {
-                throw Exception(*message_sink_state->error_message_);
-            }
-
             if (message_sink_state->message_ == nullptr) {
                 Error<SchedulerException>("No response message", __FILE_NAME__, __LINE__);
             }
@@ -1013,6 +1013,11 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
+    }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
         u64 counter = 0, sum = 0;
         for (SizeT i = 0; i < tasks_.size(); ++i) {
@@ -1025,10 +1030,6 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     }
 
     auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
-    if (first_materialize_sink_state->error_message_ != nullptr) {
-        Error<ExecutorException>(*first_materialize_sink_state->error_message_, __FILE_NAME__, __LINE__);
-    }
-
     Vector<SharedPtr<ColumnDef>> column_defs;
     SizeT column_count = first_materialize_sink_state->column_names_->size();
     column_defs.reserve(column_count);
@@ -1045,10 +1046,6 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
-        if (materialize_sink_state->error_message_ != nullptr) {
-            Error<ExecutorException>(*materialize_sink_state->error_message_, __FILE_NAME__, __LINE__);
-        }
-
         if (result_table == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
@@ -1063,6 +1060,11 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 
 SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
+    }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
         u64 counter = 0, sum = 0;
         for (SizeT i = 0; i < tasks_.size(); ++i) {

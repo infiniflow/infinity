@@ -194,11 +194,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                 BufferHandle buffer_handle = block_column_entry->buffer_->Load();
                 auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
-                try {
-                    index->train(block_row_cnt, block_data_ptr);
-                } catch (StlException &e) {
-                    StorageException("Train index failed: {}", e.what());
-                }
+                index->train(block_row_cnt, block_data_ptr);
             }
 
             auto index_entry =

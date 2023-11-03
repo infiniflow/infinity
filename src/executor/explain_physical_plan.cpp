@@ -1219,7 +1219,20 @@ void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
                                   bool is_recursive,
                                   i64 intent_size) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    String header;
+    if (intent_size != 0) {
+        header = String(intent_size - 2, ' ') + "-> UPDATE ";
+    } else {
+        header = "UPDATE ";
+    }
+
+    TableCollectionEntry *table_entry = update_node->table_entry_ptr_;
+    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
+    header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
+    result->emplace_back(MakeShared<String>(header));
+    if (update_node->left().get() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(update_node->left().get(), result, is_recursive, intent_size + 2);
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
