@@ -50,6 +50,38 @@ double elapsed() {
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
 
+struct RandomGenerator {
+    std::mt19937 mt;
+
+    /// random positive integer
+    int rand_int() { return mt() & 0x7fffffff; }
+
+    /// random int64_t
+    int64_t rand_int64() { return int64_t(rand_int()) | int64_t(rand_int()) << 31; }
+
+    /// generate random integer between 0 and max-1
+    int rand_int(int max) { return mt() % max; }
+
+    /// between 0 and 1
+    float rand_float() { return mt() / float(mt.max()); }
+
+    double rand_double() { return mt() / double(mt.max()); }
+
+    explicit RandomGenerator(int64_t seed = 1234) : mt((unsigned int)seed) {}
+};
+
+void rand_perm(int *perm, size_t n, int64_t seed) {
+    for (size_t i = 0; i < n; i++)
+        perm[i] = i;
+
+    RandomGenerator rng;
+
+    for (size_t i = 0; i + 1 < n; i++) {
+        int i2 = i + rng.rand_int(n - i);
+        std::swap(perm[i], perm[i2]);
+    }
+}
+
 template <typename DiffType, typename ElemType, typename CentroidType>
 Pair<i32, DiffType> l2_find_nearest_centroid(i32 dimension, const ElemType *vector_ptr, i32 partition_num, const CentroidType *centroids_ptr) {
     i32 nearest_centroid_id = -1;
@@ -148,11 +180,21 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                       << "warning : will randomly choose max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << max_num << " vectors to train" << std::endl;
             training_data_num = max_num;
-            // TODO: generate random training data, now use permutation
-            // TODO: now use 0 ~ n.
+            // TODO: generate random training data
             // Vector<i32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
-            Vector<i32> random_ids(training_data_num);
-            std::iota(random_ids.begin(), random_ids.end(), 0);
+            // TODO
+            Vector<i32> random_ids(vector_count);
+            rand_perm(random_ids.data(), vector_count, 1234);
+            // output content of random_ids
+            std::cout << "random_ids nums: " << training_data_num << std::endl;
+            for (int i = 0; i < 20; i++) {
+                std::cout << random_ids[i] << " ";
+            }
+            std::cout << std::endl;
+            // output dimension, training_data_num, dimension * training_data_num
+            std::cout << "dimension: " << dimension << std::endl;
+            std::cout << "training_data_num: " << training_data_num << std::endl;
+            std::cout << "dimension * training_data_num: " << dimension * training_data_num << std::endl;
             random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
             for (i32 i = 0; i < training_data_num; ++i) {
                 memcpy(random_training_data_destructor.get() + i * dimension, vectors_ptr + random_ids[i] * dimension, dimension * sizeof(ElemType));
@@ -167,20 +209,27 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     {
         // If training vectors are randomly chosen, centroids can be copied from training data.
         // Otherwise, centroids need to be randomly generated.
-        if (random_training_data_destructor != nullptr) {
-            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
-                memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
-            } else {
-                for (i32 i = 0; i < partition_num * dimension; ++i) {
-                    centroids[i] = training_data[i];
-                }
-            }
-        } else {
-            Vector<i32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
-            for (i32 i = 0; i < partition_num; ++i) {
-                for (i32 j = 0; j < dimension; ++j) {
-                    centroids[i * dimension + j] = training_data[random_ids[i] * dimension + j];
-                }
+        //        if (random_training_data_destructor != nullptr) {
+        //            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
+        //                memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
+        //            } else {
+        //                for (i32 i = 0; i < partition_num * dimension; ++i) {
+        //                    centroids[i] = training_data[i];
+        //                }
+        //            }
+        //        } else {
+        //            Vector<i32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
+        //            for (i32 i = 0; i < partition_num; ++i) {
+        //                for (i32 j = 0; j < dimension; ++j) {
+        //                    centroids[i * dimension + j] = training_data[random_ids[i] * dimension + j];
+        //                }
+        //            }
+        //        }
+        {
+            std::vector<int> perm(training_data_num);
+            rand_perm(perm.data(), training_data_num, 1234 + 1 + 0 * 15486557L);
+            for (int i = 0; i < partition_num; i++) {
+                memcpy(&centroids[i * dimension], training_data + perm[i] * dimension, sizeof(CentroidsType) * dimension);
             }
         }
         std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "

@@ -187,7 +187,7 @@ void benchmark_faiss_ivfflatl2() {
         size_t d2;
         xq = fvecs_read(sift1m_query, &d2, &nq);
         // TODO
-        nq = 100;
+        // nq = 100;
         assert(d == d2 || !"query does not have same dimension as train set");
     }
 
@@ -201,7 +201,7 @@ void benchmark_faiss_ivfflatl2() {
         size_t nq2;
         int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
         // TODO
-        nq2 = 100;
+        // nq2 = 100;
         // assert(nq2 == nq || !"incorrect nb of ground truth entries");
 
         gt = new faiss::idx_t[k * nq];
@@ -218,14 +218,50 @@ void benchmark_faiss_ivfflatl2() {
         auto *I = new u64[nq * k];
         D = new float[nq * k];
 
-        if constexpr (false) {
+        if (true) {
             // TODO: ksearch = 1?
-            int ksearch = 1;
+            int ksearch = k;
             // output buffers
             faiss::idx_t *I = new faiss::idx_t[nq * ksearch];
             D = new float[nq * ksearch];
 
             index->search(nq, xq, ksearch, D, I);
+
+            std::cout << "############################" << std::endl;
+            printf("[%.3f s] Compute recalls\n", elapsed() - t0);
+            std::cout << "############################" << std::endl;
+
+            int n_1 = 0, n_10 = 0, n_100 = 0;
+            std::unordered_set<int32_t> gt1, gt10, gt100;
+            for (int i = 0; i < nq; i++) {
+                for (int j = 0; j < k; ++j) {
+                    int32_t gt_id = gt[i * k + j];
+                    if (j < 1) {
+                        gt1.insert(gt_id);
+                    }
+                    if (j < 10) {
+                        gt10.insert(gt_id);
+                    }
+                    if (j < 100) {
+                        gt100.insert(gt_id);
+                    }
+                }
+                for (int j = 0; j < k; j++) {
+                    int32_t result_id = I[i * k + j];
+                    if (j < 1 && gt1.contains(result_id)) {
+                        ++n_1;
+                    }
+                    if (j < 10 && gt10.contains(result_id)) {
+                        ++n_10;
+                    }
+                    if (j < 100 && gt100.contains(result_id)) {
+                        ++n_100;
+                    }
+                }
+            }
+            printf("R@1 = %.4f\n", n_1 / float(nq));
+            printf("R@10 = %.4f\n", n_10 / float(nq * 10));
+            printf("R@100 = %.4f\n", n_100 / float(nq * 100));
         } else {
             // TODO:test search?
             // index->search(nq, xq, k, D, I);
@@ -327,7 +363,6 @@ void benchmark_faiss_ivfflatl2() {
          }
          std::cout << "############################DDDDDDDDDDDD" << std::endl;
             */
-        printf("[%.3f s] Compute recalls\n", elapsed() - t0);
 
         if constexpr (false) {
             int ksearch = 1;
@@ -453,7 +488,7 @@ void benchmark_annivfflatl2() {
         size_t d2;
         xq = fvecs_read(sift1m_query, &d2, &nq);
         // TODO
-        nq = 100;
+        // nq = 100;
         assert(d == d2 || !"query does not have same dimension as train set");
     }
 
@@ -468,7 +503,7 @@ void benchmark_annivfflatl2() {
         size_t nq2;
         int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
         // TODO
-        nq2 = 100;
+        // nq2 = 100;
         assert(nq2 == nq || !"incorrect nb of ground truth entries");
 
         gt = new faiss::idx_t[k * nq];
@@ -498,6 +533,8 @@ void benchmark_annivfflatl2() {
             }
             std::cout << std::endl;
         }
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", elapsed() - t0);
         std::cout << "############################" << std::endl;
 
         int n_1 = 0, n_10 = 0, n_100 = 0;
