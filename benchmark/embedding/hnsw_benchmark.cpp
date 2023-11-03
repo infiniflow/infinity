@@ -8,11 +8,10 @@
 #include "base_profiler.h"
 #include "helper.h"
 
-static const char* sift1m_base = "/home/jinhai/Documents/data/sift1M/sift_base.fvecs";
-static const char* sift1m_train = "/home/jinhai/Documents/data/sift1M/sift_learn.fvecs";
-static const char* sift1m_query = "/home/jinhai/Documents/data/sift1M/sift_query.fvecs";
-static const char* sift1m_ground_truth = "/home/jinhai/Documents/data/sift1M/sift_groundtruth.ivecs";
-static const char* hnsw_index_l2_name = "hnsw_index_l2.bin";
+static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
+static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
+static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
+static const char *hnsw_index_l2_name = "./tmp/the.hnsw";
 
 using namespace infinity;
 
@@ -32,7 +31,7 @@ main() -> int {
     }
 
     assert(dimension == 128 || !"embedding dimension isn't 128");
-    assert(embedding_count == 10000000 || !"embedding size isn't 1000000");
+    assert(embedding_count == 1000000 || !"embedding size isn't 1000000");
     hnswlib::L2Space l2space(dimension);
     hnswlib::HierarchicalNSW<float>* hnsw_index = nullptr;
 
@@ -42,7 +41,7 @@ main() -> int {
         std::cout << "Found index file ... " << std::endl;
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
     } else {
-        size_t max_elements = 10000000;        // create index
+        size_t max_elements = 1000000; // create index
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
 
         infinity::BaseProfiler profiler;
@@ -50,10 +49,8 @@ main() -> int {
         // insert data into index
         for(size_t idx = 0; idx < embedding_count; ++idx) {
             hnsw_index->addPoint(input_embeddings + idx * dimension, idx);
-
-            if(idx % 100000 == 0) {
-                std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, "
-                          << profiler.ElapsedToString() << std::endl;
+            if (idx % 10000 == 0) {
+                std::cout << idx << ", " << get_current_rss() / 1000000 << " MB, " << profiler.ElapsedToString() << std::endl;
             }
         }
         profiler.End();
@@ -132,3 +129,40 @@ main() -> int {
 
     return 0;
 }
+
+// For debug hnswlib
+// void DumpGraph() {
+//     std::fstream fo("./tmp/the_graph.txt", std::ios::out);
+//     fo << std::endl << "---------------------------------------------" << std::endl;
+//     fo << "M_: " << M_ << std::endl;
+//     fo << "Mmax_: " << maxM_ << std::endl;
+//     fo << "Mmax0_: " << maxM0_ << std::endl;
+//     fo << "ef_: " << ef_ << std::endl;
+//     fo << "ef_construction_: " << ef_construction_ << std::endl;
+//     fo << "dim_: " << *(size_t *)(dist_func_param_) << std::endl;
+//     fo << std::endl;
+
+//     fo << "current element number: " << cur_element_count << std::endl;
+//     fo << "max layer: " << maxlevel_ << std::endl;
+
+//     std::vector<std::vector<tableint>> layer2vertex(maxlevel_ + 1);
+//     for (tableint v = 0; v < cur_element_count; ++v) {
+//         for (size_t layer = 0; layer <= element_levels_[v]; ++layer) {
+//             layer2vertex[layer].emplace_back(v);
+//         }
+//     }
+//     for (size_t layer = 0; layer <= maxlevel_; ++layer) {
+//         fo << "layer " << layer << std::endl;
+//         for (tableint v : layer2vertex[layer]) {
+//             fo << v << ": ";
+//             linklistsizeint *ll_cur = get_linklist_at_level(v, layer);
+//             int size = getListCount(ll_cur);
+//             tableint *data = (tableint *)(ll_cur + 1);
+//             for (int j = 0; j < size; j++) {
+//                 fo << data[j] << ", ";
+//             }
+//             fo << std::endl;
+//         }
+//     }
+//     fo << "---------------------------------------------" << std::endl;
+// }
