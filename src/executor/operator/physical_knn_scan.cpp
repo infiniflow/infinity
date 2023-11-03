@@ -22,6 +22,7 @@ import third_party;
 import infinity_assert;
 import infinity_exception;
 import table_collection_entry;
+import default_values;
 
 module physical_knn_scan;
 
@@ -116,25 +117,27 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
         // Last block, Get the result according to the topk row.
         knn_flat->End();
 
-        for (i64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
+        for (u64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
 
             T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
             RowID *row_id = knn_flat->GetIDByIdx(query_idx);
 
-            i64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
+            u64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
 
-            for (i64 top_idx = 0; top_idx < result_count; ++top_idx) {
+            for (u64 top_idx = 0; top_idx < result_count; ++top_idx) {
                 // Bug here? id = top_idx?
                 SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
+
+                u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
                 LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
                                  row_id[id].segment_id_,
-                                 row_id[id].block_id_,
-                                 row_id[id].block_offset_,
+                                 block_id,
+                                 row_id[id].segment_offset_,
                                  top_distance[id]));
 
-                BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, row_id[id].block_id_);
+                BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, row_id[id].block_id_),
+                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id),
                                              __FILE_NAME__,
                                              __LINE__);
                 }
@@ -144,7 +147,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
-                    const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].block_offset_, *output_types_->at(column_id));
+                    const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].segment_offset_, *output_types_->at(column_id));
                     output_state->data_block_->AppendValueByPtr(column_id, ptr);
                 }
 

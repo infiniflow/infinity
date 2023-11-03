@@ -128,12 +128,19 @@ int SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, const Vector<RowID> &rows) {
+void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap) {
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
-    BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
-    Assert<StorageException>(block_entry != nullptr, "The segment doesn't contain the given block.", __FILE_NAME__, __LINE__);
-    for (RowID row_id : rows) {
-        BlockEntry::DeleteData(block_entry, txn_ptr, row_id.block_offset_);
+
+    for(const auto& row_hash_map: block_row_hashmap) {
+        u16 block_id = row_hash_map.first;
+        // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
+        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
+        if(block_entry == nullptr) {
+            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id), __FILE_NAME__, __LINE__);
+        }
+
+        const Vector<RowID>& rows = row_hash_map.second;
+        BlockEntry::DeleteData(block_entry, txn_ptr, rows);
     }
 }
 
@@ -223,13 +230,21 @@ void SegmentEntry::CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<Inde
     segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
 }
 
-void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id) {
+void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap) {
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
-    BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
-    Assert<StorageException>(block_entry != nullptr, "The segment doesn't contain the given block.", __FILE_NAME__, __LINE__);
-    BlockEntry::CommitDelete(block_entry, txn_ptr);
-    segment_entry->max_row_ts_ = Max(segment_entry->max_row_ts_, commit_ts);
+
+    for(const auto& row_hash_map: block_row_hashmap) {
+        u16 block_id = row_hash_map.first;
+        // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
+        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
+        if(block_entry == nullptr) {
+            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id), __FILE_NAME__, __LINE__);
+        }
+
+        BlockEntry::CommitDelete(block_entry, txn_ptr);
+        segment_entry->max_row_ts_ = Max(segment_entry->max_row_ts_, commit_ts);
+    }
 }
 
 u64 SegmentEntry::GetBlockIDByRowID(SizeT row_id) {

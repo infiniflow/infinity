@@ -164,7 +164,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
             SizeT output_column_id{0};
             for (auto column_id : column_ids) {
                 if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, block_id, read_offset), write_size);
+                    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
                 } else {
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());

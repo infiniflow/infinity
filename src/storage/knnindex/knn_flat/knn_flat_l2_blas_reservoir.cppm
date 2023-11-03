@@ -31,6 +31,7 @@ import parser;
 import third_party;
 import infinity_assert;
 import infinity_exception;
+import default_values;
 
 export module knn_flat_l2_blas_reservoir;
 
@@ -77,7 +78,7 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *base, i16 base_count, i32 segment_id, i16 block_id) final {
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
             Error<ExecutorException>("KnnFlatL2BlasReservoir isn't begin", __FILE_NAME__, __LINE__);
         }
@@ -94,7 +95,7 @@ public:
         // block sizes
         const SizeT bs_x = faiss_distance_compute_blas_query_bs;
         const SizeT bs_y = faiss_distance_compute_blas_database_bs;
-
+        u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
         for (SizeT i0 = 0; i0 < this->query_count_; i0 += bs_x) {
             SizeT i1 = i0 + bs_x;
             if (i1 > this->query_count_)
@@ -138,7 +139,7 @@ public:
                         ip_line++;
                     }
                 }
-                reservoir_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id, block_id);
+                reservoir_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start);
             }
         }
     }

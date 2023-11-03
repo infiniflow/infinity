@@ -149,8 +149,7 @@ TEST_F(DataBlockTest, test2) {
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-        EXPECT_EQ((*row_ids)[row_id].block_offset_, row_id);
-        EXPECT_EQ((*row_ids)[row_id].block_id_, 1);
+        EXPECT_EQ((*row_ids)[row_id].segment_offset_, row_id + DEFAULT_BLOCK_CAPACITY);
         EXPECT_EQ((*row_ids)[row_id].segment_id_, INVALID_SEGMENT_ID);
     }
 }

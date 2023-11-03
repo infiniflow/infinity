@@ -72,10 +72,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
                                                  row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
+                                                 row_id[id].segment_offset_,
                                                  top_distance[id]));
                             }
                         }
@@ -228,10 +227,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
                                                  row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
+                                                 row_id[id].segment_offset_,
                                                  top_distance[id]));
                             }
                         }

@@ -220,18 +220,14 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
 }
 
 UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
-    for (auto it = delete_state.rows_.begin(); it != delete_state.rows_.end(); ++it) {
-        RowID key(it->first);
-        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, key.segment_id_);
-        if (segment == nullptr)
-            continue;
-        auto &rows = it->second;
-        SegmentEntry::DeleteData(segment, txn_ptr, key.block_id_, rows);
-        LOG_TRACE(Format("Table {} Segment {} Block {} has deleted {} rows",
-                         *table_entry->table_collection_name_,
-                         key.segment_id_,
-                         key.block_id_,
-                         rows.size()));
+    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+        u32 segment_id = to_delete_seg_rows.first;
+        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        if(segment == nullptr) {
+            Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+        }
+        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        SegmentEntry::DeleteData(segment, txn_ptr, block_row_hashmap);
     }
     return nullptr;
 }
@@ -270,12 +266,14 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
 }
 
 void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
-    for (auto it = delete_state.rows_.begin(); it != delete_state.rows_.end(); ++it) {
-        RowID key(it->first);
-        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, key.segment_id_);
-        if (segment == nullptr)
-            continue;
-        SegmentEntry::CommitDelete(segment, txn_ptr, key.block_id_);
+    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+        u32 segment_id = to_delete_seg_rows.first;
+        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        if(segment == nullptr) {
+            Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+        }
+        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
     }
 }
 

@@ -81,7 +81,7 @@ public:
 
     static int AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id, const Vector<RowID> &rows);
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
 
     static void CreateIndexScalar(SegmentEntry *segment_entry,
                                   Txn *txn_ptr,
@@ -102,7 +102,7 @@ public:
 
     static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
-    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, i16 block_id);
+    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
 
     static u64 GetBlockIDByRowID(SizeT row_id);
 

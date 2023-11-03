@@ -20,6 +20,8 @@ import local_file_system;
 import serialize;
 import infinity_assert;
 import infinity_exception;
+import table_collection_entry;
+import parser;
 
 module block_entry;
 namespace infinity {
@@ -183,16 +185,26 @@ i16 BlockEntry::AppendData(BlockEntry *block_entry,
     return actual_copied;
 }
 
-void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset) {
+void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(
         block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
         Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_),
         __FILE_NAME__,
         __LINE__);
+
+    String *table_collect_name_ptr = block_entry->segment_entry_->table_entry_->table_collection_name_.get();
+    u32 segment_id = block_entry->segment_entry_->segment_id_;
+    u16 block_id = block_entry->block_id_;
+
     block_entry->txn_ptr_ = txn_ptr;
     auto &block_version = block_entry->block_version_;
-    block_version->deleted_[block_offset] = txn_ptr->CommitTS();
+    for (RowID row_id : rows) {
+        u16 block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+        block_version->deleted_[block_offset] = txn_ptr->CommitTS();
+    }
+
+    LOG_TRACE(Format("Table {} Segment {} Block {} has deleted {} rows", *table_collect_name_ptr, segment_id, block_id, rows.size()));
 }
 
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.

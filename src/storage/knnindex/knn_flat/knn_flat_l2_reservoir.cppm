@@ -15,6 +15,7 @@ import parser;
 import infinity_assert;
 import infinity_exception;
 import third_party;
+import default_values;
 
 export module knn_flat_l2_reservoir;
 
@@ -49,7 +50,7 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *base, i16 base_count, i32 segment_id, i16 block_id) final {
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
             Error<ExecutorException>("KnnFlatL2Reservoir isn't begin", __FILE_NAME__, __LINE__);
         }
@@ -60,13 +61,15 @@ public:
             return;
         }
 
+        u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+
         for (i64 i = 0; i < this->query_count_; i++) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
             for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 DistType ip = fvec_L2sqr(x_i, y_j, this->dimension_);
-                single_reservoir_result_handler_->add_result(ip, RowID{segment_id, block_id, j}, i);
+                single_reservoir_result_handler_->add_result(ip, RowID{segment_id, segment_offset_start + j}, i);
             }
         }
     }

@@ -9,6 +9,7 @@ import default_values;
 import base_entry;
 import third_party;
 import block_column_entry;
+import parser;
 
 export module block_entry;
 
@@ -75,7 +76,7 @@ public:
     static i16
     AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows, BufferManager *buffer_mgr);
 
-    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset);
+    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID>& rows);
 
     static void CommitAppend(BlockEntry *block_entry, Txn *txn_ptr);
 

@@ -166,7 +166,7 @@ TEST_F(WalEntryTest, ReadWrite) {
     data_block->Finalize();
 
     entry->cmds.push_back(MakeShared<WalCmdAppend>("db1", "tbl1", data_block));
-    Vector<RowID> row_ids = {RowID(1, 2, 3)};
+    Vector<RowID> row_ids = {RowID(1, 3)};
     entry->cmds.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     entry->cmds.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, "/tmp/infinity/data/catalog/META_123.full.json"));
 
