@@ -12,4 +12,5 @@ using std::max;
 using std::min;
 using std::reverse_copy;
 using std::sort;
+using std::reverse;
 } // namespace std

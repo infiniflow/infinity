@@ -68,6 +68,12 @@ export {
     using HashSet = std::unordered_set<S>;
 
     template <typename T>
+    using MaxHeap = std::priority_queue<T>;
+
+    template <typename T, typename C>
+    using Heap = std::priority_queue<T, std::vector<T>, C>;
+
+    template <typename T>
     using Optional = std::optional<T>;
 
     using StdOfStream = std::ofstream;
