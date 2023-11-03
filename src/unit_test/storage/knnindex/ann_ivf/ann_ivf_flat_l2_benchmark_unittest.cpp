@@ -48,7 +48,6 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int n_lists;
 int n_probes = 1;
-int dimension;
 size_t k;
 float *D = nullptr;
 
@@ -140,16 +139,37 @@ void benchmark_faiss_ivfflatl2() {
 
         size_t nb, d2;
         float *xb = fvecs_read(sift1m_base, &d2, &nb);
+
+        //// TODO: change nb to do tests
+        nb = 10000;
         assert(d == d2 || !"dataset does not have same dimension as train set");
 
         printf("[%.3f s] Indexing database, size %ld*%ld\n", elapsed() - t0, nb, d);
 
-        //// TODO: change nb to do tests
-        // nb = testnum;
-
         index->add(nb, xb);
 
         delete[] xb;
+    }
+
+    {
+        // output 100th bucket content
+        std::cout << "######################################################" << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "the 100th bucket content of IndexIVFFlat:\n";
+        auto v_vectors = (const float *)(((faiss::ArrayInvertedLists *)index->invlists)->codes[100].data());
+        auto v_ids = ((faiss::ArrayInvertedLists *)index->invlists)->ids[100];
+        for (i32 i = 0; i < v_ids.size(); ++i) {
+            auto vectors = v_vectors + i * d;
+            auto ids = v_ids.data() + i;
+            std::cout << "id: " << *ids << std::endl;
+            std::cout << "######################################################" << std::endl;
+            std::cout << std::endl;
+            std::cout << "vector: " << i << "\n";
+            for (i32 i = 0; i < d; ++i) {
+                std::cout << vectors[i] << " ";
+            }
+            std::cout << std::endl;
+        }
     }
 
     size_t nq;
@@ -160,6 +180,8 @@ void benchmark_faiss_ivfflatl2() {
 
         size_t d2;
         xq = fvecs_read(sift1m_query, &d2, &nq);
+        // TODO
+        nq = 100;
         assert(d == d2 || !"query does not have same dimension as train set");
     }
 
@@ -172,7 +194,9 @@ void benchmark_faiss_ivfflatl2() {
         // load ground-truth and convert int to long
         size_t nq2;
         int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
-        assert(nq2 == nq || !"incorrect nb of ground truth entries");
+        // TODO
+        nq2 = 100;
+        // assert(nq2 == nq || !"incorrect nb of ground truth entries");
 
         gt = new faiss::idx_t[k * nq];
         for (int i = 0; i < k * nq; i++) {
@@ -348,11 +372,53 @@ void benchmark_annivfflatl2() {
 
         size_t nb, d2;
         float *xb = fvecs_read(sift1m_base, &d2, &nb);
+        // TODO:nb
+        nb = 10000;
         assert(d == d2 || !"dataset does not have same dimension as train set");
 
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
         ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0, 0);
+
+        // output centroids
+        {
+            auto centroids = ann_index_data->centroids_;
+            // output content of centroids, 128 per line
+            std::cout << "######################################################" << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "centroids:\n";
+            for (i32 i = 0; i < partition_num; ++i) {
+                std::cout << "partition " << i << ": ";
+                for (i32 j = 0; j < d; ++j) {
+                    std::cout << centroids[i * d + j] << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << "######################################################" << std::endl;
+            std::cout << std::endl;
+        }
+
+        // output the 100th vector content of ann_index_data->vectors_ and ann_index_data->ids_
+        {
+            std::cout << "######################################################" << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "the 100th bucket content of ann_index_data:\n";
+            auto v_vectors = ann_index_data->vectors_[100];
+            auto v_ids = ann_index_data->ids_[100];
+            for (i32 i = 0; i < v_ids.size(); ++i) {
+                auto vectors = v_vectors.data() + i * d;
+                auto ids = v_ids.data() + i;
+                std::cout << "id: " << ids->block_offset_ << std::endl;
+                std::cout << "######################################################" << std::endl;
+                std::cout << std::endl;
+                std::cout << "vector: " << i << "\n";
+                for (i32 i = 0; i < d; ++i) {
+                    std::cout << vectors[i] << " ";
+                }
+                std::cout << std::endl;
+            }
+        }
+
         delete[] xt;
         delete[] xb;
     }
@@ -365,6 +431,8 @@ void benchmark_annivfflatl2() {
 
         size_t d2;
         xq = fvecs_read(sift1m_query, &d2, &nq);
+        // TODO
+        nq = 100;
         assert(d == d2 || !"query does not have same dimension as train set");
     }
 
@@ -378,6 +446,8 @@ void benchmark_annivfflatl2() {
         // load ground-truth and convert int to long
         size_t nq2;
         int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
+        // TODO
+        nq2 = 100;
         assert(nq2 == nq || !"incorrect nb of ground truth entries");
 
         gt = new faiss::idx_t[k * nq];

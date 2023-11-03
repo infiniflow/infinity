@@ -5,7 +5,6 @@ module;
 #include <cstring>
 #include <iomanip>
 #include <iostream>
-#include <mm_malloc.h>
 #include <random>
 #include <sys/time.h>
 
@@ -37,7 +36,7 @@ struct ClusteringIterationStats {
 };
 
 template <typename T>
-static double imbalance_factor(int n, int k, T *hist) {
+static double imbalance_factor(int n, int k, const T *hist) {
     double uf = 0;
     for (int i = 0; i < k; i++) {
         uf += hist[i] * (double)hist[i];
@@ -150,7 +149,10 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                       << partition_num << ") = " << max_num << " vectors to train" << std::endl;
             training_data_num = max_num;
             // TODO: generate random training data, now use permutation
-            Vector<i32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
+            // TODO: now use 0 ~ n.
+            // Vector<i32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
+            Vector<i32> random_ids(training_data_num);
+            std::iota(random_ids.begin(), random_ids.end(), 0);
             random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
             for (i32 i = 0; i < training_data_num; ++i) {
                 memcpy(random_training_data_destructor.get() + i * dimension, vectors_ptr + random_ids[i] * dimension, dimension * sizeof(ElemType));
@@ -165,14 +167,20 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     {
         // If training vectors are randomly chosen, centroids can be copied from training data.
         // Otherwise, centroids need to be randomly generated.
-        if (training_data != vectors_ptr) {
-            for (i32 i = 0; i < partition_num; ++i) {
-                memcpy(centroids + i * dimension, training_data + i * dimension, dimension * sizeof(ElemType));
+        if (random_training_data_destructor != nullptr) {
+            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
+                memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
+            } else {
+                for (i32 i = 0; i < partition_num * dimension; ++i) {
+                    centroids[i] = training_data[i];
+                }
             }
         } else {
             Vector<i32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
             for (i32 i = 0; i < partition_num; ++i) {
-                memcpy(centroids + i * dimension, training_data + random_ids[i] * dimension, dimension * sizeof(ElemType));
+                for (i32 j = 0; j < dimension; ++j) {
+                    centroids[i * dimension + j] = training_data[random_ids[i] * dimension + j];
+                }
             }
         }
         std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
@@ -183,10 +191,10 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     f32 previous_total_distance = std::numeric_limits<f32>::max();
     // Assign each vector to a partition
     Vector<i32> training_data_partition_id(training_data_num);
-    // Record the number of vectors in each partition
-    Vector<i32> partition_element_count(partition_num);
     // Distance
     Vector<f32> partition_element_distance(training_data_num);
+    // Record the number of vectors in each partition
+    Vector<i32> partition_element_count(partition_num);
 
     // Iteration
     for (i32 iter = 1; iter <= iteration_max; ++iter) {
@@ -201,8 +209,6 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         // First : assign each training vector to a partition
         {
             auto t_search_now = elapsed();
-            // Clear partition_element_count
-            memset(partition_element_count.data(), 0, sizeof(i32) * partition_num);
             // search top 1
             search_top_1(dimension,
                          training_data_num,
@@ -211,6 +217,8 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                          centroids,
                          training_data_partition_id.data(),
                          partition_element_distance.data());
+            // Clear partition_element_count
+            memset(partition_element_count.data(), 0, sizeof(i32) * partition_num);
             // calculate partition_element_count
             for (auto i : training_data_partition_id)
                 ++partition_element_count[i];
@@ -245,12 +253,29 @@ void k_means_partition_only_centroids_l2(i32 dimension,
             // Divide. If there is no vector in a partition, the centroid of this partition will not be updated.
             for (i32 i = 0; i < partition_num; ++i) {
                 if (auto cnt = partition_element_count[i]; cnt > 0) {
-                    f32 inv = 1.0f / (f32)cnt;
+                    auto inv = 1.0f / (f32)cnt;
                     for (i32 j = 0; j < dimension; ++j) {
-                        centroids[i * dimension + j] = centroids[i * dimension + j] * inv;
+                        centroids[i * dimension + j] *= inv;
                     }
                 }
             }
+        }
+
+        // output centroids
+        {
+            // output content of centroids, 128 per line
+            std::cout << "######################################################" << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "centroids:\n";
+            for (i32 i = 0; i < partition_num; ++i) {
+                std::cout << "partition " << i << ": ";
+                for (i32 j = 0; j < dimension; ++j) {
+                    std::cout << centroids[i * dimension + j] << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << "######################################################" << std::endl;
+            std::cout << std::endl;
         }
 
         // output imbalance factor
@@ -291,7 +316,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         //  For every vacant partition, split the partition with the most vectors.
         {
             for (i32 i = 0; i < partition_num; ++i) {
-                if (partition_element_count[i] <= 13) {
+                if (partition_element_count[i] == 0) {
                     // find the partition with the most vectors
                     i32 max_partition_id = -1;
                     i32 max_partition_element_count = -1;
@@ -313,7 +338,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                     constexpr f32 minus_epsilon = 1 - epsilon;
                     for (i32 j = 0; j < dimension; ++j) {
                         centroids[i * dimension + j] *= j & 1 ? plus_epsilon : minus_epsilon;
-                        centroids[max_partition_id * dimension + j] *= j & 1 ? minus_epsilon : plus_epsilon;
+                        centroids[max_partition_id * dimension + j] *= ((j & 1) ? minus_epsilon : plus_epsilon);
                     }
                 }
             }
@@ -329,6 +354,8 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                   << "Iteration " << iter << " (" << std::fixed << std::setprecision(2) << stats.time << " s, search " << stats.time_search << " s): "
                   << "objective=" << stats.obj << " imbalance=" << std::fixed << std::setprecision(3) << stats.imbalance_factor
                   << " nsplit=" << stats.nsplit << std::endl;
+        // TODO:stop?
+        previous_total_distance = this_iter_distance;
 
         // In the next loop, training data will be re-assigned to partitions.
     }
@@ -336,7 +363,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     // Output results if typeof(centroids_output) != typeof(centroids)
     if constexpr (!std::is_same_v<CentroidsOutputType, CentroidsType>) {
         for (i32 i = 0; i < partition_num * dimension; ++i) {
-            centroids_output[i] = centroids[i];
+            centroids_output[i] = (CentroidsOutputType)centroids[i];
         }
     }
 }
@@ -356,7 +383,7 @@ void add_data_to_partition_l2(i32 dimension,
     if (partition_num != index_data->partition_num_) {
         Error<ExecutorException>("partition_num not match", __FILE_NAME__, __LINE__);
     }
-    auto &centroids = index_data->centroids_;
+    const auto &centroids = index_data->centroids_;
     auto &vectors = index_data->vectors_;
     auto &ids = index_data->ids_;
     Vector<i32> assigned_partition_id(vector_count);
@@ -371,6 +398,19 @@ void add_data_to_partition_l2(i32 dimension,
     // Classify vectors
     // search_top_1
     search_top_1<f32>(dimension, vector_count, vectors_ptr, partition_num, centroids.data(), assigned_partition_id.data());
+
+    // output assigned_partition_id
+    {
+        // output content of assigned_partition_id, 10 per line
+        std::cout << "#####################################################"
+                  << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "assigned_partition_id:\n";
+        for (i32 i = 0; i < vector_count; ++i) {
+            std::cout << assigned_partition_id[i] << " ";
+        }
+        std::cout << "#####################################################\n" << std::endl;
+    }
+
     // calculate partition_element_count
     for (auto i : assigned_partition_id)
         ++partition_element_count[i];

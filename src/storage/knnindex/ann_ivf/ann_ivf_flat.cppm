@@ -37,7 +37,7 @@ public:
     }
 
     static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(i32 dimension, SizeT vector_count, DistType *vectors_ptr, i32 partition_num, i32 segment_id, i16 block_id) {
+    CreateIndex(i32 dimension, SizeT vector_count, const DistType *vectors_ptr, i32 partition_num, i32 segment_id, i16 block_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, partition_num, index_data->centroids_.data());
         add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
