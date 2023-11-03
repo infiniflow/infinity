@@ -1,6 +1,6 @@
-# name: test/sql/dml/delete.slt
-# description: Test delete
-# group: [dml, delete]
+# name: test/sql/dml/update.slt
+# description: Test update
+# group: [dml, update]
 
 # Parse only support
 statement ok
@@ -24,18 +24,27 @@ SELECT * FROM products;
 7 8
 
 statement ok
-DELETE FROM products WHERE product_no = 3;
+UPDATE products SET price=100 WHERE product_no = 3;
 
 query II rowsort
 SELECT * FROM products;
 ----
 1 2
+3 100
 5 6
 7 8
 
-statement ok
-DELETE FROM products;
+# TODO: UpdateExpr shall support column
+# statement ok
+# UPDATE products SET price=price+3 WHERE product_no = 1 OR product_no = 5;
 
-# Table has already been dropped
-statement error
+# query II rowsort
+# SELECT * FROM products;
+# ----
+# 1 5
+# 3 100
+# 5 9
+# 7 8
+
+statement ok
 DROP TABLE products;

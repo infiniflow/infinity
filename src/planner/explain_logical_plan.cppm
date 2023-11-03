@@ -22,6 +22,7 @@ class LogicalDropCollection;
 class LogicalDropView;
 class LogicalInsert;
 class LogicalDelete;
+class LogicalUpdate;
 class LogicalProject;
 class LogicalFilter;
 class LogicalTableScan;
@@ -62,6 +63,8 @@ public:
     static void Explain(const LogicalInsert *insert_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalUpdate *update_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalProject *project_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

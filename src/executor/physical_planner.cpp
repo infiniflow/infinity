@@ -75,6 +75,7 @@ import logical_drop_view;
 import logical_flush;
 import logical_insert;
 import logical_delete;
+import logical_update;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
@@ -386,7 +387,16 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeShared<PhysicalUpdate>(logical_operator->node_id());
+    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical update node has no input node.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical update node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    SharedPtr<LogicalUpdate> logical_update = std::dynamic_pointer_cast<LogicalUpdate>(logical_operator);
+    auto input_logical_node = logical_operator->left_node();
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    auto physical_update = MakeShared<PhysicalUpdate>(logical_operator->node_id(),
+                                                      input_physical_operator,
+                                                      logical_update->table_entry_ptr_,
+                                                      logical_update->update_columns_);
+    return physical_update;
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {

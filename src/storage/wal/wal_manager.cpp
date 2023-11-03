@@ -230,11 +230,8 @@ void WalManager::Flush() {
             if (file_size > wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts);
             }
-        } catch (StlException &e) {
-            LOG_WARN(e.what());
-        } catch (...) {
-            LOG_WARN("WalManager::Flush threads get exception");
-            return;
+        } catch (Exception &e) {
+            LOG_ERROR(e.what());
         }
         SetWalState(max_commit_ts, wal_size);
     }
@@ -289,7 +286,7 @@ void WalManager::Checkpoint() {
             }
             LOG_INFO(Format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
             RecycleWalFile();
-        } catch (StlException &e) {
+        } catch (Exception &e) {
             LOG_ERROR(Format("WalManager::Checkpoint failed: {}", e.what()));
         }
     }

@@ -123,6 +123,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
+        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kDelete: {
             if (phys_op->left().get() == nullptr) {
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()), __FILE_NAME__, __LINE__);
@@ -162,8 +163,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kJoinNestedLoop:
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
-        case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kUpdate: {
+        case PhysicalOperatorType::kCrossProduct: {
             Error<SchedulerException>(Format("Not support {}.", phys_op->GetName()), __FILE_NAME__, __LINE__);
         }
         case PhysicalOperatorType::kKnnScan: {

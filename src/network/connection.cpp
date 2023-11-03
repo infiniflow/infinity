@@ -26,8 +26,7 @@ module connection;
 namespace infinity {
 
 Connection::Connection(AsioIOService &io_service)
-    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())),
-      session_(MakeUnique<RemoteSession>()) {}
+    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())), session_(MakeUnique<RemoteSession>()) {}
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
@@ -122,8 +121,7 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     // Response to the result message to client
     if (result.result_.get() == nullptr) {
         HashMap<PGMessageType, String> error_message_map;
-        String response_message = Format("Error: {}", query);
-        error_message_map[PGMessageType::kHumanReadableError] = response_message;
+        error_message_map[PGMessageType::kHumanReadableError] = *result.result_msg_;
         pg_handler_->send_error_response(error_message_map);
     } else {
         // Have result
@@ -295,10 +293,6 @@ void Connection::SendQueryResponse(const QueryResponse &query_response) {
     switch (query_response.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
-            break;
-        }
-        case LogicalNodeType::kUpdate: {
-            message = "UPDATE -1";
             break;
         }
         case LogicalNodeType::kImport: {
