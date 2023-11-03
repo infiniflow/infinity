@@ -1,0 +1,49 @@
+# name: test/sql/dml/update.slt
+# description: Test update
+# group: [dml, update]
+
+# Parse only support
+statement ok
+CREATE TABLE products (product_no integer, price integer);
+
+# insert data
+query I
+INSERT INTO products VALUES (1, 2), (3, 4);
+----
+
+query I
+INSERT INTO products VALUES (5, 6), (7, 8);
+----
+
+query II rowsort
+SELECT * FROM products;
+----
+1 2
+3 4
+5 6
+7 8
+
+statement ok
+UPDATE products SET price=100 WHERE product_no = 3;
+
+query II rowsort
+SELECT * FROM products;
+----
+1 2
+3 100
+5 6
+7 8
+
+statement ok
+UPDATE products SET price=price+product_no+1 WHERE product_no IN (1, 5);
+
+query II rowsort
+SELECT * FROM products;
+----
+1 4
+3 100
+5 12
+7 8
+
+statement ok
+DROP TABLE products;

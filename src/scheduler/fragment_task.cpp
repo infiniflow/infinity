@@ -11,6 +11,7 @@ import logger;
 import physical_source;
 import physical_sink;
 import physical_operator;
+import infinity_exception;
 
 module fragment_task;
 
@@ -46,7 +47,7 @@ void FragmentTask::OnExecute(i64 worker_id) {
                                            operator_input_state_[op_idx].get(),
                                            operator_output_state_[op_idx].get());
         }
-    } catch (const StlException &e) {
+    } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
     }
 

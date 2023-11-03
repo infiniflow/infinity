@@ -42,13 +42,9 @@ String LogicalDelete::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "DELETE FROM table: ";
-    if (table_entry_ptr_ == nullptr) {
-        ss << "null";
-    } else {
-        const DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry_ptr_);
-        ss << *db_entry->db_name_ << "." << *table_entry_ptr_->table_collection_name_;
-    }
+    ss << String(space, ' ') << arrow_str << "DELETE FROM ";
+    const DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry_ptr_);
+    ss << *db_entry->db_name_ << "." << *table_entry_ptr_->table_collection_name_;
     space += arrow_str.size();
 
     return ss.str();
