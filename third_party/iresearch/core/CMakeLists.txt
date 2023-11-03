@@ -36,11 +36,6 @@ set(IResearch_INCLUDE_DIR
   ""
   )
 
-
-#for some reason TARGET_PROPERTY generator expression does not work for this target
-get_target_property(VPACK_INCLUDE_PATH velocypack INTERFACE_INCLUDE_DIRECTORIES)
-
-
 if (MSVC)
   add_definitions(/W4)
   # disable "checked iterators" feature
@@ -325,6 +320,7 @@ add_library(iresearch
   STATIC
   ${IResearch_core_sources} 
   ${IResearch_core_headers}
+  $<TARGET_OBJECTS:openfst>
   )
 
 # trigger generation of BUILD_IDENTIFIER if needed
@@ -335,7 +331,6 @@ add_custom_command(
 
 add_dependencies(iresearch
   hwy
-  velocypack
   )
 
 target_include_directories(iresearch
@@ -354,9 +349,7 @@ set_target_properties(iresearch
   )
 
 target_link_libraries(iresearch
-  ${Lz4_STATIC_LIB}
   ${SIMD_LIBRARY_STATIC}
-  velocypack
   text
   ${LIBURING}
   )

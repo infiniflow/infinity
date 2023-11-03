@@ -18,11 +18,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   static void init();  // for triggering registration in a static build
 
   struct options_t {
-    std::string dict_path_;
-    std::string hmm_path_;
-    std::string user_dict_path_;
-    std::string idf_path_;
-    std::string stopwords_path_;
+      std::string path_;
   };
 
   attribute* get_mutable(irs::type_info::type_id type) noexcept final {

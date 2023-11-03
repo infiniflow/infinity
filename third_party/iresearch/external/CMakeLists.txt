@@ -1,12 +1,5 @@
 ### Suppressing all warnings from external libs
-if (SUPPRESS_EXTERNAL_WARNINGS)
-  if (MSVC)
-    add_compile_options(/W0)
-  else ()
-    add_compile_options(-Wno-all)
-  endif ()
-endif ()
-
+add_compile_options(-Wno-all)
 
 set(HIGHWAY_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/highway)
 set(HIGHWAY_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/highway PARENT_SCOPE)
@@ -29,12 +22,6 @@ set(GPHM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap PARENT_SCO
 ### SIMDCOMP library
 ################################################################################
 add_subdirectory(simdcomp)
-
-
-################################################################################
-### velocypack library
-################################################################################
-add_subdirectory(velocypack)
 
 
 ################################################################################

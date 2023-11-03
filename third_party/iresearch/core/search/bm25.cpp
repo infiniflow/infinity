@@ -22,11 +22,6 @@
 
 #include "bm25.hpp"
 
-#include <velocypack/Parser.h>
-#include <velocypack/Slice.h>
-#include <velocypack/velocypack-aliases.h>
-#include <velocypack/vpack.h>
-
 #include <cstdint>
 
 #include "analysis/token_attributes.hpp"
@@ -83,118 +78,6 @@ struct BM25FieldCollector final : FieldCollector {
 // TODO(MBkkt) deduplicate with tfidf.cpp
 const auto kSQRT = irs::cache_func<uint32_t, 2048>(
   0, [](uint32_t i) noexcept { return std::sqrt(static_cast<float_t>(i)); });
-
-irs::Scorer::ptr make_from_object(const VPackSlice slice) {
-  IRS_ASSERT(slice.isObject());
-
-  float_t k{BM25::K()};
-  float_t b{BM25::B()};
-
-  auto get = [&](std::string_view key, float_t& coefficient) {
-    auto v = slice.get(key);
-    if (v.isNone()) {
-      return true;
-    }
-    if (!v.isNumber<float_t>()) {
-      IRS_LOG_ERROR(
-        rst::StrCat({"Non-float value in '", key,
-                     "' while constructing bm25 scorer from VPack arguments"}));
-      return false;
-    }
-    coefficient = v.getNumber<float_t>();
-    return true;
-  };
-  if (!get("k", k) || !get("b", b)) {
-    return nullptr;
-  }
-
-  return std::make_unique<BM25>(k, b);
-}
-
-Scorer::ptr make_from_array(const VPackSlice slice) {
-  IRS_ASSERT(slice.isArray());
-
-  VPackArrayIterator array(slice);
-  VPackValueLength size = array.size();
-  if (size > 2) {
-    // wrong number of arguments
-    IRS_LOG_ERROR(
-      "Wrong number of arguments while constructing bm25 scorer from VPack "
-      "arguments (must be <= 2)");
-    return nullptr;
-  }
-
-  // default args
-  auto k = BM25::K();
-  auto b = BM25::B();
-  uint8_t i = 0;
-  for (auto arg_slice : array) {
-    if (!arg_slice.isNumber<decltype(k)>()) {
-      IRS_LOG_ERROR(rst::StrCat({"Non-float value at position '", i,
-                                 "' while constructing bm25 scorer "
-                                 "from VPack arguments"}));
-      return nullptr;
-    }
-
-    switch (i) {
-      case 0:  // parse `k` coefficient
-        k = static_cast<float_t>(arg_slice.getNumber<decltype(k)>());
-        ++i;
-        break;
-      case 1:  // parse `b` coefficient
-        b = static_cast<float_t>(arg_slice.getNumber<decltype(b)>());
-        break;
-    }
-  }
-
-  return std::make_unique<BM25>(k, b);
-}
-
-Scorer::ptr make_vpack(const VPackSlice slice) {
-  switch (slice.type()) {
-    case VPackValueType::Object:
-      return make_from_object(slice);
-    case VPackValueType::Array:
-      return make_from_array(slice);
-    default:  // wrong type
-      IRS_LOG_ERROR(
-        "Invalid VPack arguments passed while constructing bm25 scorer");
-      return nullptr;
-  }
-}
-
-Scorer::ptr make_vpack(std::string_view args) {
-  if (irs::IsNull(args)) {
-    // default args
-    return std::make_unique<irs::BM25>();
-  } else {
-    VPackSlice slice(reinterpret_cast<const uint8_t*>(args.data()));
-    return make_vpack(slice);
-  }
-}
-
-Scorer::ptr make_json(std::string_view args) {
-  if (irs::IsNull(args)) {
-    // default args
-    return std::make_unique<irs::BM25>();
-  } else {
-    try {
-      auto vpack = VPackParser::fromJson(args.data(), args.size());
-      return make_vpack(vpack->slice());
-    } catch (const VPackException& ex) {
-      IRS_LOG_ERROR(
-        rst::StrCat({"Caught error '", ex.what(),
-                     "' while constructing VPack from JSON for bm25 scorer"}));
-    } catch (...) {
-      IRS_LOG_ERROR(
-        "Caught error while constructing VPack from JSON for bm25 scorer");
-    }
-    return nullptr;
-  }
-}
-
-REGISTER_SCORER_JSON(irs::BM25, make_json);
-REGISTER_SCORER_VPACK(irs::BM25, make_vpack);
 
 struct BM1Context : public irs::score_ctx {
   BM1Context(float_t k, irs::score_t boost, const BM25Stats& stats,
@@ -551,9 +434,6 @@ bool BM25::equals(const Scorer& other) const noexcept {
   return p.k_ == k_ && p.b_ == b_;
 }
 
-void BM25::init() {
-  REGISTER_SCORER_JSON(BM25, make_json);    // match registration above
-  REGISTER_SCORER_VPACK(BM25, make_vpack);  // match registration above
-}
+void BM25::init() {}
 
 }  // namespace irs

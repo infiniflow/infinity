@@ -25,11 +25,6 @@
 
 #include <string_view>
 
-#include "utils/vpack_utils.hpp"
-#include "velocypack/Builder.h"
-#include "velocypack/Parser.h"
-#include "velocypack/Slice.h"
-#include "velocypack/velocypack-aliases.h"
 #include "utils/rst/strings/str_cat.h"
 
 namespace {
@@ -100,159 +95,6 @@ size_t find_delimiter(irs::bytes_view data, irs::bytes_view delim) {
   return data.size();
 }
 
-constexpr std::string_view DELIMITER_PARAM_NAME{"delimiter"};
-
-bool parse_vpack_options(const VPackSlice slice, std::string& delimiter) {
-  if (!slice.isObject() && !slice.isString()) {
-    IRS_LOG_ERROR(
-      "Slice for delimited_token_stream is not an object or string");
-    return false;
-  }
-
-  switch (slice.type()) {
-    case VPackValueType::String:
-      delimiter = slice.stringView();
-      return true;
-    case VPackValueType::Object:
-      if (auto delim_type_slice = slice.get(DELIMITER_PARAM_NAME);
-          !delim_type_slice.isNone()) {
-        if (!delim_type_slice.isString()) {
-          IRS_LOG_WARN(
-            rst::StrCat({"Invalid type '", DELIMITER_PARAM_NAME,
-                         "' (string expected) for delimited_token_stream from "
-                         "VPack arguments"}));
-          return false;
-        }
-        delimiter = delim_type_slice.stringView();
-        return true;
-      }
-    default: {
-    }  // fall through
-  }
-
-  IRS_LOG_ERROR(rst::StrCat({
-    "Missing '", DELIMITER_PARAM_NAME,
-    "' while constructing delimited_token_stream from VPack arguments"}));
-
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief args is a jSON encoded object with the following attributes:
-///        "delimiter"(string): the delimiter to use for tokenization <required>
-////////////////////////////////////////////////////////////////////////////////
-irs::analysis::analyzer::ptr make_vpack(const VPackSlice slice) {
-  std::string delimiter;
-  if (parse_vpack_options(slice, delimiter)) {
-    return irs::analysis::delimited_token_stream::make(delimiter);
-  } else {
-    return nullptr;
-  }
-}
-
-irs::analysis::analyzer::ptr make_vpack(std::string_view args) {
-  VPackSlice slice(reinterpret_cast<const uint8_t*>(args.data()));
-  return make_vpack(slice);
-}
-///////////////////////////////////////////////////////////////////////////////
-/// @brief builds analyzer config from internal options in json format
-/// @param delimiter reference to analyzer options storage
-/// @param definition string for storing json document with config
-///////////////////////////////////////////////////////////////////////////////
-bool make_vpack_config(std::string_view delimiter,
-                       VPackBuilder* vpack_builder) {
-  VPackObjectBuilder object(vpack_builder);
-  {
-    // delimiter
-    vpack_builder->add(DELIMITER_PARAM_NAME, VPackValue(delimiter));
-  }
-
-  return true;
-}
-
-bool normalize_vpack_config(const VPackSlice slice,
-                            VPackBuilder* vpack_builder) {
-  std::string delimiter;
-  if (parse_vpack_options(slice, delimiter)) {
-    return make_vpack_config(delimiter, vpack_builder);
-  } else {
-    return false;
-  }
-}
-
-bool normalize_vpack_config(std::string_view args, std::string& definition) {
-  VPackSlice slice(reinterpret_cast<const uint8_t*>(args.data()));
-  VPackBuilder builder;
-  bool res = normalize_vpack_config(slice, &builder);
-  if (res) {
-    definition.assign(builder.slice().startAs<char>(),
-                      builder.slice().byteSize());
-  }
-  return res;
-}
-
-irs::analysis::analyzer::ptr make_json(std::string_view args) {
-  try {
-    if (irs::IsNull(args)) {
-      IRS_LOG_ERROR("Null arguments while constructing delimited_token_stream");
-      return nullptr;
-    }
-    auto vpack = VPackParser::fromJson(args.data(), args.size());
-    return make_vpack(vpack->slice());
-  } catch (const VPackException& ex) {
-    IRS_LOG_ERROR(
-      rst::StrCat({"Caught error '", ex.what(),
-                   "' while constructing delimited_token_stream from JSON"}));
-  } catch (...) {
-    IRS_LOG_ERROR(
-      "Caught error while constructing delimited_token_stream from JSON");
-  }
-  return nullptr;
-}
-
-bool normalize_json_config(std::string_view args, std::string& definition) {
-  try {
-    if (irs::IsNull(args)) {
-      IRS_LOG_ERROR("Null arguments while normalizing delimited_token_stream");
-      return false;
-    }
-    auto vpack = VPackParser::fromJson(args.data(), args.size());
-    VPackBuilder vpack_builder;
-    if (normalize_vpack_config(vpack->slice(), &vpack_builder)) {
-      definition = vpack_builder.toString();
-      return !definition.empty();
-    }
-  } catch (const VPackException& ex) {
-    IRS_LOG_ERROR(
-      rst::StrCat({"Caught error '", ex.what(),
-                   "' while normalizing delimited_token_stream from JSON"}));
-  } catch (...) {
-    IRS_LOG_ERROR(
-      "Caught error while normalizing delimited_token_stream from JSON");
-  }
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief args is a delimiter to use for tokenization
-////////////////////////////////////////////////////////////////////////////////
-irs::analysis::analyzer::ptr make_text(std::string_view args) {
-  return std::make_unique<irs::analysis::delimited_token_stream>(args);
-}
-
-bool normalize_text_config(std::string_view delimiter,
-                           std::string& definition) {
-  definition = delimiter;
-  return true;
-}
-
-REGISTER_ANALYZER_VPACK(irs::analysis::delimited_token_stream, make_vpack,
-                        normalize_vpack_config);
-REGISTER_ANALYZER_JSON(irs::analysis::delimited_token_stream, make_json,
-                       normalize_json_config);
-REGISTER_ANALYZER_TEXT(irs::analysis::delimited_token_stream, make_text,
-                       normalize_text_config);
-
 }  // namespace
 
 namespace irs {
@@ -264,10 +106,6 @@ delimited_token_stream::delimited_token_stream(std::string_view delimiter)
     delim_buf_ = delim_;  // keep a local copy of the delimiter
     delim_ = delim_buf_;  // update the delimter to point at the local copy
   }
-}
-
-analyzer::ptr delimited_token_stream::make(std::string_view delimiter) {
-  return make_text(delimiter);
 }
 
 void delimited_token_stream::init() {}

@@ -22,11 +22,6 @@
 
 #include "tfidf.hpp"
 
-#include <velocypack/Parser.h>
-#include <velocypack/Slice.h>
-#include <velocypack/velocypack-aliases.h>
-#include <velocypack/vpack.h>
-
 #include <cmath>
 #include <string_view>
 
@@ -75,113 +70,6 @@ const auto kSQRT = cache_func<uint32_t, 2048>(
 const auto kRSQRT = cache_func<uint32_t, 2048>(1, [](uint32_t i) noexcept {
   return 1.f / std::sqrt(static_cast<float_t>(i));
 });
-
-Scorer::ptr make_from_bool(const VPackSlice slice) {
-  IRS_ASSERT(slice.isBool());
-
-  return std::make_unique<TFIDF>(slice.getBool());
-}
-
-constexpr std::string_view WITH_NORMS_PARAM_NAME("withNorms");
-
-Scorer::ptr make_from_object(const VPackSlice slice) {
-  IRS_ASSERT(slice.isObject());
-
-  auto normalize = TFIDF::WITH_NORMS();
-
-  if (auto v = slice.get(WITH_NORMS_PARAM_NAME); !v.isNone()) {
-    if (!v.isBool()) {
-      IRS_LOG_ERROR(
-        rst::StrCat({"Non-boolean value in '", WITH_NORMS_PARAM_NAME,
-                     "' while constructing tfidf scorer from VPack arguments"}));
-      return nullptr;
-    }
-    normalize = v.getBool();
-  }
-
-  return std::make_unique<TFIDF>(normalize);
-}
-
-Scorer::ptr make_from_array(const VPackSlice slice) {
-  IRS_ASSERT(slice.isArray());
-
-  VPackArrayIterator array = VPackArrayIterator(slice);
-  VPackValueLength size = array.size();
-
-  if (size > 1) {
-    // wrong number of arguments
-    IRS_LOG_ERROR(
-      "Wrong number of arguments while constructing tfidf scorer from VPack "
-      "arguments (must be <= 1)");
-    return nullptr;
-  }
-
-  // default args
-  auto norms = TFIDF::WITH_NORMS();
-
-  // parse `withNorms` optional argument
-  for (auto arg_slice : array) {
-    if (!arg_slice.isBool()) {
-      IRS_LOG_ERROR(
-        "Non-bool value on position `0` while constructing tfidf scorer from "
-        "VPack arguments");
-      return nullptr;
-    }
-
-    norms = arg_slice.getBool();
-  }
-
-  return std::make_unique<TFIDF>(norms);
-}
-
-Scorer::ptr make_vpack(const VPackSlice slice) {
-  switch (slice.type()) {
-    case VPackValueType::Bool:
-      return make_from_bool(slice);
-    case VPackValueType::Object:
-      return make_from_object(slice);
-    case VPackValueType::Array:
-      return make_from_array(slice);
-    default:  // wrong type
-      IRS_LOG_ERROR(
-        "Invalid VPack arguments passed while constructing tfidf scorer, "
-        "arguments");
-      return nullptr;
-  }
-}
-
-Scorer::ptr make_vpack(std::string_view args) {
-  if (irs::IsNull(args)) {
-    // default args
-    return std::make_unique<TFIDF>();
-  } else {
-    VPackSlice slice(reinterpret_cast<const uint8_t*>(args.data()));
-    return make_vpack(slice);
-  }
-}
-
-Scorer::ptr make_json(std::string_view args) {
-  if (irs::IsNull(args)) {
-    // default args
-    return std::make_unique<TFIDF>();
-  } else {
-    try {
-      auto vpack = VPackParser::fromJson(args.data(), args.size());
-      return make_vpack(vpack->slice());
-    } catch (const VPackException& ex) {
-      IRS_LOG_ERROR(
-        rst::StrCat({"Caught error '", ex.what(),
-                     "' while constructing VPack from JSON for tfidf scorer"}));
-    } catch (...) {
-      IRS_LOG_ERROR(
-        "Caught error while constructing VPack from JSON for tfidf scorer");
-    }
-    return nullptr;
-  }
-}
-
-REGISTER_SCORER_JSON(TFIDF, make_json);
-REGISTER_SCORER_VPACK(TFIDF, make_vpack);
 
 IRS_FORCE_INLINE float_t tfidf(uint32_t freq, float_t idf) noexcept {
   return kSQRT.get<true>(freq) * idf;
@@ -394,9 +282,6 @@ bool TFIDF::equals(const Scorer& other) const noexcept {
   return p.normalize_ == normalize_;
 }
 
-void TFIDF::init() {
-  REGISTER_SCORER_JSON(TFIDF, make_json);    // match registration above
-  REGISTER_SCORER_VPACK(TFIDF, make_vpack);  // match registration above
-}
+void TFIDF::init() {}
 
 }  // namespace irs

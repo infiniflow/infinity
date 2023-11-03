@@ -1,7 +1,0 @@
-Testing
--------
-* automate tests on MacOS and ARM
-
-Features
---------
-* implement missing type BCD in Builder, Slice, Parser and Dumper

@@ -9,6 +9,7 @@ else ()
   option(IRESEARCH_DEBUG "Enable IRS_ASSERT and other checks" OFF)
 endif ()
 
+add_compile_options(-fsized-deallocation)
 
 if (USE_VALGRIND)
   add_definitions(-DIRESEARCH_VALGRIND)
