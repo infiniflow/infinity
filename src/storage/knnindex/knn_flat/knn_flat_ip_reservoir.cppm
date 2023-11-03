@@ -41,7 +41,7 @@ public:
             return;
         }
 
-        for (SizeT i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_reservoir_result_handler_->begin(i);
         }
 
@@ -61,11 +61,11 @@ public:
 
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
 
-        for (i64 i = 0; i < this->query_count_; i++) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 DistType ip = fvec_inner_product(x_i, y_j, this->dimension_);
                 single_reservoir_result_handler_->add_result(ip, RowID{segment_id, segment_offset_start + j}, i);
             }
@@ -76,7 +76,7 @@ public:
         if (!begin_)
             return;
 
-        for (i32 i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_reservoir_result_handler_->end(i);
         }
 

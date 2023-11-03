@@ -110,11 +110,11 @@ UniquePtr<String> Txn::Delete(const String &db_name, const String &table_name, c
 void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_name, const String &table_name, const Vector<ColumnID> &columns) {
     auto txn_table_iter = txn_tables_store_.find(table_name);
     if (txn_table_iter != txn_tables_store_.end()) {
-        Vector<SharedPtr<DataBlock>> &blocks = txn_table_iter->second->blocks_;
-        meta_table_state->local_blocks_.reserve(blocks.size());
-        SizeT block_count = blocks.size();
+        Vector<SharedPtr<DataBlock>> &local_blocks = txn_table_iter->second->blocks_;
+        meta_table_state->local_blocks_.reserve(local_blocks.size());
+        SizeT block_count = local_blocks.size();
         for(SizeT idx = 0; idx < block_count; ++ idx) {
-            const auto &data_block = blocks[idx];
+            const auto &data_block = local_blocks[idx];
             MetaLocalDataState data_block_state;
             data_block_state.data_block_ = data_block.get();
             SizeT column_count = columns.size();
@@ -145,8 +145,8 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
         MetaSegmentState segment_state;
         segment_state.segment_entry_ = segment_entry_ptr;
 
-        i16 max_block_id = SegmentEntry::GetMaxBlockID(segment_entry_ptr);
-        for (i16 block_id = 0; block_id < max_block_id; ++block_id) {
+        u16 max_block_id = SegmentEntry::GetMaxBlockID(segment_entry_ptr);
+        for (u16 block_id = 0; block_id < max_block_id; ++block_id) {
             BlockEntry *block_entry_ptr = SegmentEntry::GetBlockEntryByID(segment_entry_ptr, block_id);
 
             MetaBlockState block_state;
@@ -167,10 +167,6 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
     }
 }
 
-SharedPtr<GetState> Txn::InitializeGet(GetParam) { return nullptr; }
-
-void Txn::TableGet() {}
-
 void Txn::AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store) {
     if (txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
         String err_msg = Format("Attempt to add duplicated table store for table: {}", table_name);
@@ -186,63 +182,6 @@ TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
         return nullptr;
     }
     return txn_table_iter->second.get();
-}
-
-void Txn::IndexGet() {}
-
-SharedPtr<ScanState> Txn::InitializeScan(const String &db_name, const String &table_name, const Vector<ColumnID> &column_ids) {
-
-    SharedPtr<ScanState> scan_state{};
-    auto txn_table_iter = txn_tables_store_.find(table_name);
-    if (txn_table_iter != txn_tables_store_.end()) {
-        scan_state->txn_table_store_ = txn_table_iter->second.get();
-        scan_state->table_entry_ = (void *)(txn_table_iter->second->table_entry_);
-        scan_state->scan_location_ = ScanLocation::kLocal;
-    } else {
-        TableCollectionEntry *table_entry{nullptr};
-        UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
-        if (err_msg.get() != nullptr) {
-            Error<TransactionException>(*err_msg, __FILE_NAME__, __LINE__);
-        }
-        scan_state->table_entry_ = (void *)table_entry;
-        scan_state->scan_location_ = ScanLocation::kGlobal;
-    }
-    scan_state->columns_ = column_ids;
-
-    return scan_state;
-}
-
-void Txn::Scan(ScanState *scan_state, SharedPtr<DataBlock> &output_block) {
-
-    if (scan_state->scan_location_ == ScanLocation::kLocal) {
-        // Scan local storage
-        TxnTableStore *local_table_store = (TxnTableStore *)scan_state->txn_table_store_;
-        if (scan_state->filter_ptr_ == nullptr) {
-            // No filter
-            //            if(scan_state->)
-        } else {
-            // With filter
-        }
-        //        local_table_store->blocks_
-    }
-
-    // Scan global storage
-}
-
-void Txn::TableScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block) {
-    Error<TransactionException>("Not implemented", __FILE_NAME__, __LINE__);
-}
-
-void Txn::IndexScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block) {
-    Error<TransactionException>("Not implemented", __FILE_NAME__, __LINE__);
-}
-
-void Txn::AnnScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block) {
-    Error<TransactionException>("Not implemented", __FILE_NAME__, __LINE__);
-}
-
-UniquePtr<String> Txn::CompleteScan(const String &db_name, const String &table_name) {
-    return nullptr;
 }
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }

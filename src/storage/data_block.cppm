@@ -71,7 +71,7 @@ public:
 public:
     [[nodiscard]] inline SizeT column_count() const { return column_count_; }
 
-    [[nodiscard]] inline i16 row_count() const {
+    [[nodiscard]] inline u16 row_count() const {
         if (!finalized) {
             if (row_count_ == 0) {
                 return 0;
@@ -96,7 +96,7 @@ public:
     Vector<SharedPtr<ColumnVector>> column_vectors;
 
 private:
-    SizeT row_count_{0};
+    u16 row_count_{0};
     SizeT column_count_{0};
     SizeT capacity_{0};
     bool initialized = false;

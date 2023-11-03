@@ -42,7 +42,7 @@ public:
     static ColumnBuffer GetColumnData(BlockColumnEntry *column_data_entry, BufferManager *buffer_manager);
 
     static void
-    Append(BlockColumnEntry *column_entry, offset_t column_entry_offset, ColumnVector *input_column_vector, offset_t input_offset, SizeT append_rows);
+    Append(BlockColumnEntry *column_entry, u16 column_entry_offset, ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows);
 
     static void AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_ptr, SizeT data_size);
 

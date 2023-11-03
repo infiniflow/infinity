@@ -88,8 +88,8 @@ public:
             if (i1 > this->query_count_)
                 i1 = this->query_count_;
 
-            for (i16 j0 = 0; j0 < base_count; j0 += bs_y) {
-                i16 j1 = j0 + bs_y;
+            for (u16 j0 = 0; j0 < base_count; j0 += bs_y) {
+                u16 j1 = j0 + bs_y;
                 if (j1 > base_count)
                     j1 = base_count;
                 /* compute the actual dot products */

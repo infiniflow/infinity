@@ -77,7 +77,7 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
-UniquePtr<String> TxnTableStore::CreateIndexFile(u64 segment_id, SharedPtr<IndexEntry> index) {
+UniquePtr<String> TxnTableStore::CreateIndexFile(u32 segment_id, SharedPtr<IndexEntry> index) {
     uncommitted_indexes_.emplace(segment_id, Move(index));
     return nullptr;
 }

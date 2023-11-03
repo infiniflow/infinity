@@ -152,8 +152,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->capacity();
     while (write_capacity > 0 && block_ids_idx < block_ids->size()) {
-        i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-        i16 block_id = block_ids->at(block_ids_idx).block_id_;
+        u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+        u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
         auto [row_begin, row_end] = BlockEntry::VisibleRange(current_block_entry, begin_ts, read_offset);

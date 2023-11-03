@@ -171,6 +171,7 @@ export {
 
     using Thread = std::thread;
 
+    using atomic_u32 = std::atomic_uint32_t;
     using au64 = std::atomic_uint64_t;
     using ai64 = std::atomic_int64_t;
     using aptr = std::atomic_uintptr_t;

@@ -38,7 +38,7 @@ void BlockIndex::Reserve(SizeT n) {
     segment_block_index_.reserve(n);
 }
 
-BlockEntry *BlockIndex::GetBlockEntry(i32 segment_id, i16 block_id) const {
+BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
     auto seg_it = segment_block_index_.find(segment_id);
     if (seg_it != segment_block_index_.end()) {
         auto block_it = seg_it->second.find(block_id);

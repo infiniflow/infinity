@@ -42,7 +42,7 @@ public:
             return;
         }
 
-        for (SizeT i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_result_handler_->begin(i);
         }
 
@@ -62,7 +62,7 @@ public:
 
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
 
-        for (i64 i = 0; i < this->query_count_; i++) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
@@ -77,7 +77,7 @@ public:
         if (!begin_)
             return;
 
-        for (i32 i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_result_handler_->end(i);
         }
 

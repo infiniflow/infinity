@@ -102,8 +102,8 @@ public:
             if (i1 > this->query_count_)
                 i1 = this->query_count_;
 
-            for (i16 j0 = 0; j0 < base_count; j0 += bs_y) {
-                i16 j1 = j0 + bs_y;
+            for (u16 j0 = 0; j0 < base_count; j0 += bs_y) {
+                u16 j1 = j0 + bs_y;
                 if (j1 > base_count)
                     j1 = base_count;
                 /* compute the actual dot products */
@@ -149,7 +149,7 @@ public:
         if (!begin_)
             return;
 
-        for (i32 i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_best_result_handler_->end_multiple();
         }
 

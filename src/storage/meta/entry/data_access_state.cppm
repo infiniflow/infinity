@@ -14,13 +14,13 @@ export module data_access_state;
 namespace infinity {
 
 export struct AppendRange {
-    inline explicit AppendRange(i32 segment_id, i16 block_id, i16 start_id, i16 row_count)
-        : segment_id_(segment_id), block_id_(block_id), start_id_(start_id), row_count_(row_count) {}
+    inline explicit AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count)
+        : segment_id_(segment_id), block_id_(block_id), start_offset_(start_offset), row_count_(row_count) {}
 
-    i32 segment_id_;
-    i16 block_id_;
-    i16 start_id_;
-    i16 row_count_;
+    u32 segment_id_;
+    u16 block_id_;
+    u16 start_offset_;
+    u16 row_count_;
 };
 
 export struct AppendState {
@@ -35,8 +35,8 @@ export struct AppendState {
     SizeT total_count_{};
     SizeT current_count_{};
 
-    SizeT current_block_{};
-    SizeT current_block_offset_{};
+    u64 current_block_{}; // block count in append state may larger than u16::max, since these blocks may not be in one segment.
+    u16 current_block_offset_{};
 
     Vector<AppendRange> append_ranges_{};
 
@@ -64,31 +64,6 @@ export enum class ScanStateType {
 export enum class ScanLocation {
     kLocal,
     kGlobal,
-};
-
-export struct ScanState {
-    void *txn_table_store_{};
-    void *table_entry_{};
-    ScanLocation scan_location_{ScanLocation::kLocal};
-
-    // For local
-    u64 current_block_id_{};
-    u64 current_row_in_block_{};
-
-    // For global
-    u64 current_segment_id_{};
-    u64 current_row_in_segment_{};
-
-    // TableFilter
-    void *filter_ptr_;
-
-    // Ann query embeddings
-    ColumnVector *column_vector_ptr_;
-
-    // ScanType: table scan/index scan/ann scan
-
-    // input columns
-    Vector<ColumnID> columns_;
 };
 
 } // namespace infinity

@@ -95,11 +95,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
     SizeT knn_column_id = knn_column_ids[0];
 
     i64 &block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
-    i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    i16 block_id = block_ids->at(block_ids_idx).block_id_;
+    u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+    u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
     BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-    i16 row_count = current_block_entry->row_count_;
+    u16 row_count = current_block_entry->row_count_;
 
     Vector<ColumnBuffer> columns_buffer;
     columns_buffer.reserve(current_block_entry->columns_.size());
