@@ -1,10 +1,6 @@
 module;
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <random>
-
+import std;
 import stl;
 import parser;
 import knn_distance;
@@ -79,7 +75,7 @@ private:
     // >= 0
     i32 GenerateRandomLayer() {
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
-        double r = -log(distribution(level_rng_)) * mult_;
+        double r = -std::log(distribution(level_rng_)) * mult_;
         return static_cast<i32>(r);
     }
 
@@ -202,7 +198,7 @@ public:
         requires SpaceConcept<DataType, SpaceType>
     KnnHnsw(SpaceType space, SizeT M = 16, SizeT ef_construction = 200, SizeT random_seed = 100)
         : M_(M), Mmax_(M_), Mmax0_(2 * Mmax_), ef_(10), ef_construction_(Max(M_, ef_construction)), dim_(space.Dimension()),
-          dist_func_(space.template DistFuncPtr<DataType>()), max_layer_(i64_max), enterpoint_(-1), mult_(1 / log(1.0 * M_)) {
+          dist_func_(space.template DistFuncPtr<DataType>()), max_layer_(-1), enterpoint_(-1), mult_(1 / std::log(1.0 * M_)) {
         level_rng_.seed(random_seed);
     }
 
@@ -321,7 +317,7 @@ public:
         requires SpaceConcept<DataType, SpaceType>
     KnnHnsw(SpaceType space, const String &file_name)
         : M_(16), Mmax_(M_), Mmax0_(2 * Mmax_), ef_(10), ef_construction_(200), dim_(space.Dimension()),
-          dist_func_(space.template DistFuncPtr<DataType>()), mult_(1 / log(1.0 * M_)) {
+          dist_func_(space.template DistFuncPtr<DataType>()), mult_(1 / std::log(1.0 * M_)) {
         level_rng_.seed(100);
         std::fstream fo(file_name, std::ios::in);
         fo >> max_layer_;
