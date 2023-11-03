@@ -46,15 +46,13 @@ void PhysicalUpdate::Execute(QueryContext *query_context, InputState *input_stat
         }
     }
     if (!row_ids.empty()) {
-
         ExpressionEvaluator evaluator;
-        evaluator.Init(nullptr);
+        evaluator.Init(data_block_ptr);
         for (SizeT expr_idx = 0; expr_idx < update_columns_.size(); ++expr_idx) {
             SizeT column_idx = update_columns_[expr_idx].first;
             const SharedPtr<BaseExpression> &expr = update_columns_[expr_idx].second;
             SharedPtr<ColumnVector> output_column = ColumnVector::Make(column_vectors[column_idx]->data_type_);
             output_column->Initialize(ColumnVectorType::kFlat);
-            output_column->Reserve(data_block_ptr->row_count());
             SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
             evaluator.Execute(expr, expr_state, output_column);
             column_vectors[column_idx] = output_column;

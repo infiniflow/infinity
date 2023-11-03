@@ -947,6 +947,7 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     const Vector<String> &column_names = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
     const Vector<SharedPtr<DataType>> &column_types = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
     //    const Vector<String> &column_names = *static_cast<BaseTableRef *>(base_table_ref.get())->column_names_;
+    auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
         std::string &column_name = upd_expr->column_name;
         ParsedExpr *expr = upd_expr->value;
@@ -956,7 +957,7 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
                                  __FILE_NAME__,
                                  __LINE__);
         SizeT column_id = std::distance(column_names.begin(), it);
-        SharedPtr<BaseExpression> update_expr = where_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
+        SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
         update_expr = CastExpression::AddCastToType(update_expr, *column_types[column_id]);
         bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
     }
