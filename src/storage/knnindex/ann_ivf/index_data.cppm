@@ -9,11 +9,11 @@ export module index_data;
 
 namespace infinity {
 
-export template <typename VectorDataType>
+export template <typename CentroidsDataType, typename VectorDataType = CentroidsDataType>
 struct IVFFlatIndexData {
     i32 dimension_;
     i32 partition_num_;
-    Vector<VectorDataType> centroids_;
+    Vector<CentroidsDataType> centroids_;
     Vector<Vector<VectorDataType>> vectors_;
     Vector<Vector<RowID>> ids_;
     IVFFlatIndexData(i32 dimension, i32 partition_num)

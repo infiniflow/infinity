@@ -39,7 +39,22 @@ public:
     static SharedPtr<IVFFlatIndexData<DistType>>
     CreateIndex(i32 dimension, SizeT vector_count, DistType *vectors_ptr, i32 partition_num, i32 segment_id, i16 block_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
-        l2_kmeans_partition_inplace_f32(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
+        k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, partition_num, index_data->centroids_.data());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
+        return index_data;
+    }
+
+    static SharedPtr<IVFFlatIndexData<DistType>> CreateIndex(i32 dimension,
+                                                             SizeT train_count,
+                                                             DistType *train_ptr,
+                                                             SizeT vector_count,
+                                                             DistType *vectors_ptr,
+                                                             i32 partition_num,
+                                                             i32 segment_id,
+                                                             i16 block_id) {
+        auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
+        k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, partition_num, index_data->centroids_.data());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
         return index_data;
     }
 
@@ -83,6 +98,7 @@ public:
                 DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                 centroid_single_heap_result.add_result(ip, j, 0);
             }
+            centroid_single_heap_result.end(0);
             for (i32 k = 0; k < n_probes; k++) {
                 const i32 selected_centroid = centroid_ids[k];
                 const i32 contain_nums = base_ivf->vectors_[selected_centroid].size() / this->dimension_;
