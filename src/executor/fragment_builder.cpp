@@ -60,6 +60,10 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
 
             // Set texts to explain physical operator
             current_fragment_ptr->AddOperator(phys_op);
+
+            if (explain_op->explain_type() == ExplainType::kPipeline) {
+                current_fragment_ptr->AddChild(Move(explain_child_fragment));
+            }
             break;
         }
     }

@@ -30,15 +30,20 @@ public:
 
     void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = Move(text); }
 
+    void SetExplainTaskText(SharedPtr<Vector<SharedPtr<String>>> text) { task_texts = Move(text); }
+
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     inline ExplainType explain_type() const { return explain_type_; }
 
+    static void alignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2);
+
 private:
     ExplainType explain_type_{ExplainType::kPhysical};
     SharedPtr<Vector<SharedPtr<String>>> texts_{nullptr};
+    SharedPtr<Vector<SharedPtr<String>>> task_texts{nullptr};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

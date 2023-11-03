@@ -68,6 +68,8 @@ public:
 
     [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
+    [[nodiscard]] inline i64 TaskID() const { return task_id_; }
+
     [[nodiscard]] bool Ready() const;
 
     [[nodiscard]] bool IsComplete() const;
