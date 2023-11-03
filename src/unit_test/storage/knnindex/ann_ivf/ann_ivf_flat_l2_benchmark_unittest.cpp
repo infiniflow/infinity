@@ -1,5 +1,5 @@
 
-// #define centroids
+#define centroids
 // #define bucketcontent
 
 #include "unit_test/base_test.h"
@@ -435,15 +435,15 @@ void benchmark_annivfflatl2() {
 #ifdef centroids
         // output centroids
         {
-            auto centroids = ann_index_data->centroids_;
+            auto centroids_ = ann_index_data->centroids_;
             // output content of centroids, 128 per line
             std::cout << "######################################################" << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "centroids:\n";
-            for (i32 i = 0; i < partition_num; ++i) {
+                      << "first 10 centroids:\n";
+            for (i32 i = 0; i < 10; ++i) {
                 std::cout << "partition " << i << ": ";
                 for (i32 j = 0; j < d; ++j) {
-                    std::cout << centroids[i * d + j] << " ";
+                    std::cout << centroids_[i * d + j] << " ";
                 }
                 std::cout << std::endl;
             }

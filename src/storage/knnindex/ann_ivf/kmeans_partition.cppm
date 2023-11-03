@@ -311,12 +311,12 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         }
 
         // output centroids
-        if (false) {
+        if (true) {
             // output content of centroids, 128 per line
             std::cout << "######################################################" << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "centroids:\n";
-            for (i32 i = 0; i < partition_num; ++i) {
+                      << "first 10 centroids:\n";
+            for (i32 i = 0; i < 10; ++i) {
                 std::cout << "partition " << i << ": ";
                 for (i32 j = 0; j < dimension; ++j) {
                     std::cout << centroids[i * dimension + j] << " ";
