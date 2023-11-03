@@ -32,7 +32,7 @@ public:
     inline String name() final { return "LogicalUpdate"; }
 
     TableCollectionEntry *table_entry_ptr_{};
-    const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> update_columns_;
+    Vector<Pair<SizeT, SharedPtr<BaseExpression>>> update_columns_; // Column ID = Expression
 };
 
 } // namespace infinity

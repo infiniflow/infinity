@@ -7,7 +7,7 @@ import stl;
 import base_entry;
 import parser;
 import table_collection_detail;
-//import table_collection_entry;
+// import table_collection_entry;
 import table_def;
 import index_def;
 import data_block;
@@ -22,7 +22,6 @@ import index_def_entry;
 import database_detail;
 
 export module txn;
-
 
 namespace infinity {
 

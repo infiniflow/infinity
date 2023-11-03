@@ -110,11 +110,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ReferenceExpression> &column_expr) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<DataType> column_data_type = MakeShared<DataType>(column_expr->Type());
-    result->column_vector_ = MakeShared<ColumnVector>(column_data_type);
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
-
-    //    result->output_data_block_.Init({column});
     return result;
 }
 
