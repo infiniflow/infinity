@@ -49,7 +49,7 @@ TEST_F(ExplainTest, test1) {
     task_text.push_back(MakeShared<String>("-> Task #1"));
     task_text.push_back(MakeShared<String>());
 
-    PhysicalExplain::alignParagraphs(fragment_text, task_text);
+    PhysicalExplain::AlignParagraphs(fragment_text, task_text);
 
     EXPECT_EQ(fragment_text.size(), task_text.size());
 }

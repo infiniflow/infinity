@@ -38,7 +38,7 @@ public:
 
     inline ExplainType explain_type() const { return explain_type_; }
 
-    static void alignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2);
+    static void AlignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2);
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};

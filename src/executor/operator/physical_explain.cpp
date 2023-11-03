@@ -23,40 +23,40 @@ module physical_explain;
 
 namespace infinity {
 
-void PhysicalExplain::alignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2) {
-    Vector<SizeT> paragraphIndices1;
-    Vector<SizeT> paragraphIndices2;
+void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2) {
+    Vector<SizeT> paragraph_indices_1;
+    Vector<SizeT> paragraph_indices_2;
 
     for (SizeT i = 0; i < array1.size(); ++i) {
         if (array1[i]->empty()) {
-            paragraphIndices1.push_back(i);
+            paragraph_indices_1.push_back(i);
         }
     }
     for (SizeT i = 0; i < array2.size(); ++i) {
         if (array2[i]->empty()) {
-            paragraphIndices2.push_back(i);
+            paragraph_indices_2.push_back(i);
         }
     }
 
-    SizeT maxParagraphs = Max(paragraphIndices1.size(), paragraphIndices2.size());
+    SizeT max_paragraphs = Max(paragraph_indices_1.size(), paragraph_indices_2.size());
 
-    for (SizeT i = 0; i < maxParagraphs; ++i) {
-        if (i < paragraphIndices1.size() && i < paragraphIndices2.size()) {
-            SizeT start1 = (i == 0) ? 0 : paragraphIndices1[i - 1] + 1;
-            SizeT start2 = (i == 0) ? 0 : paragraphIndices2[i - 1] + 1;
+    for (SizeT i = 0; i < max_paragraphs; ++i) {
+        if (i < paragraph_indices_1.size() && i < paragraph_indices_2.size()) {
+            SizeT start_1 = (i == 0) ? 0 : paragraph_indices_1[i - 1] + 1;
+            SizeT start_2 = (i == 0) ? 0 : paragraph_indices_2[i - 1] + 1;
 
-            SizeT end1 = paragraphIndices1[i];
-            SizeT end2 = paragraphIndices2[i];
+            SizeT end1 = paragraph_indices_1[i];
+            SizeT end2 = paragraph_indices_2[i];
 
-            Vector<SharedPtr<String>> paragraphs1(array1.begin() + start1, array1.begin() + end1);
-            Vector<SharedPtr<String>> paragraphs2(array2.begin() + start2, array2.begin() + end2);
+            Vector<SharedPtr<String>> paragraphs1(array1.begin() + start_1, array1.begin() + end1);
+            Vector<SharedPtr<String>> paragraphs2(array2.begin() + start_2, array2.begin() + end2);
 
-            SizeT lengthDiff = paragraphs1.size() - paragraphs2.size();
+            SizeT length_diff = paragraphs1.size() - paragraphs2.size();
 
-            if (lengthDiff > 0) {
-                array2.insert(array2.begin() + end2, lengthDiff, MakeShared<String>());
-            } else if (lengthDiff < 0) {
-                array1.insert(array1.begin() + end1, -lengthDiff, MakeShared<String>());
+            if (length_diff > 0) {
+                array2.insert(array2.begin() + end2, length_diff, MakeShared<String>());
+            } else if (length_diff < 0) {
+                array1.insert(array1.begin() + end1, -length_diff, MakeShared<String>());
             }
         }
     }
@@ -158,7 +158,7 @@ void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_sta
             task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts)[idx]));
         }
 
-        alignParagraphs(*this->texts_, *this->task_texts);
+        AlignParagraphs(*this->texts_, *this->task_texts);
     }
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
