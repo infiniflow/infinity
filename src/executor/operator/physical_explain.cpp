@@ -38,26 +38,24 @@ void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>>& array1, Vector<
         }
     }
 
-    SizeT max_paragraphs = Max(paragraph_indices_1.size(), paragraph_indices_2.size());
+    SizeT min_paragraphs = Min(paragraph_indices_1.size(), paragraph_indices_2.size());
 
-    for (SizeT i = 0; i < max_paragraphs; ++i) {
-        if (i < paragraph_indices_1.size() && i < paragraph_indices_2.size()) {
-            SizeT start_1 = (i == 0) ? 0 : paragraph_indices_1[i - 1] + 1;
-            SizeT start_2 = (i == 0) ? 0 : paragraph_indices_2[i - 1] + 1;
+    for (SizeT i = 0; i < min_paragraphs; ++i) {
+        SizeT start_1 = (i == 0) ? 0 : paragraph_indices_1[i - 1] + 1;
+        SizeT start_2 = (i == 0) ? 0 : paragraph_indices_2[i - 1] + 1;
 
-            SizeT end1 = paragraph_indices_1[i];
-            SizeT end2 = paragraph_indices_2[i];
+        SizeT end1 = paragraph_indices_1[i];
+        SizeT end2 = paragraph_indices_2[i];
 
-            Vector<SharedPtr<String>> paragraphs1(array1.begin() + start_1, array1.begin() + end1);
-            Vector<SharedPtr<String>> paragraphs2(array2.begin() + start_2, array2.begin() + end2);
+        Vector<SharedPtr<String>> paragraphs1(array1.begin() + start_1, array1.begin() + end1);
+        Vector<SharedPtr<String>> paragraphs2(array2.begin() + start_2, array2.begin() + end2);
 
-            SizeT length_diff = paragraphs1.size() - paragraphs2.size();
+        SizeT length_diff = paragraphs1.size() - paragraphs2.size();
 
-            if (length_diff > 0) {
-                array2.insert(array2.begin() + end2, length_diff, MakeShared<String>());
-            } else if (length_diff < 0) {
-                array1.insert(array1.begin() + end1, -length_diff, MakeShared<String>());
-            }
+        if (length_diff > 0) {
+            array2.insert(array2.begin() + end2, length_diff, MakeShared<String>());
+        } else if (length_diff < 0) {
+            array1.insert(array1.begin() + end1, -length_diff, MakeShared<String>());
         }
     }
 }
