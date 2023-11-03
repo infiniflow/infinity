@@ -51,7 +51,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
@@ -87,7 +87,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     //    return ;
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
@@ -137,7 +137,7 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         column_vector.AppendByPtr((ptr_t)(&row_id));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
@@ -192,7 +192,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < 1; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
@@ -242,7 +242,7 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < 1; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
@@ -263,7 +263,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
     }
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<i16>(i)};
+        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
     }

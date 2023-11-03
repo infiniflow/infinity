@@ -30,7 +30,7 @@ public:
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, topk), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->top_k_ * this->query_count_);
+        distance_array_ = MakeUnique<DistType[]>(this->top_k_ * this->query_count_);
 
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), this->top_k_);
         single_result_handler_ = MakeUnique<SingleResultHandler>(*heap_result_handler_, query_count);
@@ -63,7 +63,7 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u32 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 DistType l2 = fvec_L2sqr(x_i, y_j, this->dimension_);
                 single_result_handler_->add_result(l2, RowID{segment_id, block_id, j}, i);
             }

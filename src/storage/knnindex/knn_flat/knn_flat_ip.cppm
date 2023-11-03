@@ -63,7 +63,7 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u32 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 DistType ip = fvec_inner_product(x_i, y_j, this->dimension_);
                 single_heap_result_handler_->add_result(ip, RowID{segment_id, block_id, j}, i);
             }

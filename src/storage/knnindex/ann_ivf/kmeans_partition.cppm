@@ -262,7 +262,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         }
 
         // output centroids
-        {
+        if (false) {
             // output content of centroids, 128 per line
             std::cout << "######################################################" << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
@@ -400,7 +400,7 @@ void add_data_to_partition_l2(i32 dimension,
     search_top_1<f32>(dimension, vector_count, vectors_ptr, partition_num, centroids.data(), assigned_partition_id.data());
 
     // output assigned_partition_id
-    {
+    if (false) {
         // output content of assigned_partition_id, 10 per line
         std::cout << "#####################################################"
                   << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "

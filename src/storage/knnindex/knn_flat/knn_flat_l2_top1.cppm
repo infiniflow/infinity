@@ -63,7 +63,7 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (i16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u32 j = 0; j < base_count; j++, y_j += this->dimension_) {
 
                 DistType l2_distance = fvec_L2sqr(x_i, y_j, this->dimension_);
                 single_result_handler_->add_result(l2_distance, RowID{segment_id, block_id, j}, i);

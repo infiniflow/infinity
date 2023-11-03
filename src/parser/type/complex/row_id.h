@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace infinity {
@@ -11,12 +12,12 @@ namespace infinity {
 struct RowID {
     RowID() : segment_id_(-1), block_id_(-1), block_offset_(-1) {}
 
-    inline explicit RowID(int32_t segment_id, int16_t block_id, int16_t block_offset)
+    inline explicit RowID(int32_t segment_id, int16_t block_id, uint32_t block_offset)
         : segment_id_(segment_id), block_id_(block_id), block_offset_(block_offset) {}
 
     int32_t segment_id_{};
     int16_t block_id_{};
-    int16_t block_offset_{};
+    uint32_t block_offset_{};
 
     inline bool operator<(const RowID &other) const {
         return segment_id_ < other.segment_id_ || (segment_id_ == other.segment_id_ && block_id_ < other.block_id_) ||

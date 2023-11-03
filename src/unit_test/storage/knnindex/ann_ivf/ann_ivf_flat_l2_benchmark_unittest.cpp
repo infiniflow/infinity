@@ -1,4 +1,7 @@
 
+// #define centroids
+// #define bucketcontent
+
 #include "unit_test/base_test.h"
 
 #include <cmath>
@@ -46,6 +49,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 // size_t testnum = 100'000;
 
+int global_nb = 100'000;
 int n_lists;
 int n_probes = 1;
 size_t k;
@@ -141,7 +145,7 @@ void benchmark_faiss_ivfflatl2() {
         float *xb = fvecs_read(sift1m_base, &d2, &nb);
 
         //// TODO: change nb to do tests
-        nb = 10000;
+        // nb = global_nb;
         assert(d == d2 || !"dataset does not have same dimension as train set");
 
         printf("[%.3f s] Indexing database, size %ld*%ld\n", elapsed() - t0, nb, d);
@@ -151,6 +155,7 @@ void benchmark_faiss_ivfflatl2() {
         delete[] xb;
     }
 
+#ifdef bucketcontent
     {
         // output 100th bucket content
         std::cout << "######################################################" << std::endl;
@@ -171,6 +176,7 @@ void benchmark_faiss_ivfflatl2() {
             std::cout << std::endl;
         }
     }
+#endif
 
     size_t nq;
     float *xq;
@@ -252,8 +258,8 @@ void benchmark_faiss_ivfflatl2() {
                     centroid_single_heap_result.add_result(ip, j, 0);
                 }
                 centroid_single_heap_result.end(0);
-                for (i32 k = 0; k < n_probes; k++) {
-                    const i32 selected_centroid = centroid_ids[k];
+                for (i32 kk = 0; kk < n_probes; kk++) {
+                    const i32 selected_centroid = centroid_ids[kk];
                     const i32 contain_nums = ((faiss::ArrayInvertedLists *)index->invlists)->ids[selected_centroid].size();
                     const float *y_j = (const float *)(((faiss::ArrayInvertedLists *)index->invlists)->codes[selected_centroid].data());
                     for (i32 j = 0; j < contain_nums; j++, y_j += d) {
@@ -267,6 +273,17 @@ void benchmark_faiss_ivfflatl2() {
                 single_heap_result_handler_->end(i);
             }
             I = heap_result_handler_->heap_ids_tab;
+
+            // output first 3 lines of I
+            std::cout << "############################" << std::endl;
+            for (int i = 0; i < 3; i++) {
+                std::cout << "line " << i << ":\t";
+                for (int j = 0; j < k; j++) {
+                    std::cout << I[i * k + j] << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << "############################" << std::endl;
 
             int n_1 = 0, n_10 = 0, n_100 = 0;
             std::unordered_set<int32_t> gt1, gt10, gt100;
@@ -373,13 +390,14 @@ void benchmark_annivfflatl2() {
         size_t nb, d2;
         float *xb = fvecs_read(sift1m_base, &d2, &nb);
         // TODO:nb
-        nb = 10000;
+        // nb = global_nb;
         assert(d == d2 || !"dataset does not have same dimension as train set");
 
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
         ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0, 0);
 
+#ifdef centroids
         // output centroids
         {
             auto centroids = ann_index_data->centroids_;
@@ -397,7 +415,9 @@ void benchmark_annivfflatl2() {
             std::cout << "######################################################" << std::endl;
             std::cout << std::endl;
         }
+#endif
 
+#ifdef bucketcontent
         // output the 100th vector content of ann_index_data->vectors_ and ann_index_data->ids_
         {
             std::cout << "######################################################" << std::endl;
@@ -418,6 +438,7 @@ void benchmark_annivfflatl2() {
                 std::cout << std::endl;
             }
         }
+#endif
 
         delete[] xt;
         delete[] xb;
@@ -467,6 +488,17 @@ void benchmark_annivfflatl2() {
         test_ivf.End();
 
         auto I = test_ivf.GetIDs();
+
+        // output first 3 lines of I
+        std::cout << "############################" << std::endl;
+        for (int i = 0; i < 3; i++) {
+            std::cout << "line " << i << ":\t";
+            for (int j = 0; j < k; j++) {
+                std::cout << I[i * k + j].block_offset_ << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "############################" << std::endl;
 
         int n_1 = 0, n_10 = 0, n_100 = 0;
         std::unordered_set<int32_t> gt1, gt10, gt100;
