@@ -20,6 +20,7 @@ import knn_scan_data;
 import physical_table_scan;
 import physical_knn_scan;
 import physical_aggregate;
+import physical_explain;
 
 import global_block_id;
 import knn_expression;
@@ -350,6 +351,36 @@ void SetTaskState(InputState &input_state, PhysicalOperator *physical_op, const 
     }
 }
 
+void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr) {
+    if (fragment_ptr->GetContext() == nullptr) {
+        return;
+    }
+
+    auto tasks = &fragment_ptr->GetContext()->Tasks();
+    {
+        String fragment_header = "Fragment #";
+
+        fragment_header += ToStr(fragment_ptr->FragmentID());
+        fragment_header += " * ";
+        fragment_header += ToStr(tasks->size());
+        fragment_header += " Task";
+
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    for (const auto &task : *tasks) {
+        result.emplace_back(MakeShared<String>("-> Task #" + ToStr(task->TaskID())));
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : fragment_ptr->Children()) {
+            CollectTasks(result, child_fragment.get());
+        }
+    }
+}
+
 void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                                           FragmentContext *parent_context,
                                           PlanFragment *fragment_ptr,
@@ -454,11 +485,25 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
             FragmentContext::MakeFragmentContext(query_context, fragment_context.get(), child_fragment.get(), task_array);
         }
     }
+    switch (fragment_operators[0]->operator_type()) {
+        case PhysicalOperatorType::kExplain: {
+            Vector<SharedPtr<String>> result;
+            PhysicalExplain *explain_op = (PhysicalExplain *)fragment_operators[0];
 
-    for (i64 task_id = 0; task_id < tasks.size(); task_id++) {
-        FragmentTask *task = tasks[task_id].get();
-        auto &first_input_state = *task->operator_input_state_.back();
-        SetTaskState(first_input_state, fragment_operators.back(), fragment_ptr->Children());
+            if (explain_op->explain_type() == ExplainType::kPipeline) {
+                CollectTasks(result, fragment_ptr->Children()[0].get());
+                explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
+                task_array.clear();
+                break;
+            }
+        }
+        default: {
+            for (i64 task_id = 0; task_id < tasks.size(); task_id++) {
+                FragmentTask *task = tasks[task_id].get();
+                auto &first_input_state = *task->operator_input_state_.back();
+                SetTaskState(first_input_state, fragment_operators.back(), fragment_ptr->Children());
+            }
+        }
     }
 
     for (const auto &task : tasks) {

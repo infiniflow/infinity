@@ -50,13 +50,16 @@ void ExplainFragment::Explain(PlanFragment *fragment_ptr, SharedPtr<Vector<Share
             result->back() = MakeShared<String>(fragment_footer);
         }
     }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result->emplace_back(MakeShared<String>());
 
     // NOTE: recursive call this function to explain child fragment
     if (!fragment_ptr->Children().empty()) {
         for (auto &child : fragment_ptr->Children()) {
-            result->emplace_back(MakeShared<String>());
-
             ExplainFragment::Explain(child.get(), result, 2);
+
+            // NOTE: Insert blank elements after each Fragment for alignment
+            result->emplace_back(MakeShared<String>());
         }
     }
 }
