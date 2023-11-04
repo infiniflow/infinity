@@ -114,9 +114,7 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
-    void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
-
-    TxnTableStore *GetTxnTableStore(const String &table_name);
+    TxnTableStore *GetTxnTableStore(TableCollectionEntry *table_entry);
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
@@ -125,8 +123,11 @@ public:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
 private:
+    // Txn Manager
+    TxnManager *txn_mgr_{};
     NewCatalog *catalog_{};
     u64 txn_id_{};
+
     TxnContext txn_context_{};
 
     // Related database
@@ -147,13 +148,11 @@ private:
 
     // WalEntry
     SharedPtr<WalEntry> wal_entry_;
+
     // WalManager notify the  commit bottom half is done
     Mutex m;
     CondVar cv;
     bool done_bottom_{false};
-
-    // Txn Manager
-    TxnManager *txn_mgr_{};
 };
 
 } // namespace infinity

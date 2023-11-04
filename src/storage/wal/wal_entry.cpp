@@ -405,9 +405,10 @@ String WalEntry::ToString() const {
         }
         if (cmd->GetType() == WalCommandType::IMPORT) {
             auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
+            ss << "db name: " << import_cmd->db_name << std::endl;
+            ss << "table name: " << import_cmd->table_name << std::endl;
             ss << "segment dir: " << import_cmd->segment_dir << std::endl;
             ss << "segment id: " << import_cmd->segment_id << std::endl;
-            ss << "table name: " << import_cmd->table_name << std::endl;
             ss << "block entries size: " << import_cmd->block_entries_size << std::endl;
         }
         if (cmd->GetType() == WalCommandType::APPEND) {

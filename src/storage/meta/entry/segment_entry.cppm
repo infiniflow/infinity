@@ -31,25 +31,6 @@ class TableCollectionEntry;
 //
 export class SegmentEntry;
 
-export struct SegmentVersion {
-public:
-    explicit inline SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
-        for (SizeT i = 0; i < capacity; ++i) {
-            created_[i] = 0;
-            deleted_[i] = 0;
-            txn_ptr_[i] = (u64)(nullptr);
-        }
-    }
-    Vector<au64> created_{};
-    Vector<au64> deleted_{};
-    Vector<aptr> txn_ptr_{};
-
-public:
-    static Json Serialize(SegmentVersion *segment_version);
-
-    static UniquePtr<SegmentVersion> Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
-};
-
 struct SegmentEntry : public BaseEntry {
 public:
     explicit SegmentEntry(const TableCollectionEntry *table_entry);
@@ -81,7 +62,7 @@ public:
 
     static u64 AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     static void CreateIndexScalar(SegmentEntry *segment_entry,
                                   Txn *txn_ptr,
@@ -102,7 +83,7 @@ public:
 
     static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
-    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
+    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     static u16 GetMaxBlockID(const SegmentEntry *segment_entry);
 
