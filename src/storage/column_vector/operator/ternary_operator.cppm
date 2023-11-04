@@ -6,7 +6,7 @@ module;
 
 import stl;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
@@ -77,13 +77,13 @@ public:
         // 2. Flat Flat Constant
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            Error<TypeException>("Not support Flat Flat Constant", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not support Flat Flat Constant");
         }
 
         // 3. Flat Constant Flat
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Flat Constant Flat", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not support Flat Constant Flat");
         }
 
         // 4. Flat Constant Constant
@@ -115,19 +115,19 @@ public:
         // 5. Constant Flat Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Constant Flat Flat", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not support Constant Flat Flat");
         }
 
         // 6. Constant Flat Constant
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            Error<TypeException>("Not support Constant Flat Constant", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not support Constant Flat Constant");
         }
 
         // 7. Constant Constant Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Constant Constant Flat", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not support Constant Constant Flat");
         }
 
         // 8. Constant Constant Constant

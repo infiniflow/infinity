@@ -7,7 +7,7 @@ import operator_state;
 import parser;
 import table_def;
 import data_table;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_command;
@@ -17,7 +17,7 @@ namespace infinity {
 void PhysicalCommand::Init() {}
 
 void PhysicalCommand::Execute(QueryContext *query_context) {
-    Error<NotImplementException>("Deprecated execute function should not be called.", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Deprecated execute function should not be called.");
 }
 
 void PhysicalCommand::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
@@ -33,7 +33,7 @@ void PhysicalCommand::Execute(QueryContext *query_context, InputState *input_sta
             break;
         }
         case CommandType::kInvalid: {
-            Error<ExecutorException>("Invalid command type.", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid command type.");
         }
     }
 }

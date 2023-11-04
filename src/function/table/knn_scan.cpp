@@ -14,7 +14,7 @@ import new_catalog;
 import knn_scan_data;
 import block_index;
 import global_block_id;
-import infinity_assert;
+
 import infinity_exception;
 import block_entry;
 import column_buffer;
@@ -34,7 +34,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if (knn_column_ids.size() != 1) {
-        Error<ExecutorException>("More than one knn column", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("More than one knn column");
     }
 
     SizeT knn_column_id = knn_column_ids[0];
@@ -51,7 +51,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     switch (knn_scan_function_data_ptr->knn_distance_type_) {
 
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2: {
             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -200,13 +200,13 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid element data type");
                 }
             }
             break;
         }
         case KnnDistanceType::kCosine: {
-            Error<ExecutorException>("Not implemented Cosine", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Cosine");
         }
         case KnnDistanceType::kInnerProduct: {
             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -355,13 +355,13 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid element data type");
                 }
             }
             break;
         }
         case KnnDistanceType::kHamming: {
-            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Hamming");
         }
     }
 

@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -22,7 +22,7 @@ namespace infinity {
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -61,7 +61,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool SubFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // FloatT - FloatT = FloatT, and check overflow
@@ -87,7 +87,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal - Decimal = Decimal
 template <>
 inline bool SubFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // DateT - Interval
@@ -99,43 +99,43 @@ inline bool SubFunction::Run(DateT left, IntervalT right, DateT &result) {
 // DateTime - Interval
 template <>
 inline bool SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // TimestampT - Interval
 template <>
 inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT left, BigIntT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT left, DoubleT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 void RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

@@ -4,7 +4,7 @@ module;
 import stl;
 import parser;
 import base_table_ref;
-import infinity_assert;
+
 import infinity_exception;
 import merge_knn;
 import faiss;
@@ -23,14 +23,14 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
       table_ref_(table_ref) {
     switch (elem_type) {
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid element type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid element type");
         }
         case kElemFloat: {
             MergeKnnFunctionData::InitMergeKnn<f32>(query_count, topk, knn_distance_type);
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
     }
 }
@@ -39,7 +39,7 @@ template <typename DataType>
 void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

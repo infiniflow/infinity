@@ -8,7 +8,7 @@ module;
 #include <string>
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 import txn_manager;
@@ -131,7 +131,7 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_n
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg.get() != nullptr) {
-        Error<TransactionException>(*err_msg, __FILE_NAME__, __LINE__);
+        Error<TransactionException>(*err_msg);
     }
 
     return GetMetaTableState(meta_table_state, table_entry, columns);
@@ -276,7 +276,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 Vector<TableCollectionDetail> Txn::GetTableCollections(const String &db_name) {
     EntryResult entry_result = GetDatabase(db_name);
     if (entry_result.err_.get() != nullptr) {
-        Error<TransactionException>(*entry_result.err_, __FILE_NAME__, __LINE__);
+        Error<TransactionException>(*entry_result.err_);
     }
 
     DBEntry *db_entry = (DBEntry *)entry_result.entry_;
@@ -491,23 +491,23 @@ EntryResult Txn::CreateCollection(const String &db_name, const String &collectio
 }
 
 EntryResult Txn::GetCollectionByName(const String &db_name, const String &table_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 EntryResult Txn::CreateView(const String &db_name, const String &view_name, ConflictType conflict_type) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 EntryResult Txn::DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 void Txn::BeginTxn() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }

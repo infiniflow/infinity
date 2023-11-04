@@ -13,7 +13,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import base_entry;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_drop_table;
@@ -42,7 +42,7 @@ void PhysicalDropTable::Execute(QueryContext *query_context) {
     Txn *txn = query_context->GetTxn();
     EntryResult res = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
     if (res.err_.get() != nullptr) {
-        Error<ExecutorException>(*res.err_, __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(*res.err_);
     }
 
     // Generate the result

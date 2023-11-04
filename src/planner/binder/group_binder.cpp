@@ -11,7 +11,7 @@ import parser;
 import bind_context;
 import function;
 import expression_binder;
-import infinity_assert;
+
 import infinity_exception;
 import logger;
 import third_party;
@@ -58,7 +58,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
         String expr_name = expr.GetName();
 
         if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
-            Error<PlannerException>(Format("Duplicated group by expression: {}", expr_name), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("Duplicated group by expression: {}", expr_name));
         }
 
         // Add the group by expression into bind context
@@ -98,12 +98,12 @@ SharedPtr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &exp
 }
 
 SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr &expr, BindContext *bind_context_ptr) {
-    Assert<PlannerException>(expr.literal_type_ == LiteralType::kInteger, "Not an integer.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(expr.literal_type_ == LiteralType::kInteger, "Not an integer.");
     i64 select_idx = expr.integer_value_;
 
     Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
     if (select_idx > expr_array.size() or select_idx < 1) {
-        Error<PlannerException>(Format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
     }
 
     select_idx -= 1;
@@ -129,25 +129,23 @@ SharedPtr<BaseExpression> GroupBinder::BuildColExpr(const ColumnExpr &expr, Bind
 SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ != FunctionType::kScalar) {
-        Error<PlannerException>("Only scalar function is supported in group by list.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Only scalar function is supported in group by list.");
     }
     return ExpressionBinder::BuildFuncExpr(expr, bind_context_ptr, depth, root);
 }
 
 void GroupBinder::CheckFuncType(FunctionType func_type) const {
     Assert<PlannerException>(func_type == FunctionType::kScalar,
-                             "Onlyl scalar function type are allowed in group by clause",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "Onlyl scalar function type are allowed in group by clause");
 }
 
 SharedPtr<SubqueryExpression>
 GroupBinder::BuildSubquery(const SubqueryExpr &select, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool root) {
-    Error<PlannerException>("Subquery isn't supported in group by list.", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Subquery isn't supported in group by list.");
 }
 
 SharedPtr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Error<PlannerException>("KNN expression isn't supported in group by list", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("KNN expression isn't supported in group by list");
 }
 
 } // namespace infinity

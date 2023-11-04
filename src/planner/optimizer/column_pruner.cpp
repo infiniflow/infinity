@@ -22,7 +22,7 @@ import parser;
 import base_table_ref;
 import function;
 import column_binding;
-import infinity_assert;
+
 import infinity_exception;
 
 module column_pruner;

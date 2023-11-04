@@ -9,7 +9,7 @@ import base_expression;
 import parser;
 import bind_context;
 import expression_binder;
-import infinity_assert;
+
 import infinity_exception;
 
 module aggregate_binder;
@@ -22,7 +22,7 @@ SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &exp
 }
 
 SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Error<PlannerException>("KNN expression isn't supported in in aggregate function", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("KNN expression isn't supported in in aggregate function");
 }
 
 } // namespace infinity

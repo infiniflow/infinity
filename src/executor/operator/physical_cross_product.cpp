@@ -13,7 +13,7 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
-import infinity_assert;
+
 import infinity_exception;
 import data_block;
 import column_vector;
@@ -27,8 +27,8 @@ void PhysicalCrossProduct::Init() {}
 void PhysicalCrossProduct::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
 void PhysicalCrossProduct::Execute(QueryContext *query_context) {
-    Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.", __FILE_NAME__, __LINE__);
-    Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.");
+    Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.");
     left_table_ = left_->output();
     right_table_ = right_->output();
 

@@ -10,7 +10,7 @@ import txn;
 import txn_state;
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import wal_entry;
 import logger;
@@ -26,7 +26,7 @@ TxnManager::TxnManager(NewCatalog *catalog, BufferManager *buffer_mgr, PutWalEnt
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot create txn", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
@@ -74,7 +74,7 @@ TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
 void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot invalidate", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot invalidate");
     }
     LockGuard<Mutex> guard(mutex_);
     SizeT cnt = priority_que_.erase(commit_ts);
@@ -90,7 +90,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
 void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot put wal entry", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot put wal entry");
     }
     if (put_wal_entry_ == nullptr)
         return;

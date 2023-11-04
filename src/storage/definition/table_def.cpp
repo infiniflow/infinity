@@ -8,7 +8,7 @@ import std;
 import stl;
 import parser;
 import serialize;
-import infinity_assert;
+
 import infinity_exception;
 
 module table_def;
@@ -117,7 +117,7 @@ void TableDef::WriteAdv(char *&ptr) const {
 
 SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
     char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef");
     String schema_name = ReadBufAdv<String>(ptr);
     String table_name = ReadBufAdv<String>(ptr);
     i32 columns_size = ReadBufAdv<i32>(ptr);
@@ -125,7 +125,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
     for (i32 i = 0; i < columns_size; i++) {
         i64 id = ReadBufAdv<i64>(ptr);
         maxbytes = ptr_end - ptr;
-        Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef");
         SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
         String column_name = ReadBufAdv<String>(ptr);
         i32 constraints_size = ReadBufAdv<i32>(ptr);
@@ -138,7 +138,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading TableDef");
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
 }
 

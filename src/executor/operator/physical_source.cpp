@@ -12,7 +12,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_source;
@@ -44,9 +44,7 @@ void PhysicalSource::Execute(QueryContext *query_context, SourceState *source_st
             break;
         }
         default: {
-            Error<NotImplementException>("Not support source state type",
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>("Not support source state type");
         }
     }
 }

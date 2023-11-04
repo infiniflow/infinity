@@ -20,7 +20,7 @@ import column_buffer;
 import table_collection_entry;
 import wal_entry;
 import infinity_exception;
-import infinity_assert;
+
 import column_vector;
 import physical_import;
 import txn;

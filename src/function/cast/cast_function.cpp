@@ -5,7 +5,7 @@
 
 module;
 
-import infinity_assert;
+
 import infinity_exception;
 import bound_cast_func;
 import bool_cast;
@@ -23,34 +23,34 @@ template <typename SourceType>
 static BoundCastFunc NumericCast(const DataType &target) {
     switch (target.type()) {
         case kTinyInt: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kSmallInt: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kInteger: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kBigInt: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kHugeInt: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kFloat: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         case kDouble: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
         default: {
-            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast to {}", target.ToString()));
         }
     }
 }
 
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source != target, Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(source != target, Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
 
     switch (source.type()) {
         case kBoolean: {
@@ -78,76 +78,76 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
             return BindFloatCast<DoubleT>(source, target);
         }
         case kDecimal: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kVarchar: {
             return BindVarcharCast(source, target);
         }
         case kDate: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTime: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kDateTime: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTimestamp: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kInterval: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kArray: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTuple: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kPoint: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kLine: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kLineSeg: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kBox: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kPath: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kPolygon: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kCircle: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kBitmap: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kUuid: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kBlob: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kEmbedding: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kRowID: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kMixed: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kNull: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         default:
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
     }
 }
 

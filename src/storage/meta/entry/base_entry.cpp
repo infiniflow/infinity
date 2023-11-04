@@ -2,7 +2,7 @@
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 module base_entry;
@@ -20,7 +20,7 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
         } else if ((*it2)->entry_type_ == EntryType::kDummy) {
             ++it2;
         } else {
-            Assert<StorageException>((*it1)->Committed() && (*it2)->Committed(), "MergeLists requires entries be committed", __FILE_NAME__, __LINE__);
+            Assert<StorageException>((*it1)->Committed() && (*it2)->Committed(), "MergeLists requires entries be committed");
             if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
                 ++it1;
             } else if ((*it1)->commit_ts_ < (*it2)->commit_ts_) {

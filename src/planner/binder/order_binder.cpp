@@ -10,7 +10,7 @@ import parser;
 import bind_context;
 import column_expression;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module order_binder;
@@ -20,7 +20,7 @@ namespace infinity {
 void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<BindContext> &bind_context_ptr) {
     if (expr->type_ == ParsedExprType::kConstant) {
         ConstantExpr *order_by_index = (ConstantExpr *)expr;
-        Assert<PlannerException>(order_by_index->literal_type_ == LiteralType::kInteger, "Error Order by expression", __FILE_NAME__, __LINE__);
+        Assert<PlannerException>(order_by_index->literal_type_ == LiteralType::kInteger, "Error Order by expression");
         // Order by 1, means order by 1st select list item.
         return;
     }
@@ -52,11 +52,11 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         if (const_expr.literal_type_ == LiteralType::kInteger) {
             column_id = const_expr.integer_value_;
             if (column_id >= bind_context_ptr->project_exprs_.size()) {
-                Error<PlannerException>("Order by are going to use nonexistent column from select list.", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("Order by are going to use nonexistent column from select list.");
             }
             --column_id;
         } else {
-            Error<PlannerException>("Order by non-integer constant value.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Order by non-integer constant value.");
         }
     } else {
         String expr_name = expr.GetName();
@@ -70,7 +70,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
 
         if (column_id == -1) {
-            Error<PlannerException>(Format("{} isn't found in project list.", expr_name), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("{} isn't found in project list.", expr_name));
         }
     }
 

@@ -8,7 +8,7 @@ import parser;
 import stl;
 import bound_cast_func;
 import column_vector_cast;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import column_vector;
@@ -24,9 +24,7 @@ export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     Assert<TypeException>(source.type() == LogicalType::kVarchar,
-                          Format("Expect Varchar type, but it is {}", source.ToString()),
-                          __FILE_NAME__,
-                          __LINE__);
+                          Format("Expect Varchar type, but it is {}", source.ToString()));
     switch (target.type()) {
         case kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);
@@ -53,12 +51,10 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
         case kDecimal: {
-            Error<NotImplementException>(Format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()),
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>(Format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case kVarchar: {
-            Error<TypeException>("Attempt to cast from varchar to varchar", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to cast from varchar to varchar");
         }
         case kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
@@ -76,52 +72,52 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntervalT, TryCastVarchar>);
         }
         case kArray: {
-            Error<TypeException>("Cast from varchar to array", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to array");
         }
         case kTuple: {
-            Error<TypeException>("Cast from varchar to tuple", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to tuple");
         }
         case kPoint: {
-            Error<TypeException>("Cast from varchar to point", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to point");
         }
         case kLine: {
-            Error<TypeException>("Cast from varchar to line", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to line");
         }
         case kLineSeg: {
-            Error<TypeException>("Cast from varchar to line segment", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to line segment");
         }
         case kBox: {
-            Error<TypeException>("Cast from varchar to box", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to box");
         }
         case kPath: {
-            Error<TypeException>("Cast from varchar to path", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to path");
         }
         case kPolygon: {
-            Error<TypeException>("Cast from varchar to polygon", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to polygon");
         }
         case kCircle: {
-            Error<TypeException>("Cast from varchar to circle", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to circle");
         }
         case kBitmap: {
-            Error<TypeException>("Cast from varchar to bitmap", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to bitmap");
         }
         case kUuid: {
-            Error<TypeException>("Cast from varchar to uuid", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to uuid");
         }
         case kBlob: {
-            Error<TypeException>("Cast from varchar to blob", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to blob");
         }
         case kEmbedding: {
-            Error<TypeException>("Cast from varchar to embedding", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to embedding");
         }
         case kRowID: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowT, TryCastVarchar>);
         }
         case kMixed: {
-            Error<TypeException>("Cast from varchar to mix", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Cast from varchar to mix");
         }
         default: {
-            Error<TypeException>("Can't convert varchar", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Can't convert varchar");
         }
     }
 }
@@ -131,7 +127,7 @@ struct TryCastVarchar {
     static inline bool Run(const SourceType &input, TargetType &target) {
         Error<FunctionException>(Format("No implementation to cast from {} to {}",
                                  DataType::TypeToString<SourceType>(),
-                                 DataType::TypeToString<TargetType>()), __FILE_NAME__, __LINE__);
+                                 DataType::TypeToString<TargetType>()));
     }
 };
 
@@ -237,7 +233,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
 // Cast VarcharT to HugeIntT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, HugeIntT &target) {
-    Error<TypeException>("Cast varchar to hugeint", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Cast varchar to hugeint");
 }
 
 // Cast VarcharT to FloatT type
@@ -286,28 +282,28 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DateT &target) {
 // Cast VarcharT to TimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, TimeT &target) {
-    Error<TypeException>("Cast from varchar to time", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Cast from varchar to time");
     return true;
 }
 
 // Cast VarcharT to DateTimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, DateTimeT &target) {
-    Error<TypeException>("Cast from varchar to datetime", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Cast from varchar to datetime");
     return true;
 }
 
 // Cast VarcharT to TimestampT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, TimestampT &target) {
-    Error<TypeException>("Cast from varchar to timestamp", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Cast from varchar to timestamp");
     return true;
 }
 
 // Cast VarcharT to IntervalT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, IntervalT &target) {
-    Error<TypeException>("Cast from varchar to interval", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Cast from varchar to interval");
     return true;
 }
 

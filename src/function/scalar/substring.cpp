@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -21,7 +21,7 @@ namespace infinity {
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA first, TB second, TC third, TD &result, ColumnVector *column_vector_ptr) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -29,11 +29,11 @@ template <>
 inline bool SubstrFunction::Run(VarcharT first, BigIntT second, BigIntT third, VarcharT &result, ColumnVector *column_vector_ptr) {
     // Validate the input before slice the string
     if (second < 0) {
-        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second));
     }
 
     if (third < 0) {
-        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second));
     }
 
     if (third == 0) {

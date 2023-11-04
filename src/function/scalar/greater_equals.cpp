@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -48,7 +48,7 @@ inline void GreaterEqualsFunction::Run(VarcharT left, VarcharT right, bool &resu
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT left, BigIntT right, bool &result) {
-    Error<NotImplementException>("Not implement: mixed >= bigint", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement: mixed >= bigint");
 }
 
 template <>
@@ -58,7 +58,7 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT left, DoubleT right, bool &result) {
-    Error<NotImplementException>("Not implement: mixed >= double", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement: mixed >= double");
 }
 
 template <>
@@ -68,7 +68,7 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT left, VarcharT right, bool &result) {
-    Error<NotImplementException>("Not implement: mixed >= varchar", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement: mixed >= varchar");
 }
 
 template <>

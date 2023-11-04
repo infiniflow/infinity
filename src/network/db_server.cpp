@@ -13,7 +13,7 @@ import stl;
 import boost;
 import third_party;
 import infinity_exception;
-import infinity_assert;
+
 import connection;
 
 namespace infinity {
@@ -34,7 +34,7 @@ void DBServer::Run() {
     BoostErrorCode error;
     AsioIpAddr address = asio_make_address(listen_address_ref, error);
     if (error) {
-        Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref), __FILE_NAME__, __LINE__);
+        Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref));
     }
 
     acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));

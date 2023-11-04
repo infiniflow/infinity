@@ -5,7 +5,7 @@
 
 import infinity_context;
 import infinity_exception;
-import infinity_assert;
+
 import stl;
 import global_resource_usage;
 import third_party;

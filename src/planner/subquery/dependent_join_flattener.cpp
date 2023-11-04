@@ -10,7 +10,7 @@ import parser;
 import logical_node;
 import logical_node_type;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import logical_aggregate;
 import logical_join;
@@ -67,7 +67,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoin(const SharedPtr
 SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode> &subquery_plan) {
     // 1. Validates if the logical node was checked in operator2correlated_expression_map_ before.
     if (!operator2correlated_expression_map_.contains(subquery_plan->node_id())) {
-        Error<PlannerException>(Format("Logical node {} wasn't detected before.", subquery_plan->node_id()), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Logical node {} wasn't detected before.", subquery_plan->node_id()));
     }
 
     // 2. if no correlated expression in this operator. which means all correlated expressions are unnested
@@ -110,11 +110,11 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kExcept:
         case LogicalNodeType::kUnion:
         case LogicalNodeType::kIntersect: {
-            Error<PlannerException>("Can't push down through set operation node.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Can't push down through set operation node.");
             break;
         }
         case LogicalNodeType::kJoin: {
-            Error<PlannerException>("Can't push down through join node.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Can't push down through join node.");
             break;
         }
         case LogicalNodeType::kCrossProduct: {
@@ -189,7 +189,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             return logical_join;
         }
         case LogicalNodeType::kLimit: {
-            Error<PlannerException>("Can't push down through limit node", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Can't push down through limit node");
             break;
         }
         case LogicalNodeType::kFilter: {
@@ -235,11 +235,11 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             return subquery_plan;
         }
         case LogicalNodeType::kSort: {
-            Error<PlannerException>("Can't push down through order by node", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Can't push down through order by node");
             break;
         }
         case LogicalNodeType::kTableScan: {
-            Error<PlannerException>("Can't push down through table scan node", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Can't push down through table scan node");
             break;
         }
         case LogicalNodeType::kDelete:
@@ -262,16 +262,16 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kShow:
         case LogicalNodeType::kExplain:
         case LogicalNodeType::kPrepare: {
-            Error<PlannerException>(Format("Logical node {} should be involved in subquery.", subquery_plan->name()), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("Logical node {} should be involved in subquery.", subquery_plan->name()));
         }
         case LogicalNodeType::kInvalid: {
-            Error<PlannerException>("Invalid logical operator node", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid logical operator node");
         }
         default: {
-            Error<PlannerException>("Unsupported logical operator node", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unsupported logical operator node");
         }
     }
-    Error<PlannerException>("Unreachable", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Unreachable");
 }
 
 SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode> &subquery_plan) {
@@ -293,9 +293,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
     for (SizeT idx = 1; idx < column_count; ++idx) {
         Assert<PlannerException>(correlated_columns[idx]->binding().table_idx == table_index,
-                                 "Correlated column are from different table.",
-                                 __FILE_NAME__,
-                                 __LINE__);
+                                 "Correlated column are from different table.");
         column_names->emplace_back(correlated_columns[idx]->column_name());
         column_types->emplace_back(MakeShared<DataType>(correlated_columns[idx]->Type()));
         column_ids.emplace_back(correlated_columns[idx]->binding().column_idx);
@@ -303,7 +301,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
 
     const Binding *table_binding_ptr = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
     if (table_binding_ptr == nullptr) {
-        Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }
 
     NewCatalog *catalog = query_context_->storage()->catalog();

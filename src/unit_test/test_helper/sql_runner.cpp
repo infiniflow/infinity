@@ -20,7 +20,7 @@ import bind_context;
 import logical_node;
 import physical_operator;
 import fragment_scheduler;
-import infinity_assert;
+
 import infinity_exception;
 import singleton;
 import resource_manager;
@@ -54,7 +54,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     parser->Parse(sql_text, parsed_result);
 
     if (parsed_result->IsError()) {
-        Error<PlannerException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(parsed_result->error_message_);
     }
 
     query_context_ptr->CreateTxn();

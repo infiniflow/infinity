@@ -24,7 +24,7 @@ import logger;
 import parser;
 import txn;
 import infinity_exception;
-import infinity_assert;
+
 
 module storage;
 
@@ -114,7 +114,7 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     create_res = new_txn->CreateDatabase("default", ConflictType::kError);
     new_txn->CommitTxn();
     if (create_res.err_ != nullptr) {
-        Error<StorageException>(*create_res.err_, __FILE_NAME__, __LINE__);
+        Error<StorageException>(*create_res.err_);
     }
 }
 

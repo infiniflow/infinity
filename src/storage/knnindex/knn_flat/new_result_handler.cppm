@@ -8,7 +8,7 @@ import stl;
 import parser;
 import knn_heap;
 import knn_partition;
-import infinity_assert;
+
 import infinity_exception;
 
 export module knn_result_handler;
@@ -152,7 +152,7 @@ struct ReservoirTopN {
     ReservoirTopN() {}
 
     ReservoirTopN(SizeT n, SizeT capacity, T *vals, TI *ids) : vals(vals), ids(ids), i(0), n(n), capacity(capacity) {
-        Assert<ExecutorException>(n < capacity, "n >= capacity", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(n < capacity, "n >= capacity");
         threshold = C::neutral();
     }
 
@@ -170,7 +170,7 @@ struct ReservoirTopN {
     // reduce storage from capacity to anything
     // between n and (capacity + n) / 2
     void shrink_fuzzy() {
-        Assert<ExecutorException>(i == capacity, "n != capacity", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(i == capacity, "n != capacity");
 
         threshold = partition_fuzzy<C>(vals, ids, capacity, n, (capacity + n) / 2, &i);
     }

@@ -19,7 +19,7 @@ import data_access_state;
 import index_def;
 import table_collection_entry;
 import base_entry;
-import infinity_assert;
+
 import infinity_exception;
 import defer_op;
 import ivfflat_index_def;
@@ -37,11 +37,11 @@ module segment_entry;
 namespace infinity {
 
 Json SegmentVersion::Serialize(SegmentVersion *segment_version) {
-    Error<NotImplementException>("Segment version serialize", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Segment version serialize");
 }
 
 UniquePtr<SegmentVersion> SegmentVersion::Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("Segment version deserialize", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Segment version deserialize");
 }
 
 SegmentEntry::SegmentEntry(const TableCollectionEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
@@ -113,9 +113,7 @@ u64 SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
             u16 actual_appended =
                 BlockEntry::AppendData(last_block_entry, txn_ptr, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
             if (to_append_rows < actual_appended) {
-                Error<StorageException>(Format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended),
-                                        __FILE_NAME__,
-                                        __LINE__);
+                Error<StorageException>(Format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
             }
 
             append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_block_id, range_block_start_row, actual_appended);
@@ -140,7 +138,7 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
         u16 block_id = row_hash_map.first;
         BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id), __FILE_NAME__, __LINE__);
+            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         const Vector<RowID> &rows = row_hash_map.second;
@@ -154,7 +152,7 @@ void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry,
                                      u64 column_id,
                                      BufferManager *buffer_mgr,
                                      TxnTableStore *txn_store) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
@@ -182,10 +180,10 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                     break;
                 }
                 case MetricType::kInvalid: {
-                    Error<StorageException>("Metric type is invalid", __FILE_NAME__, __LINE__);
+                    Error<StorageException>("Metric type is invalid");
                 }
                 default: {
-                    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Not implemented");
                 }
             }
             auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
@@ -204,10 +202,10 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
             return index_entry;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Index method type is invalid", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Index method type is invalid");
         }
         default: {
-            Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implemented");
         }
     }
 }
@@ -239,7 +237,7 @@ void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id), __FILE_NAME__, __LINE__);
+            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         BlockEntry::CommitDelete(block_entry, txn_ptr);
@@ -347,28 +345,18 @@ SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u
 
 void SegmentEntry::MergeFrom(BaseEntry &other) {
     auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
-    Assert<StorageException>(segment_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(segment_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(*this->segment_dir_ == *segment_entry2->segment_dir_,
-                             "SegmentEntry::MergeFrom requires segment_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "SegmentEntry::MergeFrom requires segment_dir_ match");
     Assert<StorageException>(this->segment_id_ == segment_entry2->segment_id_,
-                             "SegmentEntry::MergeFrom requires segment_id_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "SegmentEntry::MergeFrom requires segment_id_ match");
     Assert<StorageException>(this->column_count_ == segment_entry2->column_count_,
-                             "SegmentEntry::MergeFrom requires column_count_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "SegmentEntry::MergeFrom requires column_count_ match");
     Assert<StorageException>(this->row_capacity_ == segment_entry2->row_capacity_,
-                             "SegmentEntry::MergeFrom requires row_capacity_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "SegmentEntry::MergeFrom requires row_capacity_ match");
     Assert<StorageException>(this->min_row_ts_ == segment_entry2->min_row_ts_,
-                             "SegmentEntry::MergeFrom requires min_row_ts_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "SegmentEntry::MergeFrom requires min_row_ts_ match");
 
     this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
     this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);

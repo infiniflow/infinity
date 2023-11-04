@@ -9,7 +9,7 @@ import stl;
 import serialize;
 import ivfflat_index_def;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module index_def;
@@ -101,7 +101,7 @@ void IndexDef::WriteAdv(char *&ptr) const {
 
 SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
     char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexDef");
     SharedPtr<String> index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
     IndexMethod method_type = ReadBufAdv<IndexMethod>(ptr);
     Vector<String> column_names;
@@ -119,13 +119,13 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
             break;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Error index method while reading", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Error index method while reading");
         }
         default: {
-            Error<StorageException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Not implemented");
         }
     }
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexDef");
     return res;
 }
 
@@ -164,10 +164,10 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
             break;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Error index method while deserializing", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Error index method while deserializing");
         }
         default: {
-            Error<StorageException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Not implemented");
         }
     }
     return res;

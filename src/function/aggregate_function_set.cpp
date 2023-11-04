@@ -8,7 +8,7 @@ import std;
 import stl;
 import base_expression;
 import aggregate_function;
-import infinity_assert;
+
 import infinity_exception;
 import parser;
 import cast_table;
@@ -49,7 +49,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str(), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(ss.str());
     }
 
     if (candidates_index.size() > 1) {
@@ -60,7 +60,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str(), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(ss.str());
     }
 
     return functions_[candidates_index[0]];
@@ -68,7 +68,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
 
-    Assert<ExecutorException>(argument.get() != nullptr, "Argument is NULL", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(argument.get() != nullptr, "Argument is NULL");
 
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());
 

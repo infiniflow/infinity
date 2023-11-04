@@ -6,7 +6,7 @@ module;
 
 import stl;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
@@ -27,7 +27,7 @@ public:
 
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                Error<TypeException>("Invalid column vector type.", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
@@ -53,7 +53,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -76,7 +76,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -99,7 +99,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -348,7 +348,7 @@ private:
                                                 SizeT count,
                                                 void *state_ptr,
                                                 bool nullable) {
-        Error<TypeException>("Not implemented.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -506,7 +506,7 @@ private:
                                                     SizeT count,
                                                     void *state_ptr,
                                                     bool nullable) {
-        Error<TypeException>("Not implemented.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -516,7 +516,7 @@ private:
                                                 SizeT count,
                                                 void *state_ptr,
                                                 bool nullable) {
-        Error<TypeException>("Not implemented.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -526,7 +526,7 @@ private:
                                                     SizeT count,
                                                     void *state_ptr,
                                                     bool nullable) {
-        Error<TypeException>("Not implemented.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -536,7 +536,7 @@ private:
                                                          SizeT count,
                                                          void *state_ptr,
                                                          bool nullable) {
-        Error<TypeException>("Not implemented.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented.");
     }
 };
 

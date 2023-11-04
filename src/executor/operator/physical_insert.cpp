@@ -18,7 +18,7 @@ import data_block;
 import third_party;
 import expression_evaluator;
 import base_expression;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_insert;
@@ -33,9 +33,7 @@ void PhysicalInsert::Execute(QueryContext *query_context, InputState *input_stat
     SizeT table_collection_column_count = table_collection_entry_->columns_.size();
     if (column_count != table_collection_column_count) {
         Error<ExecutorException>(
-            Format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));;
     }
 
     // Prepare the output block

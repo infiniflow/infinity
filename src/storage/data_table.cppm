@@ -10,7 +10,7 @@ import stl;
 import parser;
 import data_block;
 import infinity_exception;
-import infinity_assert;
+
 import third_party;
 
 export module data_table;
@@ -59,9 +59,7 @@ public:
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
         Assert<StorageException>(idx < data_blocks_.size(),
-                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()),
-                                 __FILE_NAME__,
-                                 __LINE__);
+                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
         return data_blocks_[idx];
     }
 

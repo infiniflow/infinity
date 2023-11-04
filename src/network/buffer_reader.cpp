@@ -10,7 +10,7 @@ module;
 import stl;
 import pg_message;
 import ring_buffer_iterator;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 
@@ -120,7 +120,7 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
     }
 
     if (null_terminator == NullTerminator::kYes) {
-        Assert<NetworkException>(result.back() == NULL_END, "Last character isn't null.", __FILE_NAME__, __LINE__);
+        Assert<NetworkException>(result.back() == NULL_END, "Last character isn't null.");
         result.pop_back();
     }
 
@@ -155,10 +155,10 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
-        Error<ClientException>("Client close the connection.", __FILE_NAME__, __LINE__);
+        Error<ClientException>("Client close the connection.");
     }
 
-    Assert<NetworkException>(!boost_error, boost_error.message(), __FILE_NAME__, __LINE__);
+    Assert<NetworkException>(!boost_error, boost_error.message());
 
     current_pos_.increment(bytes_read);
 }

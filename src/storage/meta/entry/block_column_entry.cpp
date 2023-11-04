@@ -19,7 +19,7 @@ import column_vector;
 import default_values;
 import third_party;
 import table_collection_entry;
-import infinity_assert;
+
 import infinity_exception;
 import varchar_layout;
 import logger;
@@ -74,7 +74,7 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
                               u16 input_column_vector_offset,
                               SizeT append_rows) {
     if (column_entry->buffer_ == nullptr) {
-        Error<StorageException>("Not initialize buffer handle", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Not initialize buffer handle");
     }
     SizeT data_type_size = input_column_vector->data_type_size_;
 
@@ -141,10 +141,10 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
         case kNull:
         case kMissing:
         case kInvalid: {
-            Error<StorageException>("AppendRaw: Error type.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("AppendRaw: Error type.");
         }
         default: {
-            Error<NotImplementException>("AppendRaw: Not implement the type.", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("AppendRaw: Not implement the type.");
         }
     }
 }
@@ -206,12 +206,12 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kMixed:
         case kNull: {
             LOG_ERROR(Format("{} isn't supported", column_type->ToString()));
-            Error<NotImplementException>("Invalid data type.", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Invalid data type.");
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(Format("Invalid data type {}", column_type->ToString()));
-            Error<StorageException>("Invalid data type.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Invalid data type.");
         }
     }
 }

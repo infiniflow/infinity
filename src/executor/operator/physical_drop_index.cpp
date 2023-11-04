@@ -7,7 +7,7 @@ import operator_state;
 import parser;
 import table_def;
 import data_table;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_drop_index;
@@ -17,7 +17,7 @@ namespace infinity {
 void PhysicalDropIndex::Init() {}
 
 void PhysicalDropIndex::Execute(QueryContext *query_context) {
-    Error<NotImplementException>("Deprecated execute function should not be called.", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Deprecated execute function should not be called.");
 }
 
 void PhysicalDropIndex::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {

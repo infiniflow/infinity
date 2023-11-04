@@ -20,7 +20,7 @@ import block_index;
 import logger;
 import third_party;
 import infinity_exception;
-import infinity_assert;
+
 
 module db_entry;
 
@@ -231,16 +231,14 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager
 
 void DBEntry::MergeFrom(BaseEntry &other) {
     if(other.entry_type_ != EntryType::kDatabase) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry", __FILE_NAME__, __LINE__);
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
     }
     DBEntry* db_entry2 = static_cast<DBEntry*>(&other);
 
     // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(IsEqual(*this->db_name_, *db_entry2->db_name_), "DBEntry::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_name_, *db_entry2->db_name_), "DBEntry::MergeFrom requires db_name_ match");
     Assert<StorageException>(IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_),
-                             "DBEntry::MergeFrom requires db_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "DBEntry::MergeFrom requires db_entry_dir_ match");
     for (auto &[table_name, table_meta2] : db_entry2->tables_) {
         auto it = this->tables_.find(table_name);
         if (it == this->tables_.end()) {

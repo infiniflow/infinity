@@ -16,7 +16,7 @@ import function_expression;
 import in_expression;
 import conjunction_expression;
 import expression_type;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -135,7 +135,7 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const StdFunct
         case ExpressionType::kValue:
             break;
         default: {
-            Error<PlannerException>(Format("Unsupported expression type: {}", expression->Name()), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("Unsupported expression type: {}", expression->Name()));
         }
     }
 }

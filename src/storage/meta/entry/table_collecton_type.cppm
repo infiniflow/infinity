@@ -5,7 +5,7 @@
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 export module table_collection_type;
@@ -26,7 +26,7 @@ export inline String ToString(TableCollectionType type) {
             return "Collection";
         }
         default: {
-            Error<ExecutorException>("Invalid base table type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid base table type");
         }
     }
 }

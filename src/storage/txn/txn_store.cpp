@@ -11,7 +11,7 @@ import third_party;
 import parser;
 import table_collection_entry;
 import table_collection_meta;
-import infinity_assert;
+
 import infinity_exception;
 import segment_entry;
 import data_block;

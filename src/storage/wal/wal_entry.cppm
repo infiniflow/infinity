@@ -9,7 +9,7 @@ import stl;
 import parser;
 import data_block;
 import table_def;
-import infinity_assert;
+
 import infinity_exception;
 import index_def;
 

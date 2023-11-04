@@ -16,7 +16,7 @@ import column_vector;
 import data_block;
 import default_values;
 import value;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_explain;
@@ -69,7 +69,7 @@ void PhysicalExplain::Init() {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
-            Error<NotImplementException>("Not implement: Query analyze", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implement: Query analyze");
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -115,7 +115,7 @@ void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_sta
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
-            Error<NotImplementException>("Not implement: Query analyze", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implement: Query analyze");
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";
@@ -183,7 +183,7 @@ void PhysicalExplain::Execute(QueryContext *query_context) {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
-            Error<NotImplementException>("Not implement: Query analyze", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implement: Query analyze");
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";

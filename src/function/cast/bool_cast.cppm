@@ -8,7 +8,6 @@ import parser;
 import stl;
 import bound_cast_func;
 import column_vector_cast;
-import infinity_assert;
 import infinity_exception;
 import third_party;
 import column_vector;
@@ -21,9 +20,7 @@ export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType input, TargetType &target) {
         Error<FunctionException>("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " +
-                                     DataType::TypeToString<TargetType>(),
-                                 __FILE_NAME__,
-                                 __LINE__);
+                                 DataType::TypeToString<TargetType>());
     }
 };
 
@@ -45,17 +42,14 @@ inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
 }
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() == LogicalType::kBoolean,
-                          Format("Expect boolean type, but it is {}", source.ToString()),
-                          __FILE_NAME__,
-                          __LINE__);
+    Assert<TypeException>(source.type() == LogicalType::kBoolean, Format("Expect boolean type, but it is {}", source.ToString()));
 
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Boolean to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<TypeException>(Format("Can't cast from Boolean to {}", target.ToString()));
         }
     }
 }

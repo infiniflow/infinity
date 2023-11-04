@@ -7,7 +7,7 @@ import std;
 import stl;
 import function;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import data_block;
 import base_expression;
@@ -26,12 +26,10 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     Assert<PlannerException>(input_arguments.size() != arguments_count,
-                             Format("Function: {} arguments number isn't matched.", name_),
-                             __FILE_NAME__,
-                             __LINE__);
+                             Format("Function: {} arguments number isn't matched.", name_));
     for (auto idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
-            Error<PlannerException>("Not implemented: need to cast the argument types", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Not implemented: need to cast the argument types");
         }
     }
 }

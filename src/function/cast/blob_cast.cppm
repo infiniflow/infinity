@@ -10,7 +10,7 @@ import vector_buffer;
 import bound_cast_func;
 import parser;
 import column_vector_cast;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -26,7 +26,7 @@ export inline BoundCastFunc BindBlobCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BlobT, VarcharT, BlobTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Blob type to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<TypeException>(Format("Can't cast from Blob type to {}", target.ToString()));
         }
     }
 }
@@ -35,9 +35,7 @@ struct BlobTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
     }
 };
 
@@ -54,9 +52,7 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
         Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         Assert<FunctionException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                                  "Varchar column vector should use MemoryVectorBuffer. ",
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  "Varchar column vector should use MemoryVectorBuffer. ");
         // Set varchar prefix
         Memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
 

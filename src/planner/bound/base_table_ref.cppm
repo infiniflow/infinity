@@ -12,7 +12,7 @@ import table_collection_entry;
 import parser;
 import table_function;
 import block_index;
-import infinity_assert;
+
 import infinity_exception;
 
 export module base_table_ref;
@@ -34,7 +34,7 @@ public:
           column_types_(Move(column_types)), table_index_(table_index) {}
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
-        Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order", __FILE_NAME__, __LINE__);
+        Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order");
 
         replace_field<SizeT>(column_ids_, indices);
         replace_field<String>(*column_names_, indices);

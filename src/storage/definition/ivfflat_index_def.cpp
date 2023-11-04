@@ -9,7 +9,7 @@ import index_def;
 import parser;
 import third_party;
 import serialize;
-import infinity_assert;
+
 import infinity_exception;
 
 module ivfflat_index_def;
@@ -27,7 +27,7 @@ SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name, Vector<S
         }
     }
     if (centroids_count == 0 || metric_type == MetricType::kInvalid) {
-        Error<StorageException>("Lack index parameters", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Lack index parameters");
     }
     auto ptr = MakeShared<IVFFlatIndexDef>(Move(index_name), IndexMethod::kIVFFlat, Move(column_names), centroids_count, metric_type);
     return std::static_pointer_cast<IndexDef>(ptr);

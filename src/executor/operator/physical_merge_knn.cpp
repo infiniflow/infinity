@@ -11,7 +11,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import logger;
-import infinity_assert;
+
 import infinity_exception;
 import merge_knn_data;
 import faiss;
@@ -38,12 +38,12 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
     auto &merge_knn_data = *merge_knn_input->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid elem type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid elem type");
         }
         case kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
-                    Error<ExecutorException>("Invalid heap type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid heap type");
                 }
                 case MergeKnnHeapType::kMaxHeap: {
                     ExecuteInner<f32, FaissCMax>(query_context, merge_knn_input, merge_knn_output);
@@ -57,12 +57,12 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implemented");
         }
     }
 }
 
-void PhysicalMergeKnn::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated function", __FILE_NAME__, __LINE__); }
+void PhysicalMergeKnn::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated function"); }
 
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state) {
@@ -76,7 +76,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
-    Assert<ExecutorException>(column_n >= 0, "Error. The input data block is invalid", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(column_n >= 0, "Error. The input data block is invalid");
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
 
@@ -103,7 +103,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id), __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 SizeT column_id = 0;

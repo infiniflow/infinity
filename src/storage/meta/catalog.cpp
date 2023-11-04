@@ -13,7 +13,7 @@ import db_meta;
 import db_entry;
 import logger;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import function_set;
 import table_function;
@@ -150,7 +150,7 @@ SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, Str
     StringToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(Format("No function name: {}", function_name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("No function name: {}", function_name));
     }
     return catalog->function_sets_[function_name];
 }
@@ -159,7 +159,7 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        Error<CatalogException>(Format("Trying to add duplicated function table_name into catalog: {}", name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("Trying to add duplicated function table_name into catalog: {}", name));
     }
     catalog->function_sets_.emplace(name, function_set);
 }
@@ -168,7 +168,7 @@ void NewCatalog::DeleteFunctionSet(NewCatalog *catalog, String function_name) {
     // Unused now.
     StringToLower(function_name);
     if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(Format("Delete not exist function: {}", function_name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("Delete not exist function: {}", function_name));
     }
     catalog->function_sets_.erase(function_name);
 }
@@ -177,7 +177,7 @@ void NewCatalog::DeleteFunctionSet(NewCatalog *catalog, String function_name) {
 SharedPtr<TableFunction> NewCatalog::GetTableFunctionByName(NewCatalog *catalog, String function_name) {
     StringToLower(function_name);
     if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(Format("No table function table_name: {}", function_name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("No table function table_name: {}", function_name));
     }
     return catalog->table_functions_[function_name];
 }
@@ -186,7 +186,7 @@ void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunc
     String name = table_function->name();
     StringToLower(name);
     if (catalog->table_functions_.contains(name)) {
-        Error<CatalogException>(Format("Trying to add duplicated table function into catalog: {}", name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("Trying to add duplicated table function into catalog: {}", name));
     }
     catalog->table_functions_.emplace(name, table_function);
 }
@@ -195,7 +195,7 @@ void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) 
     // Unused now.
     StringToLower(function_name);
     if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(Format("Delete not exist table function: {}", function_name), __FILE_NAME__, __LINE__);
+        Error<CatalogException>(Format("Delete not exist table function: {}", function_name));
     }
     catalog->table_functions_.erase(function_name);
 }
@@ -222,7 +222,7 @@ Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog1 = MakeUnique<NewCatalog>(nullptr);
-    Assert<CatalogException>(!catalog_paths.empty(), "Catalog paths is empty", __FILE_NAME__, __LINE__);
+    Assert<CatalogException>(!catalog_paths.empty(), "Catalog paths is empty");
     // Load the latest full checkpoint.
     LOG_INFO(Format("Load base catalog1 from: {}", catalog_paths[0]));
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
@@ -256,7 +256,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, Buffe
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        Error<StorageException>(Format("Catalog file {}, read error.", catalog_path), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Catalog file {}, read error.", catalog_path));
     }
 
     Json catalog_json = Json::parse(json_str);
@@ -307,7 +307,7 @@ String NewCatalog::SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTim
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (nbytes != catalog_str.size()) {
-        Error<StorageException>(Format("Catalog file {}, saving error.", file_path), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Catalog file {}, saving error.", file_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();

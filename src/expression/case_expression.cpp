@@ -8,7 +8,7 @@ import std;
 import stl;
 import expression_type;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 
 module case_expression;
@@ -23,7 +23,7 @@ void CaseExpression::AddCaseCheck(const SharedPtr<BaseExpression> &when_expr, co
 
 void CaseExpression::AddElseExpr(const SharedPtr<BaseExpression> &else_expr) {
     if (else_expr_.get() != nullptr) {
-        Error<PlannerException>("else expression already been assigned before.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("else expression already been assigned before.");
     }
     else_expr_ = else_expr;
 }

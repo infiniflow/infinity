@@ -8,7 +8,7 @@ module;
 
 import stl;
 import std;
-import infinity_assert;
+
 import infinity_exception;
 import parser;
 import bind_context;
@@ -51,8 +51,8 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     SharedPtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
 
-    Assert<PlannerException>(statement.select_list_ != nullptr, "SELECT list is needed", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(!statement.select_list_->empty(), "SELECT list can't be empty", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(statement.select_list_ != nullptr, "SELECT list is needed");
+    Assert<PlannerException>(!statement.select_list_->empty(), "SELECT list can't be empty");
 
     // 1. WITH clause
     if (statement.with_exprs_ != nullptr) {
@@ -68,13 +68,10 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             WithExpr *with_expr = (*statement.with_exprs_)[i];
             String name = with_expr->alias_;
             if (bind_context_ptr_->CTE_map_.contains(name)) {
-                Error<PlannerException>("WITH query table_name: " + name + " occurs more than once.", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("WITH query table_name: " + name + " occurs more than once.");
             }
 
-            Assert<PlannerException>(with_expr->select_->type_ == StatementType::kSelect,
-                                     "Non-select statement in WITH clause.",
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Assert<PlannerException>(with_expr->select_->type_ == StatementType::kSelect, "Non-select statement in WITH clause.");
 
             masked_name_set.insert(name);
             SharedPtr<CommonTableExpressionInfo> cte_info_ptr =
@@ -109,9 +106,7 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             if (bind_context_ptr_->select_alias2index_.contains(select_expr->alias_)) {
                 i64 bound_column_index = bind_context_ptr_->select_alias2index_[select_expr->alias_];
                 Error<PlannerException>(bind_context_ptr_->select_expression_[bound_column_index]->ToString() + " and " + select_expr->ToString() +
-                                            " have same alias: " + select_expr->alias_,
-                                        __FILE_NAME__,
-                                        __LINE__);
+                                        " have same alias: " + select_expr->alias_);
             } else {
                 // Store the alias to column index mapping, the mapping will be used in
                 // - where clause binding
@@ -122,7 +117,7 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
         } else {
             // KNN expression without alias, isn't allowed
             if (select_expr->type_ == ParsedExprType::kKnn) {
-                Error<PlannerException>("KNN expression in select list must have an alias.", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("KNN expression in select list must have an alias.");
             }
 
             const String select_expr_name = select_expr->ToString();
@@ -226,7 +221,7 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
         }
 
         case TableRefType::kDummy: {
-            Error<PlannerException>("Unexpected table reference type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unexpected table reference type.");
         }
 
             // TODO: No case currently, since parser doesn't support it.
@@ -272,7 +267,7 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
         return view_ref;
     }
 
-    Error<PlannerException>("Table or View: " + from_table->table_name_ + " is not found in catalog.", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Table or View: " + from_table->table_name_ + " is not found in catalog.");
     return nullptr;
 }
 
@@ -321,7 +316,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *query_context, const Str
     // Table is from CTE
     if (this->bind_context_ptr_->IsCTEBound(cte)) {
         // The CTE is bound before.
-        Error<PlannerException>("CTE can only be bound only once", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("CTE can only be bound only once");
     }
 
     // Build CTE(subquery)
@@ -356,11 +351,11 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     }
     EntryResult result = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(*result.err_);
     }
     TableCollectionEntry *table_collection_entry = static_cast<TableCollectionEntry *>(result.entry_);
     if (table_collection_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
-        Error<PlannerException>("Currently, collection isn't supported.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Currently, collection isn't supported.");
     }
 
     String alias = from_table->GetTableName();
@@ -398,16 +393,14 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
     EntryResult result = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_);
     if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(*result.err_);
     }
 
     ViewEntry *view_entry = static_cast<ViewEntry *>(result.entry_);
 
     // Build view scan operator
     Assert<PlannerException>(!(this->bind_context_ptr_->IsViewBound(from_table->table_name_)),
-                             "View: " + from_table->table_name_ + " is bound before!",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "View: " + from_table->table_name_ + " is bound before!");
     this->bind_context_ptr_->BoundView(from_table->table_name_);
 
     const SelectStatement *select_stmt_ptr = view_entry->GetSQLStatement();
@@ -486,7 +479,7 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
     }
 
     right_bind_context = bind_contexts[bind_context_idx];
-    Assert<PlannerException>(bind_context_idx == 0, "Mismatched bind context count.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(bind_context_idx == 0, "Mismatched bind context count.");
     right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
     right_table_ref = right_query_binder->BuildFromClause(query_context, tables[table_count - 1]);
 
@@ -571,16 +564,11 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
             for (auto &column_name : using_column_names) {
                 // Create left bound column expression
                 Assert<PlannerException>(result->left_bind_context_->binding_names_by_column_.contains(column_name),
-                                         "Column: " + column_name + " doesn't exist in left table",
-                                         __FILE_NAME__,
-                                         __LINE__);
+                                         "Column: " + column_name + " doesn't exist in left table");
 
                 auto &left_column_binding_names = result->left_bind_context_->binding_names_by_column_[column_name];
 
-                Assert<PlannerException>(left_column_binding_names.size() == 1,
-                                         "Ambiguous column table_name: " + column_name + " in left table",
-                                         __FILE_NAME__,
-                                         __LINE__);
+                Assert<PlannerException>(left_column_binding_names.size() == 1, "Ambiguous column table_name: " + column_name + " in left table");
 
                 auto &left_binding_name = left_column_binding_names[0];
                 auto &left_binding_ptr = result->left_bind_context_->binding_by_name_[left_binding_name];
@@ -595,23 +583,15 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
                                                                                                       0);
 
                 Assert<PlannerException>(result->right_bind_context_->binding_names_by_column_.contains(column_name),
-                                         "Column: " + column_name + " doesn't exist in right table",
-                                         __FILE_NAME__,
-                                         __LINE__);
+                                         "Column: " + column_name + " doesn't exist in right table");
 
                 auto &right_column_binding_names = result->right_bind_context_->binding_names_by_column_[column_name];
 
-                Assert<PlannerException>(right_column_binding_names.size() == 1,
-                                         "Ambiguous column table_name: " + column_name + " in right table",
-                                         __FILE_NAME__,
-                                         __LINE__);
+                Assert<PlannerException>(right_column_binding_names.size() == 1, "Ambiguous column table_name: " + column_name + " in right table");
 
                 auto &right_binding_name = right_column_binding_names[0];
                 auto &right_binding_ptr = result->right_bind_context_->binding_by_name_[right_binding_name];
-                Assert<PlannerException>(right_binding_ptr.get() != nullptr,
-                                         "Column: " + column_name + " doesn't exist in right table",
-                                         __FILE_NAME__,
-                                         __LINE__);
+                Assert<PlannerException>(right_binding_ptr.get() != nullptr, "Column: " + column_name + " doesn't exist in right table");
                 auto right_column_index = right_binding_ptr->name2index_[column_name];
                 auto right_column_type = right_binding_ptr->column_types_->at(right_column_index);
 
@@ -652,21 +632,18 @@ void QueryBinder::UnfoldStarExpression(QueryContext *query_context,
             if (column_expr->star_) {
                 if (column_expr->names_.empty()) {
                     // select * from t1;
-                    Assert<PlannerException>(!this->bind_context_ptr_->table_names_.empty(), "No table was bound.", __FILE_NAME__, __LINE__);
+                    Assert<PlannerException>(!this->bind_context_ptr_->table_names_.empty(), "No table was bound.");
 
                     // select * from t1, t2; means select t1.*, t2.* from t1, t2;
                     for (const auto &table_name : this->bind_context_ptr_->table_names_) {
                         SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
-                        Assert<PlannerException>(binding.get() != nullptr,
-                                                 Format("Table: {} wasn't bound before.", table_name),
-                                                 __FILE_NAME__,
-                                                 __LINE__);
+                        Assert<PlannerException>(binding.get() != nullptr, Format("Table: {} wasn't bound before.", table_name));
                         GenerateColumns(binding, table_name, output_select_list);
                     }
                 } else {
                     String table_name = column_expr->names_[0];
                     SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
-                    Assert<PlannerException>(binding.get() != nullptr, Format("Table: {} wasn't bound before.", table_name), __FILE_NAME__, __LINE__);
+                    Assert<PlannerException>(binding.get() != nullptr, Format("Table: {} wasn't bound before.", table_name));
                     GenerateColumns(binding, table_name, output_select_list);
                 }
 
@@ -681,7 +658,7 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
     switch (binding->binding_type_) {
 
         case BindingType::kInvalid: {
-            Error<PlannerException>("Invalid binding type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid binding type.");
             break;
         }
         case BindingType::kTable: {
@@ -720,7 +697,7 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
             break;
         }
         case BindingType::kView: {
-            Error<PlannerException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Not implemented");
             break;
         }
     }
@@ -818,9 +795,7 @@ void QueryBinder::BuildSelectList(QueryContext *query_context, SharedPtr<BoundSe
         !bind_context_ptr_->aggregate_exprs_.empty()) {
         if (!project_binder->BoundColumn().empty()) {
             Error<PlannerException>("Column: " + project_binder->BoundColumn() +
-                                        " must appear in the GROUP BY clause or be used in an aggregate function",
-                                    __FILE_NAME__,
-                                    __LINE__);
+                                        " must appear in the GROUP BY clause or be used in an aggregate function");
         }
     }
 }
@@ -836,7 +811,7 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
 
         if (!bind_context_ptr_->knn_exprs_.empty()) {
             // TODO: In future, we may allow to order by more than one knn exprs or mix knn and other exprs.
-            Error<PlannerException>("Only one KNN expression is allowed in order by clause", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Only one KNN expression is allowed in order by clause");
         }
 
         // If order by has KNN expression, the expr need to be stored in bind_context without push to select list.
@@ -889,16 +864,16 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
     switch (distance_type) {
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            Assert<PlannerException>(order_type == OrderType::kAsc, "L2 need ascending order", __FILE_NAME__, __LINE__);
+            Assert<PlannerException>(order_type == OrderType::kAsc, "L2 need ascending order");
             break;
         }
         case KnnDistanceType::kInnerProduct:
         case KnnDistanceType::kCosine: {
-            Assert<PlannerException>(order_type == OrderType::kDesc, "IP need descending order", __FILE_NAME__, __LINE__);
+            Assert<PlannerException>(order_type == OrderType::kDesc, "IP need descending order");
             break;
         }
         default: {
-            Error<PlannerException>("Invalid KNN distance type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid KNN distance type");
         }
     }
 }
@@ -911,10 +886,7 @@ SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     from_table.table_name_ = statement.table_name_;
     SharedPtr<TableRef> base_table_ref = QueryBinder::BuildBaseTable(this->query_context_ptr_, &from_table);
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
-    Assert<PlannerException>(base_table_ref.get() != nullptr,
-                             Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_),
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<PlannerException>(base_table_ref.get() != nullptr, Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
@@ -931,10 +903,7 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     from_table.table_name_ = statement.table_name_;
     SharedPtr<TableRef> base_table_ref = QueryBinder::BuildBaseTable(this->query_context_ptr_, &from_table);
     bound_update_statement->table_ref_ptr_ = base_table_ref;
-    Assert<PlannerException>(base_table_ref.get() != nullptr,
-                             Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_),
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<PlannerException>(base_table_ref.get() != nullptr, Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
@@ -942,7 +911,7 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
-    Assert<PlannerException>(statement.update_expr_array_ != nullptr, Format("Update expr array is empty"), __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(statement.update_expr_array_ != nullptr, Format("Update expr array is empty"));
 
     const Vector<String> &column_names = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
     const Vector<SharedPtr<DataType>> &column_types = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
@@ -953,9 +922,7 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         ParsedExpr *expr = upd_expr->value;
         auto it = std::find(column_names.begin(), column_names.end(), column_name);
         Assert<PlannerException>(it != column_names.end(),
-                                 Format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_),
-                                 __FILE_NAME__,
-                                 __LINE__);
+                                 Format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
         SizeT column_id = std::distance(column_names.begin(), it);
         SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
         update_expr = CastExpression::AddCastToType(update_expr, *column_types[column_id]);

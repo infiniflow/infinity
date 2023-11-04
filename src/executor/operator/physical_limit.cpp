@@ -15,7 +15,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
-import infinity_assert;
+
 import infinity_exception;
 import expression_type;
 import value_expression;
@@ -32,26 +32,20 @@ void PhysicalLimit::Execute(QueryContext *query_context) {
 
     // output table definition is same as input
     input_table_ = left_->output();
-    Assert<ExecutorException>(input_table_.get() != nullptr, "No input", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(input_table_.get() != nullptr, "No input");
 
     Assert<ExecutorException>(limit_expr_->type() == ExpressionType::kValue,
-                              "Currently, only support constant limit expression",
-                              __FILE_NAME__,
-                              __LINE__);
+                              "Currently, only support constant limit expression");
 
     i64 limit = (std::static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
-    Assert<ExecutorException>(limit > 0, "Limit should be larger than 0", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(limit > 0, "Limit should be larger than 0");
     i64 offset = 0;
     if (offset_expr_ != nullptr) {
         Assert<ExecutorException>(offset_expr_->type() == ExpressionType::kValue,
-                                  "Currently, only support constant limit expression",
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  "Currently, only support constant limit expression");
         offset = (std::static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
         Assert<ExecutorException>(offset >= 0 && offset < input_table_->row_count(),
-                                  "Offset should be larger or equal than 0 and less than row number",
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  "Offset should be larger or equal than 0 and less than row number");
     }
 
     output_ = GetLimitOutput(input_table_, limit, offset);

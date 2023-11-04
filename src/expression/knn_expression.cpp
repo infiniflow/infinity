@@ -9,7 +9,7 @@ import stl;
 import expression_type;
 import parser;
 import scalar_function;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -20,7 +20,7 @@ namespace infinity {
 String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
-            Error<PlannerException>("Invalid KNN distance type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid KNN distance type");
         }
         case KnnDistanceType::kL2: {
             return "L2";

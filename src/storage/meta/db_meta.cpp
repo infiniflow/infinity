@@ -14,7 +14,7 @@ import logger;
 import third_party;
 import buffer_manager;
 import txn_state;
-import infinity_assert;
+
 import infinity_exception;
 
 module db_meta;
@@ -265,8 +265,8 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *b
 
 void DBMeta::MergeFrom(DBMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(IsEqual(*this->db_name_, *other.db_name_), "DBMeta::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(IsEqual(*this->data_dir_, *other.data_dir_), "DBMeta::MergeFrom requires db_dir_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_name_, *other.db_name_), "DBMeta::MergeFrom requires db_name_ match");
+    Assert<StorageException>(IsEqual(*this->data_dir_, *other.data_dir_), "DBMeta::MergeFrom requires db_dir_ match");
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

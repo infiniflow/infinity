@@ -9,7 +9,7 @@ import logical_node;
 import base_expression;
 import column_expression;
 import subquery_expression;
-import infinity_assert;
+
 import infinity_exception;
 
 module corrlated_expr_detector;
@@ -25,7 +25,7 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
     }
 
     if (expression->depth() > 1) {
-        Error<PlannerException>("Column expression with depth > 1 is detected", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Column expression with depth > 1 is detected");
     }
 
     is_correlated_ = true;
@@ -38,7 +38,7 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
         return nullptr;
     }
 
-    Error<PlannerException>("Not support nested correlated subquery in the subquery plan", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Not support nested correlated subquery in the subquery plan");
 }
 
 } // namespace infinity
