@@ -22,8 +22,7 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
         }
         chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
         current_chunk_idx_ = 0;
-    }
-    else {
+    } else {
         if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
             // Current chunk can't afford size of nbytes object
             while (current_chunk_size_ < nbytes) {
@@ -50,11 +49,13 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
 String StringHeapMgr::Stats() const {
     StringStream ss;
     SizeT chunk_count = chunks_.size();
-    ss << "Chunk count: " << chunk_count << std::endl;;
-    for(SizeT idx = 0; idx < chunk_count; ++ idx) {
-        auto& chunk = chunks_[idx];
+    ss << "Chunk count: " << chunk_count << std::endl;
+    ;
+    for (SizeT idx = 0; idx < chunk_count; ++idx) {
+        auto &chunk = chunks_[idx];
         ss << "Chunk id: " << idx++ << ", Capacity: " << chunk->capacity_ << ", Current pos: " << chunk->current_offset_
-           << ", object count: " << chunk->object_count_ << std::endl;;
+           << ", object count: " << chunk->object_count_ << std::endl;
+        ;
     }
     return ss.str();
 }

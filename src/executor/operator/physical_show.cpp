@@ -478,8 +478,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputStat
                 case IndexMethod::kIVFFlat: {
                     auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def);
                     other_parameters = Format("metric = {}, centroids_count = {}",
-                                                   MetricTypeToString(ivfflat_index_def->metric_type_),
-                                                   ivfflat_index_def->centroids_count_);
+                                              MetricTypeToString(ivfflat_index_def->metric_type_),
+                                              ivfflat_index_def->centroids_count_);
                     break;
                 }
                 case IndexMethod::kInvalid: {

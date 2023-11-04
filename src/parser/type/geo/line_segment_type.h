@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "point_type.h"
 #include "parser_assert.h"
+#include "point_type.h"
 
 namespace infinity {
 

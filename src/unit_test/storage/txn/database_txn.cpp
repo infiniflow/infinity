@@ -2,7 +2,6 @@
 // Created by jinhai on 23-6-4.
 //
 
-
 #include "unit_test/base_test.h"
 
 import infinity_context;
@@ -22,7 +21,7 @@ import txn_manager;
 import txn;
 import base_entry;
 
-class DBTxnTest  : public BaseTest {
+class DBTxnTest : public BaseTest {
     void SetUp() override {
         system("rm -rf /tmp/infinity");
         infinity::GlobalResourceUsage::Init();

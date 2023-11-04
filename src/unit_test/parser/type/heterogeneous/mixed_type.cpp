@@ -13,8 +13,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class MixedTypeTest : public BaseTest {
-};
+class MixedTypeTest : public BaseTest {};
 
 TEST_F(MixedTypeTest, mixed_integer) {
     using namespace infinity;
@@ -101,7 +100,6 @@ TEST_F(MixedTypeTest, mixed_float) {
 TEST_F(MixedTypeTest, mixed_short_str) {
     using namespace infinity;
 
-
     // Short string
     {
         MixedType mixed_short_string = MixedType::MakeString("Hello");
@@ -182,7 +180,6 @@ TEST_F(MixedTypeTest, mixed_short_str) {
 
 TEST_F(MixedTypeTest, mixed_long_str) {
     using namespace infinity;
-
 
     // Long string
     MixedType mixed_long_string = MixedType::MakeString("Hello the world");
@@ -274,7 +271,6 @@ TEST_F(MixedTypeTest, mixed_miss) {
 
 TEST_F(MixedTypeTest, mixed_tuple1) {
     using namespace infinity;
-
 
     MixedType mixed_tuple1 = MixedType::MakeTuple(7);
     EXPECT_EQ(mixed_tuple1.type, MixedValueType::kTuple);
@@ -698,7 +694,6 @@ TEST_F(MixedTypeTest, mixed_tuple1) {
 TEST_F(MixedTypeTest, mixed_tuple2) {
     using namespace infinity;
 
-
     MixedType mixed_tuple1 = MixedType::MakeTuple(7);
     EXPECT_EQ(mixed_tuple1.type, MixedValueType::kTuple);
     auto *tuple_ptr1 = (TupleMixedType *)(&mixed_tuple1);
@@ -1014,7 +1009,6 @@ TEST_F(MixedTypeTest, mixed_tuple2) {
 TEST_F(MixedTypeTest, mixed_tuple3) {
     using namespace infinity;
 
-
     MixedType mixed_tuple3 = MixedType::MakeTuple(3);
     EXPECT_EQ(mixed_tuple3.type, MixedValueType::kTuple);
     auto *tuple_ptr3 = (TupleMixedType *)(&mixed_tuple3);
@@ -1062,7 +1056,6 @@ TEST_F(MixedTypeTest, mixed_tuple3) {
 
 TEST_F(MixedTypeTest, mixed_array1) {
     using namespace infinity;
-
 
     MixedType mixed_array1 = MixedType::MakeArray(7);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);
@@ -1499,7 +1492,6 @@ TEST_F(MixedTypeTest, mixed_array1) {
 TEST_F(MixedTypeTest, mixed_array2) {
     using namespace infinity;
 
-
     MixedType mixed_array1 = MixedType::MakeArray(7);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);
     auto *array_ptr1 = (ArrayMixedType *)(&mixed_array1);
@@ -1824,7 +1816,6 @@ TEST_F(MixedTypeTest, mixed_array2) {
 
 TEST_F(MixedTypeTest, mixed_array3) {
     using namespace infinity;
-
 
     MixedType mixed_array1 = MixedType::MakeArray(2);
     EXPECT_EQ(mixed_array1.type, MixedValueType::kArray);

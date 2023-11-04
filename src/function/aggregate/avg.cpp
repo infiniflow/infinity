@@ -24,7 +24,9 @@ public:
 
     inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Update average state."); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Constant update average state."); }
+    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+        Error<NotImplementException>("Constant update average state.");
+    }
 
     inline ptr_t Finalize() { Error<NotImplementException>("Finalize average state."); }
 

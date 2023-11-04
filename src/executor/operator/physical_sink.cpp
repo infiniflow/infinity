@@ -105,7 +105,6 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
     }
 }
 
-
 void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_sink_state, OutputState *task_output_state) {
     switch (task_output_state->operator_type_) {
         case PhysicalOperatorType::kDelete:
@@ -117,7 +116,6 @@ void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_si
         default: {
             Error<ExecutorException>("Invalid operator");
         }
-
     }
 }
 

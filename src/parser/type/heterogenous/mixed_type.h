@@ -12,9 +12,9 @@
 #include "missing_mixed_type.h"
 #include "mixed_value_type.h"
 #include "null_mixed_type.h"
+#include "parser_assert.h"
 #include "short_string_mixed_type.h"
 #include "tuple_mixed_type.h"
-#include "parser_assert.h"
 #include <cstdint>
 
 namespace infinity {

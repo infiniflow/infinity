@@ -83,14 +83,14 @@ UniquePtr<String> TxnTableStore::CreateIndexFile(u32 segment_id, SharedPtr<Index
 }
 
 UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
-//    auto &rows = delete_state_.rows_;
+    //    auto &rows = delete_state_.rows_;
     HashMap<u32, HashMap<u16, Vector<RowID>>> &row_hash_table = delete_state_.rows_;
-    for(auto row_id: row_ids) {
+    for (auto row_id : row_ids) {
         auto seg_it = row_hash_table.find(row_id.segment_id_);
-        if(seg_it != row_hash_table.end()) {
+        if (seg_it != row_hash_table.end()) {
             u16 block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
             auto block_it = seg_it->second.find(block_id);
-            if(block_it != seg_it->second.end()) {
+            if (block_it != seg_it->second.end()) {
                 block_it->second.push_back(row_id);
             } else {
                 seg_it->second.emplace(block_id, Vector<RowID>{row_id});

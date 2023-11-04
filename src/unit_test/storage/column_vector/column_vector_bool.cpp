@@ -23,7 +23,6 @@ class ColumnVectorBoolTest : public BaseTest {};
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -156,7 +155,6 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
 
@@ -244,7 +242,6 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
 TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -278,7 +275,6 @@ TEST_F(ColumnVectorBoolTest, bool_column_vector_select) {
 
 TEST_F(ColumnVectorBoolTest, bool_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
     ColumnVector column_vector(data_type);

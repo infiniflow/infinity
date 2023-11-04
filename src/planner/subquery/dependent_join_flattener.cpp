@@ -292,8 +292,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     column_types->emplace_back(MakeShared<DataType>(correlated_columns[0]->Type()));
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
     for (SizeT idx = 1; idx < column_count; ++idx) {
-        Assert<PlannerException>(correlated_columns[idx]->binding().table_idx == table_index,
-                                 "Correlated column are from different table.");
+        Assert<PlannerException>(correlated_columns[idx]->binding().table_idx == table_index, "Correlated column are from different table.");
         column_names->emplace_back(correlated_columns[idx]->column_name());
         column_types->emplace_back(MakeShared<DataType>(correlated_columns[idx]->Type()));
         column_ids.emplace_back(correlated_columns[idx]->binding().column_idx);

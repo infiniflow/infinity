@@ -32,7 +32,6 @@ class JsonTest : public BaseTest {
 TEST_F(JsonTest, test1) {
     using namespace infinity;
 
-
     String json_path = String(test_data_path()) + "/json/twitter.json";
     std::ifstream f(json_path);
 

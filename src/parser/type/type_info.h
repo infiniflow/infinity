@@ -5,8 +5,8 @@
 #pragma once
 
 #include "json.hpp"
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 

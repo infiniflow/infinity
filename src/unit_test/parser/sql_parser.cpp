@@ -13,7 +13,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 class SQLParserTest : public BaseTest {};
 
 TEST_F(SQLParserTest, good_test1) {

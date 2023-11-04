@@ -23,7 +23,6 @@ class ColumnVectorRowTest : public BaseTest {};
 TEST_F(ColumnVectorRowTest, flat_row) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -158,7 +157,6 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
 
@@ -249,7 +247,6 @@ TEST_F(ColumnVectorRowTest, contant_row) {
 TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -287,7 +284,6 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
 
 TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kRowID);
     ColumnVector column_vector(data_type);

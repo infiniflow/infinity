@@ -39,9 +39,9 @@ String LogicalCommand::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
 
-    switch(command_info_->type()) {
+    switch (command_info_->type()) {
         case CommandType::kUse: {
-            UseCmd* use_cmd_info = (UseCmd*)(command_info_.get());
+            UseCmd *use_cmd_info = (UseCmd *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Use table: " << use_cmd_info->db_name();
         }
         case CommandType::kInvalid: {

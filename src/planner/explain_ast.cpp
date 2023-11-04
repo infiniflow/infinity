@@ -352,8 +352,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             auto *cross_product_ref = (CrossProductReference *)base_table_ref;
             if (cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
-                Assert<PlannerException>(cross_product_ref->alias_->column_alias_array_ == nullptr,
-                                         "Table reference has columns alias");
+                Assert<PlannerException>(cross_product_ref->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
             } else {
                 from_str += ": ";
             }
@@ -371,8 +370,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             from_str = String(intent_size, ' ') + "table join on: " + join_reference->condition_->ToString();
             if (join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
-                Assert<PlannerException>(join_reference->alias_->column_alias_array_ == nullptr,
-                                         "Table reference has columns alias");
+                Assert<PlannerException>(join_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
             }
             result->emplace_back(MakeShared<String>(from_str));
 
@@ -390,8 +388,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             from_str += table_reference->table_name_;
             if (table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
-                Assert<PlannerException>(table_reference->alias_->column_alias_array_ == nullptr,
-                                         "Table reference has columns alias");
+                Assert<PlannerException>(table_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
             }
             result->emplace_back(MakeShared<String>(from_str));
             break;
@@ -401,8 +398,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             auto *subquery_reference = (SubqueryReference *)base_table_ref;
             if (subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
-                Assert<PlannerException>(subquery_reference->alias_->column_alias_array_ == nullptr,
-                                         "Table reference has columns alias");
+                Assert<PlannerException>(subquery_reference->alias_->column_alias_array_ == nullptr, "Table reference has columns alias");
             } else {
                 from_str += ": ";
             }

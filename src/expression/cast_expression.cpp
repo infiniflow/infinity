@@ -119,8 +119,6 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     }
 }
 
-String CastExpression::ToString() const {
-    return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString());
-}
+String CastExpression::ToString() const { return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
 
 } // namespace infinity

@@ -23,7 +23,6 @@ class ColumnVectorBlobTest : public BaseTest {};
 TEST_F(ColumnVectorBlobTest, flat_blob) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -53,7 +52,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -86,7 +85,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -104,7 +103,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -192,7 +191,6 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -311,7 +309,6 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -374,7 +371,6 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 
 TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);

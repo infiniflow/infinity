@@ -25,7 +25,6 @@ import parser;
 import txn;
 import infinity_exception;
 
-
 module storage;
 
 namespace infinity {

@@ -23,7 +23,6 @@ class ColumnVectorEmbeddingTest : public BaseTest {};
 TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     using namespace infinity;
 
-
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
@@ -196,7 +195,6 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 
     using namespace infinity;
 
-
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
@@ -317,7 +315,6 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     using namespace infinity;
 
-
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     ColumnVector column_vector(data_type);
@@ -381,7 +378,6 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
 
 TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     using namespace infinity;
-
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);

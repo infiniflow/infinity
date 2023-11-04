@@ -1,6 +1,5 @@
 module;
 
-
 import infinity_exception;
 import spinlock;
 import memory_chunk;

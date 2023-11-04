@@ -220,13 +220,13 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
 }
 
 UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
-    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+    for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
-        if(segment_entry == nullptr) {
+        if (segment_entry == nullptr) {
             Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id));
         }
-        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::DeleteData(segment_entry, txn_ptr, block_row_hashmap);
     }
     return nullptr;
@@ -234,8 +234,11 @@ UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
     for (const auto &range : append_state_ptr->append_ranges_) {
-        LOG_TRACE(
-            Format("Commit, segment: {}, block: {} start offset: {}, count: {}", range.segment_id_, range.block_id_, range.start_offset_, range.row_count_));
+        LOG_TRACE(Format("Commit, segment: {}, block: {} start offset: {}, count: {}",
+                         range.segment_id_,
+                         range.block_id_,
+                         range.start_offset_,
+                         range.row_count_));
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_offset_, range.row_count_);
     }
@@ -255,13 +258,13 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
 }
 
 void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
-    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+    for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
-        if(segment == nullptr) {
+        if (segment == nullptr) {
             Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
-        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
     }
 }
@@ -439,8 +442,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(*this->table_collection_name_ == *table_entry2->table_collection_name_,
                              "DBEntry::MergeFrom requires table_collection_name_ match");
-    Assert<StorageException>(*this->table_entry_dir_ == *table_entry2->table_entry_dir_,
-                             "DBEntry::MergeFrom requires table_entry_dir_ match");
+    Assert<StorageException>(*this->table_entry_dir_ == *table_entry2->table_entry_dir_, "DBEntry::MergeFrom requires table_entry_dir_ match");
     Assert<StorageException>(this->table_collection_type_ == table_entry2->table_collection_type_,
                              "DBEntry::MergeFrom requires table_entry_dir_ match");
 

@@ -13,12 +13,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class BaseMixedTypeTest : public BaseTest {
-};
+class BaseMixedTypeTest : public BaseTest {};
 
 TEST_F(BaseMixedTypeTest, GetTypeName) {
     using namespace infinity;
-
 
     EXPECT_STREQ(BaseMixedType::GetTypeName(MixedValueType::kInvalid).c_str(), "Invalid");
     EXPECT_STREQ(BaseMixedType::GetTypeName(MixedValueType::kInteger).c_str(), "Integer");

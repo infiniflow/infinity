@@ -4,8 +4,8 @@
 
 module;
 
-#include <boost/asio/read.hpp>
 #include <arpa/inet.h>
+#include <boost/asio/read.hpp>
 
 import stl;
 import pg_message;
@@ -140,18 +140,18 @@ void BufferReader::receive_more(SizeT bytes) {
 
     boost::system::error_code boost_error;
 
-    if((RingBufferIterator::Distance(start_pos_, current_pos_) < 0) || (start_pos_.position_ == 0)) {
+    if ((RingBufferIterator::Distance(start_pos_, current_pos_) < 0) || (start_pos_.position_ == 0)) {
         bytes_read = boost::asio::read(*socket_,
                                        boost::asio::buffer(current_pos_.position_addr(), available_size),
                                        boost::asio::transfer_at_least(bytes - size()),
                                        boost_error);
     } else {
         bytes_read = boost::asio::read(
-                *socket_,
-                std::array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(current_pos_.position_addr(), PG_MSG_BUFFER_SIZE - current_pos_.position_),
-                                                           boost::asio::buffer(&data_[0], start_pos_.position_ - 1)},
-                boost::asio::transfer_at_least(bytes - size()),
-                boost_error);
+            *socket_,
+            std::array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(current_pos_.position_addr(), PG_MSG_BUFFER_SIZE - current_pos_.position_),
+                                                       boost::asio::buffer(&data_[0], start_pos_.position_ - 1)},
+            boost::asio::transfer_at_least(bytes - size()),
+            boost_error);
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {

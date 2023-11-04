@@ -188,8 +188,7 @@ void LogicalPlanner::BuildInsertValue(const InsertStatement *statement, SharedPt
         auto &value_list = value_list_array[idx];
         if (statement->columns_ != nullptr) {
             SizeT statement_column_count = statement->columns_->size();
-            Assert<PlannerException>(statement_column_count == value_list.size(),
-                                     "INSERT: Target column count and input column count mismatch");
+            Assert<PlannerException>(statement_column_count == value_list.size(), "INSERT: Target column count and input column count mismatch");
 
             //        Value null_value = Value::MakeNullData();
             //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
@@ -403,8 +402,7 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
         columns_ptr = bound_statement_ptr->names_ptr_;
     } else {
         // Specify the view column
-        Assert<PlannerException>(column_count == bound_statement_ptr->names_ptr_->size(),
-                                 "Create view column count isn't matched.");
+        Assert<PlannerException>(column_count == bound_statement_ptr->names_ptr_->size(), "Create view column count isn't matched.");
         columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
 

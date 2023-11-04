@@ -4,7 +4,6 @@
 
 module;
 
-
 import std;
 import stl;
 import selection;
@@ -231,8 +230,7 @@ void ColumnVector::Initialize(const ColumnVector &other, SizeT start_idx, SizeT 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     Assert<StorageException>(!initialized, "Column vector is already initialized.");
     Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
-    Assert<StorageException>(vector_type != ColumnVectorType::kInvalid,
-                             "Attempt to initialize column vector to invalid type.");
+    Assert<StorageException>(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.");
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
@@ -1227,15 +1225,13 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
 }
 
 void ColumnVector::Finalize(SizeT index) {
-    Assert<StorageException>(index <= capacity_,
-                             Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     tail_index_ = index;
 }
 
 void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<StorageException>(index <= capacity_,
-                             Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
 
     Assert<StorageException>(index <= tail_index_,
                              Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
@@ -1439,8 +1435,7 @@ void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
 void ColumnVector::AppendValue(const Value &value) {
     Assert<StorageException>(initialized, "Column vector isn't initialized.");
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1,
-                                 Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
 
     if (tail_index_ >= capacity_) {
@@ -1452,8 +1447,7 @@ void ColumnVector::AppendValue(const Value &value) {
 void ColumnVector::AppendByRawPtr(const_ptr_t raw_ptr) {
     Assert<StorageException>(initialized, "Column vector isn't initialized.");
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1,
-                                 Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
     if (tail_index_ >= capacity_) {
         Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
@@ -1468,8 +1462,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     } else {
         Assert<StorageException>(initialized, "Column vector isn't initialized.");
         if (vector_type_ == ColumnVectorType::kConstant) {
-            Assert<StorageException>(tail_index_ < 1,
-                                     Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+            Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
         }
         if (tail_index_ >= capacity_) {
             Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
@@ -1894,7 +1887,8 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
         LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
         Error<StorageException>(
-            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));;
+            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
+        ;
     }
     if (this->buffer_.get() != other.buffer_.get()) {
         this->buffer_ = other.buffer_;

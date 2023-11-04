@@ -6,15 +6,15 @@
 
 #include <utility>
 
+#include "definition/column_def.h"
+#include "extra_ddl_info.h"
+#include "statement/select_statement.h"
+#include "statement/statement_common.h"
 #include "type/data_type.h"
 #include "type/info/bitmap_info.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/varchar_info.h"
-#include "extra_ddl_info.h"
-#include "statement/select_statement.h"
-#include "statement/statement_common.h"
-#include "definition/column_def.h"
 #include <unordered_set>
 
 namespace infinity {

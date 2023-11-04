@@ -75,8 +75,6 @@ void ParseArguments(int argc, char **argv, StartupParameter &parameters) {
 auto main(int argc, char **argv) -> int {
     using namespace infinity;
 
-//    std::cout << "OK: "<< std::source_location::current().line() << std::endl;
-
     Printf(" __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
            "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
            "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"

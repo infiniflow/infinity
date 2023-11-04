@@ -36,9 +36,7 @@ module segment_entry;
 
 namespace infinity {
 
-Json SegmentVersion::Serialize(SegmentVersion *segment_version) {
-    Error<NotImplementException>("Segment version serialize");
-}
+Json SegmentVersion::Serialize(SegmentVersion *segment_version) { Error<NotImplementException>("Segment version serialize"); }
 
 UniquePtr<SegmentVersion> SegmentVersion::Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     Error<NotImplementException>("Segment version deserialize");
@@ -347,16 +345,11 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
     Assert<StorageException>(segment_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
     // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(*this->segment_dir_ == *segment_entry2->segment_dir_,
-                             "SegmentEntry::MergeFrom requires segment_dir_ match");
-    Assert<StorageException>(this->segment_id_ == segment_entry2->segment_id_,
-                             "SegmentEntry::MergeFrom requires segment_id_ match");
-    Assert<StorageException>(this->column_count_ == segment_entry2->column_count_,
-                             "SegmentEntry::MergeFrom requires column_count_ match");
-    Assert<StorageException>(this->row_capacity_ == segment_entry2->row_capacity_,
-                             "SegmentEntry::MergeFrom requires row_capacity_ match");
-    Assert<StorageException>(this->min_row_ts_ == segment_entry2->min_row_ts_,
-                             "SegmentEntry::MergeFrom requires min_row_ts_ match");
+    Assert<StorageException>(*this->segment_dir_ == *segment_entry2->segment_dir_, "SegmentEntry::MergeFrom requires segment_dir_ match");
+    Assert<StorageException>(this->segment_id_ == segment_entry2->segment_id_, "SegmentEntry::MergeFrom requires segment_id_ match");
+    Assert<StorageException>(this->column_count_ == segment_entry2->column_count_, "SegmentEntry::MergeFrom requires column_count_ match");
+    Assert<StorageException>(this->row_capacity_ == segment_entry2->row_capacity_, "SegmentEntry::MergeFrom requires row_capacity_ match");
+    Assert<StorageException>(this->min_row_ts_ == segment_entry2->min_row_ts_, "SegmentEntry::MergeFrom requires min_row_ts_ match");
 
     this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
     this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);

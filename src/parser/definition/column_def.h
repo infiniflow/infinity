@@ -1,8 +1,8 @@
 #pragma once
 
 #include "definition/column_def.h"
-#include "type/logical_type.h"
 #include "type/data_type.h"
+#include "type/logical_type.h"
 
 #include <string>
 #include <unordered_set>

@@ -13,12 +13,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class PathTypeTest : public BaseTest {
-};
+class PathTypeTest : public BaseTest {};
 
 TEST_F(PathTypeTest, path1) {
     using namespace infinity;
-
 
     PathT path1;
     EXPECT_EQ(path1.PointCount(), 0);

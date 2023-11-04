@@ -53,8 +53,7 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
             status = 1;
         }
     } else {
-        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy,
-                                 "Dummy entry should always be committed.");
+        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy, "Dummy entry should always be committed.");
         // Uncommitted
         TxnState header_index_def_entry_state = txn_mgr->GetTxnState(header_base_entry->txn_id_);
         switch (header_index_def_entry_state) {
@@ -137,8 +136,7 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
             status = 1;
         }
     } else {
-        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy,
-                                 "Dummy entry should always be committed.");
+        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy, "Dummy entry should always be committed.");
         // Uncommitted
         TxnState header_index_def_entry_state = txn_mgr->GetTxnState(header_base_entry->txn_id_);
         switch (header_index_def_entry_state) {

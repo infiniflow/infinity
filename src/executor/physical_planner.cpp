@@ -96,7 +96,6 @@ import logical_command;
 import parser;
 import explain_physical_plan;
 
-
 import infinity_exception;
 
 module physical_planner;
@@ -426,8 +425,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    Assert<PlannerException>(logical_operator->right_node() == nullptr,
-                             "Aggregate project node shouldn't have right child.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Aggregate project node shouldn't have right child.");
     SharedPtr<LogicalAggregate> logical_aggregate = std::static_pointer_cast<LogicalAggregate>(logical_operator);
     SharedPtr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node != nullptr) {

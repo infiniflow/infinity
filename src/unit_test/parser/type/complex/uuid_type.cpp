@@ -13,8 +13,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class UuidTypeTest : public BaseTest {
-};
+class UuidTypeTest : public BaseTest {};
 
 TEST_F(UuidTypeTest, Uuid) {
     using namespace infinity;

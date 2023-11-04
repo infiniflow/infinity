@@ -16,9 +16,7 @@ namespace infinity {
 
 void PhysicalDropIndex::Init() {}
 
-void PhysicalDropIndex::Execute(QueryContext *query_context) {
-    Error<NotImplementException>("Deprecated execute function should not be called.");
-}
+void PhysicalDropIndex::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated execute function should not be called."); }
 
 void PhysicalDropIndex::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto txn = query_context->GetTxn();

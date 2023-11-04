@@ -13,8 +13,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class VarcharTypeTest : public BaseTest {
-};
+class VarcharTypeTest : public BaseTest {};
 
 TEST_F(VarcharTypeTest, TestInit) {
     using namespace infinity;
@@ -69,7 +68,7 @@ TEST_F(VarcharTypeTest, TestConstructor1) {
 
     // Constructor from string
     {
-        
+
         VarcharT v1(s1);
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -89,7 +88,7 @@ TEST_F(VarcharTypeTest, TestConstructor2) {
 
     // Constructor from char*
     {
-        
+
         VarcharT v1(s1.c_str());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -110,7 +109,7 @@ TEST_F(VarcharTypeTest, TestConstructor3) {
 
     // Constructor from char* and length
     {
-        
+
         VarcharT v1(s1.c_str(), s1.length());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -131,7 +130,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
 
     // Copy constructor
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2 = v1;
         EXPECT_EQ(v1.length, s1.length());
@@ -141,7 +140,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
     }
 
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2 = v1;
         EXPECT_EQ(v1.length, s2.length());
@@ -159,7 +158,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
     // Move constructor 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -170,7 +169,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
     // Move constructor 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -190,7 +189,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2;
         v2 = v1;
@@ -202,7 +201,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2;
         v2 = v1;
@@ -214,7 +213,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 3
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2(s2);
         VarcharT v3(s3);
@@ -241,7 +240,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move constructor 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2;
         v2 = Move(v1);
@@ -253,7 +252,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move constructor 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2;
         v2 = Move(v1);
@@ -266,7 +265,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move Assignment 3
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2(s2);
         VarcharT v3(s3);

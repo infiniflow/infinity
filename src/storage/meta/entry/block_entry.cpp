@@ -155,9 +155,10 @@ u16 BlockEntry::AppendData(BlockEntry *block_entry,
                            u16 append_rows,
                            BufferManager *buffer_mgr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(
-        block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-        Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
+    Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
+                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                                    block_entry->segment_entry_->segment_id_,
+                                    block_entry->block_id_));
     block_entry->txn_ptr_ = txn_ptr;
     u16 actual_copied = append_rows;
     if (block_entry->row_count_ + append_rows > block_entry->row_capacity_) {
@@ -185,9 +186,10 @@ u16 BlockEntry::AppendData(BlockEntry *block_entry,
 
 void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(
-        block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-        Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
+    Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
+                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                                    block_entry->segment_entry_->segment_id_,
+                                    block_entry->block_id_));
 
     String *table_collect_name_ptr = block_entry->segment_entry_->table_entry_->table_collection_name_.get();
     u32 segment_id = block_entry->segment_entry_->segment_id_;
@@ -206,9 +208,10 @@ void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
 void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(
-        block_entry->txn_ptr_ == txn_ptr,
-        Format("Multiple transactions are changing data of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
+    Assert<StorageException>(block_entry->txn_ptr_ == txn_ptr,
+                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                                    block_entry->segment_entry_->segment_id_,
+                                    block_entry->block_id_));
     block_entry->txn_ptr_ = nullptr;
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     if (block_entry->min_row_ts_ == 0) {
@@ -354,10 +357,8 @@ void BlockEntry::MergeFrom(BaseEntry &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(*this->base_dir_ == *block_entry2->base_dir_, "BlockEntry::MergeFrom requires base_dir_ match");
     Assert<StorageException>(this->block_id_ == block_entry2->block_id_, "BlockEntry::MergeFrom requires block_id_ match");
-    Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_,
-                             "BlockEntry::MergeFrom requires row_capacity_ match");
-    Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_,
-                             "BlockEntry::MergeFrom requires min_row_ts_ match");
+    Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_, "BlockEntry::MergeFrom requires row_capacity_ match");
+    Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_, "BlockEntry::MergeFrom requires min_row_ts_ match");
 
     if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
         return;

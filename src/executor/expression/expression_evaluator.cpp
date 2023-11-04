@@ -72,8 +72,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
 
     Assert<ExecutorException>(expr->aggregate_function_.argument_type_ == *child_output->data_type(),
                               "Argument type isn't matched with the child expression output");
-    Assert<ExecutorException>(expr->aggregate_function_.return_type_ == *output_column_vector->data_type(),
-                              "Return type isn't matched");
+    Assert<ExecutorException>(expr->aggregate_function_.return_type_ == *output_column_vector->data_type(), "Return type isn't matched");
 
     // 1. Initialize the aggregate state.
     expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());

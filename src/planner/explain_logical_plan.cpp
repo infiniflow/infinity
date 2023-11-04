@@ -52,7 +52,6 @@ import in_expression;
 import value_expression;
 import reference_expression;
 
-
 import infinity_exception;
 
 module explain_logical_plan;
@@ -1215,8 +1214,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
     switch (base_expression->type()) {
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
-            Assert<PlannerException>(aggregate_expression->arguments().size() == 1,
-                                     "More than one argument in aggregate function");
+            Assert<PlannerException>(aggregate_expression->arguments().size() == 1, "More than one argument in aggregate function");
             expr_str += aggregate_expression->aggregate_function_.name();
             expr_str += "(";
             Explain(aggregate_expression->arguments()[0].get(), expr_str);
@@ -1305,8 +1303,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         }
         case ExpressionType::kBetween: {
             BetweenExpression *between_expression = (BetweenExpression *)base_expression;
-            Assert<PlannerException>(between_expression->arguments().size() == 3,
-                                     "Between expression should have three arguments.");
+            Assert<PlannerException>(between_expression->arguments().size() == 3, "Between expression should have three arguments.");
             Explain(between_expression->arguments()[0].get(), expr_str);
             expr_str += " BETWEEN ";
             Explain(between_expression->arguments()[1].get(), expr_str);

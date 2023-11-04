@@ -21,8 +21,8 @@ public:
     int8_t _dummy1{};
     int16_t _dummy2{};
     int16_t _dummy3{};
-    uint16_t count{0};       // count of the tuple, each tuple will have two MixedType member, one for key, another for value.
-    char* ptr{nullptr}; // pointer to mixed type of tuple
+    uint16_t count{0};  // count of the tuple, each tuple will have two MixedType member, one for key, another for value.
+    char *ptr{nullptr}; // pointer to mixed type of tuple
 };
 
 } // namespace infinity

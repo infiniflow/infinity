@@ -9,9 +9,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class FP16TypeTest : public BaseTest {
-};
-
+class FP16TypeTest : public BaseTest {};
 
 TEST_F(FP16TypeTest, test1) {
     using namespace infinity;

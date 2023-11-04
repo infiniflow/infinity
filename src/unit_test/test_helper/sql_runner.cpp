@@ -37,9 +37,9 @@ namespace infinity {
  * @return Table
  */
 SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
-//    if (print) {
-//        LOG_TRACE(Format("{}", sql_text));
-//    }
+    //    if (print) {
+    //        LOG_TRACE(Format("{}", sql_text));
+    //    }
 
     SharedPtr<RemoteSession> session_ptr = MakeShared<RemoteSession>();
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
@@ -60,10 +60,10 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->CreateTxn();
     query_context_ptr->BeginTxn();
 
-//    LogicalPlanner logical_planner(query_context_ptr.get());
-//    Optimizer optimizer(query_context_ptr.get());
-//    PhysicalPlanner physical_planner(query_context_ptr.get());
-//    FragmentBuilder fragment_builder(query_context_ptr.get());
+    //    LogicalPlanner logical_planner(query_context_ptr.get());
+    //    Optimizer optimizer(query_context_ptr.get());
+    //    PhysicalPlanner physical_planner(query_context_ptr.get());
+    //    FragmentBuilder fragment_builder(query_context_ptr.get());
     BaseStatement *statement = (*parsed_result->statements_ptr_)[0];
 
     SharedPtr<BindContext> bind_context;

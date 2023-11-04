@@ -122,8 +122,7 @@ void DataBlock::Reset() {
 Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return column_vectors[column_index]->GetValue(row_index); }
 
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
-    Assert<StorageException>(column_index < column_count_,
-                             Format("Attempt to access invalid column index: {}", column_index));
+    Assert<StorageException>(column_index < column_count_, Format("Attempt to access invalid column index: {}", column_index));
     column_vectors[column_index]->SetValue(row_index, val);
 }
 
@@ -195,7 +194,8 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) { AppendWith(other
 void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
         Error<StorageException>(
-            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));;
+            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+        ;
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
         Error<StorageException>(Format("Attempt append block with row count {} into block with row count {}, "
@@ -214,7 +214,8 @@ void DataBlock::AppendWith(const DataBlock *other) {
 void DataBlock::AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count) {
     if (other->column_count() != this->column_count()) {
         Error<StorageException>(
-            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));;
+            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+        ;
     }
     if (this->row_count_ + count > this->capacity_) {
         Error<StorageException>(Format("Attempt append block with row count {} into block with row count{}, "

@@ -2,9 +2,7 @@
 // Created by JinHai on 2022/12/14.
 //
 
-
 module;
-
 
 import infinity_exception;
 import bound_cast_func;

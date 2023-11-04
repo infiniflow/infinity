@@ -14,8 +14,7 @@ import null_value;
 import stl;
 import infinity_context;
 
-class NullValueTest : public BaseTest {
-};
+class NullValueTest : public BaseTest {};
 
 TEST_F(NullValueTest, null_value_test1) {
     using namespace infinity;

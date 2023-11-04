@@ -131,7 +131,6 @@ public:
         plain_type_ = false;
     }
 
-
     nlohmann::json Serialize();
 
     static std::shared_ptr<DataType> Deserialize(const nlohmann::json &data_type_json);

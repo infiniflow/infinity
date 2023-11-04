@@ -65,7 +65,6 @@ import explain_logical_plan;
 
 import logical_show;
 
-
 import infinity_exception;
 
 import table_collection_meta;

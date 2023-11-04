@@ -30,7 +30,8 @@ void PhysicalDropTable::Execute(QueryContext *query_context, InputState *input_s
     drop_table_output_state->error_message_ = Move(res.err_);
 
     // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
 
     auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);

@@ -22,7 +22,7 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp) {
         }
         segment_block_index_[segment_entry->segment_id_].reserve(segment_entry->block_entries_.size());
         SizeT block_count = segment_entry->block_entries_.size();
-        for(SizeT idx = 0; idx < block_count; ++ idx) {
+        for (SizeT idx = 0; idx < block_count; ++idx) {
             const auto &block_entry = segment_entry->block_entries_[idx];
             if (timestamp >= block_entry->min_row_ts_) {
                 segment_block_index_[segment_entry->segment_id_].emplace(block_entry->block_id_, block_entry.get());

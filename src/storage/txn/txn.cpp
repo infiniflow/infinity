@@ -4,8 +4,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 import stl;
 
@@ -113,12 +113,12 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_n
         Vector<SharedPtr<DataBlock>> &local_blocks = txn_table_iter->second->blocks_;
         meta_table_state->local_blocks_.reserve(local_blocks.size());
         SizeT block_count = local_blocks.size();
-        for(SizeT idx = 0; idx < block_count; ++ idx) {
+        for (SizeT idx = 0; idx < block_count; ++idx) {
             const auto &data_block = local_blocks[idx];
             MetaLocalDataState data_block_state;
             data_block_state.data_block_ = data_block.get();
             SizeT column_count = columns.size();
-            for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+            for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
                 const auto &column_id = columns[col_idx];
                 MetaColumnVectorState column_vector_state;
                 column_vector_state.column_vector_ = data_block->column_vectors[column_id].get();
@@ -153,7 +153,7 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
             block_state.block_entry_ = block_entry_ptr;
 
             SizeT column_count = columns.size();
-            for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+            for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
                 const auto &column_id = columns[col_idx];
                 MetaBlockColumnState column_data_state;
                 column_data_state.block_column_ = BlockEntry::GetColumnDataByID(block_entry_ptr, column_id);
@@ -265,8 +265,8 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 
     Vector<DBEntry *> db_entries = NewCatalog::Databases(catalog_, txn_id_, txn_context_.GetBeginTS());
     SizeT db_count = db_entries.size();
-    for(SizeT idx = 0; idx < db_count; ++ idx) {
-        DBEntry* db_entry = db_entries[idx];
+    for (SizeT idx = 0; idx < db_count; ++idx) {
+        DBEntry *db_entry = db_entries[idx];
         res.emplace_back(DatabaseDetail{db_entry->db_name_});
     }
 
@@ -490,9 +490,7 @@ EntryResult Txn::CreateCollection(const String &db_name, const String &collectio
     return res;
 }
 
-EntryResult Txn::GetCollectionByName(const String &db_name, const String &table_name) {
-    Error<TransactionException>("Not Implemented");
-}
+EntryResult Txn::GetCollectionByName(const String &db_name, const String &table_name) { Error<TransactionException>("Not Implemented"); }
 
 EntryResult Txn::CreateView(const String &db_name, const String &view_name, ConflictType conflict_type) {
     Error<TransactionException>("Not Implemented");
@@ -502,13 +500,9 @@ EntryResult Txn::DropViewByName(const String &db_name, const String &view_name, 
     Error<TransactionException>("Not Implemented");
 }
 
-EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) {
-    Error<TransactionException>("Not Implemented");
-}
+EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) { Error<TransactionException>("Not Implemented"); }
 
-Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
-    Error<TransactionException>("Not Implemented");
-}
+Vector<BaseEntry *> Txn::GetViews(const String &db_name) { Error<TransactionException>("Not Implemented"); }
 
 void Txn::BeginTxn() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
 

@@ -13,12 +13,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class DateTypeTest : public BaseTest {
-};
+class DateTypeTest : public BaseTest {};
 
 TEST_F(DateTypeTest, test1) {
     using namespace infinity;
-
 
     DateT date1;
 

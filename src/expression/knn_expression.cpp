@@ -43,8 +43,7 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              EmbeddingT query_embedding,
                              Vector<SharedPtr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kKnn, Move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
-      distance_type_(knn_distance_type),
-      query_embedding_(Move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
+      distance_type_(knn_distance_type), query_embedding_(Move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
 {}
 
 String KnnExpression::ToString() const {

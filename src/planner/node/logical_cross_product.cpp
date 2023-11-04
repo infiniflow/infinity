@@ -37,13 +37,13 @@ SharedPtr<Vector<String>> LogicalCrossProduct::GetOutputNames() const {
     SizeT right_name_count = right_output_names->size();
 
     result->reserve(left_name_count + right_name_count);
-    for(SizeT idx = 0; idx < left_name_count; ++ idx) {
-        const auto& name_str = left_output_names->at(idx);
+    for (SizeT idx = 0; idx < left_name_count; ++idx) {
+        const auto &name_str = left_output_names->at(idx);
         result->emplace_back(name_str);
     }
 
-    for(SizeT idx = 0; idx < right_name_count; ++ idx) {
-        const auto& name_str = right_output_names->at(idx);
+    for (SizeT idx = 0; idx < right_name_count; ++idx) {
+        const auto &name_str = right_output_names->at(idx);
         result->emplace_back(name_str);
     }
 
@@ -59,13 +59,13 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalCrossProduct::GetOutputTypes() con
     SizeT right_type_count = right_output_types->size();
     result->reserve(left_type_count + right_type_count);
 
-    for(SizeT idx = 0; idx < left_type_count; ++ idx) {
-        const auto& name_str = left_output_types->at(idx);
+    for (SizeT idx = 0; idx < left_type_count; ++idx) {
+        const auto &name_str = left_output_types->at(idx);
         result->emplace_back(name_str);
     }
 
-    for(SizeT idx = 0; idx < right_type_count; ++ idx) {
-        const auto& name_str = right_output_types->at(idx);
+    for (SizeT idx = 0; idx < right_type_count; ++idx) {
+        const auto &name_str = right_output_types->at(idx);
         result->emplace_back(name_str);
     }
 

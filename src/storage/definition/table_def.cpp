@@ -102,7 +102,7 @@ void TableDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *table_name_);
     WriteBufAdv(ptr, (i32)(columns_.size()));
     SizeT column_count = columns_.size();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for (SizeT idx = 0; idx < column_count; ++idx) {
         const ColumnDef &cd = *columns_[idx];
         WriteBufAdv<i64>(ptr, cd.id_);
         cd.column_type_->WriteAdv(ptr);

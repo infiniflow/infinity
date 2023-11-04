@@ -3,14 +3,14 @@
 //
 
 #include "data_type.h"
+#include "info/bitmap_info.h"
+#include "serializable.h"
+#include "spdlog/fmt/fmt.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/varchar_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include "info/bitmap_info.h"
-#include "spdlog/fmt/fmt.h"
-#include "serializable.h"
 #include <charconv>
 
 namespace infinity {
@@ -270,7 +270,6 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(type, type_info);
     return data_type;
 }
-
 
 nlohmann::json DataType::Serialize() {
     nlohmann::json json_res;

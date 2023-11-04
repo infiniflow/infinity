@@ -146,9 +146,9 @@ void faiss_bench(const char *index_key, const char *test_data_path, int64_t to_q
         return;
     }
 
-    if(test_data_path == nullptr) {
+    if (test_data_path == nullptr) {
         printf("invalid test data path\n");
-        return ;
+        return;
     }
 
     if (!test_file_existence(test_data_path)) {
@@ -368,9 +368,9 @@ void faiss_bench(const char *index_key, const char *test_data_path, int64_t to_q
 }
 
 void hnsw_bench(const char *test_data_path, int64_t to_query, size_t M, size_t ef_construction) {
-    if(test_data_path == nullptr) {
+    if (test_data_path == nullptr) {
         printf("invalid test data path\n");
-        return ;
+        return;
     }
 
     if (!test_file_existence(test_data_path)) {

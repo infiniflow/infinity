@@ -13,8 +13,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class BitmapTypeTest : public BaseTest {
-};
+class BitmapTypeTest : public BaseTest {};
 
 TEST_F(BitmapTypeTest, bitmap1) {
     using namespace infinity;

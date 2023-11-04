@@ -16,8 +16,7 @@ import stl;
 import global_resource_usage;
 import infinity_context;
 
-class ColumnVectorTest : public BaseTest {
-};
+class ColumnVectorTest : public BaseTest {};
 
 TEST_F(ColumnVectorTest, ReadWrite) {
     using namespace infinity;

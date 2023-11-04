@@ -133,12 +133,12 @@ void NewCatalog::RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 t
 Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts) {
     catalog->rw_locker_.lock_shared();
 
-    Vector<DBEntry*> res;
+    Vector<DBEntry *> res;
     res.reserve(catalog->databases_.size());
-    for(const auto& db_meta: catalog->databases_) {
+    for (const auto &db_meta : catalog->databases_) {
         EntryResult entry_result = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts);
-        if(entry_result.Success()) {
-            res.emplace_back(static_cast<DBEntry*>(entry_result.entry_));
+        if (entry_result.Success()) {
+            res.emplace_back(static_cast<DBEntry *>(entry_result.entry_));
         }
     }
     catalog->rw_locker_.unlock_shared();

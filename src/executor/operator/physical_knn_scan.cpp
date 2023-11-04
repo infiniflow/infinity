@@ -129,11 +129,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                 SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
 
                 u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
-                                 row_id[id].segment_id_,
-                                 block_id,
-                                 row_id[id].segment_offset_,
-                                 top_distance[id]));
+                LOG_TRACE(
+                    Format("Row offset: {}: {}: {}, distance {}", row_id[id].segment_id_, block_id, row_id[id].segment_offset_, top_distance[id]));
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
                 if (block_entry == nullptr) {

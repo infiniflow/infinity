@@ -41,20 +41,19 @@ SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
 
     SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count);
-    for(SizeT col_idx; col_idx < column_count; ++ col_idx) {
-        const auto& column_name = base_table_ref_->column_names_->at(col_idx);
+    for (SizeT col_idx; col_idx < column_count; ++col_idx) {
+        const auto &column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
 
     SizeT expr_count = knn_expressions_.size();
-    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
-        const auto& knn_expr = knn_expressions_[expr_idx];
+    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
+        const auto &knn_expr = knn_expressions_[expr_idx];
         result_names->emplace_back(knn_expr->Name());
     }
 
     result_names->emplace_back("_row_id");
     return result_names;
-
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
@@ -62,7 +61,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
     SizeT expr_count = knn_expressions_.size();
     result_types.reserve(result_types.size() + expr_count);
 
-    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
+    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
         const auto &knn_expr = knn_expressions_[expr_idx];
         result_types.emplace_back(MakeShared<DataType>(knn_expr->Type()));
     }

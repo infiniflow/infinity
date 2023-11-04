@@ -8,9 +8,7 @@ import stl;
 import global_resource_usage;
 
 class GlobalResourceUsageTest : public BaseTest {
-    void SetUp() override {
-        infinity::GlobalResourceUsage::Init();
-    }
+    void SetUp() override { infinity::GlobalResourceUsage::Init(); }
 
     void TearDown() override {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);

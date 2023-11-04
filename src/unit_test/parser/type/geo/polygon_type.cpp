@@ -13,12 +13,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class PolygonTypeTest : public BaseTest {
-};
+class PolygonTypeTest : public BaseTest {};
 
 TEST_F(PolygonTypeTest, polygon1) {
     using namespace infinity;
-
 
     PolygonT polygon1;
     EXPECT_EQ(polygon1.PointCount(), 0);

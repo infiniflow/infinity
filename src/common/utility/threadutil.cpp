@@ -29,4 +29,4 @@ bool ThreadUtil::pin(Thread &thread, const u16 cpu_id) {
 #endif
 }
 
-}
+} // namespace infinity

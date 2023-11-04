@@ -367,8 +367,7 @@ void TableCollectionMeta::MergeFrom(TableCollectionMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(IsEqual(*this->table_collection_name_, *other.table_collection_name_),
                              "DBEntry::MergeFrom requires table_collection_name_ match");
-    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_),
-                             "DBEntry::MergeFrom requires db_entry_dir_ match");
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_), "DBEntry::MergeFrom requires db_entry_dir_ match");
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

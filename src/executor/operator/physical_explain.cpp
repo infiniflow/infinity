@@ -23,7 +23,7 @@ module physical_explain;
 
 namespace infinity {
 
-void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2) {
+void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2) {
     Vector<SizeT> paragraph_indices_1;
     Vector<SizeT> paragraph_indices_2;
 

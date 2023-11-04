@@ -31,7 +31,7 @@ import storage;
 import resource_manager;
 import query_context;
 
-class TableScanTest  : public BaseTest {
+class TableScanTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
         system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
@@ -52,7 +52,7 @@ class TableScanTest  : public BaseTest {
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
-//    RegisterSeqScanFunction(catalog);
+    //    RegisterSeqScanFunction(catalog);
     RegisterTableScanFunction(catalog);
 
     Config config;

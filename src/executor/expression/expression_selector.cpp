@@ -52,8 +52,7 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
     if (count == 0) {
         return; // All data are false;
     }
-    Assert<ExecutorException>(output_true_select.get() != nullptr || output_false_select.get() != nullptr,
-                              "No output select column vector is given");
+    Assert<ExecutorException>(output_true_select.get() != nullptr || output_false_select.get() != nullptr, "No output select column vector is given");
     Assert<ExecutorException>(expr->Type().type() == LogicalType::kBoolean, "Attempting to select non-boolean expression");
     Select(expr, state, count, output_true_select);
 }

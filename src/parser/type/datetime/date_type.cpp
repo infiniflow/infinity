@@ -3,8 +3,8 @@
 //
 
 #include "date_type.h"
-#include "spdlog/fmt/fmt.h"
 #include "parser_assert.h"
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 

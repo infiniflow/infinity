@@ -1,8 +1,8 @@
 
 #include "type/info/varchar_info.h"
-#include "type/type_info.h"
 #include "default_value.h"
 #include "parser_assert.h"
+#include "type/type_info.h"
 
 namespace infinity {
 

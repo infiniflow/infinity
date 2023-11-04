@@ -795,7 +795,7 @@ void QueryBinder::BuildSelectList(QueryContext *query_context, SharedPtr<BoundSe
         !bind_context_ptr_->aggregate_exprs_.empty()) {
         if (!project_binder->BoundColumn().empty()) {
             Error<PlannerException>("Column: " + project_binder->BoundColumn() +
-                                        " must appear in the GROUP BY clause or be used in an aggregate function");
+                                    " must appear in the GROUP BY clause or be used in an aggregate function");
         }
     }
 }

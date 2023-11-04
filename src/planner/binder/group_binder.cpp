@@ -135,8 +135,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildFuncExpr(const FunctionExpr &expr, B
 }
 
 void GroupBinder::CheckFuncType(FunctionType func_type) const {
-    Assert<PlannerException>(func_type == FunctionType::kScalar,
-                             "Onlyl scalar function type are allowed in group by clause");
+    Assert<PlannerException>(func_type == FunctionType::kScalar, "Onlyl scalar function type are allowed in group by clause");
 }
 
 SharedPtr<SubqueryExpression>

@@ -192,7 +192,6 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
@@ -308,7 +307,6 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -366,7 +364,6 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -422,7 +419,6 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 
 TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -596,7 +592,6 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
 
@@ -711,7 +706,6 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
 TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);

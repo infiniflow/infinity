@@ -40,7 +40,7 @@ bool BlobType::operator==(const BlobType &other) const {
     return memcmp(this->ptr, other.ptr, other.size) == 0;
 }
 
-void BlobType::Copy(char* blob_ptr, uint64_t blob_size) {
+void BlobType::Copy(char *blob_ptr, uint64_t blob_size) {
     // If input blob size is same as current blob size, don't need to allocate memory again
     if (blob_size != this->size) {
         Reset();
@@ -52,7 +52,7 @@ void BlobType::Copy(char* blob_ptr, uint64_t blob_size) {
     this->size = blob_size;
 }
 
-void BlobType::Move(char* blob_ptr, uint64_t blob_size) {
+void BlobType::Move(char *blob_ptr, uint64_t blob_size) {
     Reset();
     this->ptr = blob_ptr;
     this->size = blob_size;
