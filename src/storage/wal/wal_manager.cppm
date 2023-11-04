@@ -64,9 +64,10 @@ public:
     void ReplayWalEntry(const WalEntry &entry);
 
     void RecycleWalFile();
+
 private:
     void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    void GetWalState(TxnTimeStamp& max_commit_ts, i64& wal_size);
+    void GetWalState(TxnTimeStamp &max_commit_ts, i64 &wal_size);
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);

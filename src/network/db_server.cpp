@@ -4,8 +4,8 @@
 
 module;
 
-#include <thread>
 #include <boost/bind.hpp>
+#include <thread>
 
 module db_server;
 import infinity_context;
@@ -18,7 +18,7 @@ import connection;
 
 namespace infinity {
 
-DBServer::DBServer(const StartupParameter &parameter) : config_path_(parameter.config_path) {}
+void DBServer::Init(const StartupParameter &parameter) { config_path_ = std::move(parameter.config_path); }
 
 void DBServer::Run() {
     if (initialized) {
@@ -54,6 +54,7 @@ void DBServer::Run() {
 }
 
 void DBServer::Shutdown() {
+    Printf("Shutdown infinity server ...\n");
     while (running_connection_count_ > 0) {
         // Running connection exists.
         std::this_thread::yield();
@@ -63,6 +64,7 @@ void DBServer::Shutdown() {
     initialized = false;
     acceptor_ptr_->close();
     infinity::InfinityContext::instance().UnInit();
+    Printf("Shutdown infinity server successfully\n");
 }
 
 void DBServer::CreateConnection() {

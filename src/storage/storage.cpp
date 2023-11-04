@@ -4,10 +4,10 @@
 
 module;
 
-#include <string>
 #include <filesystem>
 #include <functional>
 #include <regex>
+#include <string>
 
 import base_entry;
 import config;
@@ -66,6 +66,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
+    Printf("Shutdown storage ...\n");
     txn_mgr_->Stop();
     wal_mgr_->Stop();
 
@@ -75,6 +76,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
+    Printf("Shutdown storage successfully\n");
 }
 
 SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {

@@ -145,6 +145,8 @@ void WalManager::Stop() {
     flush_thread_.join();
 
     ofs_.close();
+
+    LOG_INFO("WalManager is stopped");
 }
 
 // Session request to persist an entry. Assuming txn_id of the entry has
