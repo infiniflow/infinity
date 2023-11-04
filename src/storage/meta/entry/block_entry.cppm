@@ -9,6 +9,7 @@ import default_values;
 import base_entry;
 import third_party;
 import block_column_entry;
+import parser;
 
 export module block_entry;
 
@@ -19,8 +20,10 @@ class Txn;
 class SegmentEntry;
 class DataBlock;
 
-struct BlockVersion {
-    BlockVersion(SizeT capacity) : deleted_(capacity) {}
+export struct BlockVersion {
+    BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
+    bool operator==(const BlockVersion &rhs) const;
+    bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
     i32 GetRowCount(TxnTimeStamp begin_ts);
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
@@ -32,14 +35,14 @@ struct BlockVersion {
 export struct BlockEntry : public BaseEntry {
 public:
     /// Normal Constructor
-    explicit BlockEntry(const SegmentEntry *segment_entry, i16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
+    explicit BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
     /// Construct a new block entry For Replay
     explicit BlockEntry(const SegmentEntry *segment_entry,
-                        i16 block_id,
+                        u16 block_id,
                         TxnTimeStamp checkpoint_ts,
                         u64 column_count,
                         BufferManager *buffer_mgr,
-                        i16 row_count_,
+                        u16 row_count_,
                         i16 min_row_ts_,
                         i16 max_row_ts_);
 
@@ -49,9 +52,9 @@ public:
 
     SharedPtr<String> base_dir_{};
 
-    i16 block_id_{};
-    i16 row_count_{};
-    i16 row_capacity_{};
+    u16 block_id_{};
+    u16 row_count_{};
+    u16 row_capacity_{};
 
     Vector<UniquePtr<BlockColumnEntry>> columns_;
 
@@ -65,13 +68,16 @@ public:
     BufferManager *buffer_{nullptr};
 
     // checkpoint state
-    i16 checkpoint_row_count_{0};
+    u16 checkpoint_row_count_{0};
 
 public:
-    static i16
-    AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, offset_t input_offset, i16 append_rows, BufferManager *buffer_mgr);
+    // Get visible range of the BlockEntry since the given row number for a txn
+    static Pair<u16, u16> VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin = 0);
 
-    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, i16 block_offset);
+    static u16
+    AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
+
+    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID>& rows);
 
     static void CommitAppend(BlockEntry *block_entry, Txn *txn_ptr);
 

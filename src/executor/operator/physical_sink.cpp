@@ -4,20 +4,15 @@
 
 module;
 
-#include <vector>
-
+import std;
 import stl;
-// import txn;
 import query_context;
-// import table_def;
-// import data_table;
 import parser;
 import operator_state;
 import physical_operator_type;
 import third_party;
 import fragment_data;
 import data_block;
-// import column_vector;
 import infinity_assert;
 import infinity_exception;
 
@@ -51,6 +46,12 @@ void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
             // Output message
             auto *message_sink_state = static_cast<MessageSinkState *>(sink_state);
             FillSinkStateFromLastOutputState(message_sink_state, message_sink_state->prev_output_state_);
+            break;
+        }
+        case SinkStateType::kSummary: {
+            // Output summary
+            auto *summary_sink_state = static_cast<SummarySinkState *>(sink_state);
+            FillSinkStateFromLastOutputState(summary_sink_state, summary_sink_state->prev_output_state_);
             break;
         }
         case SinkStateType::kQueue: {
@@ -106,6 +107,22 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
     }
 }
 
+
+void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_sink_state, OutputState *task_output_state) {
+    switch (task_output_state->operator_type_) {
+        case PhysicalOperatorType::kDelete:
+        case PhysicalOperatorType::kUpdate: {
+            summary_sink_state->count_ = task_output_state->count_;
+            summary_sink_state->sum_ = task_output_state->sum_;
+            break;
+        }
+        default: {
+            Error<ExecutorException>("Invalid operator", __FILE_NAME__, __LINE__);
+        }
+
+    }
+}
+
 void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink_state, OutputState *task_output_state) {
     switch (task_output_state->operator_type_) {
 
@@ -138,8 +155,6 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
         case PhysicalOperatorType::kSort:
         case PhysicalOperatorType::kMergeSort:
         case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kDelete:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:

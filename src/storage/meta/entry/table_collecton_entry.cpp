@@ -4,10 +4,8 @@
 
 module;
 
-#include <string>
-#include <vector>
-
 import stl;
+import std;
 import parser;
 import base_entry;
 import table_collection_meta;
@@ -45,7 +43,7 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
       table_collection_meta_(table_collection_meta) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
-        name2id_[columns[idx]->name()] = idx;
+        column_name2column_id_[columns[idx]->name()] = idx;
     }
 
     begin_ts_ = begin_ts;
@@ -58,11 +56,12 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                               u64 txn_id,
                                               TxnTimeStamp begin_ts,
                                               TxnManager *txn_mgr) {
+    // TODO: lock granularity can be narrowed.
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
     if (index_def->index_name_->empty()) {
         // set default index name
-        int index_id = 0;
+        i32 index_id = 0;
         String index_name_base = "idx";
         for (const auto &column_name : index_def->column_names_) {
             index_name_base += "_" + column_name;
@@ -73,7 +72,7 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                 index_def->index_name_ = MakeShared<String>(Move(index_name));
                 break;
             }
-            index_id++;
+            ++index_id;
         }
     } else if (auto iter = table_entry->indexes_.find(*index_def->index_name_); iter != table_entry->indexes_.end()) {
         index_def_meta = iter->second.get();
@@ -152,7 +151,6 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
-    Txn *transaction_ptr = (Txn *)txn_ptr;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     if (append_state_ptr->Finished()) {
         LOG_TRACE("No append is done.");
@@ -168,12 +166,12 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
                     SegmentEntry::MakeNewSegmentEntry(table_entry, TableCollectionEntry::GetNextSegmentID(table_entry), buffer_mgr);
                 table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
                 table_entry->unsealed_segment_ = new_segment.get();
-                LOG_TRACE("Add a new segment");
+                LOG_TRACE(Format("Created a new segment {}", new_segment->segment_id_));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        int actual_appended = SegmentEntry::AppendData(table_entry->unsealed_segment_, txn_ptr, append_state_ptr, buffer_mgr);
-        LOG_TRACE(Format("Segment {} is appended with {} rows", int(table_entry->unsealed_segment_->segment_id_), actual_appended));
+        u64 actual_appended = SegmentEntry::AppendData(table_entry->unsealed_segment_, txn_ptr, append_state_ptr, buffer_mgr);
+        LOG_TRACE(Format("Segment {} is appended with {} rows", table_entry->unsealed_segment_->segment_id_, actual_appended));
     }
 }
 
@@ -221,42 +219,29 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     }
 }
 
-UniquePtr<String>
-TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
-    for (auto it = delete_state.rows_.begin(); it != delete_state.rows_.end(); ++it) {
-        u64 segment_id = it->first;
-        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
-        if (segment == nullptr)
-            continue;
-        const auto &rows = it->second;
-        SegmentEntry::DeleteData(segment, txn_ptr, rows, buffer_mgr);
-        LOG_TRACE(Format("Table {} Segment {} is deleted {} rows", *table_entry->table_collection_name_, segment->segment_id_, rows.size()));
+UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
+    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+        u32 segment_id = to_delete_seg_rows.first;
+        SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        if(segment_entry == nullptr) {
+            Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+        }
+        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        SegmentEntry::DeleteData(segment_entry, txn_ptr, block_row_hashmap);
     }
-    return nullptr;
-}
-
-UniquePtr<String> TableCollectionEntry::InitScan(TableCollectionEntry *table_entry, Txn *txn_ptr, ScanState &scan_state, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("TableCollectionEntry::InitScan", __FILE_NAME__, __LINE__);
-    return nullptr;
-}
-
-UniquePtr<String>
-TableCollectionEntry::Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, const ScanState &scan_state, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("TableCollectionEntry::Scan", __FILE_NAME__, __LINE__);
     return nullptr;
 }
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
-
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE(
-            Format("Commit, segment: {}, block: {} start: {}, count: {}", range.segment_id_, range.block_id_, range.start_id_, range.row_count_));
+            Format("Commit, segment: {}, block: {} start offset: {}, count: {}", range.segment_id_, range.block_id_, range.start_offset_, range.row_count_));
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
-        SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_id_, range.row_count_);
+        SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_offset_, range.row_count_);
     }
 }
 
-void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes) {
+void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u32, SharedPtr<IndexEntry>> &uncommitted_indexes) {
     // FIXME: One index_entry is created for one segment_entry.
     for (const auto &[segment_id, index_entry] : uncommitted_indexes) {
         SegmentEntry::CommitCreateIndex(table_entry->segments_[segment_id].get(), index_entry);
@@ -269,10 +254,16 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
     Error<NotImplementException>("TableCollectionEntry::RollbackAppend", __FILE_NAME__, __LINE__);
 }
 
-UniquePtr<String>
-TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr) {
-    Error<StorageException>("TableCollectionEntry::CommitDelete", __FILE_NAME__, __LINE__);
-    return nullptr;
+void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
+    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+        u32 segment_id = to_delete_seg_rows.first;
+        SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
+        if(segment == nullptr) {
+            Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+        }
+        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
+    }
 }
 
 UniquePtr<String>
@@ -297,8 +288,8 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     return nullptr;
 }
 
-SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u64 id) {
-    auto iter = table_entry->segments_.find(id);
+SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u32 segment_id) {
+    auto iter = table_entry->segments_.find(segment_id);
     if (iter != table_entry->segments_.end()) {
         return iter->second.get();
     } else {
@@ -351,7 +342,7 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
 
             json_res["column_definition"].emplace_back(column_def_json);
         }
-        u64 next_segment_id = table_entry->next_segment_id_;
+        u32 next_segment_id = table_entry->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
 
         for (const auto &segment_pair : table_entry->segments_) {
@@ -412,10 +403,13 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
     table_entry->table_entry_dir_ = table_entry_dir;
     if (table_entry_json.contains("segments")) {
+        u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
+            max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
+        table_entry->unsealed_segment_ = table_entry->segments_[max_segment_id].get();
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
@@ -432,8 +426,8 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 }
 
 u64 TableCollectionEntry::GetColumnIdByName(const String &column_name) {
-    auto it = name2id_.find(column_name);
-    if (it == name2id_.end()) {
+    auto it = column_name2column_id_.find(column_name);
+    if (it == column_name2column_id_.end()) {
         Error<NotImplementException>(Format("No column name: {}", column_name), __FILE_NAME__, __LINE__);
     }
     return it->second;
@@ -457,13 +451,18 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
                              __LINE__);
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
+    u32 max_segment_id = 0;
     for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
+        max_segment_id = Max(max_segment_id, seg_id);
         auto it = this->segments_.find(seg_id);
         if (it == this->segments_.end()) {
             this->segments_.emplace(seg_id, sgement_entry2);
         } else {
             it->second->MergeFrom(*sgement_entry2.get());
         }
+    }
+    if (this->unsealed_segment_ == nullptr) {
+        this->unsealed_segment_ = this->segments_[max_segment_id].get();
     }
 }
 

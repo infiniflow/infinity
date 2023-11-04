@@ -9,7 +9,7 @@ import stl;
 
 namespace infinity {
 
-export class Exception : public StlException {
+export class Exception : public StdException {
 public:
     explicit Exception(String message) : message_(Move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }

@@ -1,9 +1,9 @@
 
 module;
 
-#include <sstream>
 #include <memory>
 
+import std;
 import stl;
 import index_def;
 import parser;

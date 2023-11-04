@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
 import selection;
 import infinity_assert;
@@ -181,8 +180,9 @@ String DataBlock::ToString() const {
 
 void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const {
     Assert<StorageException>(finalized, "DataBlock isn't finalized.", __FILE_NAME__, __LINE__);
+    u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
     for (u32 offset = 0; offset < row_count_; ++offset) {
-        row_ids->emplace_back(INVALID_SEGMENT_ID, block_id, offset);
+        row_ids->emplace_back(INVALID_SEGMENT_ID, segment_offset_start + offset);
     }
 }
 

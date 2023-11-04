@@ -4,9 +4,9 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
+import std;
 import infinity_assert;
 import infinity_exception;
 import parser;
@@ -14,6 +14,7 @@ import third_party;
 import data_block;
 import table_def;
 import table_collection_type;
+import value;
 
 module data_table;
 
@@ -97,6 +98,25 @@ SharedPtr<DataTable> DataTable::MakeResultTable(const Vector<SharedPtr<ColumnDef
 SharedPtr<DataTable> DataTable::MakeEmptyResultTable() {
     SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, Vector<SharedPtr<ColumnDef>>());
     return Make(result_table_def_ptr, TableType::kResult);
+}
+
+SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    column_defs.emplace_back(MakeShared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "count", HashSet<ConstraintType>()));
+    column_defs.emplace_back(MakeShared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kBigInt, nullptr), "sum", HashSet<ConstraintType>()));
+    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(nullptr, nullptr, column_defs);
+    SharedPtr<DataTable> result_table = Make(result_table_def_ptr, TableType::kResult);
+
+    SharedPtr<DataBlock> data_block = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types;
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBigInt));
+    data_block->Init(column_types);
+    data_block->AppendValue(0, Value::MakeBigInt(count));
+    data_block->AppendValue(1, Value::MakeBigInt(sum));
+    data_block->Finalize();
+    result_table->Append(data_block);
+    return result_table;
 }
 
 DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)

@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import bitmask_buffer;
 import global_resource_usage;
 import infinity_assert;

@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-enum class ExplainType { kAnalyze, kAst, kUnOpt, kOpt, kPhysical, kPipeline };
+enum class ExplainType { kAnalyze, kAst, kUnOpt, kOpt, kPhysical, kPipeline, kFragment };
 
 class ExplainStatement final : public BaseStatement {
 public:

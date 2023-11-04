@@ -35,6 +35,9 @@ public:
 
     SharedPtr<Database> GetDatabase(const String &db_name);
 
+    // For embedded sqllogictest
+    QueryResult Query(const String& query_text);
+
     ~Infinity();
 
 private:

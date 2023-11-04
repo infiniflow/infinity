@@ -128,12 +128,12 @@ TEST_F(DataBlockTest, test2) {
     Vector<SharedPtr<DataType>> column_types;
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kBoolean));
 
-    SizeT row_count = DEFAULT_VECTOR_SIZE;
+    u16 row_count = DEFAULT_VECTOR_SIZE;
 
     data_block.Init(column_types);
 
     // Test DataBlock::AppendValue
-    for (SizeT i = 0; i < row_count; ++i) {
+    for (u16 i = 0; i < row_count; ++i) {
         data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
     }
     EXPECT_THROW(data_block.AppendValue(1, Value::MakeBool(true)), StorageException);
@@ -148,9 +148,8 @@ TEST_F(DataBlockTest, test2) {
     SharedPtr<Vector<RowID>> row_ids = MakeShared<Vector<RowID>>();
     row_ids->reserve(row_count);
     data_block.FillRowIDVector(row_ids, 1);
-    for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-        EXPECT_EQ((*row_ids)[row_id].block_offset_, row_id);
-        EXPECT_EQ((*row_ids)[row_id].block_id_, 1);
+    for (u16 row_id = 0; row_id < row_count; ++row_id) {
+        EXPECT_EQ((*row_ids)[row_id].segment_offset_, row_id + DEFAULT_BLOCK_CAPACITY);
         EXPECT_EQ((*row_ids)[row_id].segment_id_, INVALID_SEGMENT_ID);
     }
 }

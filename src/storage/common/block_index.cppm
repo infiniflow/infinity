@@ -23,11 +23,11 @@ export struct BlockIndex {
 
     inline SizeT SegmentCount() const { return segments_.size(); }
 
-    BlockEntry *GetBlockEntry(i32 segment_id, i16 block_id) const;
+    BlockEntry *GetBlockEntry(u32 segment_id, u16 block_id) const;
 
     Vector<SegmentEntry *> segments_;
-    HashMap<i32, SegmentEntry *> segment_index_;
-    HashMap<i32, HashMap<i16, BlockEntry *>> segment_block_index_;
+    HashMap<u32, SegmentEntry *> segment_index_;
+    HashMap<u32, HashMap<u16, BlockEntry *>> segment_block_index_;
     Vector<GlobalBlockID> global_blocks_;
 };
 

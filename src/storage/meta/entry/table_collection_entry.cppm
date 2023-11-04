@@ -6,7 +6,7 @@ module;
 
 import stl;
 import parser;
-//import txn;
+// import txn;
 import buffer_manager;
 import third_party;
 import table_collection_type;
@@ -27,14 +27,6 @@ export module table_collection_entry;
 namespace infinity {
 
 class DBEntry;
-//class TableCollectionMeta;
-//class BufferManager;
-//class Txn;
-//class BlockIndex;
-//class ColumnDef;
-//class DeleteState;
-//class ScanState;
-//class AppendState;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
@@ -71,29 +63,25 @@ public:
     static void
     CreateIndexFile(TableCollectionEntry *table_entry, void *txn_store, const IndexDef &index_def, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
 
-    static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state, BufferManager *buffer_mgr);
-
-    static UniquePtr<String> InitScan(TableCollectionEntry *table_entry, Txn *txn_ptr, ScanState &scan_state, BufferManager *buffer_mgr);
-
-    static UniquePtr<String> Scan(TableCollectionEntry *table_entry, Txn *txn_ptr, const ScanState &scan_state, BufferManager *buffer_mgr);
+    static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state);
 
     static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);
 
-    static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u64, SharedPtr<IndexEntry>> &uncommitted_indexes);
+    static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u32, SharedPtr<IndexEntry>> &uncommitted_indexes);
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 
-    static UniquePtr<String> CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
+    static void CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &append_state);
 
     static UniquePtr<String> RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr);
 
     static UniquePtr<String> ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment);
 
-    static inline u64 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
+    static inline u32 GetNextSegmentID(TableCollectionEntry *table_entry) { return table_entry->next_segment_id_++; }
 
-    static inline u64 GetMaxSegmentID(const TableCollectionEntry *table_entry) { return table_entry->next_segment_id_; }
+    static inline u32 GetMaxSegmentID(const TableCollectionEntry *table_entry) { return table_entry->next_segment_id_; }
 
-    static SegmentEntry *GetSegmentByID(const TableCollectionEntry *table_entry, u64 id);
+    static SegmentEntry *GetSegmentByID(const TableCollectionEntry *table_entry, u32 seg_id);
 
     static DBEntry *GetDBEntry(const TableCollectionEntry *table_entry);
 
@@ -103,8 +91,7 @@ public:
 
     static Json Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<TableCollectionEntry>
-    Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
+    static UniquePtr<TableCollectionEntry> Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
 
     virtual void MergeFrom(BaseEntry &other);
 
@@ -112,7 +99,7 @@ public:
     u64 GetColumnIdByName(const String &column_name);
 
 private:
-    HashMap<String, u64> name2id_;
+    HashMap<String, u64> column_name2column_id_;
 
 public:
     RWMutex rw_locker_{};
@@ -127,9 +114,9 @@ public:
 
     // from data table
     SizeT row_count_{};
-    HashMap<u64, SharedPtr<SegmentEntry>> segments_{};
+    HashMap<u32, SharedPtr<SegmentEntry>> segments_{};
     SegmentEntry *unsealed_segment_{};
-    au64 next_segment_id_{};
+    atomic_u32 next_segment_id_{};
 
     //
     HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};

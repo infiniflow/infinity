@@ -4,8 +4,7 @@
 
 module;
 
-#include <sstream>
-
+import std;
 import stl;
 import bound_select_statement;
 import expression_type;
@@ -20,7 +19,7 @@ SubqueryExpression::SubqueryExpression(SharedPtr<BoundSelectStatement> bound_sel
 
 String SubqueryExpression::ToString() const {
     std::stringstream ss;
-    ss << "Substring: " << std::endl;
+    ss << "Subquery: " << std::endl;
     return ss.str();
 }
 

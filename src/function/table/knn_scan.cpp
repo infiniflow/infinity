@@ -40,8 +40,8 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     SizeT knn_column_id = knn_column_ids[0];
 
     i64 &block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
-    i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    i16 block_id = block_ids->at(block_ids_idx).block_id_;
+    u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+    u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
     BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
     i64 row_count = current_block_entry->row_count_;
@@ -72,10 +72,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
                                                  row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
+                                                 row_id[id].segment_offset_,
                                                  top_distance[id]));
                             }
                         }
@@ -165,9 +164,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                 case EmbeddingDataType::kElemInt16: {
                     //            KnnFlat::SearchInt16(&knn_scan_function_data_ptr->knn_flat_,
                     //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i16*)(column_buffer.GetAll()),
+                    //                                 (u16*)(column_buffer.GetAll()),
                     //                                 row_count,
-                    //                                 (i16*)knn_scan_function_data_ptr->query_embedding_,
+                    //                                 (u16*)knn_scan_function_data_ptr->query_embedding_,
                     //                                 knn_scan_function_data_ptr->query_embedding_count_,
                     //                                 knn_scan_function_data_ptr->topk_,
                     //                                 nullptr,
@@ -228,10 +227,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
+                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
                                                  row_id[id].segment_id_,
-                                                 row_id[id].block_id_,
-                                                 row_id[id].block_offset_,
+                                                 row_id[id].segment_offset_,
                                                  top_distance[id]));
                             }
                         }
@@ -321,9 +319,9 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                 case EmbeddingDataType::kElemInt16: {
                     //            KnnFlat::SearchInt16(&knn_scan_function_data_ptr->knn_flat_,
                     //                                 knn_scan_function_data_ptr->dimension_,
-                    //                                 (i16*)(column_buffer.GetAll()),
+                    //                                 (u16*)(column_buffer.GetAll()),
                     //                                 row_count,
-                    //                                 (i16*)knn_scan_function_data_ptr->query_embedding_,
+                    //                                 (u16*)knn_scan_function_data_ptr->query_embedding_,
                     //                                 knn_scan_function_data_ptr->query_embedding_count_,
                     //                                 knn_scan_function_data_ptr->topk_,
                     //                                 nullptr,

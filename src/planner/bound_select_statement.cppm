@@ -18,10 +18,6 @@ export module bound_select_statement;
 
 namespace infinity {
 
-//class LogicalKnnScan;
-//class QueryContext;
-//class BaseExpression;
-
 export struct BoundSelectStatement final: public BoundStatement {
 public:
     static inline SharedPtr<BoundSelectStatement> Make(SharedPtr<BindContext> bind_context) {

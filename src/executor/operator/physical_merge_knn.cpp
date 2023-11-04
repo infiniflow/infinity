@@ -21,6 +21,7 @@ import column_buffer;
 import block_column_entry;
 import third_party;
 import block_entry;
+import default_values;
 
 module physical_merge_knn;
 
@@ -94,9 +95,10 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
             for (i64 top_idx = result_n - 1; top_idx >= 0; top_idx--) {
-                i32 segment_id = result_row_ids[top_idx].segment_id_;
-                i16 block_id = result_row_ids[top_idx].block_id_;
-                i16 block_offset = result_row_ids[top_idx].block_offset_;
+                u32 segment_id = result_row_ids[top_idx].segment_id_;
+                u32 segment_offset = result_row_ids[top_idx].segment_offset_;
+                u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
                 LOG_TRACE(Format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);

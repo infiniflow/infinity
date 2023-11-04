@@ -79,6 +79,7 @@ FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
 FORMAT          { return FORMAT; }
+FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
 FULL            { return FULL; }
 GROUP           { return GROUP; }
@@ -130,7 +131,6 @@ PRIMARY         { return PRIMARY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
-DATABASE        { return DATABASE; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }

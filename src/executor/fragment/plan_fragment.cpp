@@ -4,8 +4,7 @@
 
 module;
 
-#include <vector>
-
+import std;
 import stl;
 import parser;
 import physical_source;
@@ -17,14 +16,14 @@ module plan_fragment;
 
 namespace infinity {
 
-void PlanFragment::AddSourceNode(QueryContext *query_context,
+void PlanFragment::SetSourceNode(QueryContext *query_context,
                                  SourceType source_type,
                                  const SharedPtr<Vector<String>> &names,
                                  const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
     source_ = MakeUnique<PhysicalSource>(query_context->GetNextNodeID(), source_type, names, types);
 }
 
-void PlanFragment::AddSinkNode(QueryContext *query_context,
+void PlanFragment::SetSinkNode(QueryContext *query_context,
                                SinkType sink_type,
                                const SharedPtr<Vector<String>> &names,
                                const SharedPtr<Vector<SharedPtr<DataType>>> &types) {

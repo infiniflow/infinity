@@ -20,7 +20,7 @@ class MergeKnn : public MergeKnnBase {
     using SingleResultHandler = HeapResultHandler::HeapSingleResultHandler;
 
 public:
-    explicit MergeKnn(i64 query_count, i64 topk)
+    explicit MergeKnn(u64 query_count, u64 topk)
         : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUnique<RowID[]>(topk * query_count)),
           distance_array_(MakeUnique<DataType[]>(topk * query_count)) {
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, this->distance_array_.get(), this->idx_array_.get(), topk);
@@ -28,7 +28,7 @@ public:
     }
 
 public:
-    void Search(const DataType *dist, const RowID *row_ids, int count);
+    void Search(const DataType *dist, const RowID *row_ids, u16 count);
 
     void Begin();
 
@@ -58,12 +58,12 @@ private:
 };
 
 template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, int count) {
+void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u16 count) {
     this->total_count_ += count;
-    for (i64 i = 0; i < this->query_count_; i++) {
+    for (u64 i = 0; i < this->query_count_; ++i) {
         const DataType *d = dist + i * count;
         const RowID *r = row_ids + i * count;
-        for (i16 j = 0; j < count; j++) {
+        for (u16 j = 0; j < count; j++) {
             single_result_handler_->add_result(d[j], r[j], i);
         }
     }
@@ -85,7 +85,7 @@ void MergeKnn<DataType, C>::End() {
     if (!this->begin_)
         return;
 
-    for (i32 i = 0; i < this->query_count_; ++i) {
+    for (u64 i = 0; i < this->query_count_; ++i) {
         single_result_handler_->end(i);
     }
 

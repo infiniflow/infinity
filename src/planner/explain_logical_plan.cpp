@@ -4,8 +4,7 @@
 
 module;
 
-#include <string>
-
+import std;
 import stl;
 import logical_node;
 import logical_node_type;
@@ -17,6 +16,8 @@ import logical_drop_schema;
 import logical_drop_table;
 import logical_drop_collection;
 import logical_drop_view;
+import logical_delete;
+import logical_update;
 import logical_flush;
 import logical_insert;
 import logical_project;
@@ -95,8 +96,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
             break;
         }
         case LogicalNodeType::kDelete:
+            Explain((LogicalDelete *)statement, result, intent_size);
             break;
         case LogicalNodeType::kUpdate:
+            Explain((LogicalUpdate *)statement, result, intent_size);
             break;
         case LogicalNodeType::kInsert: {
             Explain((LogicalInsert *)statement, result, intent_size);
@@ -609,6 +612,24 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
     if (insert_node->left_node().get() != nullptr) {
         intent_size += 2;
         ExplainLogicalPlan::Explain(insert_node->left_node().get(), result, intent_size);
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String header = delete_node->ToString(intent_size);
+    result->emplace_back(MakeShared<String>(header));
+    if (delete_node->left_node().get() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(delete_node->left_node().get(), result, intent_size);
+    }
+}
+
+void ExplainLogicalPlan::Explain(const LogicalUpdate *update_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String header = update_node->ToString(intent_size);
+    result->emplace_back(MakeShared<String>(header));
+    if (update_node->left_node().get() != nullptr) {
+        intent_size += 2;
+        ExplainLogicalPlan::Explain(update_node->left_node().get(), result, intent_size);
     }
 }
 

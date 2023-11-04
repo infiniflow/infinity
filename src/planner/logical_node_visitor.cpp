@@ -23,6 +23,7 @@ import logical_filter;
 import logical_project;
 import logical_sort;
 import logical_insert;
+import logical_update;
 
 import aggregate_expression;
 import between_expression;
@@ -104,6 +105,14 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
                 for (auto &expression : value) {
                     VisitExpression(expression);
                 }
+            break;
+        }
+        case LogicalNodeType::kUpdate: {
+            auto &node = (LogicalUpdate &)op;
+            for(auto &update_column_pair: node.update_columns_) {
+                SharedPtr<BaseExpression>& expression = update_column_pair.second;
+                VisitExpression(expression);
+            }
             break;
         }
         default: {

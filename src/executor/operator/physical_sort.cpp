@@ -4,8 +4,7 @@
 
 module;
 
-#include <algorithm>
-
+import std;
 import stl;
 import txn;
 import query_context;

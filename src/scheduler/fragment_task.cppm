@@ -2,14 +2,6 @@
 // Created by jinhai on 23-9-8.
 //
 
-//#pragma once
-//
-//#include "executor/operator_state.h"
-//
-//#include <atomic>
-
-//#include "storage/meta/entry/segment_entry.h"
-
 module;
 
 import stl;
@@ -75,6 +67,8 @@ public:
     void OnExecute(i64 worker_id);
 
     [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
+
+    [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
     [[nodiscard]] bool Ready() const;
 

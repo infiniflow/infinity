@@ -7,7 +7,7 @@ import stl;
 import base_entry;
 import parser;
 import table_collection_detail;
-//import table_collection_entry;
+// import table_collection_entry;
 import table_def;
 import index_def;
 import data_block;
@@ -22,7 +22,6 @@ import index_def_entry;
 import database_detail;
 
 export module txn;
-
 
 namespace infinity {
 
@@ -49,11 +48,7 @@ public:
 
     void BeginTxn();
 
-    void BeginTxn(TxnTimeStamp begin_ts);
-
     void CommitTxn();
-
-    void CommitTxn(TxnTimeStamp commit_ts);
 
     void CommitTxnBottom();
 
@@ -104,24 +99,6 @@ public:
 
     void GetMetaTableState(MetaTableState *meta_table_state, const TableCollectionEntry *table_collection_entry, const Vector<ColumnID> &columns);
 
-    SharedPtr<GetState> InitializeGet(GetParam);
-
-    void TableGet();
-
-    void IndexGet();
-
-    SharedPtr<ScanState> InitializeScan(const String &db_name, const String &table_name, const Vector<ColumnID> &column_ids);
-
-    void Scan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void TableScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void IndexScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    void AnnScan(ScanState *scan_state, SharedPtr<DataBlock> &output_block);
-
-    UniquePtr<String> CompleteScan(const String &db_name, const String &table_name);
-
     BufferManager *GetBufferMgr() const;
 
     inline u64 TxnID() const { return txn_id_; }
@@ -134,7 +111,8 @@ public:
 
     void SetTxnCommitted() { txn_context_.SetTxnCommitted(); }
 
-    void SetTxnCommitting(TxnTimeStamp commit_ts) { txn_context_.SetTxnCommitting(commit_ts); }
+    // Dangerous! only used during replaying wal.
+    void FakeCommit(TxnTimeStamp commit_ts);
 
     void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
 

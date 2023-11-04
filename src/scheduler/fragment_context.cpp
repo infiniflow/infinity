@@ -20,6 +20,7 @@ import knn_scan_data;
 import physical_table_scan;
 import physical_knn_scan;
 import physical_aggregate;
+import physical_explain;
 
 import global_block_id;
 import knn_expression;
@@ -230,6 +231,10 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
             MakeTaskStateTemplate<DeleteInputState, DeleteOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
         }
+        case PhysicalOperatorType::kUpdate: {
+            MakeTaskStateTemplate<UpdateInputState, UpdateOutputState>(input_state, output_state, physical_ops[operator_id]);
+            break;
+        }
         case PhysicalOperatorType::kInsert: {
             MakeTaskStateTemplate<InsertInputState, InsertOutputState>(input_state, output_state, physical_ops[operator_id]);
             break;
@@ -303,7 +308,6 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kFlush:
@@ -343,6 +347,36 @@ void SetTaskState(InputState &input_state, PhysicalOperator *physical_op, const 
         // TODO: add other operator like kMergeAgg
         default: {
             break;
+        }
+    }
+}
+
+void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr) {
+    if (fragment_ptr->GetContext() == nullptr) {
+        return;
+    }
+
+    auto tasks = &fragment_ptr->GetContext()->Tasks();
+    {
+        String fragment_header = "Fragment #";
+
+        fragment_header += ToStr(fragment_ptr->FragmentID());
+        fragment_header += " * ";
+        fragment_header += ToStr(tasks->size());
+        fragment_header += " Task";
+
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    for (const auto &task : *tasks) {
+        result.emplace_back(MakeShared<String>("-> Task #" + ToStr(task->TaskID())));
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : fragment_ptr->Children()) {
+            CollectTasks(result, child_fragment.get());
         }
     }
 }
@@ -451,11 +485,25 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
             FragmentContext::MakeFragmentContext(query_context, fragment_context.get(), child_fragment.get(), task_array);
         }
     }
+    switch (fragment_operators[0]->operator_type()) {
+        case PhysicalOperatorType::kExplain: {
+            Vector<SharedPtr<String>> result;
+            PhysicalExplain *explain_op = (PhysicalExplain *)fragment_operators[0];
 
-    for (i64 task_id = 0; task_id < tasks.size(); task_id++) {
-        FragmentTask *task = tasks[task_id].get();
-        auto &first_input_state = *task->operator_input_state_.back();
-        SetTaskState(first_input_state, fragment_operators.back(), fragment_ptr->Children());
+            if (explain_op->explain_type() == ExplainType::kPipeline) {
+                CollectTasks(result, fragment_ptr->Children()[0].get());
+                explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
+                task_array.clear();
+                break;
+            }
+        }
+        default: {
+            for (i64 task_id = 0; task_id < tasks.size(); task_id++) {
+                FragmentTask *task = tasks[task_id].get();
+                auto &first_input_state = *task->operator_input_state_.back();
+                SetTaskState(first_input_state, fragment_operators.back(), fragment_ptr->Children());
+            }
+        }
     }
 
     for (const auto &task : tasks) {
@@ -563,6 +611,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
+        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kDelete: {
             Error<SchedulerException>(
                 Format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())),
@@ -601,7 +650,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kFlush: {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())),
@@ -825,7 +873,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
         case PhysicalOperatorType::kDummyScan:
-        case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kJoinHash:
         case PhysicalOperatorType::kJoinNestedLoop:
         case PhysicalOperatorType::kJoinMerge:
@@ -839,6 +886,12 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                                       __LINE__);
         }
         case PhysicalOperatorType::kDelete:
+        case PhysicalOperatorType::kUpdate: {
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<SummarySinkState>();
+            }
+            break;
+        }
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -894,10 +947,14 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 }
 
 SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
-
     // Only one sink state
     if (tasks_.size() != 1) {
         Error<SchedulerException>("There should be one sink state in serial materialized fragment", __FILE_NAME__, __LINE__);
+    }
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {
@@ -924,24 +981,27 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         }
         case SinkStateType::kResult: {
             auto *result_sink_state = static_cast<ResultSinkState *>(tasks_[0]->sink_state_.get());
-            if (result_sink_state->error_message_ == nullptr) {
-                SharedPtr<DataTable> result_table = DataTable::MakeResultTable({result_sink_state->result_def_});
-                return result_table;
-            }
-            Error<ExecutorException>(*result_sink_state->error_message_, __FILE_NAME__, __LINE__);
+            SharedPtr<DataTable> result_table = DataTable::MakeResultTable({result_sink_state->result_def_});
+            return result_table;
         }
         case SinkStateType::kMessage: {
             auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
-            if (message_sink_state->error_message_ != nullptr) {
-                throw Exception(*message_sink_state->error_message_);
-            }
-
             if (message_sink_state->message_ == nullptr) {
                 Error<SchedulerException>("No response message", __FILE_NAME__, __LINE__);
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
             result_table->SetResultMsg(Move(message_sink_state->message_));
+            return result_table;
+        }
+        case SinkStateType::kSummary: {
+            u64 counter = 0, sum = 0;
+            for (SizeT i = 0; i < tasks_.size(); ++i) {
+                auto summaryState = dynamic_cast<SummarySinkState *>(tasks_[i]->sink_state_.get());
+                counter += summaryState->count_;
+                sum += summaryState->sum_;
+            }
+            SharedPtr<DataTable> result_table = DataTable::MakeSummaryResultTable(counter, sum);
             return result_table;
         }
         case SinkStateType::kQueue: {
@@ -952,14 +1012,24 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 }
 
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
-
     SharedPtr<DataTable> result_table = nullptr;
-
-    auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
-    if (first_materialize_sink_state->error_message_ != nullptr) {
-        Error<ExecutorException>(*first_materialize_sink_state->error_message_, __FILE_NAME__, __LINE__);
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
+    }
+    if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
+        u64 counter = 0, sum = 0;
+        for (SizeT i = 0; i < tasks_.size(); ++i) {
+            auto summaryState = dynamic_cast<SummarySinkState *>(tasks_[i]->sink_state_.get());
+            counter += summaryState->count_;
+            sum += summaryState->sum_;
+        }
+        result_table = DataTable::MakeSummaryResultTable(counter, sum);
+        return result_table;
     }
 
+    auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
     Vector<SharedPtr<ColumnDef>> column_defs;
     SizeT column_count = first_materialize_sink_state->column_names_->size();
     column_defs.reserve(column_count);
@@ -976,10 +1046,6 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
-        if (materialize_sink_state->error_message_ != nullptr) {
-            Error<ExecutorException>(*materialize_sink_state->error_message_, __FILE_NAME__, __LINE__);
-        }
-
         if (result_table == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
@@ -994,9 +1060,23 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 
 SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
+    for (const auto &task : tasks_) {
+        if (task->sink_state_->error_message_ != nullptr) {
+            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+        }
+    }
+    if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
+        u64 counter = 0, sum = 0;
+        for (SizeT i = 0; i < tasks_.size(); ++i) {
+            auto summaryState = dynamic_cast<SummarySinkState *>(tasks_[i]->sink_state_.get());
+            counter += summaryState->count_;
+            sum += summaryState->sum_;
+        }
+        result_table = DataTable::MakeSummaryResultTable(counter, sum);
+        return result_table;
+    }
 
     auto *first_materialize_sink_state = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
-
     Vector<SharedPtr<ColumnDef>> column_defs;
     SizeT column_count = first_materialize_sink_state->column_names_->size();
     column_defs.reserve(column_count);

@@ -37,14 +37,14 @@ export struct MetaBlockState {
 export struct MetaSegmentState {
     SegmentEntry *segment_entry_{};
 
-    HashMap<i16, MetaBlockState> block_map_{};
+    HashMap<u16, MetaBlockState> block_map_{};
 };
 
 export struct MetaTableState {
     Vector<MetaLocalDataState> local_blocks_{};
 
     // segment id->meta segment state
-    HashMap<i32, MetaSegmentState> segment_map_{};
+    HashMap<u32, MetaSegmentState> segment_map_{};
 };
 
 } // namespace infinity

@@ -69,16 +69,16 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entr
 }
 
 void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
-                              offset_t column_entry_offset,
+                              u16 column_entry_offset,
                               ColumnVector *input_column_vector,
-                              offset_t input_offset,
+                              u16 input_column_vector_offset,
                               SizeT append_rows) {
     if (column_entry->buffer_ == nullptr) {
         Error<StorageException>("Not initialize buffer handle", __FILE_NAME__, __LINE__);
     }
     SizeT data_type_size = input_column_vector->data_type_size_;
 
-    ptr_t src_ptr = input_column_vector->data() + input_offset * data_type_size;
+    ptr_t src_ptr = input_column_vector->data() + input_column_vector_offset * data_type_size;
     SizeT data_size = append_rows * data_type_size;
     SizeT dst_offset = column_entry_offset * data_type_size;
     BlockColumnEntry::AppendRaw(column_entry, dst_offset, src_ptr, data_size);

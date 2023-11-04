@@ -436,7 +436,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++parser_context->row_count_;
 }
 void PhysicalImport::SaveSegmentData(Txn *txn, SharedPtr<SegmentEntry> &segment_entry, const String &db_name, const String &table_name) {
-    Vector<i32> block_row_counts;
+    Vector<u16> block_row_counts;
 
     block_row_counts.reserve(segment_entry->block_entries_.size());
     for (auto &block_entry : segment_entry->block_entries_) {

@@ -68,6 +68,12 @@ export {
     using HashSet = std::unordered_set<S>;
 
     template <typename T>
+    using MaxHeap = std::priority_queue<T>;
+
+    template <typename T, typename C>
+    using Heap = std::priority_queue<T, std::vector<T>, C>;
+
+    template <typename T>
     using Optional = std::optional<T>;
 
     using StdOfStream = std::ofstream;
@@ -108,19 +114,19 @@ export {
         }
     }
 
-    template<typename T>
-    inline const T& Min(const T& a, const T& b) {
+    template <typename T>
+    inline const T &Min(const T &a, const T &b) {
         return std::min(a, b);
     }
 
-    template<typename T>
-    inline const T& Max(const T& a, const T& b) {
-    return std::max(a, b);
+    template <typename T>
+    inline const T &Max(const T &a, const T &b) {
+        return std::max(a, b);
     }
 
     // ToStr()
 
-    template<typename T>
+    template <typename T>
     inline String ToStr(T value) {
         return std::to_string(value);
     }
@@ -171,6 +177,7 @@ export {
 
     using Thread = std::thread;
 
+    using atomic_u32 = std::atomic_uint32_t;
     using au64 = std::atomic_uint64_t;
     using ai64 = std::atomic_int64_t;
     using aptr = std::atomic_uintptr_t;
@@ -240,17 +247,17 @@ export {
 
     // Exception
 
-    using StlException = std::exception;
+    using StdException = std::exception;
 
     // Move
     template <typename T>
-    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&Move(T&& value) noexcept {
+    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&Move(T && value) noexcept {
         return static_cast<typename std::remove_reference<T>::type &&>(value);
     }
 
     // Forward
     template <typename T>
-    [[nodiscard]] constexpr T &&Forward(typename std::remove_reference<T>::type& value) noexcept {
+    [[nodiscard]] constexpr T &&Forward(typename std::remove_reference<T>::type & value) noexcept {
         return static_cast<T &&>(value);
     }
 
@@ -333,9 +340,7 @@ export {
 
     using Mutex = std::mutex;
 
-    float HugeValf() {
-        return HUGE_VALF;
-    }
+    float HugeValf() { return HUGE_VALF; }
 
     template <typename T, typename Allocator = std::allocator<T>>
     using ForwardList = std::forward_list<T, Allocator>;

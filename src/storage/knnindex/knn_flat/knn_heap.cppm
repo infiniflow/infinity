@@ -2,11 +2,6 @@
 // Created by jinhai on 23-9-25.
 //
 
-//#pragma once
-//
-//#include "faiss/utils/ordered_key_value.h"
-//#include <cassert>
-
 module;
 
 #include <cassert>

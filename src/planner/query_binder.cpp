@@ -7,6 +7,7 @@ module;
 #include <string>
 
 import stl;
+import std;
 import infinity_assert;
 import infinity_exception;
 import parser;
@@ -17,6 +18,8 @@ import query_context;
 import binding;
 import table_collection_entry;
 import bound_select_statement;
+import bound_delete_statement;
+import bound_update_statement;
 import table_ref;
 import bind_alias_proxy;
 import base_expression;
@@ -39,6 +42,7 @@ import base_entry;
 import view_entry;
 import table_collection_type;
 import block_index;
+import cast_expression;
 
 module query_binder;
 namespace infinity {
@@ -269,6 +273,7 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     }
 
     Error<PlannerException>("Table or View: " + from_table->table_name_ + " is not found in catalog.", __FILE_NAME__, __LINE__);
+    return nullptr;
 }
 
 SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *query_context, const SubqueryReference *subquery_ref) {
@@ -381,14 +386,8 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     SharedPtr<BlockIndex> block_index = TableCollectionEntry::GetBlockIndex(table_collection_entry, txn_id, begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_scan_function,
-                                              table_collection_entry,
-                                              columns,
-                                              Move(block_index),
-                                              alias,
-                                              table_index,
-                                              names_ptr,
-                                              types_ptr);
+    auto table_ref =
+        MakeShared<BaseTableRef>(table_scan_function, table_collection_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
     this->bind_context_ptr_->AddTableBinding(alias, table_index, table_collection_entry, types_ptr, names_ptr, block_index);
@@ -902,6 +901,68 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
             Error<PlannerException>("Invalid KNN distance type", __FILE_NAME__, __LINE__);
         }
     }
+}
+
+SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
+    // refers to QueryBinder::BindSelect
+    SharedPtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
+    TableReference from_table;
+    from_table.db_name_ = statement.schema_name_;
+    from_table.table_name_ = statement.table_name_;
+    SharedPtr<TableRef> base_table_ref = QueryBinder::BuildBaseTable(this->query_context_ptr_, &from_table);
+    bound_delete_statement->table_ref_ptr_ = base_table_ref;
+    Assert<PlannerException>(base_table_ref.get() != nullptr,
+                             Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_),
+                             __FILE_NAME__,
+                             __LINE__);
+
+    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
+    SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+    bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+    return bound_delete_statement;
+}
+
+SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
+    // refers to QueryBinder::BindSelect
+    SharedPtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
+    TableReference from_table;
+    from_table.db_name_ = statement.schema_name_;
+    from_table.table_name_ = statement.table_name_;
+    SharedPtr<TableRef> base_table_ref = QueryBinder::BuildBaseTable(this->query_context_ptr_, &from_table);
+    bound_update_statement->table_ref_ptr_ = base_table_ref;
+    Assert<PlannerException>(base_table_ref.get() != nullptr,
+                             Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_),
+                             __FILE_NAME__,
+                             __LINE__);
+
+    SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
+    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
+    if (statement.where_expr_ != nullptr) {
+        SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+    }
+    Assert<PlannerException>(statement.update_expr_array_ != nullptr, Format("Update expr array is empty"), __FILE_NAME__, __LINE__);
+
+    const Vector<String> &column_names = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
+    const Vector<SharedPtr<DataType>> &column_types = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
+    //    const Vector<String> &column_names = *static_cast<BaseTableRef *>(base_table_ref.get())->column_names_;
+    auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
+    for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
+        std::string &column_name = upd_expr->column_name;
+        ParsedExpr *expr = upd_expr->value;
+        auto it = std::find(column_names.begin(), column_names.end(), column_name);
+        Assert<PlannerException>(it != column_names.end(),
+                                 Format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_),
+                                 __FILE_NAME__,
+                                 __LINE__);
+        SizeT column_id = std::distance(column_names.begin(), it);
+        SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);
+        update_expr = CastExpression::AddCastToType(update_expr, *column_types[column_id]);
+        bound_update_statement->update_columns_.emplace_back(column_id, update_expr);
+    }
+    std::sort(bound_update_statement->update_columns_.begin(), bound_update_statement->update_columns_.end());
+    return bound_update_statement;
 }
 
 } // namespace infinity

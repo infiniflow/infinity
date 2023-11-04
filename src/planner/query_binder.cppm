@@ -18,6 +18,8 @@ export module query_binder;
 
 namespace infinity {
 
+class BoundDeleteStatement;
+class BoundUpdateStatement;
 
 export class QueryBinder : public EnableSharedFromThis<QueryBinder> {
 public:
@@ -25,6 +27,10 @@ public:
         : query_context_ptr_(Move(query_context)), bind_context_ptr_(Move(bind_context_ptr)) {}
 
     SharedPtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
+
+    SharedPtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
+
+    SharedPtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
     QueryContext *query_context_ptr_;
 

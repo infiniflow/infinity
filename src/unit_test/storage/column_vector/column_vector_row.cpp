@@ -51,14 +51,13 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -79,22 +78,20 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
     }
     EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     //    return ;
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -137,13 +134,12 @@ TEST_F(ColumnVectorRowTest, flat_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         column_vector.AppendByPtr((ptr_t)(&row_id));
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -152,9 +148,8 @@ TEST_F(ColumnVectorRowTest, flat_row) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.CopyRow(column_vector, 0, i);
         Value vx = column_constant.GetValue(0);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         column_constant.Reset();
     }
 }
@@ -192,22 +187,20 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
 
     for (i64 i = 0; i < 1; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
     for (i64 i = 0; i < 1; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
     }
 
     column_vector.Reset();
@@ -242,14 +235,13 @@ TEST_F(ColumnVectorRowTest, contant_row) {
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < 1; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
@@ -263,7 +255,7 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
     }
@@ -271,9 +263,8 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
     }
 
     Selection input_select;
@@ -289,9 +280,8 @@ TEST_F(ColumnVectorRowTest, row_column_vector_select) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(2 * i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(2 * i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(2 * i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(2 * i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(2 * i));
     }
 }
 
@@ -304,7 +294,7 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        RowT row_id{static_cast<i32>(i), static_cast<i16>(i), static_cast<u32>(i)};
+        RowT row_id{static_cast<u32>(i), static_cast<u32>(i)};
         Value v = Value::MakeRow(row_id);
         column_vector.AppendValue(v);
     }
@@ -312,9 +302,8 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
     }
 
     ColumnVector target_column_vector(data_type);
@@ -329,8 +318,7 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
         i64 src_idx = start_idx + i;
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
-        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.row.block_id_, static_cast<i16>(i));
-        EXPECT_EQ(vx.value_.row.block_offset_, static_cast<i16>(i));
+        EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));
+        EXPECT_EQ(vx.value_.row.segment_offset_, static_cast<u32>(i));
     }
 }

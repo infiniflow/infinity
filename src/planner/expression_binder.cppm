@@ -16,10 +16,6 @@ export module expression_binder;
 
 namespace infinity {
 
-//class BaseExpression;
-//class SubqueryExpression;
-//class QueryContext;
-
 struct ExprBindResult {
     SharedPtr<BaseExpression> bound_expression_ptr_{};
     String err_msg_{};

@@ -4,9 +4,9 @@
 
 module;
 
-#include <vector>
 #include <memory>
 
+import std;
 import stl;
 import table_function;
 import data_block;
@@ -40,8 +40,8 @@ void TableScanFunc(QueryContext *query_context, TableFunctionData *table_functio
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output.capacity();
     while (write_capacity > 0 && block_ids_idx < block_ids->size()) {
-        i32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-        i16 block_id = block_ids->at(block_ids_idx).block_id_;
+        u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+        u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
 

@@ -2,12 +2,6 @@
 // Created by jinhai on 23-4-27.
 //
 
-//#pragma once
-//
-//#include "src/scheduler/fragment_context.h"
-//#include "executor/operator/physical_sink.h"
-//#include "executor/operator/physical_source.h"
-
 module;
 
 import stl;
@@ -39,12 +33,12 @@ public:
 
     inline Vector<PhysicalOperator *> &GetOperators() { return operators_; }
 
-    void AddSourceNode(QueryContext *query_context,
+    void SetSourceNode(QueryContext *query_context,
                        SourceType source_type,
                        const SharedPtr<Vector<String>> &names,
                        const SharedPtr<Vector<SharedPtr<DataType>>> &types);
 
-    void AddSinkNode(QueryContext *query_context,
+    void SetSinkNode(QueryContext *query_context,
                      SinkType sink_type,
                      const SharedPtr<Vector<String>> &names,
                      const SharedPtr<Vector<SharedPtr<DataType>>> &types);

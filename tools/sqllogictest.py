@@ -1,8 +1,9 @@
 import argparse
 import os
+from shutil import copyfile
+
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
-from shutil import copyfile
 
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):

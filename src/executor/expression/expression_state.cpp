@@ -2,18 +2,6 @@
 // Created by JinHai on 2022/10/26.
 //
 
-// #include "expression_state.h"
-// #include "common/utility/infinity_assert.h"
-// #include "expression/aggregate_expression.h"
-// #include "expression/base_expression.h"
-// #include "expression/case_expression.h"
-// #include "expression/cast_expression.h"
-// #include "expression/column_expression.h"
-// #include "expression/function_expression.h"
-// #include "expression/in_expression.h"
-// #include "expression/reference_expression.h"
-// #include "expression/value_expression.h"
-
 module;
 
 #include <memory>
@@ -59,6 +47,8 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             return CreateState(std::static_pointer_cast<ValueExpression>(expression));
         case ExpressionType::kReference:
             return CreateState(std::static_pointer_cast<ReferenceExpression>(expression));
+        case ExpressionType::kIn:
+            return CreateState(std::static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
             Error<ExecutorException>("Unexpected expression type: KNN", __FILE_NAME__, __LINE__);
         }
@@ -120,11 +110,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ReferenceExpression> &column_expr) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
-    SharedPtr<DataType> column_data_type = MakeShared<DataType>(column_expr->Type());
-    result->column_vector_ = MakeShared<ColumnVector>(column_data_type);
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
-
-    //    result->output_data_block_.Init({column});
     return result;
 }
 

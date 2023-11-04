@@ -17,14 +17,6 @@ namespace infinity {
 
 enum class ConnectionStatus : char { kIdle, kRunning, kSuspend, kTerminated };
 
-//class QueryContext;
-//
-//class QueryResult;
-//
-//class Session;
-//
-//class Table;
-
 export class Connection {
 public:
     explicit Connection(AsioIOService &io_service);
