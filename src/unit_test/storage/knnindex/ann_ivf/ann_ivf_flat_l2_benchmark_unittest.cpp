@@ -55,6 +55,8 @@ int n_probes = 1;
 size_t k;
 float *D = nullptr;
 
+float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out);
+/*
 float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out) {
     FILE *f = fopen(fname, "r");
     if (!f) {
@@ -85,15 +87,22 @@ float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out) {
     fclose(f);
     return x;
 }
+*/
 
+int *ivecs_read(const char *fname, size_t *d_out, size_t *n_out);
+/*
 // not very clean, but works as long as sizeof(int) == sizeof(float)
 int *ivecs_read(const char *fname, size_t *d_out, size_t *n_out) { return (int *)fvecs_read(fname, d_out, n_out); }
+*/
 
+double elapsed();
+/*
 double elapsed() {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
+*/
 
 void benchmark_faiss_ivfflatl2() {
     // TODO: limit omp to 1.
@@ -430,7 +439,7 @@ void benchmark_annivfflatl2() {
 
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
-        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0, 0);
+        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
 
 #ifdef centroids
         // output centroids
@@ -529,7 +538,7 @@ void benchmark_annivfflatl2() {
         for (int i = 0; i < 3; i++) {
             std::cout << "line " << i << ":\t";
             for (int j = 0; j < k; j++) {
-                std::cout << I[i * k + j].block_offset_ << " ";
+                std::cout << I[i * k + j].segment_offset_ << " ";
             }
             std::cout << std::endl;
         }
@@ -553,7 +562,7 @@ void benchmark_annivfflatl2() {
                 }
             }
             for (int j = 0; j < k; j++) {
-                int32_t result_id = I[i * k + j].block_offset_;
+                int32_t result_id = I[i * k + j].segment_offset_;
                 if (j < 1 && gt1.contains(result_id)) {
                     ++n_1;
                 }

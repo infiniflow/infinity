@@ -62,7 +62,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
 
     AnnIVFFlatL2<f32> ann_distance(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
 
-    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 2, 0, 0);
+    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 2, 0);
 
     ann_distance.Begin();
     ann_distance.Search(ann_ivf_l2_index.get(), 1);
@@ -72,23 +72,17 @@ TEST_F(AnnIVFFlatL2Test, test1) {
     RowID *id_array = ann_distance.GetIDByIdx(0);
     EXPECT_FLOAT_EQ(distance_array[0], 0);
     EXPECT_FLOAT_EQ(id_array[0].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[0].block_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[0].block_offset_, 0);
+    EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 0);
 
     EXPECT_FLOAT_EQ(distance_array[1], 0.02);
     EXPECT_FLOAT_EQ(id_array[1].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[1].block_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[1].block_offset_, 1);
+    EXPECT_FLOAT_EQ(id_array[1].segment_offset_, 1);
 
-    /*
     EXPECT_FLOAT_EQ(distance_array[2], 0.08);
     EXPECT_FLOAT_EQ(id_array[2].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[2].block_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[2].block_offset_, 2);
+    EXPECT_FLOAT_EQ(id_array[2].segment_offset_, 2);
 
     EXPECT_FLOAT_EQ(distance_array[3], 0.2);
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[3].block_id_, 0);
-    EXPECT_FLOAT_EQ(id_array[3].block_offset_, 3);
-     */
+    EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
 }

@@ -423,7 +423,6 @@ void add_data_to_partition_l2(i32 dimension,
                               const ElemType *vectors_ptr,
                               i32 partition_num,
                               i32 segment_id,
-                              i16 block_id,
                               IVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data) {
     // Check whether dimension, partition_num matches
     if (dimension != index_data->dimension_) {
@@ -480,7 +479,7 @@ void add_data_to_partition_l2(i32 dimension,
         auto vector_pos_i = vectors_ptr + i * dimension;
         auto partition_of_i = assigned_partition_id[i];
         vectors[partition_of_i].insert(vectors[partition_of_i].end(), vector_pos_i, vector_pos_i + dimension);
-        ids[partition_of_i].emplace_back(segment_id, block_id, i);
+        ids[partition_of_i].emplace_back(segment_id, i);
     }
     std::cout << "\n"
               << "##################################################\n"

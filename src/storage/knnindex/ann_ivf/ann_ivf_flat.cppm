@@ -37,24 +37,18 @@ public:
     }
 
     static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(i32 dimension, SizeT vector_count, const DistType *vectors_ptr, i32 partition_num, i32 segment_id, i16 block_id) {
+    CreateIndex(i32 dimension, SizeT vector_count, const DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, partition_num, index_data->centroids_.data());
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
         return index_data;
     }
 
-    static SharedPtr<IVFFlatIndexData<DistType>> CreateIndex(i32 dimension,
-                                                             SizeT train_count,
-                                                             DistType *train_ptr,
-                                                             SizeT vector_count,
-                                                             DistType *vectors_ptr,
-                                                             i32 partition_num,
-                                                             i32 segment_id,
-                                                             i16 block_id) {
+    static SharedPtr<IVFFlatIndexData<DistType>>
+    CreateIndex(i32 dimension, SizeT train_count, DistType *train_ptr, SizeT vector_count, DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, partition_num, index_data->centroids_.data());
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, block_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
         return index_data;
     }
 
@@ -70,7 +64,7 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *base, i16 base_count, i32 segment_id, i16 block_id) final {}
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {}
 
     void Search(const IVFFlatIndexData<DistType> *base_ivf, i32 n_probes) {
         if (base_ivf->partition_num_ < n_probes) {
