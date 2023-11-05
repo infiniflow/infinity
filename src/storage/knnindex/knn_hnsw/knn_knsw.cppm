@@ -1,5 +1,7 @@
 module;
 
+#include <xmmintrin.h>
+
 import std;
 import stl;
 import parser;
@@ -7,6 +9,8 @@ import knn_distance;
 import dist_func;
 
 export module knn_knsw;
+
+#define USE_SSE
 
 namespace infinity {
 
@@ -33,12 +37,12 @@ class KnnHnsw {
 
 private:
     const SizeT max_vertex_;
+    const SizeT dim_;
     const SizeT M_;
     const SizeT Mmax_;
     const SizeT Mmax0_;
     SizeT ef_;
     const SizeT ef_construction_;
-    const SizeT dim_;
     const DistFunc<DataType> dist_func_{};
 
     SizeT cur_vertex_n_{};
@@ -50,18 +54,18 @@ private:
     std::default_random_engine level_rng_{};
 
     // The offset of data structure. Init not in initialize list. const
-    SizeT data_offset_{};
-    SizeT neighbors0_offset_{};
-    SizeT neighbor_n0_offset_{};
-    SizeT layers_offset_{};
-    SizeT layer_n_offset_{};
-    SizeT label_offset_{};
-    SizeT level0_size_{};
+    const SizeT data_offset_;
+    const SizeT neighbor_n0_offset_;
+    const SizeT neighbors0_offset_;
+    const SizeT layer_n_offset_;
+    const SizeT layers_offset_;
+    const SizeT label_offset_;
+    const SizeT level0_size_;
 
-    SizeT neighbors1_offset_{};
-    SizeT neighbor_n1_offset_{};
-    SizeT layer_size_{};
-    char *graph_;
+    const SizeT neighbor_n1_offset_;
+    const SizeT neighbors1_offset_;
+    const SizeT layer_size_;
+    char *graph_{};
 
     Vector<bool> visited_{};
 
@@ -114,23 +118,24 @@ public:
     template <typename SpaceType>
         requires SpaceConcept<DataType, SpaceType>
     KnnHnsw(SizeT max_vertex, SpaceType space, SizeT M = 16, SizeT ef_construction = 200, SizeT random_seed = 100)
-        : max_vertex_(max_vertex), M_(M), Mmax_(M_), Mmax0_(2 * Mmax_), ef_(10), ef_construction_(Max(M_, ef_construction)), dim_(space.Dimension()),
-          dist_func_(space.template DistFuncPtr<DataType>()), cur_vertex_n_(0), max_layer_(-1), enterpoint_(-1), mult_(1 / std::log(1.0 * M_)),
+        : max_vertex_(max_vertex), dim_(space.Dimension()),                                              //
+          M_(M), Mmax_(M_), Mmax0_(2 * Mmax_),                                                           //
+          ef_(10), ef_construction_(Max(M_, ef_construction)),                                           //
+          dist_func_(space.template DistFuncPtr<DataType>()),                                            //
+          cur_vertex_n_(0), max_layer_(-1), enterpoint_(-1),                                             //
+          mult_(1 / std::log(1.0 * M_)),                                                                 //
+          data_offset_(0),                                                                               //
+          neighbor_n0_offset_(AlignTo(sizeof(DataType) * dim_, sizeof(VertexListSize))),                 //
+          neighbors0_offset_(AlignTo(neighbor_n0_offset_ + sizeof(VertexListSize), sizeof(VertexType))), //
+          layer_n_offset_(AlignTo(neighbors0_offset_ + sizeof(VertexType) * Mmax0_, sizeof(LayerSize))), //
+          layers_offset_(AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(void *))),                  //
+          label_offset_(AlignTo(layers_offset_ + sizeof(void *), sizeof(LabelType))),                    //
+          level0_size_(AlignTo(label_offset_ + sizeof(LabelType), 8)),                                   //
+          neighbor_n1_offset_(0),                                                                        //
+          neighbors1_offset_(AlignTo(sizeof(VertexListSize), sizeof(VertexType))),                       //
+          layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax_, sizeof(VertexListSize))), //
           visited_(max_vertex_, false) {
         level_rng_.seed(random_seed);
-
-        data_offset_ = 0;
-        neighbors0_offset_ = AlignTo(sizeof(DataType) * dim_, sizeof(VertexType));
-        neighbor_n0_offset_ = AlignTo(neighbors0_offset_ + sizeof(VertexType) * Mmax0_, sizeof(VertexListSize));
-        layers_offset_ = AlignTo(neighbor_n0_offset_ + sizeof(VertexListSize), sizeof(void *));
-        layer_n_offset_ = AlignTo(layers_offset_ + sizeof(void *), sizeof(LayerSize));
-        label_offset_ = AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(LabelType));
-        level0_size_ = AlignTo(label_offset_ + sizeof(LabelType), 8);
-
-        neighbors1_offset_ = 0;
-        neighbor_n1_offset_ = AlignTo(sizeof(VertexType) * Mmax_, sizeof(VertexListSize));
-        layer_size_ = AlignTo(neighbor_n1_offset_ + sizeof(VertexListSize), 4);
-
         graph_ = new char[max_vertex_ * level0_size_];
     }
 
@@ -184,8 +189,15 @@ private:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = GetNeighbors(c_idx, layer_idx);
+#ifdef USE_SSE
+            _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
+            _mm_prefetch(GetData(neighbors_p[1]), _MM_HINT_T0);
+#endif
             for (int i = 0; i < neighbor_size; ++i) {
                 VertexType n_idx = neighbors_p[i];
+#ifdef USE_SSE
+                _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+#endif
                 if (visited_[n_idx]) {
                     continue;
                 }
@@ -193,6 +205,9 @@ private:
                 dist = dist_func_(query, GetData(n_idx), dim_);
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
+#ifdef USE_SSE
+                    _mm_prefetch(GetData(result.top().second), _MM_HINT_T0);
+#endif
                     result.emplace(dist, n_idx);
                     if (result.size() > candidate_n) {
                         result.pop();
