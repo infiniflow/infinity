@@ -227,7 +227,8 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         //        }
         {
             std::vector<int> perm(training_data_num);
-            rand_perm(perm.data(), training_data_num, 1234 + 1 + 0 * 15486557L);
+            std::iota(perm.begin(), perm.end(), 0);
+            // rand_perm(perm.data(), training_data_num, 1234 + 1 + 0 * 15486557L);
             for (int i = 0; i < partition_num; i++) {
                 memcpy(&centroids[i * dimension], training_data + perm[i] * dimension, sizeof(CentroidsType) * dimension);
             }
@@ -334,7 +335,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                       << "partition_element_count:\n";
             for (i32 i = 0; i < partition_num; ++i) {
                 std::cout << partition_element_count[i] << " ";
-                if (i % 10 == 9)
+                if (i % 70 == 69)
                     std::cout << std::endl;
             }
             // output min, max of partition_element_count
@@ -348,14 +349,14 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                     max = partition_element_count[i];
                 }
             }
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "max of partition_element_count: " << max << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                       << "min of partition_element_count: " << min << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "max of partition_element_count: " << max << std::endl;
             std::cout << std::endl;
 
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "imbalance factor: " << std::fixed << std::setprecision(3)
+                      << "\nimbalance factor: " << std::fixed << std::setprecision(10)
                       << imbalance_factor(training_data_num, partition_num, partition_element_count.data()) << std::endl;
         }
 
@@ -401,7 +402,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                                           iter_split};
         std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                   << "Iteration " << iter << " (" << std::fixed << std::setprecision(2) << stats.time << " s, search " << stats.time_search << " s): "
-                  << "objective=" << stats.obj << " imbalance=" << std::fixed << std::setprecision(3) << stats.imbalance_factor
+                  << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(10) << stats.imbalance_factor
                   << " nsplit=" << stats.nsplit << std::endl;
         // TODO:stop?
         previous_total_distance = this_iter_distance;
