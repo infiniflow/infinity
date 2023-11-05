@@ -28,8 +28,8 @@ int main() {
         assert(dimension == 128 || !"embedding dimension isn't 128");
         assert(embedding_count == 1000000 || !"embedding size isn't 1000000");
 
-        DistFuncL2 space(dimension);
-        knn_hnsw = std::make_unique<KnnHnsw<float>>(embedding_count, space, M, ef_construction);
+        DistFuncL2<float> space(dimension);
+        knn_hnsw = std::make_unique<KnnHnsw<float>>(embedding_count, dimension, space, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin data cost: " << get_current_rss() / 1000000 << "MB" << std::endl;

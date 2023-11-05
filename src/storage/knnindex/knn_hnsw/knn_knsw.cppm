@@ -1,6 +1,6 @@
 module;
 
-#include <xmmintrin.h>
+#include "../header.h"
 
 import std;
 import stl;
@@ -9,8 +9,6 @@ import knn_distance;
 import dist_func;
 
 export module knn_knsw;
-
-#define USE_SSE
 
 namespace infinity {
 
@@ -117,11 +115,11 @@ private:
 public:
     template <typename SpaceType>
         requires SpaceConcept<DataType, SpaceType>
-    KnnHnsw(SizeT max_vertex, SpaceType space, SizeT M = 16, SizeT ef_construction = 200, SizeT random_seed = 100)
-        : max_vertex_(max_vertex), dim_(space.Dimension()),                                              //
+    KnnHnsw(SizeT max_vertex, SizeT dim, SpaceType space, SizeT M = 16, SizeT ef_construction = 200, SizeT random_seed = 100)
+        : max_vertex_(max_vertex), dim_(dim),                                                            //
           M_(M), Mmax_(M_), Mmax0_(2 * Mmax_),                                                           //
           ef_(10), ef_construction_(Max(M_, ef_construction)),                                           //
-          dist_func_(space.template DistFuncPtr<DataType>()),                                            //
+          dist_func_(space.DistFuncPtr()),                                                               //
           cur_vertex_n_(0), max_layer_(-1), enterpoint_(-1),                                             //
           mult_(1 / std::log(1.0 * M_)),                                                                 //
           data_offset_(0),                                                                               //
