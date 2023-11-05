@@ -143,13 +143,20 @@ Error(const String &message, const char *file_name = std::source_location::curre
     return Assert<ExceptionType>(false, message, file_name, line);
 }
 
+export void Assert(bool is_true,
+                   const String &message,
+                   const char *file_name = std::source_location::current().file_name(),
+                   u32 line = std::source_location::current().line());
+
+export void
+Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line());
+
 #elif
 
 export template <typename ExceptionType>
 inline void Assert(bool is_true, const String &message) {
     if (!(is_true)) {
-        String err_msg = message;
-        throw ExceptionType(err_msg);
+        throw ExceptionType(message);
     }
 }
 

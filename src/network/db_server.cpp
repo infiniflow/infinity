@@ -34,7 +34,9 @@ void DBServer::Run() {
     BoostErrorCode error;
     AsioIpAddr address = asio_make_address(listen_address_ref, error);
     if (error) {
-        Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref));
+        Printf("{} isn't a valid IPv4 address.\n", listen_address_ref);
+        infinity::InfinityContext::instance().UnInit();
+        return ;
     }
 
     acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));

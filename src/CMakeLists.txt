@@ -136,11 +136,11 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
-file(GLOB_RECURSE
-        std_cppm
-        CONFIGURE_DEPENDS
-        third_party_modules/std_modules/*.cppm
-)
+#file(GLOB_RECURSE
+#        std_cppm
+#        CONFIGURE_DEPENDS
+#        third_party_modules/std_modules/*.cppm
+#)
 
 add_library(infinity_core
 #        ${main_cpp}
@@ -169,7 +169,7 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
-        ${std_cppm}
+#        ${std_cppm}
 )
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

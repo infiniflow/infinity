@@ -30,7 +30,6 @@ Connection::Connection(AsioIOService &io_service)
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
-    // FIXME
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     HandleConnection();
@@ -106,7 +105,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            Error<NetworkException>("Unknown command type");
+            Error<NetworkException>("Unknown PG command type");
         }
     }
 }
