@@ -20,7 +20,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
     using namespace infinity;
 
     i64 dimension = 4;
-    i64 top_k = 2;
+    i64 top_k = 4;
     i64 base_embedding_count = 4;
     UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
     UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);
@@ -62,7 +62,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
 
     AnnIVFFlatL2<f32> ann_distance(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
 
-    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 2, 0);
+    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 1, 0);
 
     ann_distance.Begin();
     ann_distance.Search(ann_ivf_l2_index.get(), 1);
