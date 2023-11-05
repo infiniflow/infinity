@@ -1,6 +1,6 @@
 
 module;
-
+#include <iostream>
 import stl;
 import knn_heap;
 import knn_result_handler;
@@ -78,6 +78,8 @@ public:
         //     return;
         // }
         // this->total_base_count_ += base_ivf->data_num_;
+        // TODO:remove this counter
+        int counter_1 = 0, counter_10 = 0, counter_100 = 0;
         using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, i32>>;
         using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
         for (i64 i = 0; i < this->query_count_; i++) {
@@ -96,12 +98,34 @@ public:
             for (i32 k = 0; k < n_probes; k++) {
                 const i32 selected_centroid = centroid_ids[k];
                 const i32 contain_nums = base_ivf->vectors_[selected_centroid].size() / this->dimension_;
+                if (contain_nums < 100) {
+                    // output i, k, selected_centroid, contain_nums, with description
+                    std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid << ", contain_nums: " << contain_nums
+                              << std::endl;
+                    if (contain_nums < 100) {
+                        counter_100++;
+                        if (contain_nums < 10) {
+                            counter_10++;
+                            if (contain_nums < 1) {
+                                counter_1++;
+                            }
+                        }
+                    }
+                }
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                     single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
                 }
             }
+        }
+        {
+            // output counter_1, counter_10, counter_100, with description
+            std::cout << "\ncounter_1: " << counter_1 << ", counter_10: " << counter_10 << ", counter_100: " << counter_100 << std::endl;
+            // output counter_1, counter_10, counter_100, divided by query_count_ (float result), with description
+            std::cout << "\nfloat percentage:\ncounter_1: " << (float)counter_1 / this->query_count_
+                      << ", counter_10: " << (float)counter_10 / this->query_count_ << ", counter_100: " << (float)counter_100 / this->query_count_
+                      << std::endl;
         }
     }
 
