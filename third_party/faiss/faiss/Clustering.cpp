@@ -24,6 +24,8 @@
 #include <faiss/utils/distances.h>
 #include <faiss/utils/random.h>
 #include <faiss/utils/utils.h>
+#include <iomanip>
+#include <iostream>
 
 namespace faiss {
 
@@ -103,6 +105,14 @@ idx_t subsample_training_set(
     }
     std::vector<int> perm(nx);
     rand_perm(perm.data(), nx, clus.seed);
+    {
+        // output first 20 elements of perm
+        std::cout << "\nperm:\n";
+        for (int i = 0; i < 20; ++i) {
+            std::cout << perm[i] << " ";
+        }
+        std::cout << std::endl;
+    }
     nx = clus.k * clus.max_points_per_centroid;
     uint8_t* x_new = new uint8_t[nx * line_size];
     *x_out = x_new;
@@ -199,6 +209,76 @@ void compute_centroids(
         }
         float norm = 1 / hassign[ci];
         float* c = centroids + ci * d;
+        for (size_t j = 0; j < d; j++) {
+            c[j] *= norm;
+        }
+    }
+}
+
+void compute_centroids_int(size_t d,
+                           size_t k,
+                           size_t n,
+                           size_t k_frozen,
+                           const uint8_t *x,
+                           const Index *codec,
+                           const int64_t *assign,
+                           const float *weights,
+                           int *hassign,
+                           float *centroids) {
+    k -= k_frozen;
+    centroids += k_frozen * d;
+
+    memset(centroids, 0, sizeof(*centroids) * d * k);
+
+    size_t line_size = codec ? codec->sa_code_size() : d * sizeof(float);
+
+#pragma omp parallel
+    {
+        int nt = omp_get_num_threads();
+        int rank = omp_get_thread_num();
+
+        // this thread is taking care of centroids c0:c1
+        size_t c0 = (k * rank) / nt;
+        size_t c1 = (k * (rank + 1)) / nt;
+        std::vector<float> decode_buffer(d);
+
+        for (size_t i = 0; i < n; i++) {
+            int64_t ci = assign[i];
+            assert(ci >= 0 && ci < k + k_frozen);
+            ci -= k_frozen;
+            if (ci >= c0 && ci < c1) {
+                float *c = centroids + ci * d;
+                const float *xi;
+                if (!codec) {
+                    xi = reinterpret_cast<const float *>(x + i * line_size);
+                } else {
+                    float *xif = decode_buffer.data();
+                    codec->sa_decode(1, x + i * line_size, xif);
+                    xi = xif;
+                }
+                if (weights) {
+                    float w = weights[i];
+                    hassign[ci] += w;
+                    for (size_t j = 0; j < d; j++) {
+                        c[j] += xi[j] * w;
+                    }
+                } else {
+                    hassign[ci] += 1;
+                    for (size_t j = 0; j < d; j++) {
+                        c[j] += xi[j];
+                    }
+                }
+            }
+        }
+    }
+
+#pragma omp parallel for
+    for (idx_t ci = 0; ci < k; ci++) {
+        if (hassign[ci] == 0) {
+            continue;
+        }
+        float norm = 1 / (float)hassign[ci];
+        float *c = centroids + ci * d;
         for (size_t j = 0; j < d; j++) {
             c[j] *= norm;
         }
@@ -408,8 +488,9 @@ void Clustering::train_encoded(
         // initialize (remaining) centroids with random points from the dataset
         centroids.resize(d * k);
         std::vector<int> perm(nx);
+        std::iota(perm.begin(), perm.end(), 0);
 
-        rand_perm(perm.data(), nx, seed + 1 + redo * 15486557L);
+        // rand_perm(perm.data(), nx, seed + 1 + redo * 15486557L);
 
         if (!codec) {
             for (int i = n_input_centroids; i < k; i++) {
@@ -477,23 +558,27 @@ void Clustering::train_encoded(
             }
 
             // update the centroids
-            std::vector<float> hassign(k);
+            // std::vector<float> hassign(k);
+            std::vector<int> inthassign(k);
 
             size_t k_frozen = frozen_centroids ? n_input_centroids : 0;
-            compute_centroids(
-                    d,
-                    k,
-                    nx,
-                    k_frozen,
-                    x,
-                    codec,
-                    assign.get(),
-                    weights,
-                    hassign.data(),
-                    centroids.data());
-
-            int nsplit = split_clusters(
-                    d, k, nx, k_frozen, hassign.data(), centroids.data());
+            /*
+                        compute_centroids(
+                                d,
+                                k,
+                                nx,
+                                k_frozen,
+                                x,
+                                codec,
+                                assign.get(),
+                                weights,
+                                hassign.data(),
+                                centroids.data());
+            */
+            compute_centroids_int(d, k, nx, k_frozen, x, codec, assign.get(), weights, inthassign.data(), centroids.data());
+            int nsplit = 0;
+            // int nsplit = split_clusters(
+            //         d, k, nx, k_frozen, hassign.data(), centroids.data());
 
             // collect statistics
             ClusteringIterationStats stats = {
@@ -503,6 +588,42 @@ void Clustering::train_encoded(
                     imbalance_factor(nx, k, assign.get()),
                     nsplit};
             iteration_stats.push_back(stats);
+
+            // output centroids
+            if (true) {
+                // output content of centroids, 128 per line
+                std::cout << "######################################################" << std::endl;
+                std::cout << "first 10 centroids:\n";
+                for (int i = 0; i < 10; ++i) {
+                    std::cout << "partition " << i << ": ";
+                    for (int j = 0; j < d; ++j) {
+                        std::cout << centroids[i * d + j] << " ";
+                    }
+                    std::cout << std::endl;
+                }
+                std::cout << "######################################################" << std::endl;
+                std::cout << std::endl;
+                // output content of partition_element_count, 10 per line
+                std::cout << "partition_element_count:\n";
+                for (int i = 0; i < k; ++i) {
+                    std::cout << inthassign[i] << " ";
+                    if (i % 70 == 69)
+                        std::cout << std::endl;
+                }
+                // output the max and min of inthassign
+                int max = 0, min = std::numeric_limits<int>::max();
+                for (int i = 0; i < k; ++i) {
+                    if (inthassign[i] > max)
+                        max = inthassign[i];
+                    if (inthassign[i] < min)
+                        min = inthassign[i];
+                }
+                std::cout << "\nmax: " << max << " min: " << min << std::endl;
+                // rewrite the above output in std::cout
+                std::cout << "\nIteration " << i << " (" << stats.time << " s, search " << stats.time_search << " s): "
+                          << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(10) << stats.imbalance_factor
+                          << " nsplit=" << nsplit << std::endl;
+            }
 
             if (verbose) {
                 printf("  Iteration %d (%.2f s, search %.2f s): "
