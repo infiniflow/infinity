@@ -150,6 +150,7 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted", __FILE_NAME__, __LINE__);
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     if (append_state_ptr->Finished()) {
@@ -220,13 +221,13 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
 }
 
 UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
-    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+    for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
-        if(segment_entry == nullptr) {
+        if (segment_entry == nullptr) {
             Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
         }
-        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::DeleteData(segment_entry, txn_ptr, block_row_hashmap);
     }
     return nullptr;
@@ -234,8 +235,11 @@ UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
     for (const auto &range : append_state_ptr->append_ranges_) {
-        LOG_TRACE(
-            Format("Commit, segment: {}, block: {} start offset: {}, count: {}", range.segment_id_, range.block_id_, range.start_offset_, range.row_count_));
+        LOG_TRACE(Format("Commit, segment: {}, block: {} start offset: {}, count: {}",
+                         range.segment_id_,
+                         range.block_id_,
+                         range.start_offset_,
+                         range.row_count_));
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_offset_, range.row_count_);
     }
@@ -255,13 +259,13 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
 }
 
 void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
-    for(const auto& to_delete_seg_rows: delete_state.rows_) {
+    for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
-        if(segment == nullptr) {
+        if (segment == nullptr) {
             Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
         }
-        const HashMap<u16, Vector<RowID>>& block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
     }
 }
@@ -273,6 +277,7 @@ TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn
 }
 
 UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment) {
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted", __FILE_NAME__, __LINE__);
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     segment->min_row_ts_ = commit_ts;
     segment->max_row_ts_ = commit_ts;
@@ -300,6 +305,11 @@ SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *t
 DBEntry *TableCollectionEntry::GetDBEntry(const TableCollectionEntry *table_entry) {
     TableCollectionMeta *table_meta = (TableCollectionMeta *)table_entry->table_collection_meta_;
     return (DBEntry *)table_meta->db_entry_;
+}
+
+SharedPtr<String> TableCollectionEntry::GetDBName(const TableCollectionEntry *table_entry) {
+    TableCollectionMeta *table_meta = (TableCollectionMeta *)table_entry->table_collection_meta_;
+    return table_meta->db_entry_->db_name_;
 }
 
 SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts) {
@@ -375,7 +385,8 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
-    if (!deleted) {
+
+    if (table_entry_json.contains("column_definition")) {
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
@@ -422,6 +433,13 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
         }
     }
 
+    if (table_entry->deleted_)
+        Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment", __FILE_NAME__, __LINE__);
+    else
+        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0] != nullptr,
+                                 "table segment 0 should be valid",
+                                 __FILE_NAME__,
+                                 __LINE__);
     return table_entry;
 }
 
@@ -452,6 +470,9 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     u32 max_segment_id = 0;
+    for (auto &[seg_id, sgement_entry] : this->segments_) {
+        max_segment_id = Max(max_segment_id, seg_id);
+    }
     for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
         max_segment_id = Max(max_segment_id, seg_id);
         auto it = this->segments_.find(seg_id);
@@ -461,8 +482,10 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
             it->second->MergeFrom(*sgement_entry2.get());
         }
     }
-    if (this->unsealed_segment_ == nullptr) {
-        this->unsealed_segment_ = this->segments_[max_segment_id].get();
+    if (this->unsealed_segment_ == nullptr && !this->segments_.empty()) {
+        auto seg_it = this->segments_.find(max_segment_id);
+        Assert<StorageException>(seg_it != this->segments_.end(), Format("max_segment_id {} is invalid", max_segment_id), __FILE_NAME__, __LINE__);
+        this->unsealed_segment_ = seg_it->second.get();
     }
 }
 

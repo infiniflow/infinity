@@ -85,6 +85,8 @@ public:
 
     static DBEntry *GetDBEntry(const TableCollectionEntry *table_entry);
 
+    static SharedPtr<String> GetDBName(const TableCollectionEntry *table_entry);
+
     inline static TableCollectionMeta *GetTableMeta(const TableCollectionEntry *table_entry) { return table_entry->table_collection_meta_; }
 
     static SharedPtr<BlockIndex> GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts);

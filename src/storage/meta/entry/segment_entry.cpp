@@ -36,14 +36,6 @@ module segment_entry;
 
 namespace infinity {
 
-Json SegmentVersion::Serialize(SegmentVersion *segment_version) {
-    Error<NotImplementException>("Segment version serialize", __FILE_NAME__, __LINE__);
-}
-
-UniquePtr<SegmentVersion> SegmentVersion::Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("Segment version deserialize", __FILE_NAME__, __LINE__);
-}
-
 SegmentEntry::SegmentEntry(const TableCollectionEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u32 segment_id, BufferManager *buffer_mgr) {

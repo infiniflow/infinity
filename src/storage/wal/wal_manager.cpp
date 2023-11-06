@@ -632,7 +632,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
         Error<StorageException>("Wal Replay: Create index failed", __FILE_NAME__, __LINE__);
     }
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
-    auto table_store = MakeShared<TxnTableStore>(cmd.table_name_, table_entry, fake_txn.get());
+    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
     TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), *cmd.index_def_, commit_ts, storage_->buffer_manager());
     TableCollectionEntry::CommitCreateIndex(table_entry, table_store->uncommitted_indexes_);
@@ -701,7 +701,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 com
     }
     auto table_entry = dynamic_cast<TableCollectionEntry *>(table_entry_result.entry_);
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
-    auto table_store = MakeShared<TxnTableStore>(cmd.table_name, table_entry, fake_txn.get());
+    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids);
     fake_txn->FakeCommit(commit_ts);
     TableCollectionEntry::Delete(table_store->table_entry_, table_store->txn_, table_store->delete_state_);
@@ -722,7 +722,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
 
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
 
-    auto table_store = MakeShared<TxnTableStore>(cmd.table_name, table_entry, fake_txn.get());
+    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Append(cmd.block);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
