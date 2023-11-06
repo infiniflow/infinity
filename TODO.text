@@ -1,0 +1,4 @@
+1. refresh the structure of the codes
+2. record time
+3. find the way to speedup (maybe exhaustive_L2sqr_blas_cmax_avx2?)
+4. exhaustive_L2sqr_blas_cmax_avx2 should have more parameters, 16? 1024? 4096
