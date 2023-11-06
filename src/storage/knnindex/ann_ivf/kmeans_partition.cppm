@@ -1,6 +1,6 @@
 
 module;
-
+// #define rectime 0
 #include <algorithm>
 #include <cstring>
 #include <iomanip>
@@ -37,6 +37,7 @@ struct ClusteringIterationStats {
     int nsplit;              ///< number of cluster splits
 };
 
+// from faiss
 template <typename T>
 static double imbalance_factor(int n, int k, const T *hist) {
     double uf = 0;
@@ -46,12 +47,14 @@ static double imbalance_factor(int n, int k, const T *hist) {
     return uf * k / ((double)n * n);
 }
 
+// from faiss
 double elapsed() {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
 
+// from faiss
 struct RandomGenerator {
     std::mt19937 mt;
 
@@ -72,6 +75,7 @@ struct RandomGenerator {
     explicit RandomGenerator(int64_t seed = 1234) : mt((unsigned int)seed) {}
 };
 
+// from faiss
 void rand_perm(int *perm, size_t n, int64_t seed) {
     for (size_t i = 0; i < n; i++)
         perm[i] = i;
@@ -118,20 +122,26 @@ Vector<i32> random_permutation_id_partially(i32 vector_count, i32 random_num = -
     return permutation;
 }
 
-// TODO:iteration_max?
+// CentroidsType: the type to calculate centroids
+// partition_num: the number of partitions, default to sqrt(vector_count)
+// iteration_max: the max iteration count, default to 1
 export template <typename CentroidsType, typename ElemType, typename CentroidsOutputType>
 void k_means_partition_only_centroids_l2(i32 dimension,
                                          i32 vector_count,
                                          const ElemType *vectors_ptr,
-                                         i32 partition_num,
                                          CentroidsOutputType *centroids_output,
-                                         i32 iteration_max = 1) {
+                                         i32 partition_num = -1,
+                                         i32 iteration_max = -1) {
+    constexpr int default_iteration_max = 1;
+    constexpr bool b_debug_info = false;
+#ifdef rectime
     // Record time now.
     f64 t0;
     std::cout << "\n[" << std::fixed << std::setprecision(3) << ((t0 = elapsed()), 0.f) << " s] "
               << "k-means training begin." << std::endl;
-    if (dimension <= 0 || vector_count <= 0 || partition_num <= 0 || iteration_max <= 0) {
-        Error<ExecutorException>("dimension, vector_count, partition_num, iteration_max must be positive", __FILE_NAME__, __LINE__);
+#endif
+    if (dimension <= 0 || vector_count <= 0) {
+        Error<ExecutorException>("dimension and vector_count must be positive", __FILE_NAME__, __LINE__);
     }
     if (vectors_ptr == nullptr) {
         Error<ExecutorException>("vectors_ptr cannot be nullptr", __FILE_NAME__, __LINE__);
@@ -140,10 +150,15 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         Error<ExecutorException>("centroids_output cannot be nullptr", __FILE_NAME__, __LINE__);
     }
     if (partition_num > vector_count) {
-        Error<ExecutorException>("partition_num cannot be larger than vector_count", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("partition_num cannot be greater than vector_count", __FILE_NAME__, __LINE__);
+    }
+    if (partition_num <= 0) {
+        partition_num = (int)sqrt(vector_count);
+    }
+    if (iteration_max <= 0) {
+        iteration_max = default_iteration_max;
     }
 
-    // TODO: use f32 to calculate the centroids?
     CentroidsType *centroids = nullptr;
     UniquePtr<CentroidsType[]> centroids_destructor;
     if constexpr (std::is_same_v<CentroidsOutputType, CentroidsType>) {
@@ -162,81 +177,100 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     // If input vectors are too few, warning and use all vectors to train.
     // If input vectors are too many, randomly choose some vectors to train.
     {
+#ifdef rectime
+        auto t_prepare_training_data_now = elapsed();
+#endif
         // TODO: user can change min max vectors per partition?
         i32 min_points_per_centroid = 39;
         i32 max_points_per_centroid = 256;
         // i32 max_points_per_centroid = 100;
         if (i32 min_num = min_points_per_centroid * partition_num; vector_count < min_num) {
             // warning : too few vectors, less than min_points_per_centroid * partition_num
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "warning : too few vectors, less than min_points_per_centroid (" << min_points_per_centroid << ") * partition_num ("
+            std::cout << "warning : too few vectors, less than min_points_per_centroid (" << min_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << min_num << " vectors to train" << std::endl;
         }
         if (i32 max_num = max_points_per_centroid * partition_num; vector_count > max_num) {
             // warning : too many vectors, more than max_points_per_centroid * partition_num
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "warning : too many vectors, more than max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
-                      << partition_num << ")" << std::endl;
+            std::cout << "warning : too many vectors, more than max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
+                      << partition_num << ") = " << max_num << " vectors to train" << std::endl;
             // warning : will randomly choose max_points_per_centroid * partition_num vectors to train
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "warning : will randomly choose max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
+            std::cout << "warning : will randomly choose max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << max_num << " vectors to train" << std::endl;
             training_data_num = max_num;
-            // TODO: generate random training data
-            // Vector<i32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
-            // TODO
-            Vector<i32> random_ids(vector_count);
-            rand_perm(random_ids.data(), vector_count, 1234);
-            // output content of random_ids
-            std::cout << "random_ids nums: " << training_data_num << std::endl;
-            for (int i = 0; i < 20; i++) {
-                std::cout << random_ids[i] << " ";
+            // generate random training data
+            if constexpr (!b_debug_info) {
+                Vector<i32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
+                random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
+                training_data = random_training_data_destructor.get();
+                for (i32 i = 0; i < training_data_num; ++i) {
+                    memcpy(training_data + i * dimension, vectors_ptr + random_ids[i] * dimension, dimension * sizeof(ElemType));
+                }
+            } else {
+                Vector<i32> random_ids(vector_count);
+                rand_perm(random_ids.data(), vector_count, 1234);
+                // output content of random_ids
+                std::cout << "random_ids nums: " << training_data_num << std::endl;
+                for (int i = 0; i < 20; i++) {
+                    std::cout << random_ids[i] << " ";
+                }
+                std::cout << std::endl;
+                // output dimension, training_data_num, dimension * training_data_num
+                std::cout << "dimension: " << dimension << std::endl;
+                std::cout << "training_data_num: " << training_data_num << std::endl;
+                std::cout << "dimension * training_data_num: " << dimension * training_data_num << std::endl;
+                random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
+                for (i32 i = 0; i < training_data_num; ++i) {
+                    memcpy(random_training_data_destructor.get() + i * dimension,
+                           vectors_ptr + random_ids[i] * dimension,
+                           dimension * sizeof(ElemType));
+                }
+                training_data = random_training_data_destructor.get();
+                std::cout << "random training vectors generated." << std::endl;
             }
-            std::cout << std::endl;
-            // output dimension, training_data_num, dimension * training_data_num
-            std::cout << "dimension: " << dimension << std::endl;
-            std::cout << "training_data_num: " << training_data_num << std::endl;
-            std::cout << "dimension * training_data_num: " << dimension * training_data_num << std::endl;
-            random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
-            for (i32 i = 0; i < training_data_num; ++i) {
-                memcpy(random_training_data_destructor.get() + i * dimension, vectors_ptr + random_ids[i] * dimension, dimension * sizeof(ElemType));
-            }
-            training_data = random_training_data_destructor.get();
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "random training vectors generated." << std::endl;
         }
+#ifdef rectime
+        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "training data prepared." << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "time for preparing training data: " << elapsed() - t_prepare_training_data_now << " s" << std::endl;
+#endif
     }
 
     // Initializing centroids
     {
+#ifdef rectime
+        auto t_init_centroids_now = elapsed();
+#endif
         // If training vectors are randomly chosen, centroids can be copied from training data.
         // Otherwise, centroids need to be randomly generated.
-        //        if (random_training_data_destructor != nullptr) {
-        //            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
-        //                memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
-        //            } else {
-        //                for (i32 i = 0; i < partition_num * dimension; ++i) {
-        //                    centroids[i] = training_data[i];
-        //                }
-        //            }
-        //        } else {
-        //            Vector<i32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
-        //            for (i32 i = 0; i < partition_num; ++i) {
-        //                for (i32 j = 0; j < dimension; ++j) {
-        //                    centroids[i * dimension + j] = training_data[random_ids[i] * dimension + j];
-        //                }
-        //            }
-        //        }
-        {
-            std::vector<int> perm(training_data_num);
-            std::iota(perm.begin(), perm.end(), 0);
-            // rand_perm(perm.data(), training_data_num, 1234 + 1 + 0 * 15486557L);
-            for (int i = 0; i < partition_num; i++) {
-                memcpy(&centroids[i * dimension], training_data + perm[i] * dimension, sizeof(CentroidsType) * dimension);
+        if (random_training_data_destructor) {
+            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
+                memcpy(centroids, training_data, sizeof(ElemType) * partition_num * dimension);
+            } else {
+                for (i32 i = 0; i < partition_num * dimension; ++i) {
+                    centroids[i] = training_data[i];
+                }
+            }
+        } else {
+            Vector<i32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
+            if constexpr (std::is_same_v<ElemType, CentroidsType>) {
+                for (i32 i = 0; i < partition_num; ++i) {
+                    memcpy(centroids + i * dimension, training_data + random_ids[i] * dimension, sizeof(ElemType) * dimension);
+                }
+            } else {
+                for (i32 i = 0; i < partition_num; ++i) {
+                    for (i32 j = 0; j < dimension; ++j) {
+                        centroids[i * dimension + j] = training_data[random_ids[i] * dimension + j];
+                    }
+                }
             }
         }
+#ifdef rectime
         std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                   << "centroids initialized." << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "time for initializing centroids: " << elapsed() - t_init_centroids_now << " s" << std::endl;
+#endif
     }
 
     // Record some information
@@ -251,16 +285,18 @@ void k_means_partition_only_centroids_l2(i32 dimension,
     // Iteration
     for (i32 iter = 1; iter <= iteration_max; ++iter) {
         // info
-        i32 iter_split = 0;
         f32 this_iter_distance = 0;
+#ifdef rectime
         auto iter_begin_time = elapsed();
         auto total_search_time = 0.0;
-
         std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "\niteration count: " << iter << std::endl;
+                  << "iteration begin: " << iter << std::endl;
+#endif
         // First : assign each training vector to a partition
         {
+#ifdef rectime
             auto t_search_now = elapsed();
+#endif
             // search top 1
             search_top_1(dimension,
                          training_data_num,
@@ -277,21 +313,32 @@ void k_means_partition_only_centroids_l2(i32 dimension,
 
             // add distance to this_iter_distance
             this_iter_distance += std::reduce(partition_element_distance.begin(), partition_element_distance.end());
+#ifdef rectime
             total_search_time += elapsed() - t_search_now;
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "training data partitioned." << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "time for partitioning training data: " << elapsed() - t_search_now << " s" << std::endl;
+#endif
         }
 
         {
+#ifdef rectime
             // output sum of partition_element_count
             i32 sum = 0;
             for (i32 i = 0; i < partition_num; ++i) {
                 sum += partition_element_count[i];
             }
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                       << "sum of partition_element_count: " << sum << std::endl;
+#endif
         }
 
         // Second : update centroids
         {
+#ifdef rectime
+            auto t_update_centroids_now = elapsed();
+#endif
             // Clear old centroids data
             memset(centroids, 0, sizeof(CentroidsType) * partition_num * dimension);
             // Sum
@@ -311,15 +358,22 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                     }
                 }
             }
+#ifdef rectime
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "centroids updated." << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "time for updating centroids: " << elapsed() - t_update_centroids_now << " s" << std::endl;
+#endif
         }
 
         // output centroids
-        if (false) {
+        {
+#ifdef rectime
             // output content of centroids, 128 per line
             std::cout << "######################################################" << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "first 10 centroids:\n";
-            for (i32 i = 0; i < 10; ++i) {
+                      << "first 3 centroids:\n";
+            for (i32 i = 0; i < 3; ++i) {
                 std::cout << "partition " << i << ": ";
                 for (i32 j = 0; j < dimension; ++j) {
                     std::cout << centroids[i * dimension + j] << " ";
@@ -328,46 +382,48 @@ void k_means_partition_only_centroids_l2(i32 dimension,
             }
             std::cout << "######################################################" << std::endl;
             std::cout << std::endl;
+#endif
         }
 
         // output imbalance factor
         {
-            if (false) {
-                // output content of partition_element_count, 10 per line
-                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                          << "partition_element_count:\n";
-                for (i32 i = 0; i < partition_num; ++i) {
-                    std::cout << partition_element_count[i] << " ";
-                    if (i % 70 == 69)
-                        std::cout << std::endl;
-                }
-                // output min, max of partition_element_count
-                i32 min = std::numeric_limits<i32>::max();
-                i32 max = std::numeric_limits<i32>::min();
-                for (i32 i = 0; i < partition_num; ++i) {
-                    if (partition_element_count[i] < min) {
-                        min = partition_element_count[i];
-                    }
-                    if (partition_element_count[i] > max) {
-                        max = partition_element_count[i];
-                    }
-                }
-                std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                          << "max of partition_element_count: " << max << std::endl;
-                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                          << "min of partition_element_count: " << min << std::endl;
-                std::cout << std::endl;
+#ifdef rectime
+            // output content of partition_element_count, 70 per line
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "partition_element_count:\n";
+            for (i32 i = 0; i < partition_num; ++i) {
+                std::cout << partition_element_count[i] << " ";
+                if (i % 70 == 69)
+                    std::cout << std::endl;
             }
+            // output min, max of partition_element_count
+            i32 min = std::numeric_limits<i32>::max();
+            i32 max = std::numeric_limits<i32>::min();
+            for (i32 i = 0; i < partition_num; ++i) {
+                if (partition_element_count[i] < min) {
+                    min = partition_element_count[i];
+                }
+                if (partition_element_count[i] > max) {
+                    max = partition_element_count[i];
+                }
+            }
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "max of partition_element_count: " << max << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                      << "min of partition_element_count: " << min << std::endl;
+            std::cout << std::endl;
 
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                       << "\nimbalance factor: " << std::fixed << std::setprecision(10)
                       << imbalance_factor(training_data_num, partition_num, partition_element_count.data()) << std::endl;
+#endif
         }
 
         // Third: split partitions when needed
         // TODO: When to split? How?
         //  Now sort the centroids by the number of vectors in each partition.
         //  For every vacant partition, split the partition with the most vectors.
+        i32 iter_split = 0;
         {
             for (i32 i = 0; i < partition_num; ++i) {
                 if (partition_element_count[i] == 0) {
@@ -391,7 +447,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                     constexpr f32 plus_epsilon = 1 + epsilon;
                     constexpr f32 minus_epsilon = 1 - epsilon;
                     for (i32 j = 0; j < dimension; ++j) {
-                        centroids[i * dimension + j] *= j & 1 ? plus_epsilon : minus_epsilon;
+                        centroids[i * dimension + j] *= ((j & 1) ? plus_epsilon : minus_epsilon);
                         centroids[max_partition_id * dimension + j] *= ((j & 1) ? minus_epsilon : plus_epsilon);
                     }
                 }
@@ -399,6 +455,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         }
 
         // output info
+#ifdef rectime
         ClusteringIterationStats stats = {this_iter_distance,
                                           elapsed() - iter_begin_time,
                                           total_search_time,
@@ -406,9 +463,12 @@ void k_means_partition_only_centroids_l2(i32 dimension,
                                           iter_split};
         std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                   << "Iteration " << iter << " (" << std::fixed << std::setprecision(2) << stats.time << " s, search " << stats.time_search << " s): "
-                  << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(10) << stats.imbalance_factor
+                  << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(7) << stats.imbalance_factor
                   << " nsplit=" << stats.nsplit << std::endl;
-        // TODO:stop?
+#endif
+        // TODO:stop condition?
+        if (this_iter_distance >= previous_total_distance)
+            break;
         previous_total_distance = this_iter_distance;
 
         // In the next loop, training data will be re-assigned to partitions.
