@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
@@ -20,15 +20,15 @@ namespace infinity {
 template <typename ValueType, typename ResultType>
 struct SumState {
 public:
-    inline void Initialize() { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline void Initialize() { Error<NotImplementException>("Not implemented"); }
 
-    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented"); }
 
-    inline ptr_t Finalize() { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline ptr_t Finalize() { Error<NotImplementException>("Not implemented"); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented"); }
 };
 
 template <>

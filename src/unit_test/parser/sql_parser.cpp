@@ -5,14 +5,13 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
 import logger;
 import stl;
 import infinity_context;
-
 
 class SQLParserTest : public BaseTest {};
 

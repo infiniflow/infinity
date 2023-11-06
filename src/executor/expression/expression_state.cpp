@@ -8,7 +8,7 @@ module;
 
 import stl;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 import column_vector;
@@ -50,16 +50,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
         case ExpressionType::kIn:
             return CreateState(std::static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
-            Error<ExecutorException>("Unexpected expression type: KNN", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Unexpected expression type: KNN");
         }
         default: {
-            Error<ExecutorException>("Unknown expression type: " + expression->Name(), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Unknown expression type: " + expression->Name());
         }
     }
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr) {
-    Assert<ExecutorException>(agg_expr->arguments().size() == 1, "Aggregate function arguments error.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(agg_expr->arguments().size() == 1, "Aggregate function arguments error.");
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(agg_expr->arguments()[0]);
@@ -89,7 +89,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
-    Assert<ExecutorException>(cast_expr->arguments().size() == 1, "Cast function arguments error.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(cast_expr->arguments().size() == 1, "Cast function arguments error.");
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);

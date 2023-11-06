@@ -128,7 +128,7 @@ void PGProtocolHandler::SendData(const Vector<Optional<String>> &values_as_strin
     // Number of columns in row
     buffer_writer_.send_value_u16(column_count);
 
-    for(u16 idx = 0; idx < column_count; ++ idx) {
+    for (u16 idx = 0; idx < column_count; ++idx) {
         const Optional<String> &value_string = values_as_strings[idx];
         if (value_string.has_value()) {
             const String &value_ref = value_string.value();

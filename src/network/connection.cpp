@@ -11,7 +11,7 @@ import boost;
 import stl;
 import session;
 import infinity_exception;
-import infinity_assert;
+
 import pg_message;
 import logger;
 import query_context;
@@ -30,7 +30,6 @@ Connection::Connection(AsioIOService &io_service)
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
-    // FIXME
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     HandleConnection();
@@ -106,7 +105,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            Error<NetworkException>("Unknown command type", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("Unknown PG command type");
         }
     }
 }
@@ -209,7 +208,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    Error<TypeException>("Not embedding type", __FILE_NAME__, __LINE__);
+                    Error<TypeException>("Not embedding type");
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -251,13 +250,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                        Error<TypeException>("Invalid embedding data type");
                     }
                 }
                 break;
             }
             default: {
-                Error<TypeException>("Unexpected type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Unexpected type");
             }
         }
 

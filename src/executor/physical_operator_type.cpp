@@ -5,7 +5,7 @@
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_operator_type;
@@ -114,6 +114,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeKnn";
     }
 
-    Error<NotImplementException>("Unknown physical operator type", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Unknown physical operator type");
 }
 } // namespace infinity

@@ -18,8 +18,7 @@ enum class CommandType {
 
 class CommandInfo {
 public:
-    explicit
-    CommandInfo(CommandType type): type_(type) {}
+    explicit CommandInfo(CommandType type) : type_(type) {}
 
     virtual ~CommandInfo() = default;
 
@@ -31,31 +30,29 @@ private:
     CommandType type_{CommandType::kInvalid};
 };
 
-class UseCmd final: public CommandInfo {
+class UseCmd final : public CommandInfo {
 public:
-    explicit
-    UseCmd(const char* db_name): CommandInfo(CommandType::kUse), db_name_(db_name) {}
+    explicit UseCmd(const char *db_name) : CommandInfo(CommandType::kUse), db_name_(db_name) {}
 
     ~UseCmd() final = default;
 
     [[nodiscard]] std::string ToString() const final;
 
-    const std::string& db_name() const { return db_name_; }
+    const std::string &db_name() const { return db_name_; }
 
 private:
     std::string db_name_;
 };
 
-class CheckTable final: public CommandInfo {
+class CheckTable final : public CommandInfo {
 public:
-    explicit
-    CheckTable(const char* table_name): CommandInfo(CommandType::kCheckTable), table_name_(table_name) {}
+    explicit CheckTable(const char *table_name) : CommandInfo(CommandType::kCheckTable), table_name_(table_name) {}
 
     ~CheckTable() final = default;
 
     [[nodiscard]] std::string ToString() const final;
 
-    const std::string& table_name() const { return table_name_; }
+    const std::string &table_name() const { return table_name_; }
 
 private:
     std::string table_name_;

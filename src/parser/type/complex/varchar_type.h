@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 
@@ -48,9 +48,9 @@ public:
 
     bool operator<(const VarcharType &other) const;
 
-    [[nodiscard]] inline char* GetDataPtr() const {
+    [[nodiscard]] inline char *GetDataPtr() const {
         if (IsInlined()) {
-            return (char*)(prefix);
+            return (char *)(prefix);
         } else {
             return this->ptr;
         }
@@ -75,10 +75,10 @@ public:
 
     [[nodiscard]] std::string ToString() const;
 
-    uint16_t length{0};                  // 65535 will be the limitation.
+    uint16_t length{0};           // 65535 will be the limitation.
     char prefix[PREFIX_LENGTH]{}; // prefix of the varchar
     // If length <= 14, ptr will be used as prefix.
-    char* ptr{nullptr}; // pointer to the varchar value buffer.
+    char *ptr{nullptr}; // pointer to the varchar value buffer.
 };
 
 } // namespace infinity

@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -22,7 +22,7 @@ namespace infinity {
 struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -85,13 +85,13 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal * Decimal = Decimal
 template <>
 inline bool MulFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // Mixed Type * i64
 template <>
 inline bool MulFunction::Run(MixedT left, BigIntT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // i64 * Mixed Type
@@ -103,7 +103,7 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type * f64
 template <>
 inline bool MulFunction::Run(MixedT left, DoubleT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // f64 * Mixed Type
@@ -115,7 +115,7 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type * Mixed Type
 template <>
 inline bool MulFunction::Run(MixedT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 void RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

@@ -10,7 +10,7 @@ import stl;
 import column_binding;
 import logical_node_type;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 
 module logical_command;
@@ -39,13 +39,13 @@ String LogicalCommand::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
 
-    switch(command_info_->type()) {
+    switch (command_info_->type()) {
         case CommandType::kUse: {
-            UseCmd* use_cmd_info = (UseCmd*)(command_info_.get());
+            UseCmd *use_cmd_info = (UseCmd *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Use table: " << use_cmd_info->db_name();
         }
         case CommandType::kInvalid: {
-            Error<PlannerException>("Invalid command type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid command type.");
         }
     }
 

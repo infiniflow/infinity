@@ -16,7 +16,7 @@ import expression_state;
 import data_block;
 import logger;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_filter;
@@ -66,7 +66,7 @@ void PhysicalFilter::Execute(QueryContext *query_context, InputState *input_stat
 void PhysicalFilter::Execute(QueryContext *query_context) {
     // Get input from left child
     input_table_ = left_->output();
-    Assert<ExecutorException>(input_table_.get() != nullptr, "No input.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(input_table_.get() != nullptr, "No input.");
 
     // Execute the expression on the input table
     SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);

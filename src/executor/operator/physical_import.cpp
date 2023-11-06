@@ -38,7 +38,7 @@ import wal_entry;
 import file_system_type;
 import file_system;
 import buffer_handle;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 import segment_entry;
@@ -83,15 +83,15 @@ void PhysicalImport::Execute(QueryContext *query_context) {}
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
     if (table_collection_entry_->columns_.size() != 1) {
-        Error<ExecutorException>("FVECS file must have only one column.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one column.");
     }
     auto &column_type = table_collection_entry_->columns_[0]->column_type_;
     if (column_type->type() != kEmbedding) {
-        Error<ExecutorException>("FVECS file must have only one embedding column.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one embedding column.");
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     if (embedding_info->Type() != kElemFloat) {
-        Error<ExecutorException>("FVECS file must have only one embedding column with float element.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one embedding column with float element.");
     }
 
     LocalFileSystem fs;
@@ -103,17 +103,15 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
-        Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes));
     }
     if (embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        Error<ExecutorException>("Weird file size.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 
@@ -131,9 +129,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension),
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
         }
         ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut()) + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -175,7 +171,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     // parser_context -> parser
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
-        Error<ExecutorException>(strerror(errno), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(strerror(errno));
     }
     Txn *txn = query_context->GetTxn();
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
@@ -211,10 +207,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
 
     if (csv_parser_status != zsv_status_no_more_input) {
         if (parser_context->err_msg_.get() != nullptr) {
-            Error<ExecutorException>(*parser_context->err_msg_, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(*parser_context->err_msg_);
         } else {
             String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
-            Error<ExecutorException>(err_msg, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(err_msg);
         }
     }
     table_collection_entry_->row_count_ += parser_context->row_count_;
@@ -258,7 +254,7 @@ namespace {
 Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Error<TypeException>("Embedding data must be surrounded by [ and ]", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Embedding data must be surrounded by [ and ]");
     }
     Vector<StringView> ret;
     SizeT i = 1, j = 1;
@@ -339,7 +335,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (column_type->type() == kVarchar) {
             auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
             if (varchar_info->dimension() < str_view.size()) {
-                Error<ExecutorException>("Varchar data size exceeds dimension.", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Varchar data size exceeds dimension.");
             }
 
             AppendVarcharData(block_column_entry, str_view, dst_offset);
@@ -348,12 +344,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                Error<ExecutorException>("Embedding data size exceeds dimension.", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Embedding data size exceeds dimension.");
             }
 
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    Error<ExecutorException>("Embedding bit type is not implemented.", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Embedding bit type is not implemented.");
                 }
                 case kElemInt8: {
                     AppendEmbeddingData<TinyIntT>(block_column_entry, ele_str_views, dst_offset);
@@ -380,7 +376,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                     break;
                 }
                 case kElemInvalid: {
-                    Error<ExecutorException>("Embedding element type is invalid.", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Embedding element type is invalid.");
                 }
             }
         } else {
@@ -415,10 +411,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 }
                 case kMissing:
                 case kInvalid: {
-                    Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid data type");
                 }
                 default: {
-                    Error<ExecutorException>("Not supported now in append data in column", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Not supported now in append data in column");
                 }
             }
         }

@@ -2,7 +2,7 @@ module;
 
 import stl;
 import buffer_base;
-import infinity_assert;
+
 import infinity_exception;
 
 #include <iterator>
@@ -26,10 +26,10 @@ SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
 }
 
 void WriteBuffer::Write(const char *from, SizeT n) {
-    Error<StorageException>("Cannot write to finalized buffer", __FILE_NAME__, __LINE__);
+    Error<StorageException>("Cannot write to finalized buffer");
     SizeT bytes_copied = 0;
 
-    Assert<StorageException>(!working_buffer_.Empty(), "working_buffer empty", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!working_buffer_.Empty(), "working_buffer empty");
 
     while (bytes_copied < n) {
         NextIfAtEnd();

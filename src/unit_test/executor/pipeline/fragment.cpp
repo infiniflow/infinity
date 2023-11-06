@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -14,7 +14,7 @@ import stl;
 import infinity_context;
 import sql_runner;
 
-class FragmentTest  : public BaseTest {
+class FragmentTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
         system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");

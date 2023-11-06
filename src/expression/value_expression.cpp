@@ -10,8 +10,6 @@ module value_expression;
 
 namespace infinity {
 
-String ValueExpression::ToString() const {
-    return value_.ToString();
-}
+String ValueExpression::ToString() const { return value_.ToString(); }
 
 } // namespace infinity

@@ -8,7 +8,7 @@ import stl;
 import logical_node;
 import base_expression;
 import column_expression;
-import infinity_assert;
+
 import infinity_exception;
 import subquery_expression;
 
@@ -24,13 +24,13 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     }
 
     if (expression->depth() > 1) {
-        Error<PlannerException>("Correlated depth > 1 is not suppported now.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Correlated depth > 1 is not suppported now.");
     }
 
     auto entry = bind_context_ptr_->correlated_column_map_.find(expression->binding());
     if (entry == bind_context_ptr_->correlated_column_map_.end()) {
         // This column expression wasn't stored in correlated column map before
-        Error<PlannerException>("Correlated expression isn't found.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Correlated expression isn't found.");
     }
 
     expression->SetBinding(base_binding_.table_idx, base_binding_.column_idx + entry->second);
@@ -45,7 +45,7 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
         return nullptr;
     }
 
-    Error<PlannerException>("Not support rewrite nested correlated subquery in the subquery plan", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Not support rewrite nested correlated subquery in the subquery plan");
     return nullptr;
 }
 

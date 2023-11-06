@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -31,12 +31,12 @@ struct MinusFunction {
 
 template <>
 inline bool MinusFunction::Run(HugeIntT value, HugeIntT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 template <>
 inline bool MinusFunction::Run(DecimalT value, DecimalT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 template <>

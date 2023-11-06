@@ -47,7 +47,7 @@ KnnExpr::~KnnExpr() {
                 break;
             }
             case EmbeddingDataType::kElemInvalid: {
-//                LOG_CRITICAL("Unexpected embedding data type")
+                //                LOG_CRITICAL("Unexpected embedding data type")
                 int8_t *data_ptr = static_cast<int8_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;

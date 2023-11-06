@@ -6,7 +6,7 @@ module;
 
 import stl;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import query_context;
@@ -17,7 +17,7 @@ namespace infinity {
 
 ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *query_context, const ColumnExpr &expr) {
     if (expr.star_) {
-        Error<PlannerException>("Star expression should be unfolded before.", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Star expression should be unfolded before.");
     }
 
     SharedPtr<String> db_name_ptr = nullptr;
@@ -26,7 +26,7 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *query_cont
     SharedPtr<String> column_name_ptr = nullptr;
 
     i64 name_count = expr.names_.size();
-    Assert<PlannerException>(name_count <= 4 && name_count > 0, "Star expression should be unfolded before.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(name_count <= 4 && name_count > 0, "Star expression should be unfolded before.");
     --name_count;
     column_name_ptr = MakeShared<String>(expr.names_[name_count]);
     --name_count;

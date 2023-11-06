@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <string>
 #include "interval_type.h"
+#include <string>
 
 namespace infinity {
 

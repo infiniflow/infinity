@@ -7,7 +7,7 @@ module;
 import std;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 import column_binding;
 import parser;
@@ -27,7 +27,7 @@ String ToString(ShowType type) {
         case ShowType::kShowIndexes:
             return "Show indexes";
         default: {
-            Error<PlannerException>("Invalid chunk scan type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid chunk scan type");
         }
     }
 }

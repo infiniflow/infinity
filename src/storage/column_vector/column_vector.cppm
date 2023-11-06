@@ -13,7 +13,7 @@ import selection;
 import default_values;
 import value;
 import column_buffer;
-import infinity_assert;
+
 import infinity_exception;
 
 export module column_vector;
@@ -131,8 +131,8 @@ public:
     void Reserve(SizeT new_capacity);
 
     void SetVectorType(ColumnVectorType vector_type) {
-        Assert<TypeException>(!initialized, "Column Vector is initialized", __FILE_NAME__, __LINE__);
-        Assert<TypeException>(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.", __FILE_NAME__, __LINE__);
+        Assert<TypeException>(!initialized, "Column Vector is initialized");
+        Assert<TypeException>(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.");
         if (vector_type_ == vector_type) {
             return;
         }
@@ -141,7 +141,7 @@ public:
     }
 
     inline void SetDataType(const SharedPtr<DataType> &data_type) {
-        Assert<TypeException>(!initialized, "Column Vector is initialized", __FILE_NAME__, __LINE__);
+        Assert<TypeException>(!initialized, "Column Vector is initialized");
         data_type_ = data_type;
     }
 

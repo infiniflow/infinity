@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -64,7 +64,7 @@ bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, S
 struct LikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -81,7 +81,7 @@ inline void LikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 

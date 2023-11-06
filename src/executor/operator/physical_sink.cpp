@@ -13,7 +13,7 @@ import physical_operator_type;
 import third_party;
 import fragment_data;
 import data_block;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_sink;
@@ -65,7 +65,7 @@ void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
 void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materialize_sink_state, OutputState *task_output_state) {
     switch (task_output_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            Error<ExecutorException>("Invalid operator", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid operator");
         }
         case PhysicalOperatorType::kShow: {
             ShowOutputState *show_output_state = static_cast<ShowOutputState *>(task_output_state);
@@ -75,7 +75,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
         case PhysicalOperatorType::kExplain: {
             ExplainOutputState *explain_output_state = static_cast<ExplainOutputState *>(task_output_state);
             if (explain_output_state->data_block_.get() == nullptr) {
-                Error<ExecutorException>("Empty explain output", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Empty explain output");
             }
             auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
@@ -84,7 +84,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
         case PhysicalOperatorType::kProjection: {
             ProjectionOutputState *projection_output_state = static_cast<ProjectionOutputState *>(task_output_state);
             if (projection_output_state->data_block_.get() == nullptr) {
-                Error<ExecutorException>("Empty projection output", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Empty projection output");
             }
             auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
@@ -93,20 +93,17 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materi
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOutputState *knn_output_state = static_cast<KnnScanOutputState *>(task_output_state);
             if (knn_output_state->data_block_.get() == nullptr) {
-                Error<ExecutorException>("Empty knn scan output", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Empty knn scan output");
             }
             auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)),
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
         }
     }
 }
-
 
 void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_sink_state, OutputState *task_output_state) {
     switch (task_output_state->operator_type_) {
@@ -117,9 +114,8 @@ void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_si
             break;
         }
         default: {
-            Error<ExecutorException>("Invalid operator", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid operator");
         }
-
     }
 }
 
@@ -127,7 +123,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
     switch (task_output_state->operator_type_) {
 
         case PhysicalOperatorType::kInvalid: {
-            Error<ExecutorException>("Invalid operator", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid operator");
         }
         case PhysicalOperatorType::kAggregate:
         case PhysicalOperatorType::kParallelAggregate:
@@ -165,9 +161,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kShow: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)),
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
         }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOutputState *>(task_output_state);
@@ -297,9 +291,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(MessageSinkState *message_si
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)),
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
             break;
         }
     }
@@ -320,9 +312,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState *message_sink
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)),
-                                         __FILE_NAME__,
-                                         __LINE__);
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
             break;
         }
     }

@@ -4,7 +4,7 @@ import stl;
 import std;
 import byte_slice;
 import byte_slice_reader;
-import infinity_assert;
+
 import infinity_exception;
 import skiplist_reader;
 import index_defines;
@@ -49,12 +49,12 @@ void PairValueSkipListReader::Load_(u32 start, u32 end, const u32 &item_count) {
         byte_slice_reader_.Read(key_buffer_, item_count * sizeof(key_buffer_[0]));
         byte_slice_reader_.Read(value_buffer_, item_count * sizeof(value_buffer_[0]));
         num_in_buffer_ = item_count;
-        Assert<StorageException>(end_ == byte_slice_reader_.Tell(), "end_ == byte_slice_reader_.Tell().", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(end_ == byte_slice_reader_.Tell(), "end_ == byte_slice_reader_.Tell().");
     }
 }
 
 bool PairValueSkipListReader::SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &value, u32 &delta) {
-    Assert<StorageException>(current_key_ <= query_key, "current_key_ <= query_key.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(current_key_ <= query_key, "current_key_ <= query_key.");
 
     u32 local_prev_key, local_prev_value;
     u32 current_key = current_key_;

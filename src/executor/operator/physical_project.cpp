@@ -15,7 +15,7 @@ import expression_evaluator;
 import expression_state;
 import data_block;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 
 module physical_project;
@@ -122,7 +122,7 @@ void PhysicalProject::Execute(QueryContext *query_context) {
     } else {
         // Get input from left child
         SharedPtr<DataTable> input_table = left_->output();
-        Assert<ExecutorException>(input_table.get() != nullptr, "No input table for projection", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(input_table.get() != nullptr, "No input table for projection");
         // Get block count;
         SizeT input_block_count = input_table->DataBlockCount();
 

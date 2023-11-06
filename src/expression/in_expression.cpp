@@ -5,7 +5,7 @@
 module;
 
 import std;
-import infinity_assert;
+
 import infinity_exception;
 import stl;
 import expression_type;
@@ -33,7 +33,7 @@ String InExpression::ToString() const {
             break;
         }
         default: {
-            Error<PlannerException>("Unknown In operator type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unknown In operator type.");
         }
     }
 

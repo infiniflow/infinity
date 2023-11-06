@@ -4,10 +4,10 @@
 
 module;
 
-#include <string>
 #include <filesystem>
 #include <functional>
 #include <regex>
+#include <string>
 
 import base_entry;
 import config;
@@ -24,7 +24,6 @@ import logger;
 import parser;
 import txn;
 import infinity_exception;
-import infinity_assert;
 
 module storage;
 
@@ -66,6 +65,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
+    Printf("Shutdown storage ...\n");
     txn_mgr_->Stop();
     wal_mgr_->Stop();
 
@@ -75,6 +75,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
+    Printf("Shutdown storage successfully\n");
 }
 
 SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
@@ -112,7 +113,7 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     create_res = new_txn->CreateDatabase("default", ConflictType::kError);
     new_txn->CommitTxn();
     if (create_res.err_ != nullptr) {
-        Error<StorageException>(*create_res.err_, __FILE_NAME__, __LINE__);
+        Error<StorageException>(*create_res.err_);
     }
 }
 

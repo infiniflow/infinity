@@ -8,7 +8,7 @@ import std;
 import stl;
 import base_expression;
 import scalar_function;
-import infinity_assert;
+
 import infinity_exception;
 import cast_table;
 
@@ -49,7 +49,7 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str(), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(ss.str());
     }
 
     if (candidates_index.size() > 1) {
@@ -60,7 +60,7 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str(), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(ss.str());
     }
 
     return functions_[candidates_index[0]];

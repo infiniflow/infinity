@@ -19,7 +19,7 @@ import column_buffer;
 import block_column_entry;
 import knn_distance;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 import default_values;
@@ -42,11 +42,11 @@ void PhysicalKnnScan::Execute(QueryContext *query_context, InputState *input_sta
             break;
         }
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid element data type");
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
     }
 }
@@ -89,7 +89,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if (knn_column_ids.size() != 1) {
-        Error<ExecutorException>("More than one knn column", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("More than one knn column");
     }
 
     SizeT knn_column_id = knn_column_ids[0];
@@ -129,17 +129,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                 SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
 
                 u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-                LOG_TRACE(Format("Row offset: {}: {}: {}, distance {}",
-                                 row_id[id].segment_id_,
-                                 block_id,
-                                 row_id[id].segment_offset_,
-                                 top_distance[id]));
+                LOG_TRACE(
+                    Format("Row offset: {}: {}: {}, distance {}", row_id[id].segment_id_, block_id, row_id[id].segment_offset_, top_distance[id]));
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id),
-                                             __FILE_NAME__,
-                                             __LINE__);
+                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id));
                 }
 
                 SizeT column_id = 0;

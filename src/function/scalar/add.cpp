@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -22,7 +22,7 @@ namespace infinity {
 struct AddFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implemented");
     }
 };
 
@@ -65,7 +65,7 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT + HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool AddFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
-    Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT");
 }
 
 // FloatT + FloatT = FloatT, and check overflow
@@ -91,7 +91,7 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal + Decimal = Decimal
 template <>
 inline bool AddFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
-    Error<NotImplementException>("Not implemented: Decimal + Decimal", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: Decimal + Decimal");
 }
 
 // Date + Interval
@@ -109,7 +109,7 @@ inline bool AddFunction::Run(IntervalT left, DateT right, DateT &result) {
 // DateTime + Interval
 template <>
 inline bool AddFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
-    Error<NotImplementException>("Not implemented: DateTimeT + IntervalT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: DateTimeT + IntervalT");
 }
 
 // Interval + DateTime
@@ -121,7 +121,7 @@ inline bool AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT &result)
 // TimestampT + Interval
 template <>
 inline bool AddFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
-    Error<NotImplementException>("Not implemented: TimestampT + IntervalT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: TimestampT + IntervalT");
 }
 
 // Interval + TimestampT
@@ -133,7 +133,7 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 // Mixed Type + i64
 template <>
 inline bool AddFunction::Run(MixedT left, BigIntT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + BigIntT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + BigIntT");
 }
 
 // i64 + Mixed Type
@@ -145,7 +145,7 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type + f64
 template <>
 inline bool AddFunction::Run(MixedT left, DoubleT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + DoubleT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + DoubleT");
 }
 
 // f64 + Mixed Type
@@ -157,7 +157,7 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type + Mixed Type
 template <>
 inline bool AddFunction::Run(MixedT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + MixedT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + MixedT");
 }
 
 void RegisterAddFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

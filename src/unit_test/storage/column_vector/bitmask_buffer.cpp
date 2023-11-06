@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import bitmask_buffer;
 import bitmask;
@@ -15,12 +15,10 @@ import stl;
 import infinity_context;
 import global_resource_usage;
 
-class BitmaskBufferTest : public BaseTest {
-};
+class BitmaskBufferTest : public BaseTest {};
 
 TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
     using namespace infinity;
-
 
     constexpr size_t bit_count = 8192;
 
@@ -54,7 +52,6 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
 
 TEST_F(BitmaskBufferTest, ReadWrite) {
     using namespace infinity;
-
 
     constexpr size_t bit_count = 8192;
     Vector<SharedPtr<Bitmask>> masks = {Bitmask::Make(bit_count), Bitmask::Make(bit_count), Bitmask::Make(bit_count)};

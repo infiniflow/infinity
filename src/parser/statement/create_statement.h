@@ -11,8 +11,8 @@
 #include "statement/extra/create_table_info.h"
 #include "statement/extra/create_view_info.h"
 
-#include <string>
 #include <memory>
+#include <string>
 
 namespace infinity {
 

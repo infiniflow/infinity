@@ -13,7 +13,7 @@ import storage;
 import resource_manager;
 import txn;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import logical_planner;
 import logical_node_type;
@@ -101,16 +101,16 @@ QueryResponse QueryContext::Query(const String &query) {
     parser_->Parse(query, parsed_result);
 
     if (parsed_result->IsError()) {
-        Error<PlannerException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(parsed_result->error_message_);
     }
 
-    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResponse query_response = QueryStatement(statement);
         return query_response;
     }
 
-    Error<NetworkException>("Not reachable", __FILE_NAME__, __LINE__);
+    Error<NetworkException>("Not reachable");
 }
 
 QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {

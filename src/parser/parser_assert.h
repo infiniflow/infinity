@@ -40,4 +40,4 @@ private:
 
 #define ParserError(message) ParserAssert(false, message)
 
-} // namespace infinty
+} // namespace infinity

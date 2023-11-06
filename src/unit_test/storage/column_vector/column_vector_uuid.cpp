@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +22,6 @@ class ColumnVectorUuidTest : public BaseTest {};
 
 TEST_F(ColumnVectorUuidTest, flat_uuid) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
@@ -158,7 +157,6 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
 
@@ -255,7 +253,6 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
 TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -299,7 +296,6 @@ TEST_F(ColumnVectorUuidTest, uuid_column_vector_select) {
 
 TEST_F(ColumnVectorUuidTest, uuid_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kUuid);
     ColumnVector column_vector(data_type);

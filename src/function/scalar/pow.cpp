@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -29,7 +29,7 @@ struct PowFunction {
 
 template <>
 inline bool PowFunction::Run(MixedT base, DoubleT exponent, DoubleT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 void RegisterPowFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

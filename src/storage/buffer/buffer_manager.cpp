@@ -6,7 +6,7 @@ import stl;
 import file_worker;
 import third_party;
 import local_file_system;
-import infinity_assert;
+
 import infinity_exception;
 import buffer_obj;
 
@@ -33,7 +33,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     rw_locker_.unlock();
 
     if (!insert_ok) {
-        Error<StorageException>("Buffer handle already exists. Use GET instead.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Buffer handle already exists. Use GET instead.");
     }
     return iter->second.get();
 }
@@ -65,7 +65,7 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
         BufferObj *buffer_obj1 = nullptr;
         if (gc_queue_.try_dequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
-                Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.", __FILE_NAME__, __LINE__);
+                Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.");
                 // prevent dead lock
                 continue;
             }

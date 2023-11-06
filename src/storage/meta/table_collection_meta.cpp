@@ -19,7 +19,7 @@ import txn_manager;
 import buffer_manager;
 import db_entry;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module table_collection_meta;
@@ -366,13 +366,8 @@ UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &tabl
 void TableCollectionMeta::MergeFrom(TableCollectionMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(IsEqual(*this->table_collection_name_, *other.table_collection_name_),
-                             "DBEntry::MergeFrom requires table_collection_name_ match",
-                             __FILE_NAME__,
-                             __LINE__);
-    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_),
-                             "DBEntry::MergeFrom requires db_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "DBEntry::MergeFrom requires table_collection_name_ match");
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_), "DBEntry::MergeFrom requires db_entry_dir_ match");
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

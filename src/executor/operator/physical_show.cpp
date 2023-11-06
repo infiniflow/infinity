@@ -11,7 +11,7 @@ import query_context;
 import parser;
 import operator_state;
 import data_block;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_type;
 import value_expression;
@@ -105,7 +105,7 @@ void PhysicalShow::Init() {
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented show type", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implemented show type");
         }
     }
 }
@@ -133,7 +133,7 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
             break;
         }
         default: {
-            Error<ExecutorException>("Invalid chunk scan type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid chunk scan type");
         }
     }
 
@@ -268,7 +268,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState 
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid table type");
                 }
             }
         }
@@ -291,7 +291,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState 
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid table type");
                 }
             }
         }
@@ -314,7 +314,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState 
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid table type");
                 }
             }
         }
@@ -478,15 +478,15 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputStat
                 case IndexMethod::kIVFFlat: {
                     auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def);
                     other_parameters = Format("metric = {}, centroids_count = {}",
-                                                   MetricTypeToString(ivfflat_index_def->metric_type_),
-                                                   ivfflat_index_def->centroids_count_);
+                                              MetricTypeToString(ivfflat_index_def->metric_type_),
+                                              ivfflat_index_def->centroids_count_);
                     break;
                 }
                 case IndexMethod::kInvalid: {
-                    Error<ExecutorException>("Invalid index method type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid index method type");
                 }
                 default: {
-                    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Not implemented");
                     break;
                 }
             }
@@ -511,7 +511,7 @@ void PhysicalShow::Execute(QueryContext *query_context) {
             break;
         }
         case ShowType::kShowIndexes: {
-            Error<ExecutorException>("Not implemented the deprecated call of execute", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented the deprecated call of execute");
             break;
         }
         case ShowType::kShowViews: {
@@ -519,11 +519,11 @@ void PhysicalShow::Execute(QueryContext *query_context) {
             break;
         }
         case ShowType::kIntermediate: {
-            Error<ExecutorException>("Intermediate type of chunk scan isn't supported now.", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Intermediate type of chunk scan isn't supported now.");
             break;
         }
         default: {
-            Error<ExecutorException>("Invalid chunk scan type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid chunk scan type");
         }
     }
 }
@@ -626,7 +626,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid table type");
                 }
             }
         }
@@ -649,7 +649,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid table type");
                 }
             }
         }
@@ -736,7 +736,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
     Txn *txn = query_context->GetTxn();
     EntryResult result = txn->GetTableByName(db_name_, object_name_);
     if (result.err_.get() != nullptr) {
-        Error<ExecutorException>(*result.err_, __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(*result.err_);
     } else {
         if (result.entry_ != nullptr) {
             TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
@@ -746,14 +746,14 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
 
     result = txn->GetViewByName(db_name_, object_name_);
     if (result.err_.get() != nullptr) {
-        Error<ExecutorException>(*result.err_, __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(*result.err_);
     }
 
     ViewEntry *view_entry = static_cast<ViewEntry *>(result.entry_);
 
     ExecuteShowViewDetail(query_context, view_entry->column_types(), view_entry->column_names());
 
-    Error<ExecutorException>(Format("No table, collection, or view name is {}.{}", this->db_name_, this->object_name_), __FILE_NAME__, __LINE__);
+    Error<ExecutorException>(Format("No table, collection, or view name is {}.{}", this->db_name_, this->object_name_));
 }
 
 void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_collecton_columns) {

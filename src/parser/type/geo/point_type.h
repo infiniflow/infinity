@@ -5,8 +5,8 @@
 #pragma once
 
 #include "parser_assert.h"
-#include <string>
 #include <cmath>
+#include <string>
 
 namespace infinity {
 

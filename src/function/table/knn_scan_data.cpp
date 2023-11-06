@@ -6,7 +6,7 @@ module;
 
 import stl;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import knn_flat_ip;
@@ -27,7 +27,7 @@ namespace infinity {
 void KnnScanFunctionData::Init() {
     switch (knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2: {
             switch (elem_type_) {
@@ -91,14 +91,14 @@ void KnnScanFunctionData::Init() {
                 case kElemDouble:
                     break;
                 case kElemInvalid: {
-                    Error<ExecutorException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid embedding data type");
                 }
             }
 
             break;
         }
         case KnnDistanceType::kCosine: {
-            Error<ExecutorException>("Not implemented cosine", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented cosine");
         }
         case KnnDistanceType::kInnerProduct: {
             switch (elem_type_) {
@@ -153,14 +153,14 @@ void KnnScanFunctionData::Init() {
                 case kElemDouble:
                     break;
                 case kElemInvalid: {
-                    Error<ExecutorException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid embedding data type");
                 }
             }
 
             break;
         }
         case KnnDistanceType::kHamming: {
-            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Hamming");
         }
     }
 }

@@ -13,7 +13,7 @@ import query_context;
 import stl;
 import std;
 import infinity_exception;
-import infinity_assert;
+
 import base_table_ref;
 import subquery_table_ref;
 import expression_transformer;
@@ -33,8 +33,8 @@ namespace infinity {
 
 SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    Assert<PlannerException>(bind_context->knn_exprs_.empty(), "knn_exprs_ shall be empty", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(!where_conditions_.empty(), "where_conditions_ shall not be empty", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(bind_context->knn_exprs_.empty(), "knn_exprs_ shall be empty");
+    Assert<PlannerException>(!where_conditions_.empty(), "where_conditions_ shall not be empty");
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
     SharedPtr<LogicalNode> filter = BuildFilter(from, where_conditions_, query_context, bind_context);
     filter->set_left_node(from);
@@ -47,7 +47,7 @@ SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_conte
 
 SharedPtr<LogicalNode>
 BoundDeleteStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-    Assert<PlannerException>(table_ref != nullptr && table_ref->type_ == TableRefType::kTable, "unsupported!", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(table_ref != nullptr && table_ref->type_ == TableRefType::kTable, "unsupported!");
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
 
@@ -95,7 +95,7 @@ void BoundDeleteStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            Error<PlannerException>("Nested subquery detected", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Nested subquery detected");
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

@@ -4,7 +4,7 @@ module;
 import stl;
 import parser;
 import knn_result_handler;
-import infinity_assert;
+
 import infinity_exception;
 import faiss;
 
@@ -105,7 +105,7 @@ RowID *MergeKnn<DataType, C>::GetIDs() const {
 template <typename DataType, template <typename, typename> typename C>
 DataType *MergeKnn<DataType, C>::GetDistancesByIdx(i64 idx) const {
     if (idx >= this->query_count_) {
-        Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Query index exceeds the limit");
     }
     return heap_result_handler_->heap_dis_tab + idx * this->topk_;
 }
@@ -113,7 +113,7 @@ DataType *MergeKnn<DataType, C>::GetDistancesByIdx(i64 idx) const {
 template <typename DataType, template <typename, typename> typename C>
 RowID *MergeKnn<DataType, C>::GetIDsByIdx(i64 idx) const {
     if (idx >= this->query_count_) {
-        Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Query index exceeds the limit");
     }
     return heap_result_handler_->heap_ids_tab + idx * this->topk_;
 }

@@ -12,7 +12,7 @@ import function;
 import function_set;
 import column_expression;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module project_binder;
@@ -80,7 +80,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            Error<PlannerException>("Aggregate function is called in another aggregate function.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Aggregate function is called in another aggregate function.");
         } else {
             this->binding_agg_func_ = true;
         }

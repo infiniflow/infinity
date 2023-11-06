@@ -5,7 +5,6 @@ import file_worker;
 import buffer_handle;
 import buffer_manager;
 import infinity_exception;
-import infinity_assert;
 
 module buffer_obj;
 
@@ -76,7 +75,7 @@ void BufferObj::UnloadInner() {
             break;
         }
         default: {
-            Error<StorageException>("Invalid call.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Invalid call.");
         }
     }
 }
@@ -106,7 +105,7 @@ bool BufferObj::Free() {
             break;
         }
         case BufferStatus::kNew: {
-            Error<StorageException>("Invalid call.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Invalid call.");
         }
     }
     file_worker_->FreeInMemory();
@@ -132,7 +131,7 @@ bool BufferObj::Save() {
             break;
         }
         default: {
-            Error<StorageException>("Invalid call.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Invalid call.");
         }
     }
     type_ = BufferType::kPersistent;
@@ -146,19 +145,19 @@ void BufferObj::CloseFile() { file_worker_->CloseFile(); }
 void BufferObj::CheckState() const {
     switch (status_) {
         case BufferStatus::kLoaded: {
-            Assert<StorageException>(rc_ > 0, "Invalid status.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(rc_ > 0, "Invalid status.");
             break;
         }
         case BufferStatus::kUnloaded: {
-            Assert<StorageException>(rc_ == 0, "Invalid status.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(rc_ == 0, "Invalid status.");
             break;
         }
         case BufferStatus::kFreed: {
-            Assert<StorageException>(rc_ == 0, "Invalid status.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(rc_ == 0, "Invalid status.");
             break;
         }
         case BufferStatus::kNew: {
-            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ == 0, "Invalid status.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ == 0, "Invalid status.");
             break;
         }
     }

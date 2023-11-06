@@ -6,8 +6,8 @@
 #include "mixed_array_value.h"
 #include "mixed_tuple_value.h"
 #include "parser_assert.h"
-#include <cstring>
 #include <cmath>
+#include <cstring>
 
 namespace infinity {
 

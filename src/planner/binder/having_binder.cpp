@@ -10,7 +10,7 @@ import parser;
 import bind_context;
 import column_expression;
 import function;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import function_set;
@@ -59,7 +59,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
-            Error<PlannerException>("Aggregate function is called in another aggregate function.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Aggregate function is called in another aggregate function.");
         }
     }
 
@@ -82,9 +82,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
         return result;
 
     } else {
-        Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()),
-                                __FILE_NAME__,
-                                __LINE__);
+        Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
     }
 }
 
@@ -93,7 +91,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            Error<PlannerException>("Aggregate function is called in another aggregate function.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Aggregate function is called in another aggregate function.");
         } else {
             this->binding_agg_func_ = true;
         }
@@ -124,7 +122,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 }
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Error<PlannerException>("KNN expression isn't supported in having clause", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("KNN expression isn't supported in having clause");
 }
 
 } // namespace infinity

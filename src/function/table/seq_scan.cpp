@@ -17,7 +17,7 @@ import block_column_entry;
 import column_buffer;
 import new_catalog;
 import default_values;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 import segment_entry;
@@ -66,7 +66,7 @@ static void SeqScanFunc(QueryContext *query_context, TableFunctionData *table_fu
     // fill the whole output data block, or we have read all data from table
     while (write_capacity > 0 && current_segment_id != INVALID_SEGMENT_ID) {
         auto iter = table_column_entry_ptr->segments_.find(current_segment_id);
-        Assert<StorageException>(iter != table_column_entry_ptr->segments_.end(), "non-exist segment id", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(iter != table_column_entry_ptr->segments_.end(), "non-exist segment id");
         SegmentEntry *segment_entry = iter->second.get();
 
         i64 block_count = segment_entry->block_entries_.size();

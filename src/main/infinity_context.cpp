@@ -12,18 +12,11 @@ import config;
 import resource_manager;
 import fragment_scheduler;
 import storage;
-//import local_file_system;
-//import std;
-//import third_party;
-//import query_options;
-//import query_result;
-//import database;
 
 namespace infinity {
 
-void
-InfinityContext::Init(const SharedPtr <String>& config_path) {
-    if(initialized_) {
+void InfinityContext::Init(const SharedPtr<String> &config_path) {
+    if (initialized_) {
         return;
     } else {
         // Config
@@ -43,9 +36,8 @@ InfinityContext::Init(const SharedPtr <String>& config_path) {
     }
 }
 
-void
-InfinityContext::UnInit() {
-    if(!initialized_) {
+void InfinityContext::UnInit() {
+    if (!initialized_) {
         return;
     }
     initialized_ = false;
@@ -62,4 +54,4 @@ InfinityContext::UnInit() {
     config_.reset();
 }
 
-}
+} // namespace infinity

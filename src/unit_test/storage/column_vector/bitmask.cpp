@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import bitmask;
 import third_party;
@@ -17,7 +17,6 @@ class BitmaskTest : public BaseTest {};
 
 TEST_F(BitmaskTest, bitmask_a) {
     using namespace infinity;
-
 
     constexpr size_t bit_count = 8192;
 
@@ -154,7 +153,6 @@ TEST_F(BitmaskTest, bitmask_a) {
 
 TEST_F(BitmaskTest, bitmask_b) {
     using namespace infinity;
-
 
     constexpr size_t bit_count = 8192;
     SharedPtr<Bitmask> bitmask2 = Bitmask::Make(bit_count);

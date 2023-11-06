@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,13 +22,11 @@ class ColumnVectorNestedTest : public BaseTest {};
 TEST_F(ColumnVectorNestedTest, flat_array) {
     using namespace infinity;
 
-
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_array) {
     using namespace infinity;
-
 
     // No test cases.
 }
@@ -36,13 +34,11 @@ TEST_F(ColumnVectorNestedTest, contant_array) {
 TEST_F(ColumnVectorNestedTest, flat_tuple) {
     using namespace infinity;
 
-
     // No test cases.
 }
 
 TEST_F(ColumnVectorNestedTest, contant_tuple) {
     using namespace infinity;
-
 
     // No test cases.
 }

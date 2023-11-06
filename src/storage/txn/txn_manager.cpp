@@ -10,7 +10,7 @@ import txn;
 import txn_state;
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import wal_entry;
 import logger;
@@ -20,17 +20,13 @@ module txn_manager;
 
 namespace infinity {
 
-TxnManager::TxnManager(NewCatalog *catalog,
-                       BufferManager *buffer_mgr,
-                       PutWalEntryFn put_wal_entry_fn,
-                       u64 start_txn_id,
-                       TxnTimeStamp start_ts)
+TxnManager::TxnManager(NewCatalog *catalog, BufferManager *buffer_mgr, PutWalEntryFn put_wal_entry_fn, u64 start_txn_id, TxnTimeStamp start_ts)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot create txn", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
@@ -78,7 +74,7 @@ TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
 void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot invalidate", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot invalidate");
     }
     LockGuard<Mutex> guard(mutex_);
     SizeT cnt = priority_que_.erase(commit_ts);
@@ -94,7 +90,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
 void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot put wal entry", __FILE_NAME__, __LINE__);
+        Error<TransactionException>("TxnManager is not running, cannot put wal entry");
     }
     if (put_wal_entry_ == nullptr)
         return;
@@ -130,6 +126,7 @@ void TxnManager::Stop() {
         ++it;
     }
     priority_que_.clear();
+    LOG_INFO("TxnManager is stopped");
 }
 
 bool TxnManager::Stopped() { return !is_running_.load(); }

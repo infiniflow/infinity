@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -23,7 +23,6 @@ class ColumnVectorBitmapTest : public BaseTest {};
 TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
 
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
@@ -191,7 +190,6 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
 
@@ -306,7 +304,6 @@ TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -366,7 +363,6 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_vector_select) {
 
 TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBitmap);
     ColumnVector column_vector(data_type);

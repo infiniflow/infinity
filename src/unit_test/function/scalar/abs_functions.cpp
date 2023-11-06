@@ -7,7 +7,7 @@
 #include <cmath>
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;

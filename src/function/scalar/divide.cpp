@@ -8,7 +8,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -51,7 +51,7 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 template <>
 inline bool DivFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
-    Error<NotImplementException>("Not implement huge int divide operator.", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement huge int divide operator.");
 }
 
 void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

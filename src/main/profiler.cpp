@@ -8,7 +8,7 @@ module;
 import std;
 import stl;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module profiler;
@@ -88,7 +88,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Execution";
         }
         default: {
-            Error<ExecutorException>("Invalid query phase in query profiler", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid query phase in query profiler");
         }
     }
 }
@@ -100,9 +100,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        Error<ExecutorException>(Format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Error<ExecutorException>(Format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
     profilers_[phase_idx].set_name(QueryPhaseToString(phase));
@@ -112,7 +110,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
 void QueryProfiler::StopPhase(QueryPhase phase) {
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        Error<ExecutorException>("Query phase isn't started, yet", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Query phase isn't started, yet");
     }
 
     current_phase_ = QueryPhase::kInvalid;
