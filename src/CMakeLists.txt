@@ -187,6 +187,12 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/external/frozen/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/highway")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
@@ -339,5 +345,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/con
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
+target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
