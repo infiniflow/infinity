@@ -439,13 +439,13 @@ void add_data_to_partition_l2(i32 dimension,
     {
         // specially check 567736,find 2 nearest centroids
         const ElemType *x_ = vectors_ptr + 567736 * dimension;
-        Pair<i32, f32> nearest_centroids[2] = {{0, L2Distance<f32>(x_, centroids.data(), dimension)},
-                                               {1, L2Distance<f32>(x_, centroids.data() + dimension, dimension)}};
+        Pair<i32, f64> nearest_centroids[2] = {{0, L2Distance<f64>(x_, centroids.data(), dimension)},
+                                               {1, L2Distance<f64>(x_, centroids.data() + dimension, dimension)}};
         if (nearest_centroids[0].second > nearest_centroids[1].second) {
             std::swap(nearest_centroids[0], nearest_centroids[1]);
         }
         for (i32 i = 2; i < partition_num; ++i) {
-            auto distance = L2Distance<f32>(x_, centroids.data() + i * dimension, dimension);
+            auto distance = L2Distance<f64>(x_, centroids.data() + i * dimension, dimension);
             if (distance < nearest_centroids[0].second) {
                 nearest_centroids[1] = nearest_centroids[0];
                 nearest_centroids[0] = {i, distance};
