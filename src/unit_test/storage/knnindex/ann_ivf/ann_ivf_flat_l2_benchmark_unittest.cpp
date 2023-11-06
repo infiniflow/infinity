@@ -201,6 +201,15 @@ void benchmark_faiss_ivfflatl2() {
             gt[i] = gt_int[i];
         }
         delete[] gt_int;
+        {
+            // output the 1472nd line of gt
+            std::cout << "############################" << std::endl;
+            std::cout << "gt[1472]:\n";
+            for (int j = 0; j < k; j++) {
+                std::cout << gt[1472 * k + j] << " ";
+            }
+            std::cout << std::endl;
+        }
     }
 
     { // Perform a search
@@ -217,6 +226,16 @@ void benchmark_faiss_ivfflatl2() {
             memset(D1, 0, nq * ksearch * sizeof(float));
 
             index->search(nq, xq, ksearch, D1, I1);
+
+            {
+                // output the 1472nd line of I1
+                std::cout << "############################" << std::endl;
+                std::cout << "I1[1472]:\n";
+                for (int j = 0; j < ksearch; j++) {
+                    std::cout << I1[1472 * ksearch + j] << " ";
+                }
+                std::cout << std::endl;
+            }
 
             // output first 3 lines of I1 and D1
             std::cout << "############################" << std::endl;

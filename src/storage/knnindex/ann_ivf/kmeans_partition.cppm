@@ -435,6 +435,32 @@ void add_data_to_partition_l2(i32 dimension,
     const auto &centroids = index_data->centroids_;
     auto &vectors = index_data->vectors_;
     auto &ids = index_data->ids_;
+    // TODO:delete this
+    {
+        // specially check 567736,find 2 nearest centroids
+        const ElemType *x_ = vectors_ptr + 567736 * dimension;
+        Pair<i32, f32> nearest_centroids[2] = {{0, L2Distance<f32>(x_, centroids.data(), dimension)},
+                                               {1, L2Distance<f32>(x_, centroids.data() + dimension, dimension)}};
+        if (nearest_centroids[0].second > nearest_centroids[1].second) {
+            std::swap(nearest_centroids[0], nearest_centroids[1]);
+        }
+        for (i32 i = 2; i < partition_num; ++i) {
+            auto distance = L2Distance<f32>(x_, centroids.data() + i * dimension, dimension);
+            if (distance < nearest_centroids[0].second) {
+                nearest_centroids[1] = nearest_centroids[0];
+                nearest_centroids[0] = {i, distance};
+            } else if (distance < nearest_centroids[1].second) {
+                nearest_centroids[1] = {i, distance};
+            }
+        }
+        // output nearest_centroids
+        std::cout << "#####################################################"
+                  << "\nnearest_centroids:\n";
+        for (i32 i = 0; i < 2; ++i) {
+            std::cout << nearest_centroids[i].first << " " << nearest_centroids[i].second << std::endl;
+        }
+        std::cout << "#####################################################\n" << std::endl;
+    }
     Vector<i32> assigned_partition_id(vector_count);
     Vector<i32> partition_element_count(partition_num);
     // record time
