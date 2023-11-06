@@ -82,7 +82,7 @@ UniquePtr<String> Txn::Append(const String &db_name, const String &table_name, c
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -99,7 +99,7 @@ UniquePtr<String> Txn::Delete(const String &db_name, const String &table_name, c
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -167,21 +167,15 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
     }
 }
 
-void Txn::AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store) {
-    if (txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
-        String err_msg = Format("Attempt to add duplicated table store for table: {}", table_name);
-        LOG_ERROR(err_msg);
-        return;
+TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
+    UniqueLock<Mutex> lk(m);
+    auto txn_table_iter = txn_tables_store_.find(*table_entry->table_collection_name_);
+    if (txn_table_iter != txn_tables_store_.end()) {
+        return txn_table_iter->second.get();
     }
-    txn_tables_store_[table_name] = Move(txn_table_store);
-}
-
-TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
-    auto txn_table_iter = txn_tables_store_.find(table_name);
-    if (txn_table_iter == txn_tables_store_.end()) {
-        return nullptr;
-    }
-    return txn_table_iter->second.get();
+    txn_tables_store_[*table_entry->table_collection_name_] = MakeUnique<TxnTableStore>(table_entry, this);
+    TxnTableStore *txn_table_store = txn_tables_store_[*table_entry->table_collection_name_].get();
+    return txn_table_store;
 }
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
@@ -351,7 +345,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 

@@ -490,7 +490,6 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry, segment_id, buffer_manager);
             EXPECT_EQ(segment_entry->segment_id_, 0);
             auto last_block_entry = segment_entry->block_entries_.back().get();
-            txn4->AddTxnTableStore("tbl1", MakeUnique<TxnTableStore>("tbl1", table_collection_entry, txn4));
 
             Vector<SharedPtr<ColumnVector>> columns_vector;
             {
@@ -549,7 +548,8 @@ TEST_F(WalReplayTest, WalReplayImport) {
             last_block_entry->row_count_ = 1;
             segment_entry->row_count_ = 1;
 
-            PhysicalImport::SaveSegmentData(txn4, segment_entry, "default", "tbl1");
+            auto txn_store = txn4->GetTxnTableStore(table_collection_entry);
+            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
             txn4->CommitTxn();
         }
 

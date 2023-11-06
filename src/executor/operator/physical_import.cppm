@@ -12,6 +12,7 @@ import physical_operator;
 import physical_operator_type;
 import third_party;
 import txn;
+import txn_store;
 import table_collection_entry;
 import segment_entry;
 import zsv;
@@ -79,7 +80,7 @@ public:
 
     inline char delimiter() const { return delimiter_; }
 
-    static void SaveSegmentData(Txn *txn, SharedPtr<SegmentEntry> &segment_entry, const String &db_name, const String &table_name);
+    static void SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry);
 
 private:
     static void CSVHeaderHandler(void *);

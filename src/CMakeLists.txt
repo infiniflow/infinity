@@ -204,6 +204,7 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
+        iresearch
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -317,6 +318,7 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
+        iresearch
 )
 
 target_sources(unit_test

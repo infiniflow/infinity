@@ -43,8 +43,41 @@ add_subdirectory(concurrentqueue)
 add_subdirectory(fastpfor)
 add_subdirectory(newpfor)
 
-# Build openfst
-add_subdirectory(openfst)
-
 # Build zsv
 add_subdirectory(zsv)
+
+################################################################################
+### Highway library
+################################################################################
+
+set(BUILD_TESTING OFF CACHE INTERNAL "" FORCE)
+add_subdirectory(highway)
+
+################################################################################
+### sse2neon
+### need this after highway and before simdcomp
+################################################################################
+
+add_library(sse2neon INTERFACE)
+
+if (ARCH_AARCH64)
+  set(SSE2NEON_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/sse2neon)
+
+  target_include_directories(
+    sse2neon
+    SYSTEM
+    INTERFACE ${SSE2NEON_ROOT}
+  )
+endif ()
+
+################################################################################
+### OpenFST
+################################################################################
+
+add_subdirectory(openfst)
+
+################################################################################
+### iresearch
+################################################################################
+
+add_subdirectory(iresearch)

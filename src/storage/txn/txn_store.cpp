@@ -124,7 +124,7 @@ void TxnTableStore::PrepareCommit() {
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
-    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", this->table_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->table_collection_name_));
     Txn *txn_ptr = (Txn *)txn_;
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
@@ -139,7 +139,7 @@ void TxnTableStore::PrepareCommit() {
 
     TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
 
-    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", this->table_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->table_collection_name_));
 }
 
 /**

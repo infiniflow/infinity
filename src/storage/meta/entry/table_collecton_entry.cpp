@@ -150,6 +150,7 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     if (append_state_ptr->Finished()) {
@@ -276,6 +277,7 @@ TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn
 }
 
 UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment) {
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     segment->min_row_ts_ = commit_ts;
     segment->max_row_ts_ = commit_ts;
@@ -303,6 +305,11 @@ SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *t
 DBEntry *TableCollectionEntry::GetDBEntry(const TableCollectionEntry *table_entry) {
     TableCollectionMeta *table_meta = (TableCollectionMeta *)table_entry->table_collection_meta_;
     return (DBEntry *)table_meta->db_entry_;
+}
+
+SharedPtr<String> TableCollectionEntry::GetDBName(const TableCollectionEntry *table_entry) {
+    TableCollectionMeta *table_meta = (TableCollectionMeta *)table_entry->table_collection_meta_;
+    return table_meta->db_entry_->db_name_;
 }
 
 SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts) {
@@ -378,7 +385,8 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
-    if (!deleted) {
+
+    if (table_entry_json.contains("column_definition")) {
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
@@ -425,6 +433,10 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
         }
     }
 
+    if (table_entry->deleted_)
+        Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");
+    else
+        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0] != nullptr, "table segment 0 should be valid");
     return table_entry;
 }
 
@@ -448,6 +460,9 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     u32 max_segment_id = 0;
+    for (auto &[seg_id, sgement_entry] : this->segments_) {
+        max_segment_id = Max(max_segment_id, seg_id);
+    }
     for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
         max_segment_id = Max(max_segment_id, seg_id);
         auto it = this->segments_.find(seg_id);
@@ -457,8 +472,10 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
             it->second->MergeFrom(*sgement_entry2.get());
         }
     }
-    if (this->unsealed_segment_ == nullptr) {
-        this->unsealed_segment_ = this->segments_[max_segment_id].get();
+    if (this->unsealed_segment_ == nullptr && !this->segments_.empty()) {
+        auto seg_it = this->segments_.find(max_segment_id);
+        Assert<StorageException>(seg_it != this->segments_.end(), Format("max_segment_id {} is invalid", max_segment_id));
+        this->unsealed_segment_ = seg_it->second.get();
     }
 }
 

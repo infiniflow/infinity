@@ -47,6 +47,8 @@ message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
 execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD OUTPUT_VARIABLE GIT_COMMIT_ID OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
 
+# attach additional cmake modules
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
@@ -80,6 +82,8 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
 # set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 # find_package(Boost REQUIRED)
+find_package(Lz4 REQUIRED)
+
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
