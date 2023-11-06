@@ -558,24 +558,12 @@ void Clustering::train_encoded(
             }
 
             // update the centroids
-            // std::vector<float> hassign(k);
-            std::vector<int> inthassign(k);
+            std::vector<float> hassign(k);
+            // std::vector<int> inthassign(k);
 
             size_t k_frozen = frozen_centroids ? n_input_centroids : 0;
-            /*
-                        compute_centroids(
-                                d,
-                                k,
-                                nx,
-                                k_frozen,
-                                x,
-                                codec,
-                                assign.get(),
-                                weights,
-                                hassign.data(),
-                                centroids.data());
-            */
-            compute_centroids_int(d, k, nx, k_frozen, x, codec, assign.get(), weights, inthassign.data(), centroids.data());
+            compute_centroids(d, k, nx, k_frozen, x, codec, assign.get(), weights, hassign.data(), centroids.data());
+            // compute_centroids_int(d, k, nx, k_frozen, x, codec, assign.get(), weights, inthassign.data(), centroids.data());
             int nsplit = 0;
             // int nsplit = split_clusters(
             //         d, k, nx, k_frozen, hassign.data(), centroids.data());
@@ -606,17 +594,17 @@ void Clustering::train_encoded(
                 // output content of partition_element_count, 10 per line
                 std::cout << "partition_element_count:\n";
                 for (int i = 0; i < k; ++i) {
-                    std::cout << inthassign[i] << " ";
+                    std::cout << hassign[i] << " ";
                     if (i % 70 == 69)
                         std::cout << std::endl;
                 }
                 // output the max and min of inthassign
                 int max = 0, min = std::numeric_limits<int>::max();
                 for (int i = 0; i < k; ++i) {
-                    if (inthassign[i] > max)
-                        max = inthassign[i];
-                    if (inthassign[i] < min)
-                        min = inthassign[i];
+                    if (hassign[i] > max)
+                        max = hassign[i];
+                    if (hassign[i] < min)
+                        min = hassign[i];
                 }
                 std::cout << "\nmax: " << max << " min: " << min << std::endl;
                 // rewrite the above output in std::cout
