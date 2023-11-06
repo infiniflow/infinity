@@ -264,6 +264,12 @@ void benchmark_faiss_ivfflatl2() {
                     }
                 }
             }
+            // output n_1, n_10, n_100
+            std::cout << "############################" << std::endl;
+            std::cout << "n_1: " << n_1 << std::endl;
+            std::cout << "n_10: " << n_10 << std::endl;
+            std::cout << "n_100: " << n_100 << std::endl;
+            std::cout << "############################" << std::endl;
             printf("R@1 = %.4f\n", n_1 / float(nq));
             printf("R@10 = %.4f\n", n_10 / float(nq * 10));
             printf("R@100 = %.4f\n", n_100 / float(nq * 100));
@@ -513,6 +519,12 @@ void benchmark_annivfflatl2() {
                 }
             }
         }
+        // output n_1, n_10, n_100
+        std::cout << "############################" << std::endl;
+        std::cout << "n_1: " << n_1 << std::endl;
+        std::cout << "n_10: " << n_10 << std::endl;
+        std::cout << "n_100: " << n_100 << std::endl;
+        std::cout << "############################" << std::endl;
         printf("R@1 = %.4f\n", n_1 / float(nq));
         printf("R@10 = %.4f\n", n_10 / float(nq * 10));
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
