@@ -4,7 +4,7 @@ import stl;
 import byte_slice;
 import memory_pool;
 import file_writer;
-import infinity_assert;
+
 import infinity_exception;
 
 module byte_slice_writer;
@@ -77,7 +77,7 @@ void ByteSliceWriter::Write(ByteSliceList &src) { slice_list_->MergeWith(src); }
 
 void ByteSliceWriter::Write(const ByteSliceList &src, u32 start, u32 end) {
     if (start >= end || end > src.GetTotalSize()) {
-        Error<StorageException>("Write past EOF ", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Write past EOF ");
     }
 
     ByteSlice *curr_slice = nullptr;

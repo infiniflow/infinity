@@ -20,7 +20,7 @@ import data_access_state;
 import db_entry;
 import logger;
 import txn_store;
-import infinity_assert;
+
 import infinity_exception;
 import ivfflat_index_def;
 import index_def_meta;
@@ -122,10 +122,10 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
                 return {nullptr, MakeUnique<String>("Attempt to drop not existed index entry")};
             }
             default: {
-                Error<StorageException>("Invalid conflict type.", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Invalid conflict type.");
             }
         }
-        Error<StorageException>("Should not reach here.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Should not reach here.");
     } else {
         LOG_TRACE(Format("Drop index entry {}", index_name));
         return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
@@ -133,7 +133,7 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    Error<StorageException>("Not implemented.", __FILE_NAME__, __LINE__);
+    Error<StorageException>("Not implemented.");
 }
 
 void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -150,7 +150,7 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
-    Assert<StorageException>(!table_entry->deleted_, "table is deleted", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     if (append_state_ptr->Finished()) {
@@ -225,7 +225,7 @@ UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
         if (segment_entry == nullptr) {
-            Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Going to delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::DeleteData(segment_entry, txn_ptr, block_row_hashmap);
@@ -255,7 +255,7 @@ void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, 
 void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store) {
     auto *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    Error<NotImplementException>("TableCollectionEntry::RollbackAppend", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("TableCollectionEntry::RollbackAppend");
 }
 
 void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
@@ -263,7 +263,7 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
         if (segment == nullptr) {
-            Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
@@ -272,12 +272,12 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
 
 UniquePtr<String>
 TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("TableCollectionEntry::RollbackDelete", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("TableCollectionEntry::RollbackDelete");
     return nullptr;
 }
 
 UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment) {
-    Assert<StorageException>(!table_entry->deleted_, "table is deleted", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     segment->min_row_ts_ = commit_ts;
     segment->max_row_ts_ = commit_ts;
@@ -434,39 +434,29 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     }
 
     if (table_entry->deleted_)
-        Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");
     else
-        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0] != nullptr,
-                                 "table segment 0 should be valid",
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0] != nullptr, "table segment 0 should be valid");
     return table_entry;
 }
 
 u64 TableCollectionEntry::GetColumnIdByName(const String &column_name) {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        Error<NotImplementException>(Format("No column name: {}", column_name), __FILE_NAME__, __LINE__);
+        Error<NotImplementException>(Format("No column name: {}", column_name));
     }
     return it->second;
 }
 
 void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     auto table_entry2 = dynamic_cast<TableCollectionEntry *>(&other);
-    Assert<StorageException>(table_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(table_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(*this->table_collection_name_ == *table_entry2->table_collection_name_,
-                             "DBEntry::MergeFrom requires table_collection_name_ match",
-                             __FILE_NAME__,
-                             __LINE__);
-    Assert<StorageException>(*this->table_entry_dir_ == *table_entry2->table_entry_dir_,
-                             "DBEntry::MergeFrom requires table_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "DBEntry::MergeFrom requires table_collection_name_ match");
+    Assert<StorageException>(*this->table_entry_dir_ == *table_entry2->table_entry_dir_, "DBEntry::MergeFrom requires table_entry_dir_ match");
     Assert<StorageException>(this->table_collection_type_ == table_entry2->table_collection_type_,
-                             "DBEntry::MergeFrom requires table_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "DBEntry::MergeFrom requires table_entry_dir_ match");
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     u32 max_segment_id = 0;
@@ -484,7 +474,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     }
     if (this->unsealed_segment_ == nullptr && !this->segments_.empty()) {
         auto seg_it = this->segments_.find(max_segment_id);
-        Assert<StorageException>(seg_it != this->segments_.end(), Format("max_segment_id {} is invalid", max_segment_id), __FILE_NAME__, __LINE__);
+        Assert<StorageException>(seg_it != this->segments_.end(), Format("max_segment_id {} is invalid", max_segment_id));
         this->unsealed_segment_ = seg_it->second.get();
     }
 }

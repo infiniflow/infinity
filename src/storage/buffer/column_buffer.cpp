@@ -4,7 +4,7 @@ import stl;
 import buffer_handle;
 import buffer_manager;
 import infinity_exception;
-import infinity_assert;
+
 import varchar_layout;
 import parser;
 import block_column_entry;
@@ -20,11 +20,11 @@ const_ptr_t ColumnBuffer::GetAll() {
     if (outline_buffer_.get() == nullptr) {
         return static_cast<const_ptr_t>(inline_col_.GetData());
     }
-    Error<NotImplementException>("Cannot get all data of an outline column", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Cannot get all data of an outline column");
 }
 
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
     auto varchar_layout = reinterpret_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -44,7 +44,7 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
 }
 
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
     auto varchar_layout = static_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -66,10 +66,10 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
             case kPolygon:
             case kBlob:
             case kMixed: {
-                Error<NotImplementException>("Not implement complex type GetValueAt function", __FILE_NAME__, __LINE__);
+                Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Invalid data type");
             }
             default:
                 break;
@@ -82,11 +82,11 @@ ptr_t ColumnBuffer::GetAllMut() {
     if (outline_buffer_.get() == nullptr) {
         return static_cast<ptr_t>(inline_col_.GetDataMut());
     }
-    Error<NotImplementException>("Cannot get all data of an outline column", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Cannot get all data of an outline column");
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
     auto varchar_layout = reinterpret_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -106,7 +106,7 @@ Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtMut(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
     auto varchar_layout = static_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
     if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -128,10 +128,10 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
             case kPolygon:
             case kBlob:
             case kMixed: {
-                Error<NotImplementException>("Not implement complex type GetValueAt function", __FILE_NAME__, __LINE__);
+                Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Invalid data type");
             }
             default:
                 break;

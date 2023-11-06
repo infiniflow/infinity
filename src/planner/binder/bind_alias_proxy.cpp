@@ -9,7 +9,7 @@ import base_expression;
 import parser;
 import bind_context;
 import expression_binder;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -29,7 +29,7 @@ BindAliasProxy::BindAlias(ExpressionBinder &expression_binder, const ParsedExpr 
     const ParsedExpr *select_expr = bind_context_ptr->select_expression_[alias_pair->second];
 
     if (binding_alias_) {
-        Error<PlannerException>(Format("Trying to bind an alias table_name: {} in another alias", expr_name), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Trying to bind an alias table_name: {} in another alias", expr_name));
     }
 
     binding_alias_ = true;

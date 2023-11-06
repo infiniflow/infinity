@@ -32,7 +32,7 @@ QueryResult Table::CreateIndex(const String &index_name, Vector<String> *column_
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -55,7 +55,7 @@ QueryResult Table::DropIndex(const String &index_name) {
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -78,7 +78,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
     QueryResponse response = query_context_ptr->QueryStatement(insert_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -105,7 +105,7 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
     QueryResponse response = query_context_ptr->QueryStatement(import_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -125,7 +125,7 @@ QueryResult Table::Delete(ParsedExpr *filter) {
     QueryResponse response = query_context_ptr->QueryStatement(delete_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -146,7 +146,7 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     QueryResponse response = query_context_ptr->QueryStatement(update_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -178,7 +178,7 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
     QueryResponse response = query_context_ptr->QueryStatement(select_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }

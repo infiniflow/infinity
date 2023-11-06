@@ -2,7 +2,7 @@
 
 import infinity;
 import infinity_exception;
-import infinity_assert;
+
 import stl;
 import buffer_manager;
 import buffer_handle;

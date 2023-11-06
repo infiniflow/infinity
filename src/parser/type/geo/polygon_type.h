@@ -5,14 +5,14 @@
 #pragma once
 
 #include "type/geo/box_type.h"
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 
 struct PolygonType {
 public:
-    char* ptr{};
+    char *ptr{};
     uint64_t point_count{0}; // 65535 point are the max point count
     BoxType bounding_box{};
 

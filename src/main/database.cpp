@@ -35,7 +35,7 @@ QueryResult Database::CreateTable(const String &table_name,
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -56,7 +56,7 @@ QueryResult Database::DropTable(const String &table_name, const DropTableOptions
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -74,7 +74,7 @@ QueryResult Database::ListTables() {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -92,26 +92,26 @@ QueryResult Database::DescribeTable(const String &db_name) {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
 }
 
 SharedPtr<Table> Database::GetTable(const String &table_name) {
-        UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
-        query_context_ptr->Init(InfinityContext::instance().config(),
-                                InfinityContext::instance().fragment_scheduler(),
-                                InfinityContext::instance().storage(),
-                                InfinityContext::instance().resource_manager());
-        UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-        command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
-        QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
-        if(response.result_msg_.get() == nullptr) {
-            return MakeShared<Table>(table_name, session_);
-        } else {
-            return nullptr;
-        }
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
+    QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
+    if (response.result_msg_.get() == nullptr) {
+        return MakeShared<Table>(table_name, session_);
+    } else {
+        return nullptr;
+    }
 }
 
 } // namespace infinity

@@ -8,7 +8,7 @@ module;
 
 import stl;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 import expression_type;
@@ -52,7 +52,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            Error<ExecutorException>("Unknown expression type: " + expr->Name(), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Unknown expression type: " + expr->Name());
         }
     }
 }
@@ -60,7 +60,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
 void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    Assert<ExecutorException>(!in_aggregate_, "Recursive execute aggregate function!", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(!in_aggregate_, "Recursive execute aggregate function!");
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
     SharedPtr<BaseExpression> &child_expr = expr->arguments()[0];
@@ -71,13 +71,8 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     Execute(child_expr, child_state, child_output);
 
     Assert<ExecutorException>(expr->aggregate_function_.argument_type_ == *child_output->data_type(),
-                              "Argument type isn't matched with the child expression output",
-                              __FILE_NAME__,
-                              __LINE__);
-    Assert<ExecutorException>(expr->aggregate_function_.return_type_ == *output_column_vector->data_type(),
-                              "Return type isn't matched",
-                              __FILE_NAME__,
-                              __LINE__);
+                              "Argument type isn't matched with the child expression output");
+    Assert<ExecutorException>(expr->aggregate_function_.return_type_ == *output_column_vector->data_type(), "Return type isn't matched");
 
     // 1. Initialize the aggregate state.
     expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());
@@ -112,13 +107,13 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    Error<ExecutorException>("Case execution", __FILE_NAME__, __LINE__);
+    Error<ExecutorException>("Case execution");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    Error<ExecutorException>("Column expression", __FILE_NAME__, __LINE__);
+    Error<ExecutorException>("Column expression");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
@@ -156,10 +151,10 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        Error<ExecutorException>("Input data block is NULL", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        Error<ExecutorException>("Invalid column index", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Invalid column index");
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];
@@ -168,7 +163,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    Error<ExecutorException>("IN execution isn't implemented yet.", __FILE_NAME__, __LINE__);
+    Error<ExecutorException>("IN execution isn't implemented yet.");
 }
 
 } // namespace infinity

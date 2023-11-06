@@ -6,7 +6,7 @@
 #include "json.hpp"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -14,12 +14,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class EmbeddingInfoTest : public BaseTest {
-};
+class EmbeddingInfoTest : public BaseTest {};
 
 TEST_F(EmbeddingInfoTest, embedding_info_A) {
     using namespace infinity;
-
 
     EXPECT_THROW(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, EMBEDDING_LIMIT + 1), ParserException);
 

@@ -8,7 +8,7 @@ import std;
 import stl;
 import parser;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 
 module hash_table;
@@ -56,7 +56,7 @@ void HashTable::Init(const Vector<DataType> &types) {
             case kNull:
             case kMissing:
             case kInvalid: {
-                Error<ExecutorException>("Attempt to construct hash key for type: " + data_type.ToString(), __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Attempt to construct hash key for type: " + data_type.ToString());
             }
         }
 
@@ -86,7 +86,7 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
             DataType &data_type = types_[column_id];
             if (data_type.type() == kMixed) {
                 // Only float/boolean/integer/string can be built as hash key. Array/Tuple will be treated as null
-                Error<ExecutorException>("Attempt to construct hash key for heterogeneous type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Attempt to construct hash key for heterogeneous type");
             }
 
             if (data_type.type() == kVarchar) {

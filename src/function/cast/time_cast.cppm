@@ -7,7 +7,7 @@ module;
 import stl;
 import parser;
 import column_vector_cast;
-import infinity_assert;
+
 import infinity_exception;
 import bound_cast_func;
 import column_vector;
@@ -26,9 +26,7 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
         }
         default: {
             Error<FunctionException>(
-                    Format("Can't cast from Time type to  {}", target.ToString()),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("Can't cast from Time type to  {}", target.ToString()));
         }
     }
 }
@@ -37,15 +35,13 @@ struct TimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()),
-                __FILE_NAME__,
-                __LINE__);
+                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
     }
 };
 
 template <>
 inline bool TimeTryCastToVarlen::Run(TimeT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 } // namespace infinity

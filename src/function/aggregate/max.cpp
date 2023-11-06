@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
@@ -22,15 +22,15 @@ struct MaxState {
 public:
     ValueType value_;
 
-    void Initialize() { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    void Initialize() { Error<NotImplementException>("Not implemented"); }
 
-    void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented"); }
 
-    [[nodiscard]] ptr_t Finalize() const { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    [[nodiscard]] ptr_t Finalize() const { Error<NotImplementException>("Not implemented"); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__); }
+    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented"); }
 };
 
 template <>

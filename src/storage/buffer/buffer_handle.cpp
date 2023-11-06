@@ -43,11 +43,9 @@ BufferHandle::~BufferHandle() {
     }
 }
 
-const void *BufferHandle::GetData() {
-    return data_;
-}
+const void *BufferHandle::GetData() { return data_; }
 
- void *BufferHandle::GetDataMut() {
+void *BufferHandle::GetDataMut() {
     buffer_obj_->GetMutPointer();
     return data_;
 }

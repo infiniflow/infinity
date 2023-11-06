@@ -9,7 +9,7 @@ import stl;
 import expression_type;
 import parser;
 import scalar_function;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -20,7 +20,7 @@ namespace infinity {
 String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
-            Error<PlannerException>("Invalid KNN distance type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid KNN distance type");
         }
         case KnnDistanceType::kL2: {
             return "L2";
@@ -43,8 +43,7 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              EmbeddingT query_embedding,
                              Vector<SharedPtr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kKnn, Move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
-      distance_type_(knn_distance_type),
-      query_embedding_(Move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
+      distance_type_(knn_distance_type), query_embedding_(Move(query_embedding)) // Should call move constructor, otherwise there will be memory leak.
 {}
 
 String KnnExpression::ToString() const {

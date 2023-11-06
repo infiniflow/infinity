@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import stl;
 import global_resource_usage;
 import third_party;
@@ -31,7 +31,6 @@ class JsonTest : public BaseTest {
 
 TEST_F(JsonTest, test1) {
     using namespace infinity;
-
 
     String json_path = String(test_data_path()) + "/json/twitter.json";
     std::ifstream f(json_path);

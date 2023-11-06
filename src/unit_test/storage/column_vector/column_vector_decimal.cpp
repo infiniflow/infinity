@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +22,6 @@ class ColumnVectorDecimalTest : public BaseTest {};
 
 TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     using namespace infinity;
-
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
@@ -148,7 +147,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
     using namespace infinity;
 
-
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
@@ -239,7 +237,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
     using namespace infinity;
 
-
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);
     ColumnVector column_vector(data_type);
@@ -276,7 +273,6 @@ TEST_F(ColumnVectorDecimalTest, decimal_column_vector_select) {
 
 TEST_F(ColumnVectorDecimalTest, decimal_column_slice_init) {
     using namespace infinity;
-
 
     auto decimal_info = DecimalInfo::Make(38, 38);
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDecimal, decimal_info);

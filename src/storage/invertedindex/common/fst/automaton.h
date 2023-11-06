@@ -331,4 +331,3 @@ std::uint64_t ComputeProperties(const Fst<Transition<W>> &fst, std::uint64_t mas
 #include <fst/vector-fst.h>
 // clang-format on
 #include <fst/matcher.h>
-

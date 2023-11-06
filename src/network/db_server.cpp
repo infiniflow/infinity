@@ -4,8 +4,8 @@
 
 module;
 
-#include <thread>
 #include <boost/bind.hpp>
+#include <thread>
 
 module db_server;
 import infinity_context;
@@ -13,12 +13,12 @@ import stl;
 import boost;
 import third_party;
 import infinity_exception;
-import infinity_assert;
+
 import connection;
 
 namespace infinity {
 
-DBServer::DBServer(const StartupParameter &parameter) : config_path_(parameter.config_path) {}
+void DBServer::Init(const StartupParameter &parameter) { config_path_ = std::move(parameter.config_path); }
 
 void DBServer::Run() {
     if (initialized) {
@@ -34,7 +34,9 @@ void DBServer::Run() {
     BoostErrorCode error;
     AsioIpAddr address = asio_make_address(listen_address_ref, error);
     if (error) {
-        Error<NetworkException>(Format("Not a valid IPv4 address: {}", listen_address_ref), __FILE_NAME__, __LINE__);
+        Printf("{} isn't a valid IPv4 address.\n", listen_address_ref);
+        infinity::InfinityContext::instance().UnInit();
+        return ;
     }
 
     acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));
@@ -54,6 +56,7 @@ void DBServer::Run() {
 }
 
 void DBServer::Shutdown() {
+    Printf("Shutdown infinity server ...\n");
     while (running_connection_count_ > 0) {
         // Running connection exists.
         std::this_thread::yield();
@@ -63,6 +66,7 @@ void DBServer::Shutdown() {
     initialized = false;
     acceptor_ptr_->close();
     infinity::InfinityContext::instance().UnInit();
+    Printf("Shutdown infinity server successfully\n");
 }
 
 void DBServer::CreateConnection() {

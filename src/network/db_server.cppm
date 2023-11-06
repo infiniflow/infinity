@@ -14,9 +14,9 @@ export struct StartupParameter {
     SharedPtr<String> config_path{};
 };
 
-export class DBServer : public Singleton<DBServer> {
+export class DBServer {
 public:
-    explicit DBServer(const StartupParameter &parameter);
+    void Init(const StartupParameter& parameter);
 
     void Run();
 

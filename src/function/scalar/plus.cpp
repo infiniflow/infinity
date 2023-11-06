@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -20,7 +20,7 @@ namespace infinity {
 struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA value, TB &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 

@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -13,12 +13,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class PointTypeTest : public BaseTest {
-};
+class PointTypeTest : public BaseTest {};
 
 TEST_F(PointTypeTest, point1) {
     using namespace infinity;
-
 
     PointT p1;
     p1.x = 1.0f;

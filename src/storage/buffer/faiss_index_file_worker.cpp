@@ -6,7 +6,7 @@ module;
 
 import stl;
 import infinity_exception;
-import infinity_assert;
+
 import file_system;
 import third_party;
 
@@ -41,7 +41,7 @@ struct FSIOWriter : faiss::IOWriter {
 
 void FaissIndexFileWorker::AllocateInMemory() {
     if (data_) {
-        Error<StorageException>("Data is already allocated.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Data is already allocated.");
     }
     auto faiss_index_ptr = new FaissIndexPtr(nullptr, nullptr);
     data_ = static_cast<void *>(faiss_index_ptr);
@@ -49,7 +49,7 @@ void FaissIndexFileWorker::AllocateInMemory() {
 
 void FaissIndexFileWorker::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("Data is not allocated.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Data is not allocated.");
     }
     auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
     delete faiss_index_ptr->index_;
@@ -65,7 +65,7 @@ void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success) {
         faiss::write_index(faiss_index_ptr->index_, &writer);
         prepare_success = true; // Not run defer_fn
     } catch (faiss::FaissException &xcp) {
-        Error<StorageException>(Format("Faiss exception: {}", xcp.what()), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Faiss exception: {}", xcp.what()));
     }
 }
 

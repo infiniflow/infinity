@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "type/logical_type.h"
 #include "parser_assert.h"
+#include "type/logical_type.h"
 
 namespace infinity {
 

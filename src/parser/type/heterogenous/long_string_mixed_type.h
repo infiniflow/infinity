@@ -43,8 +43,8 @@ public:
 
 public:
     char header[BaseMixedType::LONG_STR_HEADER]{}; // 5 bytes is used to store the header of the string to shortcut some computation.
-    uint16_t length{0};                                   // Max string length will be 65535
-    char* ptr{nullptr};
+    uint16_t length{0};                            // Max string length will be 65535
+    char *ptr{nullptr};
 };
 
 } // namespace infinity

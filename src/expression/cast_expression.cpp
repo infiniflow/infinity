@@ -6,7 +6,7 @@ module;
 
 import parser;
 import base_expression;
-import infinity_assert;
+
 import infinity_exception;
 import bound_cast_func;
 import stl;
@@ -26,7 +26,7 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        Error<PlannerException>(Format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
 }
 
@@ -34,7 +34,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     switch (target.type()) {
         case LogicalType::kNull:
         case LogicalType::kInvalid:
-            Error<PlannerException>("Invalid data type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid data type");
         default:;
     }
 
@@ -114,13 +114,11 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         default: {
-            Error<PlannerException>("Invalid data type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Invalid data type");
         }
     }
 }
 
-String CastExpression::ToString() const {
-    return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString());
-}
+String CastExpression::ToString() const { return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
 
 } // namespace infinity

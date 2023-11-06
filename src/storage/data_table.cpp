@@ -7,7 +7,7 @@ module;
 import std;
 import stl;
 import std;
-import infinity_assert;
+
 import infinity_exception;
 import parser;
 import third_party;
@@ -23,7 +23,7 @@ namespace infinity {
 static String TableTypeToString(TableType type) {
     switch (type) {
         case TableType::kInvalid:
-            Error<TypeException>("Unexpected table type: Invalid", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Unexpected table type: Invalid");
         case TableType::kDataTable:
             return "DataTable";
         case TableType::kIntermediate:
@@ -39,7 +39,7 @@ static String TableTypeToString(TableType type) {
         case TableType::kCrossProduct:
             return "CrossProduct";
     }
-    Error<TypeException>("Unexpected error.", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Unexpected error.");
 }
 
 String DataTable::ToString() const {
@@ -68,13 +68,9 @@ SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
 
 void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
     Assert<StorageException>(this->row_count_ == other->row_count_,
-                             Format("Can't union two table with different row count {}:{}", this->row_count_, other->row_count_),
-                             __FILE_NAME__,
-                             __LINE__);
+                             Format("Can't union two table with different row count {}:{}", this->row_count_, other->row_count_));
     Assert<StorageException>(this->data_blocks_.size() == other->data_blocks_.size(),
-                             Format("Can't union two table with different block count {}:{}", this->data_blocks_.size(), other->data_blocks_.size()),
-                             __FILE_NAME__,
-                             __LINE__);
+                             Format("Can't union two table with different block count {}:{}", this->data_blocks_.size(), other->data_blocks_.size()));
     SizeT block_count = this->data_blocks_.size();
     for (SizeT idx = 0; idx < block_count; ++idx) {
         this->data_blocks_[idx]->UnionWith(other->data_blocks_[idx]);

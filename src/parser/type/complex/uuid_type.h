@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <string>
 #include <cstring>
+#include <string>
 
 namespace infinity {
 
@@ -16,7 +16,7 @@ public:
 public:
     inline UuidType() = default;
 
-    explicit UuidType(const char* input) { Set(input); }
+    explicit UuidType(const char *input) { Set(input); }
 
     inline ~UuidType() { Reset(); }
 
@@ -32,7 +32,7 @@ public:
 
     inline bool operator!=(const UuidType &other) const { return !operator==(other); }
 
-    inline void Set(const char* input) { memcpy(body, input, UuidType::LENGTH); }
+    inline void Set(const char *input) { memcpy(body, input, UuidType::LENGTH); }
 
     [[nodiscard]] inline std::string ToString() const { return std::string(body, UuidType::LENGTH); }
 

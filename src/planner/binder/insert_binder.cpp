@@ -10,7 +10,7 @@ import parser;
 import bind_context;
 import column_expression;
 import function;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import function_set;
@@ -26,7 +26,7 @@ SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, 
 }
 
 SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Error<PlannerException>("KNN expression isn't supported in insert clause", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("KNN expression isn't supported in insert clause");
 }
 
 // SharedPtr<BaseExpression>

@@ -1,7 +1,7 @@
 module;
 
 import buffer_base;
-import infinity_assert;
+
 import infinity_exception;
 import stl;
 
@@ -64,7 +64,7 @@ public:
     }
 
     void WriteByte(u8 x) {
-        Error<StorageException>("Cannot write to finalized buffer", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Cannot write to finalized buffer");
         NextIfAtEnd();
         *pos_ = x;
         ++pos_;
@@ -154,7 +154,7 @@ private:
 
             if (0 == next_chunk_size) {
                 Set(Pos(), 0);
-                Error<StorageException>("current buffer exhaused", __FILE_NAME__, __LINE__);
+                Error<StorageException>("current buffer exhaused");
             }
         }
 

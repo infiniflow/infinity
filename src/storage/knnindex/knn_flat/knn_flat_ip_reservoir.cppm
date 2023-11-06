@@ -12,7 +12,7 @@ import knn_partition;
 import faiss;
 import parser;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 
@@ -50,7 +50,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPReservoir isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("KnnFlatIPReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -89,14 +89,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return reservoir_result_handler_->heap_dis_tab + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return reservoir_result_handler_->heap_ids_tab + idx * this->top_k_;
     }

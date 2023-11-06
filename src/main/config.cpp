@@ -39,14 +39,14 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
     }
 
     u64 factor;
-    const char* ptr = FromChars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
-    if(ptr == nullptr) {
+    const char *ptr = FromChars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
+    if (ptr == nullptr) {
         return MakeShared<String>("Unrecognized byte size");
     } else {
         String unit = ptr;
         ToLower(unit);
         auto it = byte_unit.find(unit);
-        if(it != byte_unit.end()) {
+        if (it != byte_unit.end()) {
             byte_size = factor * it->second;
             return nullptr;
         } else {
@@ -58,7 +58,7 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
 // extern SharedPtr<spdlogger> infinity_logger;
 
 SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
-    SharedPtr <String> result;
+    SharedPtr<String> result;
 
     // Default general config
     String default_version = Format("{}.{}.{}", version_major(), version_minor(), version_patch());
@@ -79,21 +79,21 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u32 default_sdk_port = 23817;
 
     // Default log config
-    SharedPtr <String> default_log_filename = MakeShared<String>("infinity.log");
-    SharedPtr <String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
+    SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
+    SharedPtr<String> default_log_dir = MakeShared<String>("/tmp/infinity/log");
     bool default_log_to_stdout = false;
     u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
     u64 default_log_file_rotate_count = 10;
     LogLevel default_log_level = LogLevel::kTrace;
 
     // Default storage config
-    SharedPtr <String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
-    SharedPtr <String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
+    SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
+    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
     u64 default_row_size = 8192lu;
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
-    SharedPtr <String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
+    SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
 
     // Default wal config
     u64 wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
@@ -104,7 +104,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
 
     LocalFileSystem fs;
-    if(config_path.get() == nullptr || !fs.Exists(*config_path)) {
+    if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         Printf("No config file is given, use default configs.");
 
         // General
@@ -169,20 +169,20 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             auto general_config = config["general"];
 
             String infinity_version = general_config["version"].value_or("invalid");
-            if(!IsEqual(default_version, infinity_version)) {
+            if (!IsEqual(default_version, infinity_version)) {
                 return MakeShared<String>("Unmatched version in config file.");
             }
             option_.version = infinity_version;
 
             String time_zone_str = general_config["timezone"].value_or("invalid");
-            if(IsEqual(time_zone_str, "invalid")) {
+            if (IsEqual(time_zone_str, "invalid")) {
                 result = MakeShared<String>("Timezone isn't given in config file.");
                 return result;
             }
 
             try {
                 ParseTimeZoneStr(time_zone_str, option_.time_zone, option_.time_zone_bias);
-            } catch(...) {
+            } catch (...) {
                 result = MakeShared<String>(Format("Timezone can't be recognized: {}", time_zone_str));
                 return result;
             }
@@ -253,7 +253,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             option_.log_file_rotate_count = log_config["log_file_rotate_count"].value_or(default_log_file_rotate_count);
 
             String log_level = log_config["log_level"].value_or("invalid");
-            if(IsEqual(log_level, "trace")) {
+            if (IsEqual(log_level, "trace")) {
                 option_.log_level = LogLevel::kTrace;
             } else if (IsEqual(log_level, "info")) {
                 option_.log_level = LogLevel::kInfo;

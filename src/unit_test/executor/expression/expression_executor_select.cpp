@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -36,7 +36,7 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
         Value vx = column_vector.GetValue(i);
     }
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
@@ -51,10 +51,10 @@ TEST_F(ExpressionExecutorSelectTest, test1) {
                                output_true_select,
                                true);
 #endif
-//    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE / 2);
-//    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
-//        EXPECT_EQ((*output_true_select)[idx], idx * 2);
-//    }
+    //    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE / 2);
+    //    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE / 2; ++ idx) {
+    //        EXPECT_EQ((*output_true_select)[idx], idx * 2);
+    //    }
 }
 
 TEST_F(ExpressionExecutorSelectTest, test2) {
@@ -70,7 +70,7 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
         Value vx = column_vector.GetValue(i);
     }
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, true);
@@ -85,10 +85,10 @@ TEST_F(ExpressionExecutorSelectTest, test2) {
                                output_true_select,
                                true);
 #endif
-//    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE);
-//    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE; ++ idx) {
-//        EXPECT_EQ((*output_true_select)[idx], idx);
-//    }
+    //    EXPECT_EQ(output_true_select->Size(), DEFAULT_VECTOR_SIZE);
+    //    for(SizeT idx = 0; idx < DEFAULT_VECTOR_SIZE; ++ idx) {
+    //        EXPECT_EQ((*output_true_select)[idx], idx);
+    //    }
 }
 
 TEST_F(ExpressionExecutorSelectTest, test3) {
@@ -104,7 +104,7 @@ TEST_F(ExpressionExecutorSelectTest, test3) {
         Value vx = column_vector.GetValue(i);
     }
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++ i) {
+    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
         EXPECT_EQ(vx.value_.boolean, false);

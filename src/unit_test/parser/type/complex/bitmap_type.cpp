@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -13,8 +13,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class BitmapTypeTest : public BaseTest {
-};
+class BitmapTypeTest : public BaseTest {};
 
 TEST_F(BitmapTypeTest, bitmap1) {
     using namespace infinity;

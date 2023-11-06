@@ -6,7 +6,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -20,7 +20,7 @@ namespace infinity {
 struct ExtractYearFunction {
     template <typename TA, typename TB>
     static inline void Run(TA input, TB &result) {
-        Error<NotImplementException>("ExtractYear function isn't implemented", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("ExtractYear function isn't implemented");
     }
 };
 
@@ -32,7 +32,7 @@ inline void ExtractYearFunction::Run(DateT left, BigIntT &result) {
 struct ExtractMonthFunction {
     template <typename TA, typename TB>
     static inline void Run(TA input, TB &result) {
-        Error<NotImplementException>("ExtractMonth function isn't implemented", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("ExtractMonth function isn't implemented");
     }
 };
 
@@ -44,7 +44,7 @@ inline void ExtractMonthFunction::Run(DateT left, BigIntT &result) {
 struct ExtractDayFunction {
     template <typename TA, typename TB>
     static inline void Run(TA input, TB &result) {
-        Error<NotImplementException>("ExtractDay function isn't implemented", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("ExtractDay function isn't implemented");
     }
 };
 

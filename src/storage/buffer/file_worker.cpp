@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 import local_file_system;
 import third_party;
@@ -28,10 +28,10 @@ void FileWorker::WriteToFile(bool to_spill) {
     // if (buffer_size == 0) {
     //     buffer_size = buffer_size_;
     // } else if (buffer_size > buffer_size_) {
-    //     Error<StorageException>("Invalid buffer size.", __FILE_NAME__, __LINE__);
+    //     Error<StorageException>("Invalid buffer size.");
     // }
     if (data_ == nullptr) {
-        Error<StorageException>("No data will be written.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("No data will be written.");
     }
     LocalFileSystem fs;
 
@@ -73,13 +73,13 @@ void FileWorker::MoveFile() {
     String dest_dir = ChooseFileDir(false);
     String dest_path = Format("{}/{}", dest_dir, *file_name_);
     if (!fs.Exists(src_path)) {
-        Error<StorageException>(Format("File {} doesn't exist.", src_path), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("File {} doesn't exist.", src_path));
     }
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);
     }
     if (fs.Exists(dest_path)) {
-        Error<StorageException>(Format("File {} was already been created before.", dest_path), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("File {} was already been created before.", dest_path));
     }
     fs.Rename(src_path, dest_path);
 }

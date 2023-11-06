@@ -28,8 +28,15 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <experimental/source_location>
 
 export module stl;
+
+export namespace std {
+
+using std::experimental::source_location;
+
+}
 
 namespace infinity {
 

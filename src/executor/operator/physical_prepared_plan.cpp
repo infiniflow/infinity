@@ -9,7 +9,6 @@ import operator_state;
 
 module physical_prepared_plan;
 
-
 namespace infinity {
 
 void PhysicalPreparedPlan::Init() {}

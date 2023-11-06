@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "parser_assert.h"
 #include <cstdint>
 #include <string>
-#include "parser_assert.h"
 
 namespace infinity {
 
@@ -24,16 +24,12 @@ public:
 public:
     BitmapType() = default;
 
-    explicit inline BitmapType(uint64_t bit_count) {
-        Initialize(bit_count);
-    }
+    explicit inline BitmapType(uint64_t bit_count) { Initialize(bit_count); }
 
     // The bitmap_ptr will also be freed by BitmapType's destructor.
-    inline BitmapType(uint64_t *bitmap_ptr, uint64_t bit_count) : ptr(bitmap_ptr), count(bit_count) { }
+    inline BitmapType(uint64_t *bitmap_ptr, uint64_t bit_count) : ptr(bitmap_ptr), count(bit_count) {}
 
-    inline ~BitmapType() {
-        Reset();
-    }
+    inline ~BitmapType() { Reset(); }
 
     BitmapType(const BitmapType &other);
 

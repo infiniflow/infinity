@@ -9,7 +9,7 @@ import base_expression;
 import parser;
 import function;
 import bind_context;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import bind_alias_proxy;
@@ -41,12 +41,12 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
         result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
     }
 
-    Assert<PlannerException>(result.get() != nullptr, Format("Can't bind the expr: {}", expr.GetName()), __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(result.get() != nullptr, Format("Can't bind the expr: {}", expr.GetName()));
     return result;
 }
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
-    Assert<PlannerException>(func_type == FunctionType::kScalar, "Only scalar function are allowed in where clause", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(func_type == FunctionType::kScalar, "Only scalar function are allowed in where clause");
 }
 
 } // namespace infinity

@@ -7,7 +7,7 @@
 import compilation_config;
 import infinity_context;
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -27,8 +27,8 @@ TEST_F(SQLFileParsingTest, tpch) {
     String path = String(test_data_path()) + "/tpch";
     Vector<String> files = GetFilesFromDir(path);
     SizeT file_count = files.size();
-    for(SizeT idx = 0; idx < file_count; ++ idx) {
-        const String& filename = files[idx];
+    for (SizeT idx = 0; idx < file_count; ++idx) {
+        const String &filename = files[idx];
         if (filename == "README.md") {
             continue;
         }

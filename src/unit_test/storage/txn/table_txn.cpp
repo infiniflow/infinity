@@ -6,7 +6,7 @@
 
 import infinity_context;
 import infinity_exception;
-import infinity_assert;
+
 import stl;
 import global_resource_usage;
 import third_party;
@@ -21,7 +21,7 @@ import txn_manager;
 import txn;
 import base_entry;
 
-class TableTxnTest  : public BaseTest {
+class TableTxnTest : public BaseTest {
     void SetUp() override {
         system("rm -rf /tmp/infinity");
         infinity::GlobalResourceUsage::Init();

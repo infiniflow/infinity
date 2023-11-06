@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "type/type_info.h"
 #include "parser_assert.h"
+#include "type/type_info.h"
 #include <memory>
 
 namespace infinity {
@@ -32,7 +32,9 @@ public:
 
     [[nodiscard]] nlohmann::json Serialize() const override;
 
-    [[nodiscard]] inline std::string ToString() const override { return "decimal(" + std::to_string(precision_) + ", " + std::to_string(scale_) + ")"; }
+    [[nodiscard]] inline std::string ToString() const override {
+        return "decimal(" + std::to_string(precision_) + ", " + std::to_string(scale_) + ")";
+    }
 
 private:
     int64_t precision_;

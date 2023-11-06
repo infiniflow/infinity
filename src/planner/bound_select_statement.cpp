@@ -43,7 +43,6 @@ import logical_dummy_scan;
 
 import subquery_unnest;
 
-import infinity_assert;
 import infinity_exception;
 import expression_transformer;
 import expression_type;
@@ -93,10 +92,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!order_by_expressions_.empty()) {
-            Assert<PlannerException>(order_by_expressions_.size() == order_by_types_.size(),
-                                     "Unknown error on order by expression",
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Assert<PlannerException>(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
             SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
             sort->set_left_node(root);
             root = sort;
@@ -122,7 +118,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         // Knn case
         SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, query_context, bind_context);
         if (bind_context_->knn_orders_.size() != 1) {
-            Error<PlannerException>("Knn Scan need order by clause which should have only one expression", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Knn Scan need order by clause which should have only one expression");
         }
 
         knn_scan->order_by_type_ = bind_context_->knn_orders_[0];
@@ -145,15 +141,15 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 SharedPtr<LogicalKnnScan>
 BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
-        Error<PlannerException>("Attempt to do KNN scan without table", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Attempt to do KNN scan without table");
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.");
             break;
         }
         case TableRefType::kJoin: {
-            Error<PlannerException>("KNN is not supported on JOIN relation, now.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("KNN is not supported on JOIN relation, now.");
         }
         case TableRefType::kTable: {
             auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
@@ -168,11 +164,11 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryC
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.");
             break;
         }
         default: {
-            Error<PlannerException>("Unexpected table type", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unexpected table type");
         }
     }
 }
@@ -197,7 +193,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
             default: {
-                Error<PlannerException>("Unknown table reference type.", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("Unknown table reference type.");
             }
         }
     } else {
@@ -299,7 +295,7 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            Error<PlannerException>("Nested subquery detected", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Nested subquery detected");
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

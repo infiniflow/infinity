@@ -8,7 +8,7 @@ import stl;
 import function;
 import function_data;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 import base_expression;
 import parser;
@@ -47,10 +47,10 @@ public:
                 break;
             }
             case ColumnVectorType::kHeterogeneous: {
-                Error<NotImplementException>("Heterogeneous type isn't implemented", __FILE_NAME__, __LINE__);
+                Error<NotImplementException>("Heterogeneous type isn't implemented");
             }
             default: {
-                Error<NotImplementException>("Other type of column vector isn't implemented", __FILE_NAME__, __LINE__);
+                Error<NotImplementException>("Other type of column vector isn't implemented");
             }
         }
     }

@@ -1,6 +1,5 @@
 module;
 
-import infinity_assert;
 import infinity_exception;
 import spinlock;
 import memory_chunk;
@@ -37,7 +36,7 @@ void *MemoryPool::AllocateUnsafe(SizeT num_bytes) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            Error<StorageException>("Allocate too large memory chunk: ", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Allocate too large memory chunk: ");
             return nullptr;
         }
         mem_chunk_ = chunk;
@@ -53,7 +52,7 @@ void *MemoryPool::AllocateUnsafe(SizeT num_bytes, SizeT alignment) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            Error<StorageException>("Allocate too large memory chunk: ", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Allocate too large memory chunk: ");
             return nullptr;
         }
         mem_chunk_ = chunk;

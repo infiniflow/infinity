@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -16,8 +16,7 @@ import stl;
 import global_resource_usage;
 import infinity_context;
 
-class ColumnVectorTest : public BaseTest {
-};
+class ColumnVectorTest : public BaseTest {};
 
 TEST_F(ColumnVectorTest, ReadWrite) {
     using namespace infinity;

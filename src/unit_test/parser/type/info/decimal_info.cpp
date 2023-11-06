@@ -6,7 +6,7 @@
 #include "json.hpp"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -14,12 +14,10 @@ import logger;
 import stl;
 import infinity_context;
 
-class DecimalInfoTest : public BaseTest {
-};
+class DecimalInfoTest : public BaseTest {};
 
 TEST_F(DecimalInfoTest, decimal_info_A) {
     using namespace infinity;
-
 
     EXPECT_THROW(DecimalInfo::Make(39, 39), ParserException);
     EXPECT_THROW(DecimalInfo::Make(38, 39), ParserException);

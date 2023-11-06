@@ -5,7 +5,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -14,8 +14,7 @@ import null_value;
 import stl;
 import infinity_context;
 
-class NullValueTest : public BaseTest {
-};
+class NullValueTest : public BaseTest {};
 
 TEST_F(NullValueTest, null_value_test1) {
     using namespace infinity;

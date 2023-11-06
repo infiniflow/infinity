@@ -5,7 +5,7 @@
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 export module txn_state;
@@ -46,7 +46,7 @@ export inline String ToString(TxnState txn_state) {
             break;
         }
     }
-    Error<StorageException>("Invalid transaction state.", __FILE_NAME__, __LINE__);
+    Error<StorageException>("Invalid transaction state.");
 }
 
 } // namespace infinity

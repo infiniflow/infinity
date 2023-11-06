@@ -40,7 +40,7 @@ import cast_table;
 import new_catalog;
 import column_binding;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module subquery_unnest;
@@ -139,11 +139,11 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             //     |-> Aggregate( count(*) as count_start)
             //         |-> Limit (1)
             //             |-> right plan tree
-            Error<PlannerException>("Plan EXISTS uncorrelated subquery", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Plan EXISTS uncorrelated subquery");
             break;
         }
         case SubqueryType::kNotExists: {
-            Error<PlannerException>("Plan not EXISTS uncorrelated subquery", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Plan not EXISTS uncorrelated subquery");
             break;
         }
         case SubqueryType::kNotIn:
@@ -194,13 +194,13 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             return result;
         }
         case SubqueryType::kAny:
-            Error<PlannerException>("Plan ANY uncorrelated subquery", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Plan ANY uncorrelated subquery");
             break;
         default: {
-            Error<PlannerException>("Unknown subquery type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unknown subquery type.");
         }
     }
-    Error<PlannerException>("Not implement to unnest uncorrelated subquery.", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Not implement to unnest uncorrelated subquery.");
 }
 
 SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *expr_ptr,
@@ -210,14 +210,14 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
                                                            const SharedPtr<BindContext> &bind_context) {
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
-    Assert<PlannerException>(!correlated_columns.empty(), "No correlated column", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(!correlated_columns.empty(), "No correlated column");
 
     // Valid the correlated columns are from one table.
     SizeT column_count = correlated_columns.size();
     SizeT table_index = correlated_columns[0]->binding().table_idx;
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (table_index != correlated_columns[idx]->binding().table_idx) {
-            Error<PlannerException>("Correlated columns can be only from one table, now.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Correlated columns can be only from one table, now.");
         }
     }
 
@@ -375,10 +375,10 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             return result;
         }
         case SubqueryType::kAny: {
-            Error<PlannerException>("Unnest correlated any subquery.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unnest correlated any subquery.");
         }
     }
-    Error<PlannerException>("Unreachable", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Unreachable");
 }
 
 void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
@@ -394,9 +394,7 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            Error<PlannerException>(Format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()),
-                                    __FILE_NAME__,
-                                    __LINE__);
+            Error<PlannerException>(Format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
         }
 
         // Generate new correlated column expression

@@ -10,7 +10,7 @@ import buffer_handle;
 import buffer_obj;
 import logger;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import base_entry;
 import faiss_index_file_worker;
@@ -52,7 +52,7 @@ SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, Sh
 BufferHandle IndexEntry::GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr) { return index_entry->buffer_->Load(); }
 
 void IndexEntry::UpdateIndex(IndexEntry *index_entry, TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("Not tested. TODO shenyushi0", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not tested. TODO shenyushi0");
 
     index_entry->max_ts_ = commit_ts;
     auto buffer_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
@@ -95,7 +95,7 @@ SharedPtr<IndexEntry> IndexEntry::Deserialize(const Json &index_entry_json, Segm
     auto index_name = MakeShared<String>(index_entry_json["index_name"].get<String>());
 
     auto index_entry = LoadIndexEntry(segment_entry, Move(index_name), buffer_mgr);
-    Assert<StorageException>(index_entry.get() != nullptr, "Failed to load index entry", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(index_entry.get() != nullptr, "Failed to load index entry");
     index_entry->min_ts_ = index_entry_json["min_ts"];
     index_entry->max_ts_ = index_entry_json["max_ts"];
     index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"];

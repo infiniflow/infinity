@@ -9,7 +9,7 @@ import selection;
 import parser;
 import column_vector;
 import value;
-import infinity_assert;
+
 import infinity_exception;
 
 export module data_block;
@@ -76,7 +76,7 @@ public:
             if (row_count_ == 0) {
                 return 0;
             }
-            Error<StorageException>("Not finalized data block", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Not finalized data block");
         }
         return row_count_;
     }

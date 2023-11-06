@@ -5,7 +5,7 @@ module;
 
 import parser;
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 export module value;
@@ -92,7 +92,7 @@ public:
     // Value getter template
     template <class T>
     T GetValue() const {
-        Error<TypeException>("Not implemented value getter.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Not implemented value getter.");
     }
 
     [[nodiscard]] const DataType &type() const { return type_; }

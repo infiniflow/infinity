@@ -66,7 +66,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -86,7 +86,7 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -104,7 +104,7 @@ QueryResult Infinity::ListDatabases() {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -120,14 +120,14 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
     QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
-    if(response.result_msg_.get() == nullptr) {
+    if (response.result_msg_.get() == nullptr) {
         return MakeShared<Database>(db_name, session_);
     } else {
         return nullptr;
     }
 }
 
-QueryResult Infinity::Query(const String& query_text) {
+QueryResult Infinity::Query(const String &query_text) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().fragment_scheduler(),
@@ -136,7 +136,7 @@ QueryResult Infinity::Query(const String& query_text) {
     QueryResponse response = query_context_ptr->Query(query_text);
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }

@@ -8,7 +8,7 @@ import stl;
 import parser;
 import column_binding;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import column_expression;
 import column_identifer;
@@ -182,7 +182,7 @@ public:
         if (table_table_index2table_name_.contains(index)) {
             return table_table_index2table_name_[index];
         }
-        Error<PlannerException>(Format("Can't get table name by table index: {}", index), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Can't get table name by table index: {}", index));
     }
 
     const Binding *GetBindingFromCurrentOrParentByName(const String &binding_name) const;

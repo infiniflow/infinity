@@ -9,7 +9,7 @@ module;
 
 import stl;
 import config;
-import infinity_assert;
+
 import infinity_exception;
 import fragment_task_block_queue;
 import fragment_task_poller_queue;
@@ -38,7 +38,7 @@ void FragmentScheduler::Init(const Config *config_ptr) {
     }
 
     if (cpu_set_.empty()) {
-        Error<SchedulerException>("No cpu is used in scheduler", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("No cpu is used in scheduler");
     }
 
     for (i64 cpu_id : cpu_set_) {
@@ -81,7 +81,7 @@ void FragmentScheduler::UnInit() {
 void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
     //    NotImplementError("Not implement FragmentScheduler::BuildFragmentTasks");
     if (plan_fragment == nullptr) {
-        Error<SchedulerException>("Empty plan fragment", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Empty plan fragment");
     }
 
     //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
@@ -106,7 +106,7 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
 
 void FragmentScheduler::ScheduleTask(FragmentTask *task) {
     if (!initialized_) {
-        Error<SchedulerException>("Scheduler isn't initialized", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Scheduler isn't initialized");
     }
     poller_queue_->Enqueue(task);
 }

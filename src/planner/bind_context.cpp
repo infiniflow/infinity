@@ -8,7 +8,7 @@ import stl;
 import parser;
 import binding;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import base_expression;
 import column_expression;
@@ -180,32 +180,26 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     SizeT table_name_count = other_ptr->table_names_.size();
     table_names_.reserve(table_names_.size() + table_name_count);
 
-    for(SizeT idx = 0; idx < table_name_count; ++ idx) {
-        const auto& table_name = other_ptr->table_names_[idx];
+    for (SizeT idx = 0; idx < table_name_count; ++idx) {
+        const auto &table_name = other_ptr->table_names_[idx];
         table_names_.emplace_back(table_name);
     }
 
     for (const auto &table_name2index_pair : other_ptr->table_name2table_index_) {
         const String &table_name = table_name2index_pair.first;
-        Assert<PlannerException>(!table_name2table_index_.contains(table_name), Format("{} was bound before", table_name), __FILE_NAME__, __LINE__);
+        Assert<PlannerException>(!table_name2table_index_.contains(table_name), Format("{} was bound before", table_name));
         table_name2table_index_[table_name] = table_name2index_pair.second;
     }
 
     for (const auto &table_index2name_pair : other_ptr->table_table_index2table_name_) {
         u64 table_index = table_index2name_pair.first;
-        Assert<PlannerException>(!table_table_index2table_name_.contains(table_index),
-                                 Format("Table index: {} is bound before", table_index),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<PlannerException>(!table_table_index2table_name_.contains(table_index), Format("Table index: {} is bound before", table_index));
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
 
     for (auto &name_binding_pair : other_ptr->binding_by_name_) {
         auto &binding_name = name_binding_pair.first;
-        Assert<PlannerException>(!binding_by_name_.contains(binding_name),
-                                 Format("Table: {} was bound before", binding_name),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<PlannerException>(!binding_by_name_.contains(binding_name), Format("Table: {} was bound before", binding_name));
         this->binding_by_name_.emplace(name_binding_pair);
     }
 
@@ -215,8 +209,8 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
 
         if (this->binding_names_by_column_.contains(column_name)) {
             SizeT bindings_names_count = bindings_names.size();
-            for(SizeT idx = 0; idx < bindings_names_count; ++ idx) {
-                const auto& binding_name = bindings_names[idx];
+            for (SizeT idx = 0; idx < bindings_names_count; ++idx) {
+                const auto &binding_name = bindings_names[idx];
                 this->binding_names_by_column_[column_name].emplace_back(binding_name);
             }
         } else {
@@ -225,7 +219,7 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     }
 
     SizeT corr_column_count = other_ptr->correlated_column_exprs_.size();
-    for(SizeT idx = 0; idx < corr_column_count; ++ idx) {
+    for (SizeT idx = 0; idx < corr_column_count; ++idx) {
         auto &correlated_column = other_ptr->correlated_column_exprs_[idx];
         if (correlated_column_map_.contains(correlated_column->binding())) {
             continue;
@@ -249,7 +243,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             // TODO: What will happen, when different tables have the same column name?
             Vector<String> &binding_names = binding_names_by_column_[column_name_ref];
             if (binding_names.size() > 1) {
-                Error<PlannerException>(Format("Ambiguous column table_name: {}", column_identifier.ToString()), __FILE_NAME__, __LINE__);
+                Error<PlannerException>(Format("Ambiguous column table_name: {}", column_identifier.ToString()));
             }
 
             String &binding_name = binding_names[0];
@@ -257,7 +251,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             auto binding_iter = binding_by_name_.find(binding_name);
             if (binding_iter == binding_by_name_.end()) {
                 // Found the binding, but the binding don't have the column, which should happen.
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()), __FILE_NAME__, __LINE__);
+                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
             }
 
             const auto &binding = binding_iter->second;
@@ -273,7 +267,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
                 // Found the binding, but the binding don't have the column, which should happen.
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()), __FILE_NAME__, __LINE__);
+                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.
@@ -296,7 +290,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_ = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()), __FILE_NAME__, __LINE__);
+                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.
