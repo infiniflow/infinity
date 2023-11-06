@@ -1,6 +1,7 @@
 module;
 
 #include "../header.h"
+#include <cassert>
 
 import std;
 import stl;
@@ -349,29 +350,29 @@ public:
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
-    // void CheckGraph() {
-    //     assert(cur_vertex_n_ <= max_vertex_);
-    //     int max_layer = -1;
-    //     for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
-    //         int cur_max_layer = GetLayerN(vertex_idx);
-    //         max_layer = Max(cur_max_layer, max_layer);
-    //         assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
-    //         for (int layer_idx = 0; layer_idx <= cur_max_layer; ++layer_idx) {
-    //             char *p = graph_ + vertex_idx * level0_size_;
-    //             auto [neighbors, neighbor_n] = GetNeighbors(vertex_idx, layer_idx);
-    //             VertexType Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
-    //             assert(neighbor_n <= Mmax);
-    //             for (int i = 0; i < neighbor_n; ++i) {
-    //                 VertexType neighbor_idx = neighbors[i];
-    //                 assert(neighbor_idx < cur_vertex_n_);
-    //                 assert(neighbor_idx != vertex_idx);
-    //                 auto [n_neighbors, n_neighbor_n] = GetNeighbors(neighbor_idx, layer_idx);
-    //                 assert(n_neighbor_n <= Mmax);
-    //             }
-    //         }
-    //     }
-    //     assert(max_layer == max_layer_);
-    // }
+    void CheckGraph() {
+        assert(cur_vertex_n_ <= max_vertex_);
+        int max_layer = -1;
+        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
+            int cur_max_layer = GetLayerN(vertex_idx);
+            max_layer = Max(cur_max_layer, max_layer);
+            assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
+            for (int layer_idx = 0; layer_idx <= cur_max_layer; ++layer_idx) {
+                char *p = graph_ + vertex_idx * level0_size_;
+                auto [neighbors, neighbor_n] = GetNeighbors(vertex_idx, layer_idx);
+                VertexType Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
+                assert(neighbor_n <= Mmax);
+                for (int i = 0; i < neighbor_n; ++i) {
+                    VertexType neighbor_idx = neighbors[i];
+                    assert(neighbor_idx < cur_vertex_n_);
+                    assert(neighbor_idx != vertex_idx);
+                    auto [n_neighbors, n_neighbor_n] = GetNeighbors(neighbor_idx, layer_idx);
+                    assert(n_neighbor_n <= Mmax);
+                }
+            }
+        }
+        assert(max_layer == max_layer_);
+    }
 
     // void DumpGraph(const String filename) {
     //     std::fstream fo(filename, std::ios::out);
