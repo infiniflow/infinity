@@ -581,6 +581,7 @@ void add_data_to_partition_faiss(i32 dimension,
     // output assigned_partition_id
     // check coarse_idx of 567736
     std::cout << "#####################################################"
+              << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
               << "\nassigned_partition_id of 567736:\t";
     std::cout << assigned_partition_id[567736] << std::endl;
     std::cout << "#####################################################\n" << std::endl;
