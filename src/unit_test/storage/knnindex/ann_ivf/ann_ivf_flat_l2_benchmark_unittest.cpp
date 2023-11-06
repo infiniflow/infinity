@@ -334,7 +334,8 @@ void benchmark_annivfflatl2() {
 
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
-        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
+        // ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
+        ann_index_data = AnnIVFFlatL2<float>::CreateIndex_use_faiss(d, nt, xt, nb, xb, partition_num, 0);
         // TODO:remove this
         {
             int c1 = 88, c2 = 286;

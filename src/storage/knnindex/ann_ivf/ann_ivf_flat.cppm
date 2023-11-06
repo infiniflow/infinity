@@ -54,6 +54,19 @@ public:
         return index_data;
     }
 
+    static SharedPtr<IVFFlatIndexData<DistType>> CreateIndex_use_faiss(i32 dimension,
+                                                                       SizeT train_count,
+                                                                       DistType *train_ptr,
+                                                                       SizeT vector_count,
+                                                                       DistType *vectors_ptr,
+                                                                       i32 partition_num,
+                                                                       i32 segment_id) {
+        auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
+        k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, partition_num, index_data->centroids_.data());
+        add_data_to_partition_faiss(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
+        return index_data;
+    }
+
     void Begin() final {
         if (begin_ || this->query_count_ == 0) {
             return;
