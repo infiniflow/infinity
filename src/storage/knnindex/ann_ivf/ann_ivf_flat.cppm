@@ -14,6 +14,7 @@ import infinity_exception;
 import index_data;
 import kmeans_partition;
 import vector_distance;
+import search_top_k;
 
 export module ann_ivf_flat;
 
@@ -58,7 +59,7 @@ public:
         }
 
         for (SizeT i = 0; i < this->query_count_; ++i) {
-            single_heap_result_handler_.get()->begin(i);
+            single_heap_result_handler_->begin(i);
         }
 
         begin_ = true;
@@ -71,7 +72,7 @@ public:
             Error<ExecutorException>("n_probes > partition_num_", __FILE_NAME__, __LINE__);
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIP isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("IVFFlatL2 isn't begin", __FILE_NAME__, __LINE__);
         }
         // TODO: data_num_?
         // if (base_ivf->data_num_ == 0) {
@@ -80,28 +81,23 @@ public:
         // this->total_base_count_ += base_ivf->data_num_;
         // TODO:remove this counter
         int counter_1 = 0, counter_10 = 0, counter_100 = 0;
-        using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, i32>>;
-        using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
-        for (i64 i = 0; i < this->query_count_; i++) {
-            const DistType *x_i = queries_ + i * this->dimension_;
-            Vector<DistType> centroid_dists(n_probes);
-            Vector<i32> centroid_ids(n_probes);
-            HeapResultHandler_INT centroid_heap_result(1, centroid_dists.data(), centroid_ids.data(), n_probes);
-            HeapSingleHandler_INT centroid_single_heap_result(centroid_heap_result, 1);
-            centroid_single_heap_result.begin(0);
-            for (i32 j = 0; j < base_ivf->partition_num_; j++) {
-                const DistType *y_j = base_ivf->centroids_.data() + j * this->dimension_;
-                DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                centroid_single_heap_result.add_result(ip, j, 0);
-            }
-            centroid_single_heap_result.end(0);
-            for (i32 k = 0; k < n_probes; k++) {
-                const i32 selected_centroid = centroid_ids[k];
-                const i32 contain_nums = base_ivf->ids_[selected_centroid].size();
+        if (n_probes == 1) {
+            Vector<int> assign_centroid_ids(this->query_count_);
+            search_top_1<DistType>(this->dimension_,
+                                   this->query_count_,
+                                   this->queries_,
+                                   base_ivf->partition_num_,
+                                   base_ivf->centroids_.data(),
+                                   assign_centroid_ids.data());
+            for (int i = 0; i < this->query_count_; i++) {
+                if (i == 5) {
+                    ;
+                }
+                int selected_centroid = assign_centroid_ids[i];
+                int contain_nums = base_ivf->ids_[selected_centroid].size();
                 if (contain_nums < 100) {
-                    // output i, k, selected_centroid, contain_nums, with description
-                    std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid << ", contain_nums: " << contain_nums
-                              << std::endl;
+                    // output i, selected_centroid, contain_nums, with description
+                    std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << ", contain_nums: " << contain_nums << std::endl;
                     if (contain_nums < 100) {
                         counter_100++;
                         if (contain_nums < 10) {
@@ -116,10 +112,55 @@ public:
                 if (i < 10) {
                     std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
                 }
+                const DistType *x_i = this->queries_ + i * this->dimension_;
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                     single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
+                }
+            }
+        } else {
+            using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, i32>>;
+            using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
+            for (i64 i = 0; i < this->query_count_; i++) {
+                const DistType *x_i = queries_ + i * this->dimension_;
+                Vector<DistType> centroid_dists(n_probes);
+                Vector<i32> centroid_ids(n_probes);
+                HeapResultHandler_INT centroid_heap_result(1, centroid_dists.data(), centroid_ids.data(), n_probes);
+                HeapSingleHandler_INT centroid_single_heap_result(centroid_heap_result, 1);
+                centroid_single_heap_result.begin(0);
+                for (i32 j = 0; j < base_ivf->partition_num_; j++) {
+                    const DistType *y_j = base_ivf->centroids_.data() + j * this->dimension_;
+                    DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                    centroid_single_heap_result.add_result(ip, j, 0);
+                }
+                centroid_single_heap_result.end(0);
+                for (i32 k = 0; k < n_probes; k++) {
+                    const i32 selected_centroid = centroid_ids[k];
+                    const i32 contain_nums = base_ivf->ids_[selected_centroid].size();
+                    if (contain_nums < 100) {
+                        // output i, k, selected_centroid, contain_nums, with description
+                        std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid
+                                  << ", contain_nums: " << contain_nums << std::endl;
+                        if (contain_nums < 100) {
+                            counter_100++;
+                            if (contain_nums < 10) {
+                                counter_10++;
+                                if (contain_nums < 1) {
+                                    counter_1++;
+                                }
+                            }
+                        }
+                    }
+                    // for i = 0, 10, output contain_nums
+                    if (i < 10) {
+                        std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
+                    }
+                    const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
+                    for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
+                        DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                        single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
+                    }
                 }
             }
         }

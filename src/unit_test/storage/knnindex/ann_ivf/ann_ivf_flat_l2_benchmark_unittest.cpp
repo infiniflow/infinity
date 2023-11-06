@@ -429,11 +429,11 @@ void benchmark_annivfflatl2() {
         }
         std::cout << "############################" << std::endl;
 
-        if (false) {
+        if (true) {
             // compare I1,I2, D1,D2
             std::cout << "############################" << std::endl;
             std::cout << "D1 and D2 difference:\n";
-            for (i32 i = 0; i < 20 * k; ++i) {
+            for (i32 i = 0; i < 10 * k; ++i) {
                 if (D1[i] != D2[i]) {
                     std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << i << "]: " << D2[i]
                               << "\tdifference: " << D1[i] - D2[i] << std::endl;
@@ -441,7 +441,7 @@ void benchmark_annivfflatl2() {
             }
             std::cout << "############################" << std::endl;
             std::cout << "I1 and I2 difference:\n";
-            for (i32 i = 0; i < 20 * k; ++i) {
+            for (i32 i = 0; i < 10 * k; ++i) {
                 if (I1[i] != I2[i].segment_offset_) {
                     std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << i << "]: " << I2[i].segment_offset_
                               << "\tdifference: " << I1[i] - I2[i].segment_offset_ << std::endl;
