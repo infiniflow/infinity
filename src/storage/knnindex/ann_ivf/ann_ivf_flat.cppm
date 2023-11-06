@@ -97,7 +97,7 @@ public:
             centroid_single_heap_result.end(0);
             for (i32 k = 0; k < n_probes; k++) {
                 const i32 selected_centroid = centroid_ids[k];
-                const i32 contain_nums = base_ivf->vectors_[selected_centroid].size() / this->dimension_;
+                const i32 contain_nums = base_ivf->ids_[selected_centroid].size();
                 if (contain_nums < 100) {
                     // output i, k, selected_centroid, contain_nums, with description
                     std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid << ", contain_nums: " << contain_nums
@@ -111,6 +111,10 @@ public:
                             }
                         }
                     }
+                }
+                // for i = 0, 10, output contain_nums
+                if (i < 10) {
+                    std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
                 }
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
