@@ -578,7 +578,7 @@ void Clustering::train_encoded(
             iteration_stats.push_back(stats);
 
             // output centroids
-            if (true) {
+            if (false) {
                 // output content of centroids, 128 per line
                 std::cout << "######################################################" << std::endl;
                 std::cout << "first 10 centroids:\n";
@@ -607,7 +607,8 @@ void Clustering::train_encoded(
                         min = hassign[i];
                 }
                 std::cout << "\nmax: " << max << " min: " << min << std::endl;
-                // rewrite the above output in std::cout
+            }
+            if (true) {
                 std::cout << "\nIteration " << i << " (" << stats.time << " s, search " << stats.time_search << " s): "
                           << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(10) << stats.imbalance_factor
                           << " nsplit=" << nsplit << std::endl;

@@ -227,7 +227,7 @@ void IndexIVF::add_with_ids(idx_t n, const float* x, const idx_t* xids) {
         }
         // output nearest_centroids
         std::cout << "#####################################################"
-                  << "\nfaiss nearest_centroids of 567736:\n";
+                  << "\nfaiss nearest_centroids of 567736 (float):\n";
         for (int i = 0; i < 2; ++i) {
             std::cout << nearest_centroids[i].first << " " << nearest_centroids[i].second << std::endl;
         }

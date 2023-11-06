@@ -314,7 +314,7 @@ void k_means_partition_only_centroids_l2(i32 dimension,
         }
 
         // output centroids
-        if (true) {
+        if (false) {
             // output content of centroids, 128 per line
             std::cout << "######################################################" << std::endl;
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
@@ -332,30 +332,32 @@ void k_means_partition_only_centroids_l2(i32 dimension,
 
         // output imbalance factor
         {
-            // output content of partition_element_count, 10 per line
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "partition_element_count:\n";
-            for (i32 i = 0; i < partition_num; ++i) {
-                std::cout << partition_element_count[i] << " ";
-                if (i % 70 == 69)
-                    std::cout << std::endl;
-            }
-            // output min, max of partition_element_count
-            i32 min = std::numeric_limits<i32>::max();
-            i32 max = std::numeric_limits<i32>::min();
-            for (i32 i = 0; i < partition_num; ++i) {
-                if (partition_element_count[i] < min) {
-                    min = partition_element_count[i];
+            if (false) {
+                // output content of partition_element_count, 10 per line
+                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "partition_element_count:\n";
+                for (i32 i = 0; i < partition_num; ++i) {
+                    std::cout << partition_element_count[i] << " ";
+                    if (i % 70 == 69)
+                        std::cout << std::endl;
                 }
-                if (partition_element_count[i] > max) {
-                    max = partition_element_count[i];
+                // output min, max of partition_element_count
+                i32 min = std::numeric_limits<i32>::max();
+                i32 max = std::numeric_limits<i32>::min();
+                for (i32 i = 0; i < partition_num; ++i) {
+                    if (partition_element_count[i] < min) {
+                        min = partition_element_count[i];
+                    }
+                    if (partition_element_count[i] > max) {
+                        max = partition_element_count[i];
+                    }
                 }
+                std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "max of partition_element_count: " << max << std::endl;
+                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "min of partition_element_count: " << min << std::endl;
+                std::cout << std::endl;
             }
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "max of partition_element_count: " << max << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "min of partition_element_count: " << min << std::endl;
-            std::cout << std::endl;
 
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                       << "\nimbalance factor: " << std::fixed << std::setprecision(10)
@@ -457,7 +459,7 @@ void add_data_to_partition_l2(i32 dimension,
         }
         // output nearest_centroids
         std::cout << "#####################################################"
-                  << "\nnearest_centroids:\n";
+                  << "\nnearest_centroids (double):\n";
         for (i32 i = 0; i < 2; ++i) {
             std::cout << nearest_centroids[i].first << " " << nearest_centroids[i].second << std::endl;
         }
@@ -554,7 +556,7 @@ void add_data_to_partition_faiss(i32 dimension,
         }
         // output nearest_centroids
         std::cout << "#####################################################"
-                  << "\nnearest_centroids:\n";
+                  << "\nnearest_centroids (double):\n";
         for (i32 i = 0; i < 2; ++i) {
             std::cout << nearest_centroids[i].first << " " << nearest_centroids[i].second << std::endl;
         }

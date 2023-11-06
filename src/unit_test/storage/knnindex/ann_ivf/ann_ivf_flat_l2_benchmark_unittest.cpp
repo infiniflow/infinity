@@ -201,7 +201,7 @@ void benchmark_faiss_ivfflatl2() {
             gt[i] = gt_int[i];
         }
         delete[] gt_int;
-        {
+        if (false) {
             // output the 1472nd line of gt
             std::cout << "############################" << std::endl;
             std::cout << "gt[1472]:\n";
@@ -227,7 +227,7 @@ void benchmark_faiss_ivfflatl2() {
 
             index->search(nq, xq, ksearch, D1, I1);
 
-            {
+            if (false) {
                 // output the 1472nd line of I1
                 std::cout << "############################" << std::endl;
                 std::cout << "I1[1472]:\n";
@@ -237,18 +237,19 @@ void benchmark_faiss_ivfflatl2() {
                 std::cout << std::endl;
             }
 
-            // output first 3 lines of I1 and D1
-            std::cout << "############################" << std::endl;
-            for (int i = 0; i < 3; i++) {
-                std::cout << "line " << i << ":\nI:\t";
-                for (int j = 0; j < k; j++) {
-                    std::cout << I1[i * k + j] << " ";
+            if (false) { // output first 3 lines of I1 and D1
+                std::cout << "############################" << std::endl;
+                for (int i = 0; i < 3; i++) {
+                    std::cout << "line " << i << ":\nI:\t";
+                    for (int j = 0; j < k; j++) {
+                        std::cout << I1[i * k + j] << " ";
+                    }
+                    std::cout << "\nD:\t";
+                    for (int j = 0; j < k; j++) {
+                        std::cout << D1[i * k + j] << " ";
+                    }
+                    std::cout << std::endl;
                 }
-                std::cout << "\nD:\t";
-                for (int j = 0; j < k; j++) {
-                    std::cout << D1[i * k + j] << " ";
-                }
-                std::cout << std::endl;
             }
             std::cout << "############################" << std::endl;
             printf("[%.3f s] Compute recalls\n", elapsed() - t0);
@@ -357,22 +358,24 @@ void benchmark_annivfflatl2() {
 
         // compare c1 and c2,output difference
         std::cout << "############################" << std::endl;
-        // first 10 lines of c1 and c2
-        std::cout << "c1:\n";
-        for (i32 i = 0; i < 10; ++i) {
-            std::cout << "c1 row " << i << ": ";
-            for (i32 j = 0; j < d; ++j) {
-                std::cout << c1[i * d + j] << " ";
+        if (false) {
+            // first 10 lines of c1 and c2
+            std::cout << "c1:\n";
+            for (i32 i = 0; i < 10; ++i) {
+                std::cout << "c1 row " << i << ": ";
+                for (i32 j = 0; j < d; ++j) {
+                    std::cout << c1[i * d + j] << " ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
-        }
-        std::cout << "c2:\n";
-        for (i32 i = 0; i < 10; ++i) {
-            std::cout << "c2 row " << i << ": ";
-            for (i32 j = 0; j < d; ++j) {
-                std::cout << c2[i * d + j] << " ";
+            std::cout << "c2:\n";
+            for (i32 i = 0; i < 10; ++i) {
+                std::cout << "c2 row " << i << ": ";
+                for (i32 j = 0; j < d; ++j) {
+                    std::cout << c2[i * d + j] << " ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
         }
         std::cout << "c1 and c2 difference:\n";
         for (i32 i = 0; i < 316 * 128; ++i) {
@@ -455,18 +458,19 @@ void benchmark_annivfflatl2() {
         I2 = test_ivf.GetIDs();
         D2 = test_ivf.GetDistances();
 
-        // output first 3 lines of I and D
-        std::cout << "############################" << std::endl;
-        for (int i = 0; i < 3; i++) {
-            std::cout << "line " << i << ":\nI:\t";
-            for (int j = 0; j < k; j++) {
-                std::cout << I2[i * k + j].segment_offset_ << " ";
+        if (false) { // output first 3 lines of I and D
+            std::cout << "############################" << std::endl;
+            for (int i = 0; i < 3; i++) {
+                std::cout << "line " << i << ":\nI:\t";
+                for (int j = 0; j < k; j++) {
+                    std::cout << I2[i * k + j].segment_offset_ << " ";
+                }
+                std::cout << "\nD:\t";
+                for (int j = 0; j < k; j++) {
+                    std::cout << D2[i * k + j] << " ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << "\nD:\t";
-            for (int j = 0; j < k; j++) {
-                std::cout << D2[i * k + j] << " ";
-            }
-            std::cout << std::endl;
         }
         std::cout << "############################" << std::endl;
 
