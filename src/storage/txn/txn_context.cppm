@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-17.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import txn_state;
-import infinity_assert;
+
 import infinity_exception;
 
 export module txn_context;
@@ -22,7 +32,7 @@ public:
     inline void BeginCommit(TxnTimeStamp begin_ts) {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kNotStarted) {
-            Error<StorageException>("Transaction isn't in NOT_STARTED status.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Transaction isn't in NOT_STARTED status.");
         }
         begin_ts_ = begin_ts;
         state_ = TxnState::kStarted;
@@ -46,7 +56,7 @@ public:
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
-            Error<StorageException>("Transaction isn't in STARTED status.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Transaction isn't in STARTED status.");
         }
         state_ = TxnState::kRollbacking;
         commit_ts_ = rollback_ts;
@@ -55,7 +65,7 @@ public:
     inline void SetTxnRollbacked() {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
-            Error<StorageException>("Transaction isn't in ROLLBACKING status.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Transaction isn't in ROLLBACKING status.");
         }
         state_ = TxnState::kRollbacked;
     }
@@ -63,7 +73,7 @@ public:
     inline void SetTxnCommitted() {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
-            Error<StorageException>("Transaction isn't in COMMITTING status.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Transaction isn't in COMMITTING status.");
         }
         state_ = TxnState::kCommitted;
     }
@@ -71,7 +81,7 @@ public:
     inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
         UniqueLock<RWMutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
-            Error<StorageException>("Transaction isn't in STARTED status.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Transaction isn't in STARTED status.");
         }
         state_ = TxnState::kCommitting;
         commit_ts_ = commit_ts;

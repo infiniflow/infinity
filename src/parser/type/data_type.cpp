@@ -1,16 +1,26 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/27.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "data_type.h"
+#include "info/bitmap_info.h"
+#include "serializable.h"
+#include "spdlog/fmt/fmt.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/varchar_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include "info/bitmap_info.h"
-#include "spdlog/fmt/fmt.h"
-#include "serializable.h"
 #include <charconv>
 
 namespace infinity {
@@ -270,7 +280,6 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(type, type_info);
     return data_type;
 }
-
 
 nlohmann::json DataType::Serialize() {
     nlohmann::json json_res;

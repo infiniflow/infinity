@@ -1,8 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 module base_entry;
@@ -20,7 +33,7 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
         } else if ((*it2)->entry_type_ == EntryType::kDummy) {
             ++it2;
         } else {
-            Assert<StorageException>((*it1)->Committed() && (*it2)->Committed(), "MergeLists requires entries be committed", __FILE_NAME__, __LINE__);
+            Assert<StorageException>((*it1)->Committed() && (*it2)->Committed(), "MergeLists requires entries be committed");
             if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
                 ++it1;
             } else if ((*it1)->commit_ts_ < (*it2)->commit_ts_) {

@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-26.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import knn_flat_ip;
@@ -27,7 +37,7 @@ namespace infinity {
 void KnnScanFunctionData::Init() {
     switch (knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2: {
             switch (elem_type_) {
@@ -91,14 +101,14 @@ void KnnScanFunctionData::Init() {
                 case kElemDouble:
                     break;
                 case kElemInvalid: {
-                    Error<ExecutorException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid embedding data type");
                 }
             }
 
             break;
         }
         case KnnDistanceType::kCosine: {
-            Error<ExecutorException>("Not implemented cosine", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented cosine");
         }
         case KnnDistanceType::kInnerProduct: {
             switch (elem_type_) {
@@ -153,14 +163,14 @@ void KnnScanFunctionData::Init() {
                 case kElemDouble:
                     break;
                 case kElemInvalid: {
-                    Error<ExecutorException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid embedding data type");
                 }
             }
 
             break;
         }
         case KnnDistanceType::kHamming: {
-            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Hamming");
         }
     }
 }

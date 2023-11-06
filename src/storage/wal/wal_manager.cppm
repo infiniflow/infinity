@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-5-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -64,9 +74,10 @@ public:
     void ReplayWalEntry(const WalEntry &entry);
 
     void RecycleWalFile();
+
 private:
     void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    void GetWalState(TxnTimeStamp& max_commit_ts, i64& wal_size);
+    void GetWalState(TxnTimeStamp &max_commit_ts, i64 &wal_size);
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);

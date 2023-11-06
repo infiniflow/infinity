@@ -1,20 +1,30 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-2-25.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
 #include <utility>
 
+#include "definition/column_def.h"
+#include "extra_ddl_info.h"
+#include "statement/select_statement.h"
+#include "statement/statement_common.h"
 #include "type/data_type.h"
 #include "type/info/bitmap_info.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/varchar_info.h"
-#include "extra_ddl_info.h"
-#include "statement/select_statement.h"
-#include "statement/statement_common.h"
-#include "definition/column_def.h"
 #include <unordered_set>
 
 namespace infinity {

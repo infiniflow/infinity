@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/12/5.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +32,6 @@ class ColumnVectorBlobTest : public BaseTest {};
 
 TEST_F(ColumnVectorBlobTest, flat_blob) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -53,7 +62,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -86,7 +95,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -104,7 +113,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         i64 blob_len = i + 1;
         auto blob_ptr = new char[blob_len]{0};
-//        // GlobalResourceUsage::IncrRawMemCount();
+        //        // GlobalResourceUsage::IncrRawMemCount();
 
         for (i64 j = 0; j < blob_len; ++j) {
             blob_ptr[j] = 'a' + static_cast<char_t>(j);
@@ -192,7 +201,6 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
@@ -311,7 +319,6 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -374,7 +381,6 @@ TEST_F(ColumnVectorBlobTest, blob_column_vector_select) {
 
 TEST_F(ColumnVectorBlobTest, blob_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBlob);
     ColumnVector column_vector(data_type);

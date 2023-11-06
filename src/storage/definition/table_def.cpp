@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 22-12-25.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import std;
 import stl;
 import parser;
 import serialize;
-import infinity_assert;
+
 import infinity_exception;
 
 module table_def;
@@ -102,7 +112,7 @@ void TableDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *table_name_);
     WriteBufAdv(ptr, (i32)(columns_.size()));
     SizeT column_count = columns_.size();
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
+    for (SizeT idx = 0; idx < column_count; ++idx) {
         const ColumnDef &cd = *columns_[idx];
         WriteBufAdv<i64>(ptr, cd.id_);
         cd.column_type_->WriteAdv(ptr);
@@ -117,7 +127,7 @@ void TableDef::WriteAdv(char *&ptr) const {
 
 SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
     char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef");
     String schema_name = ReadBufAdv<String>(ptr);
     String table_name = ReadBufAdv<String>(ptr);
     i32 columns_size = ReadBufAdv<i32>(ptr);
@@ -125,7 +135,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
     for (i32 i = 0; i < columns_size; i++) {
         i64 id = ReadBufAdv<i64>(ptr);
         maxbytes = ptr_end - ptr;
-        Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading TableDef");
         SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, maxbytes);
         String column_name = ReadBufAdv<String>(ptr);
         i32 constraints_size = ReadBufAdv<i32>(ptr);
@@ -138,7 +148,7 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading TableDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading TableDef");
     return TableDef::Make(MakeShared<String>(schema_name), MakeShared<String>(table_name), columns);
 }
 

@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-3-20.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -21,7 +31,7 @@ namespace infinity {
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA first, TB second, TC third, TD &result, ColumnVector *column_vector_ptr) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -29,11 +39,11 @@ template <>
 inline bool SubstrFunction::Run(VarcharT first, BigIntT second, BigIntT third, VarcharT &result, ColumnVector *column_vector_ptr) {
     // Validate the input before slice the string
     if (second < 0) {
-        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second));
     }
 
     if (third < 0) {
-        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second));
     }
 
     if (third == 0) {

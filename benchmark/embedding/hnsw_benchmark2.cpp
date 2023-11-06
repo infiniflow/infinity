@@ -1,7 +1,7 @@
 #include "base_profiler.h"
 #include "helper.h"
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <queue>
 #include <unordered_set>
 
@@ -22,17 +22,14 @@ int main() {
     std::unique_ptr<KnnHnsw<float>> knn_hnsw = nullptr;
     std::string save_place = "./tmp/my.hnsw";
     std::ifstream f(save_place);
-    if (f.good()) {
-        DistFuncL2 space(dimension);
-        knn_hnsw = std::make_unique<KnnHnsw<float>>(space, save_place);
-    } else {
+    {
         size_t embedding_count = 1000000;
         float *input_embeddings = fvecs_read(sift1m_base, &dimension, &embedding_count);
         assert(dimension == 128 || !"embedding dimension isn't 128");
         assert(embedding_count == 1000000 || !"embedding size isn't 1000000");
 
-        DistFuncL2 space(dimension);
-        knn_hnsw = std::make_unique<KnnHnsw<float>>(space, M, ef_construction);
+        DistFuncL2<float> space(dimension);
+        knn_hnsw = std::make_unique<KnnHnsw<float>>(embedding_count, dimension, space, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin data cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -48,14 +45,13 @@ int main() {
         std::cout << "Insert data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
 
         delete[] input_embeddings;
-        knn_hnsw->TmpSave(save_place);
     }
 
     size_t number_of_queries;
-    float *queries = nullptr;
+    const float *queries = nullptr;
     {
         size_t dim = -1;
-        queries = fvecs_read(sift1m_query, &dim, &number_of_queries);
+        queries = const_cast<const float *>(fvecs_read(sift1m_query, &dim, &number_of_queries));
         assert(dimension == dim || !"query does not have same dimension as train set");
     }
 
@@ -82,7 +78,7 @@ int main() {
         infinity::BaseProfiler profiler;
         profiler.Begin();
         for (int i = 0; i < number_of_queries; i++) {
-            std::priority_queue<std::pair<float, int>> result = knn_hnsw->KnnSearch(queries + i * dimension, top_k);
+            std::priority_queue<std::pair<float, unsigned int>> result = knn_hnsw->KnnSearch(queries + i * dimension, top_k);
             assert(top_k == result.size() || !"incorrect topk value");
 
             std::unordered_set<int> ground_truth_set;

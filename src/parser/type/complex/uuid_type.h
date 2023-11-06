@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/31.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
-#include <string>
 #include <cstring>
+#include <string>
 
 namespace infinity {
 
@@ -16,7 +26,7 @@ public:
 public:
     inline UuidType() = default;
 
-    explicit UuidType(const char* input) { Set(input); }
+    explicit UuidType(const char *input) { Set(input); }
 
     inline ~UuidType() { Reset(); }
 
@@ -32,7 +42,7 @@ public:
 
     inline bool operator!=(const UuidType &other) const { return !operator==(other); }
 
-    inline void Set(const char* input) { memcpy(body, input, UuidType::LENGTH); }
+    inline void Set(const char *input) { memcpy(body, input, UuidType::LENGTH); }
 
     [[nodiscard]] inline std::string ToString() const { return std::string(body, UuidType::LENGTH); }
 

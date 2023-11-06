@@ -3,9 +3,9 @@ module;
 import byte_slice_reader;
 import byte_slice_writer;
 import fastpfor;
-import infinity_assert;
-import infinity_exception;
+
 import stl;
+import infinity_exception;
 
 #include "new_pfordelta_compressor.h"
 
@@ -56,7 +56,7 @@ IntEncoder<u32, SIMDBitPacking>::Decode(u32* dest, u32 dest_len, ByteSliceReader
     void* buf_ptr = buffer;
     size_t len = slice_reader.ReadMayCopy(buf_ptr, comp_len);
     if(len != comp_len) {
-        Error<StorageException>("Decode posting FAILEDF", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Decode posting FAILEDF");
     }
     size_t destlen = dest_len;
     compressor_.Decompress((const u32*)buf_ptr, comp_len, dest, destlen);
@@ -83,7 +83,7 @@ inline u32 IntEncoder<T, Compressor>::Decode(T *dest, u32 dest_len, ByteSliceRea
     void *buf_ptr = buffer;
     size_t len = slice_reader.ReadMayCopy(buf_ptr, comp_len);
     if (len != comp_len) {
-        Error<StorageException>("Decode posting FAILEDF", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Decode posting FAILEDF");
     }
     return (u32)compressor_.Decompress(dest, dest_len, (const u32 *)buf_ptr, comp_len);
 }

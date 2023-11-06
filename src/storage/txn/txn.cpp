@@ -1,14 +1,24 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-4.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 
 import txn_manager;
@@ -82,7 +92,7 @@ UniquePtr<String> Txn::Append(const String &db_name, const String &table_name, c
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -99,7 +109,7 @@ UniquePtr<String> Txn::Delete(const String &db_name, const String &table_name, c
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -113,12 +123,12 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_n
         Vector<SharedPtr<DataBlock>> &local_blocks = txn_table_iter->second->blocks_;
         meta_table_state->local_blocks_.reserve(local_blocks.size());
         SizeT block_count = local_blocks.size();
-        for(SizeT idx = 0; idx < block_count; ++ idx) {
+        for (SizeT idx = 0; idx < block_count; ++idx) {
             const auto &data_block = local_blocks[idx];
             MetaLocalDataState data_block_state;
             data_block_state.data_block_ = data_block.get();
             SizeT column_count = columns.size();
-            for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+            for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
                 const auto &column_id = columns[col_idx];
                 MetaColumnVectorState column_vector_state;
                 column_vector_state.column_vector_ = data_block->column_vectors[column_id].get();
@@ -131,7 +141,7 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const String &db_n
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg.get() != nullptr) {
-        Error<TransactionException>(*err_msg, __FILE_NAME__, __LINE__);
+        Error<TransactionException>(*err_msg);
     }
 
     return GetMetaTableState(meta_table_state, table_entry, columns);
@@ -153,7 +163,7 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
             block_state.block_entry_ = block_entry_ptr;
 
             SizeT column_count = columns.size();
-            for(SizeT col_idx = 0; col_idx < column_count; ++ col_idx) {
+            for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
                 const auto &column_id = columns[col_idx];
                 MetaBlockColumnState column_data_state;
                 column_data_state.block_column_ = BlockEntry::GetColumnDataByID(block_entry_ptr, column_id);
@@ -167,21 +177,15 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
     }
 }
 
-void Txn::AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store) {
-    if (txn_tables_store_.find(table_name) != txn_tables_store_.end()) {
-        String err_msg = Format("Attempt to add duplicated table store for table: {}", table_name);
-        LOG_ERROR(err_msg);
-        return;
+TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
+    UniqueLock<Mutex> lk(m);
+    auto txn_table_iter = txn_tables_store_.find(*table_entry->table_collection_name_);
+    if (txn_table_iter != txn_tables_store_.end()) {
+        return txn_table_iter->second.get();
     }
-    txn_tables_store_[table_name] = Move(txn_table_store);
-}
-
-TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
-    auto txn_table_iter = txn_tables_store_.find(table_name);
-    if (txn_table_iter == txn_tables_store_.end()) {
-        return nullptr;
-    }
-    return txn_table_iter->second.get();
+    txn_tables_store_[*table_entry->table_collection_name_] = MakeUnique<TxnTableStore>(table_entry, this);
+    TxnTableStore *txn_table_store = txn_tables_store_[*table_entry->table_collection_name_].get();
+    return txn_table_store;
 }
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
@@ -265,8 +269,8 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 
     Vector<DBEntry *> db_entries = NewCatalog::Databases(catalog_, txn_id_, txn_context_.GetBeginTS());
     SizeT db_count = db_entries.size();
-    for(SizeT idx = 0; idx < db_count; ++ idx) {
-        DBEntry* db_entry = db_entries[idx];
+    for (SizeT idx = 0; idx < db_count; ++idx) {
+        DBEntry *db_entry = db_entries[idx];
         res.emplace_back(DatabaseDetail{db_entry->db_name_});
     }
 
@@ -276,7 +280,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 Vector<TableCollectionDetail> Txn::GetTableCollections(const String &db_name) {
     EntryResult entry_result = GetDatabase(db_name);
     if (entry_result.err_.get() != nullptr) {
-        Error<TransactionException>(*entry_result.err_, __FILE_NAME__, __LINE__);
+        Error<TransactionException>(*entry_result.err_);
     }
 
     DBEntry *db_entry = (DBEntry *)entry_result.entry_;
@@ -351,7 +355,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_name, table_entry, this);
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
     table_store = txn_tables_store_[table_name].get();
 
@@ -490,25 +494,19 @@ EntryResult Txn::CreateCollection(const String &db_name, const String &collectio
     return res;
 }
 
-EntryResult Txn::GetCollectionByName(const String &db_name, const String &table_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
-}
+EntryResult Txn::GetCollectionByName(const String &db_name, const String &table_name) { Error<TransactionException>("Not Implemented"); }
 
 EntryResult Txn::CreateView(const String &db_name, const String &view_name, ConflictType conflict_type) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
 EntryResult Txn::DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
+    Error<TransactionException>("Not Implemented");
 }
 
-EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
-}
+EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) { Error<TransactionException>("Not Implemented"); }
 
-Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
-    Error<TransactionException>("Not Implemented", __FILE_NAME__, __LINE__);
-}
+Vector<BaseEntry *> Txn::GetViews(const String &db_name) { Error<TransactionException>("Not Implemented"); }
 
 void Txn::BeginTxn() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
 

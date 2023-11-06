@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-2-6.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import std;
 import stl;
 import parser;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 
 module hash_table;
@@ -56,7 +66,7 @@ void HashTable::Init(const Vector<DataType> &types) {
             case kNull:
             case kMissing:
             case kInvalid: {
-                Error<ExecutorException>("Attempt to construct hash key for type: " + data_type.ToString(), __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Attempt to construct hash key for type: " + data_type.ToString());
             }
         }
 
@@ -86,7 +96,7 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
             DataType &data_type = types_[column_id];
             if (data_type.type() == kMixed) {
                 // Only float/boolean/integer/string can be built as hash key. Array/Tuple will be treated as null
-                Error<ExecutorException>("Attempt to construct hash key for heterogeneous type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Attempt to construct hash key for heterogeneous type");
             }
 
             if (data_type.type() == kVarchar) {

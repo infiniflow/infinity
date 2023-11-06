@@ -2,7 +2,7 @@ module;
 
 import stl;
 import byte_slice;
-import infinity_assert;
+
 import infinity_exception;
 
 export module byte_slice_reader;
@@ -84,7 +84,7 @@ inline u8 ByteSliceReader::ReadByte() {
         current_slice_ = NextSlice(current_slice_);
         if (!current_slice_) {
             // StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
-            Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Read past EOF");
         }
         current_slice_offset_ = 0;
     }
@@ -119,7 +119,7 @@ inline i64 ByteSliceReader::ReadInt64() { return ReadInt<i64>(); }
 inline u64 ByteSliceReader::ReadUInt64() { return ReadInt<u64>(); }
 
 inline i32 ByteSliceReader::PeekInt32() {
-    Assert<StorageException>(current_slice_ != nullptr, "current_slice null", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(current_slice_ != nullptr, "current_slice null");
     if (current_slice_offset_ + sizeof(i32) <= GetSliceDataSize(current_slice_)) {
         return *((i32 *)(current_slice_->data_ + current_slice_offset_));
     }
@@ -134,7 +134,7 @@ inline i32 ByteSliceReader::PeekInt32() {
             next_slice = NextSlice(slice);
             if (next_slice == nullptr || next_slice->data_ == nullptr) {
                 // StorageError(fmt::format("Read past EOF, State: list length = {}, offset = {}", GetSize(), global_offset_));
-                Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Read past EOF");
             } else {
                 slice = next_slice;
             }

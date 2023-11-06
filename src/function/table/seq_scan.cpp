@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/9/14.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -17,7 +27,7 @@ import block_column_entry;
 import column_buffer;
 import new_catalog;
 import default_values;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 import segment_entry;
@@ -66,7 +76,7 @@ static void SeqScanFunc(QueryContext *query_context, TableFunctionData *table_fu
     // fill the whole output data block, or we have read all data from table
     while (write_capacity > 0 && current_segment_id != INVALID_SEGMENT_ID) {
         auto iter = table_column_entry_ptr->segments_.find(current_segment_id);
-        Assert<StorageException>(iter != table_column_entry_ptr->segments_.end(), "non-exist segment id", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(iter != table_column_entry_ptr->segments_.end(), "non-exist segment id");
         SegmentEntry *segment_entry = iter->second.get();
 
         i64 block_count = segment_entry->block_entries_.size();

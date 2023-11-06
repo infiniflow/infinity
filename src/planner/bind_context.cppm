@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/8/7.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import stl;
 import parser;
 import column_binding;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import column_expression;
 import column_identifer;
@@ -182,7 +192,7 @@ public:
         if (table_table_index2table_name_.contains(index)) {
             return table_table_index2table_name_[index];
         }
-        Error<PlannerException>(Format("Can't get table name by table index: {}", index), __FILE_NAME__, __LINE__);
+        Error<PlannerException>(Format("Can't get table name by table index: {}", index));
     }
 
     const Binding *GetBindingFromCurrentOrParentByName(const String &binding_name) const;

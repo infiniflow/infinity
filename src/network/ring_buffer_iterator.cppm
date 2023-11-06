@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-24.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -16,7 +26,7 @@ public:
     explicit RingBufferIterator(Array<char, PG_MSG_BUFFER_SIZE> &data, SizeT position = 0) : data_(data), position_(position) {}
 
     RingBufferIterator &operator=(const RingBufferIterator &other) {
-        //        Assert<NetworkException>(&data_ == &other.data_, "The two iterators are from different arrays", __FILE_NAME__, __LINE__);
+        //        Assert<NetworkException>(&data_ == &other.data_, "The two iterators are from different arrays");
         position_ = other.position_;
         return *this;
     }

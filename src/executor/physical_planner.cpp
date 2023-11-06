@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/26.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -96,7 +106,6 @@ import logical_command;
 import parser;
 import explain_physical_plan;
 
-import infinity_assert;
 import infinity_exception;
 
 module physical_planner;
@@ -250,7 +259,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
         default: {
-            Error<PlannerException>("Unknown logical node type: " + logical_operator->name(), __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unknown logical node type: " + logical_operator->name());
             //            result = MakeShared<PhysicalDummyOperator>(std::numeric_limits<uint64_t>::max());
         }
     }
@@ -377,8 +386,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
-    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical delete node has no input node.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical delete node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical delete node has no input node.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical delete node shouldn't have right child.");
     SharedPtr<LogicalDelete> logical_delete = std::dynamic_pointer_cast<LogicalDelete>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
@@ -387,8 +396,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
-    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical update node has no input node.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical update node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->left_node() != nullptr, "Logical update node has no input node.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical update node shouldn't have right child.");
     SharedPtr<LogicalUpdate> logical_update = std::dynamic_pointer_cast<LogicalUpdate>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
@@ -426,10 +435,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    Assert<PlannerException>(logical_operator->right_node() == nullptr,
-                             "Aggregate project node shouldn't have right child.",
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Aggregate project node shouldn't have right child.");
     SharedPtr<LogicalAggregate> logical_aggregate = std::static_pointer_cast<LogicalAggregate>(logical_operator);
     SharedPtr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node != nullptr) {
@@ -449,8 +455,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNo
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
 
-    Assert<PlannerException>(left_node != nullptr, "Join node has no left child.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(right_node != nullptr, "Join node has no right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(left_node != nullptr, "Join node has no left child.");
+    Assert<PlannerException>(right_node != nullptr, "Join node has no right child.");
 
     SharedPtr<LogicalJoin> logical_join = std::static_pointer_cast<LogicalJoin>(logical_operator);
 
@@ -472,8 +478,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<L
     auto left_node = logical_operator->left_node();
     auto right_node = logical_operator->right_node();
 
-    Assert<PlannerException>(left_node != nullptr, "Cross product node has no left child.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(right_node != nullptr, "Cross product node has no right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(left_node != nullptr, "Cross product node has no left child.");
+    Assert<PlannerException>(right_node != nullptr, "Cross product node has no right child.");
 
     SharedPtr<LogicalCrossProduct> logical_cross_product = std::static_pointer_cast<LogicalCrossProduct>(logical_operator);
 
@@ -489,8 +495,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<L
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
 
-    Assert<PlannerException>(input_logical_node != nullptr, "Logical sort node has no input node.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical sort node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(input_logical_node != nullptr, "Logical sort node has no input node.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical sort node shouldn't have right child.");
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
@@ -502,8 +508,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNo
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
 
-    Assert<PlannerException>(input_logical_node != nullptr, "Logical limit node has no input node.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(input_logical_node != nullptr, "Logical limit node has no input node.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.");
 
     SharedPtr<LogicalLimit> logical_limit = std::static_pointer_cast<LogicalLimit>(logical_operator);
     SharedPtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
@@ -515,7 +521,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.");
     SharedPtr<LogicalProject> logical_project = std::static_pointer_cast<LogicalProject>(logical_operator);
     SharedPtr<PhysicalOperator> input_physical_operator{};
     if (input_logical_node != nullptr) {
@@ -529,8 +535,8 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<Log
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
-    Assert<PlannerException>(input_logical_node != nullptr, "Logical filter node has no input node.", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(input_logical_node != nullptr, "Logical filter node has no input node.");
+    Assert<PlannerException>(logical_operator->right_node() == nullptr, "Logical project node shouldn't have right child.");
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
 
@@ -566,7 +572,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<Logi
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    Error<NotImplementException>("BuildViewScan", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("BuildViewScan");
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -622,7 +628,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     SharedPtr<PhysicalExplain> explain_node{nullptr};
     switch (logical_explain->explain_type()) {
         case ExplainType::kAnalyze: {
-            Error<NotImplementException>("Explain analyze", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Explain analyze");
             break;
         }
         case ExplainType::kAst:

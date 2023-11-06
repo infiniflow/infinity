@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-23.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -19,7 +29,7 @@ import txn_manager;
 import buffer_manager;
 import db_entry;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module table_collection_meta;
@@ -366,13 +376,8 @@ UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &tabl
 void TableCollectionMeta::MergeFrom(TableCollectionMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
     Assert<StorageException>(IsEqual(*this->table_collection_name_, *other.table_collection_name_),
-                             "DBEntry::MergeFrom requires table_collection_name_ match",
-                             __FILE_NAME__,
-                             __LINE__);
-    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_),
-                             "DBEntry::MergeFrom requires db_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+                             "DBEntry::MergeFrom requires table_collection_name_ match");
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *other.db_entry_dir_), "DBEntry::MergeFrom requires db_entry_dir_ match");
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

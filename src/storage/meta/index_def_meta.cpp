@@ -1,3 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -14,7 +27,7 @@ import txn_state;
 import index_def_entry;
 import logger;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 
@@ -36,7 +49,7 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
                                          TxnManager *txn_mgr) {
     // write lock guard
     UniqueLock<RWMutex> lock(index_def_meta->rw_locker_);
-    Assert<StorageException>(!index_def_meta->entry_list_.empty(), "entry list should never be empty.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!index_def_meta->entry_list_.empty(), "entry list should never be empty.");
 
     BaseEntry *header_base_entry = index_def_meta->entry_list_.front().get();
     // FIXME shenyushi: use enum instead of int
@@ -53,10 +66,7 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
             status = 1;
         }
     } else {
-        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy,
-                                 "Dummy entry should always be committed.",
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy, "Dummy entry should always be committed.");
         // Uncommitted
         TxnState header_index_def_entry_state = txn_mgr->GetTxnState(header_base_entry->txn_id_);
         switch (header_index_def_entry_state) {
@@ -84,11 +94,11 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
                 break;
             }
             default: {
-                Error<StorageException>("Invalid index entry txn state.", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Invalid index entry txn state.");
             }
         }
     }
-    Assert<StorageException>(status != -1, "Invalid status.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(status != -1, "Invalid status.");
     if (status == 0) {
         auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts);
         IndexDefEntry *res = index_def_entry.get();
@@ -109,10 +119,10 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
                 return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
             }
             default: {
-                Error<StorageException>("Invalid conflict type", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Invalid conflict type");
             }
         }
-        Error<StorageException>("Cannot reach here", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Cannot reach here");
     }
 }
 
@@ -121,7 +131,7 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
     IndexDefEntry *res = nullptr;
     UniqueLock<RWMutex> lock(index_def_meta->rw_locker_);
 
-    Assert<StorageException>(!index_def_meta->entry_list_.empty(), "entry list should never be empty.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!index_def_meta->entry_list_.empty(), "entry list should never be empty.");
     BaseEntry *header_base_entry = index_def_meta->entry_list_.front().get();
 
     int status = -1; // 0: success, 1: conflict, 2: not exists
@@ -139,10 +149,7 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
             status = 1;
         }
     } else {
-        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy,
-                                 "Dummy entry should always be committed.",
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<StorageException>(header_base_entry->entry_type_ != EntryType::kDummy, "Dummy entry should always be committed.");
         // Uncommitted
         TxnState header_index_def_entry_state = txn_mgr->GetTxnState(header_base_entry->txn_id_);
         switch (header_index_def_entry_state) {
@@ -170,12 +177,12 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
                 break;
             }
             default: {
-                Error<StorageException>("Invalid index entry txn state.", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Invalid index entry txn state.");
             }
         }
     }
 
-    Assert<StorageException>(status != -1, "Invalid status.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(status != -1, "Invalid status.");
     if (status == 0) {
         auto index_def_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts);
         res = index_def_entry.get();
@@ -197,10 +204,10 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
                 return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
             }
             default: {
-                Error<StorageException>("Invalid conflict type", __FILE_NAME__, __LINE__);
+                Error<StorageException>("Invalid conflict type");
             }
         }
-        Error<StorageException>("Cannot reach here", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Cannot reach here");
     }
 }
 
@@ -247,7 +254,7 @@ EntryResult IndexDefMeta::GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, Txn
     return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid index def entry")};
 }
 
-SharedPtr<String> IndexDefMeta::ToString(IndexDefMeta *index_def_meta) { Error<StorageException>("Not implemented", __FILE_NAME__, __LINE__); }
+SharedPtr<String> IndexDefMeta::ToString(IndexDefMeta *index_def_meta) { Error<StorageException>("Not implemented"); }
 
 Json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
     Json json;
@@ -259,7 +266,7 @@ Json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
         } else if (entry->entry_type_ == EntryType::kDummy) {
             LOG_TRACE(Format("Skip dummy entry during serialize index {} meta", *index_def_meta->index_name_));
         } else {
-            Error<StorageException>("Unexpected entry type.", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Unexpected entry type.");
         }
     }
     return json;

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-31.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -18,8 +28,7 @@ enum class CommandType {
 
 class CommandInfo {
 public:
-    explicit
-    CommandInfo(CommandType type): type_(type) {}
+    explicit CommandInfo(CommandType type) : type_(type) {}
 
     virtual ~CommandInfo() = default;
 
@@ -31,31 +40,29 @@ private:
     CommandType type_{CommandType::kInvalid};
 };
 
-class UseCmd final: public CommandInfo {
+class UseCmd final : public CommandInfo {
 public:
-    explicit
-    UseCmd(const char* db_name): CommandInfo(CommandType::kUse), db_name_(db_name) {}
+    explicit UseCmd(const char *db_name) : CommandInfo(CommandType::kUse), db_name_(db_name) {}
 
     ~UseCmd() final = default;
 
     [[nodiscard]] std::string ToString() const final;
 
-    const std::string& db_name() const { return db_name_; }
+    const std::string &db_name() const { return db_name_; }
 
 private:
     std::string db_name_;
 };
 
-class CheckTable final: public CommandInfo {
+class CheckTable final : public CommandInfo {
 public:
-    explicit
-    CheckTable(const char* table_name): CommandInfo(CommandType::kCheckTable), table_name_(table_name) {}
+    explicit CheckTable(const char *table_name) : CommandInfo(CommandType::kCheckTable), table_name_(table_name) {}
 
     ~CheckTable() final = default;
 
     [[nodiscard]] std::string ToString() const final;
 
-    const std::string& table_name() const { return table_name_; }
+    const std::string &table_name() const { return table_name_; }
 
 private:
     std::string table_name_;

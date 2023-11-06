@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/26.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ module;
 
 import stl;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 import column_vector;
@@ -50,16 +60,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
         case ExpressionType::kIn:
             return CreateState(std::static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
-            Error<ExecutorException>("Unexpected expression type: KNN", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Unexpected expression type: KNN");
         }
         default: {
-            Error<ExecutorException>("Unknown expression type: " + expression->Name(), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Unknown expression type: " + expression->Name());
         }
     }
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr) {
-    Assert<ExecutorException>(agg_expr->arguments().size() == 1, "Aggregate function arguments error.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(agg_expr->arguments().size() == 1, "Aggregate function arguments error.");
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(agg_expr->arguments()[0]);
@@ -89,7 +99,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
-    Assert<ExecutorException>(cast_expr->arguments().size() == 1, "Cast function arguments error.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(cast_expr->arguments().size() == 1, "Cast function arguments error.");
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);

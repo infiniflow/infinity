@@ -1,24 +1,34 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/30.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 
 struct BlobType {
 public:
-    char* ptr{nullptr};
+    char *ptr{nullptr};
     uint64_t size{0}; // 4GB will be the limitation.
 
 public:
     inline BlobType() = default;
 
     // The blob_ptr will also be freed by BlobType's destructor.
-    inline BlobType(char* blob_ptr, uint64_t blob_size) : ptr(blob_ptr), size(blob_size) {}
+    inline BlobType(char *blob_ptr, uint64_t blob_size) : ptr(blob_ptr), size(blob_size) {}
 
     inline ~BlobType() { Reset(); }
 
@@ -35,9 +45,9 @@ public:
     inline bool operator!=(const BlobType &other) const { return !operator==(other); }
 
 public:
-    void Copy(char* blob_ptr, uint64_t blob_size);
+    void Copy(char *blob_ptr, uint64_t blob_size);
 
-    void Move(char* blob_ptr, uint64_t blob_size);
+    void Move(char *blob_ptr, uint64_t blob_size);
 
     inline void Reset() {
         if (size != 0) {

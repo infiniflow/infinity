@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-21.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -41,20 +51,19 @@ SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
 
     SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count);
-    for(SizeT col_idx; col_idx < column_count; ++ col_idx) {
-        const auto& column_name = base_table_ref_->column_names_->at(col_idx);
+    for (SizeT col_idx; col_idx < column_count; ++col_idx) {
+        const auto &column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
 
     SizeT expr_count = knn_expressions_.size();
-    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
-        const auto& knn_expr = knn_expressions_[expr_idx];
+    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
+        const auto &knn_expr = knn_expressions_[expr_idx];
         result_names->emplace_back(knn_expr->Name());
     }
 
     result_names->emplace_back("_row_id");
     return result_names;
-
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
@@ -62,7 +71,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
     SizeT expr_count = knn_expressions_.size();
     result_types.reserve(result_types.size() + expr_count);
 
-    for(SizeT expr_idx = 0; expr_idx < expr_count; ++ expr_idx) {
+    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
         const auto &knn_expr = knn_expressions_[expr_idx];
         result_types.emplace_back(MakeShared<DataType>(knn_expr->Type()));
     }

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module;
 
 import stl;
@@ -114,9 +124,7 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
-    void AddTxnTableStore(const String &table_name, UniquePtr<TxnTableStore> txn_table_store);
-
-    TxnTableStore *GetTxnTableStore(const String &table_name);
+    TxnTableStore *GetTxnTableStore(TableCollectionEntry *table_entry);
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
@@ -125,8 +133,11 @@ public:
     UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
 private:
+    // Txn Manager
+    TxnManager *txn_mgr_{};
     NewCatalog *catalog_{};
     u64 txn_id_{};
+
     TxnContext txn_context_{};
 
     // Related database
@@ -147,13 +158,11 @@ private:
 
     // WalEntry
     SharedPtr<WalEntry> wal_entry_;
+
     // WalManager notify the  commit bottom half is done
     Mutex m;
     CondVar cv;
     bool done_bottom_{false};
-
-    // Txn Manager
-    TxnManager *txn_mgr_{};
 };
 
 } // namespace infinity

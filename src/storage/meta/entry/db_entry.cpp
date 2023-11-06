@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-23.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -20,7 +30,6 @@ import block_index;
 import logger;
 import third_party;
 import infinity_exception;
-import infinity_assert;
 
 module db_entry;
 
@@ -230,17 +239,14 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager
 }
 
 void DBEntry::MergeFrom(BaseEntry &other) {
-    if(other.entry_type_ != EntryType::kDatabase) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry", __FILE_NAME__, __LINE__);
+    if (other.entry_type_ != EntryType::kDatabase) {
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
     }
-    DBEntry* db_entry2 = static_cast<DBEntry*>(&other);
+    DBEntry *db_entry2 = static_cast<DBEntry *>(&other);
 
     // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(IsEqual(*this->db_name_, *db_entry2->db_name_), "DBEntry::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_),
-                             "DBEntry::MergeFrom requires db_entry_dir_ match",
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_name_, *db_entry2->db_name_), "DBEntry::MergeFrom requires db_name_ match");
+    Assert<StorageException>(IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_), "DBEntry::MergeFrom requires db_entry_dir_ match");
     for (auto &[table_name, table_meta2] : db_entry2->tables_) {
         auto it = this->tables_.find(table_name);
         if (it == this->tables_.end()) {

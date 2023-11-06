@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-5-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -9,7 +19,7 @@ module;
 import stl;
 import file_system;
 import file_system_type;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 
@@ -31,7 +41,7 @@ u8 FileReader::ReadByte() {
     if (buffer_offset_ >= buffer_size_) {
         already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
         if (already_read_size_ == 0) {
-            Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()), __FILE_NAME__, __LINE__);
+            Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()));
         }
         buffer_offset_ = 0;
         buffer_start_ += already_read_size_;
@@ -86,12 +96,12 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             start_pos += to_read;
         }
         if (start_pos < end_pos) {
-            Assert<StorageException>(buffer_offset_ == already_read_size_, "Error file read size", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(buffer_offset_ == already_read_size_, "Error file read size");
             buffer_start_ += already_read_size_;
             buffer_offset_ = 0;
             already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
             if (already_read_size_ == 0) {
-                Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()), __FILE_NAME__, __LINE__);
+                Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()));
             }
         } else {
             return;

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/9/12.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -12,7 +22,7 @@ import table_collection_entry;
 import parser;
 import table_function;
 import block_index;
-import infinity_assert;
+
 import infinity_exception;
 
 export module base_table_ref;
@@ -34,7 +44,7 @@ public:
           column_types_(Move(column_types)), table_index_(table_index) {}
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
-        Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order", __FILE_NAME__, __LINE__);
+        Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order");
 
         replace_field<SizeT>(column_ids_, indices);
         replace_field<String>(*column_names_, indices);

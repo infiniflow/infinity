@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/20.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -10,7 +20,7 @@ module;
 import stl;
 import pg_message;
 import ring_buffer_iterator;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 
@@ -95,7 +105,7 @@ void BufferWriter::send_value_u32(u32 host_value) {
 }
 
 void BufferWriter::flush(SizeT bytes) {
-    Assert<NetworkException>(bytes <= size(), "Can't flush more bytes than available", __FILE_NAME__, __LINE__);
+    Assert<NetworkException>(bytes <= size(), "Can't flush more bytes than available");
     const auto bytes_to_send = bytes ? bytes : size();
     SizeT bytes_sent{0};
 
@@ -115,10 +125,10 @@ void BufferWriter::flush(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        Error<NetworkException>("Write failed. Client close connection.", __FILE_NAME__, __LINE__);
+        Error<NetworkException>("Write failed. Client close connection.");
     }
 
-    Assert<NetworkException>(!boost_error, boost_error.message(), __FILE_NAME__, __LINE__);
+    Assert<NetworkException>(!boost_error, boost_error.message());
     start_pos_.increment(bytes_sent);
 }
 

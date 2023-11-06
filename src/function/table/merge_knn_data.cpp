@@ -1,10 +1,23 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import parser;
 import base_table_ref;
-import infinity_assert;
+
 import infinity_exception;
 import merge_knn;
 import faiss;
@@ -23,14 +36,14 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
       table_ref_(table_ref) {
     switch (elem_type) {
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid element type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid element type");
         }
         case kElemFloat: {
             MergeKnnFunctionData::InitMergeKnn<f32>(query_count, topk, knn_distance_type);
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
     }
 }
@@ -39,7 +52,7 @@ template <typename DataType>
 void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -24,9 +34,8 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id), schema_name_(Move(schema_name)),
-      output_names_(Move(output_names)), output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index),
-      table_def_ptr_(Move(table_def_ptr)) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
+      output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index), table_def_ptr_(Move(table_def_ptr)) {}
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          const SharedPtr<PhysicalOperator> &input,
@@ -35,8 +44,8 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id), schema_name_(Move(schema_name)),
-      output_names_(Move(output_names)), output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
+      output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index) {}
 
 void PhysicalCreateTable::Init() {}
 

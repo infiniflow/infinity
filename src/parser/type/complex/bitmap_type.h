@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/31.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
+#include "parser_assert.h"
 #include <cstdint>
 #include <string>
-#include "parser_assert.h"
 
 namespace infinity {
 
@@ -24,16 +34,12 @@ public:
 public:
     BitmapType() = default;
 
-    explicit inline BitmapType(uint64_t bit_count) {
-        Initialize(bit_count);
-    }
+    explicit inline BitmapType(uint64_t bit_count) { Initialize(bit_count); }
 
     // The bitmap_ptr will also be freed by BitmapType's destructor.
-    inline BitmapType(uint64_t *bitmap_ptr, uint64_t bit_count) : ptr(bitmap_ptr), count(bit_count) { }
+    inline BitmapType(uint64_t *bitmap_ptr, uint64_t bit_count) : ptr(bitmap_ptr), count(bit_count) {}
 
-    inline ~BitmapType() {
-        Reset();
-    }
+    inline ~BitmapType() { Reset(); }
 
     BitmapType(const BitmapType &other);
 

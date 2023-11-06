@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/12/17.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import parser;
 import stl;
 import bound_cast_func;
 import column_vector_cast;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import column_vector;
@@ -24,9 +34,7 @@ export struct IntegerTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &target) {
     Assert<TypeException>(source.type() != target.type(),
-                          Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()),
-                          __FILE_NAME__,
-                          __LINE__);
+                          Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, TinyIntT, IntegerTryCastToFixlen>);
@@ -56,7 +64,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()), __FILE_NAME__, __LINE__);
+            Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
 }
@@ -65,9 +73,7 @@ struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
     }
 };
 
@@ -75,9 +81,7 @@ struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
     }
 };
 
@@ -122,7 +126,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DecimalT &target) {
-    Error<NotImplementException>(Format("Not implemented"), __FILE_NAME__, __LINE__);
+    Error<NotImplementException>(Format("Not implemented"));
 }
 
 // Cast TinyIntT to VarcharT type
@@ -136,7 +140,7 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length = static_cast<u16>(tmp_str.size());
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.", __FILE_NAME__, __LINE__);
+    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
     Memcpy(target.prefix, tmp_str.c_str(), target.length);
     Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
@@ -186,7 +190,7 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DecimalT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 // Cast SmallIntT to VarcharT type
@@ -200,7 +204,7 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length = static_cast<u16>(tmp_str.size());
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.", __FILE_NAME__, __LINE__);
+    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
     Memcpy(target.prefix, tmp_str.c_str(), target.length);
     Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
@@ -253,7 +257,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, DecimalT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 // Cast IntegerT to VarcharT type
@@ -268,7 +272,7 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length = tmp_str.size();
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.", __FILE_NAME__, __LINE__);
+    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
     Memcpy(target.prefix, tmp_str.c_str(), target.length);
     Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     return true;
@@ -324,7 +328,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, DecimalT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 // Cast integer to varlen type
@@ -345,9 +349,7 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
     } else {
         Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
         Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer. ",
-                              __FILE_NAME__,
-                              __LINE__);
+                              "Varchar column vector should use MemoryVectorBuffer. ");
 
         ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         Memcpy(ptr, tmp_str.c_str(), target.length);
@@ -360,44 +362,44 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
 // TODO: Cast HugeInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, TinyIntT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, SmallIntT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, IntegerT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, BigIntT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, FloatT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, DoubleT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, DecimalT &target) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(HugeIntT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented");
 }
 
 } // namespace infinity

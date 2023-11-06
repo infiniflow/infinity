@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/11/13.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import global_resource_usage;
 import third_party;
 import parser;
@@ -13,8 +23,7 @@ import logger;
 import stl;
 import infinity_context;
 
-class VarcharTypeTest : public BaseTest {
-};
+class VarcharTypeTest : public BaseTest {};
 
 TEST_F(VarcharTypeTest, TestInit) {
     using namespace infinity;
@@ -69,7 +78,7 @@ TEST_F(VarcharTypeTest, TestConstructor1) {
 
     // Constructor from string
     {
-        
+
         VarcharT v1(s1);
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -89,7 +98,7 @@ TEST_F(VarcharTypeTest, TestConstructor2) {
 
     // Constructor from char*
     {
-        
+
         VarcharT v1(s1.c_str());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -110,7 +119,7 @@ TEST_F(VarcharTypeTest, TestConstructor3) {
 
     // Constructor from char* and length
     {
-        
+
         VarcharT v1(s1.c_str(), s1.length());
         EXPECT_EQ(v1.length, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
@@ -131,7 +140,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
 
     // Copy constructor
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2 = v1;
         EXPECT_EQ(v1.length, s1.length());
@@ -141,7 +150,7 @@ TEST_F(VarcharTypeTest, TestCopy) {
     }
 
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2 = v1;
         EXPECT_EQ(v1.length, s2.length());
@@ -159,7 +168,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
     // Move constructor 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -170,7 +179,7 @@ TEST_F(VarcharTypeTest, TestMove) {
 
     // Move constructor 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2 = Move(v1);
         EXPECT_EQ(v1.length, 0);
@@ -190,7 +199,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2;
         v2 = v1;
@@ -202,7 +211,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2;
         v2 = v1;
@@ -214,7 +223,7 @@ TEST_F(VarcharTypeTest, TestCopyAssignment) {
 
     // Copy Assignment 3
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2(s2);
         VarcharT v3(s3);
@@ -241,7 +250,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move constructor 1
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2;
         v2 = Move(v1);
@@ -253,7 +262,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move constructor 2
     {
-        
+
         VarcharT v1(s2);
         VarcharT v2;
         v2 = Move(v1);
@@ -266,7 +275,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
 
     // Move Assignment 3
     {
-        
+
         VarcharT v1(s1);
         VarcharT v2(s2);
         VarcharT v3(s3);

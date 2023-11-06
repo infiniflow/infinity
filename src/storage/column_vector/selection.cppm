@@ -1,10 +1,20 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-17.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module;
 
 import stl;
-import infinity_assert;
+
 import infinity_exception;
 import global_resource_usage;
 import default_values;
@@ -15,7 +25,7 @@ namespace infinity {
 
 struct SelectionData {
     explicit SelectionData(SizeT count) : capacity_(count) {
-        Assert<ExecutorException>(count <= u16_max, "Too large size for selection data.", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(count <= u16_max, "Too large size for selection data.");
         data_ = MakeUnique<u16[]>(count);
         GlobalResourceUsage::IncrObjectCount();
     }
@@ -38,8 +48,8 @@ public:
     }
 
     inline void Set(SizeT selection_idx, SizeT row_idx) {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized", __FILE_NAME__, __LINE__);
-        Assert<ExecutorException>(selection_idx < storage_->capacity_, "Exceed the selection vector capacity.", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
+        Assert<ExecutorException>(selection_idx < storage_->capacity_, "Exceed the selection vector capacity.");
         selection_vector[selection_idx] = row_idx;
     }
 
@@ -52,22 +62,22 @@ public:
         if (selection_vector == nullptr) {
             return idx;
         }
-        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.");
         return selection_vector[idx];
     }
 
     inline u16 &operator[](SizeT idx) const {
-        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.");
         return selection_vector[idx];
     }
 
     inline SizeT Capacity() const {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
         return storage_->capacity_;
     }
 
     inline SizeT Size() const {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
         return latest_selection_idx_;
     }
 

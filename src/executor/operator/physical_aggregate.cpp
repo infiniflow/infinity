@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -14,7 +24,7 @@ import parser;
 import operator_state;
 import data_block;
 import utility;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 
@@ -188,9 +198,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            Error<ExecutorException>("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString(),
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Error<ExecutorException>("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
         }
         types.emplace_back(input_type);
     }
@@ -245,7 +253,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kHugeInt: {
-                            Error<NotImplementException>("HugeInt data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("HugeInt data shuffle isn't implemented.");
                         }
                         case kFloat: {
                             ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
@@ -258,7 +266,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kDecimal: {
-                            Error<NotImplementException>("Decimal data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Decimal data shuffle isn't implemented.");
                         }
                         case kVarchar: {
                             VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
@@ -280,22 +288,22 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kTime: {
-                            Error<NotImplementException>("Time data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Time data shuffle isn't implemented.");
                         }
                         case kDateTime: {
-                            Error<NotImplementException>("Datetime data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Datetime data shuffle isn't implemented.");
                         }
                         case kTimestamp: {
-                            Error<NotImplementException>("Timestamp data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Timestamp data shuffle isn't implemented.");
                         }
                         case kInterval: {
-                            Error<NotImplementException>("Interval data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Interval data shuffle isn't implemented.");
                         }
                         case kMixed: {
-                            Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.");
                         }
                         default: {
-                            Error<NotImplementException>("Unexpected data type", __FILE_NAME__, __LINE__);
+                            Error<NotImplementException>("Unexpected data type");
                         }
                     }
                 }
@@ -305,9 +313,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         }
 
         Assert<ExecutorException>(output_row_idx == datablock_size,
-                                  "Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx),
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  "Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx));
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
             output_datablock->column_vectors[column_id]->tail_index_ = datablock_size;
@@ -327,9 +333,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
         Assert<ExecutorException>(*input_type == *output_type,
-                                  "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString(),
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
 
         types.emplace_back(input_type);
     }
@@ -376,7 +380,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kHugeInt: {
-                    Error<NotImplementException>("HugeInt data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("HugeInt data shuffle isn't implemented.");
                 }
                 case kFloat: {
                     ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
@@ -389,7 +393,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kDecimal: {
-                    Error<NotImplementException>("Decimal data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Decimal data shuffle isn't implemented.");
                 }
                 case kVarchar: {
                     VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
@@ -411,22 +415,22 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kTime: {
-                    Error<NotImplementException>("Time data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Time data shuffle isn't implemented.");
                 }
                 case kDateTime: {
-                    Error<NotImplementException>("Datetime data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Datetime data shuffle isn't implemented.");
                 }
                 case kTimestamp: {
-                    Error<NotImplementException>("Timestamp data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Timestamp data shuffle isn't implemented.");
                 }
                 case kInterval: {
-                    Error<NotImplementException>("Interval data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Interval data shuffle isn't implemented.");
                 }
                 case kMixed: {
-                    Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.");
                 }
                 default: {
-                    Error<NotImplementException>("Unexpected data type", __FILE_NAME__, __LINE__);
+                    Error<NotImplementException>("Unexpected data type");
                 }
             }
 

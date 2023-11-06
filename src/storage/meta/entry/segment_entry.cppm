@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-8-10.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -30,25 +40,6 @@ class TableCollectionEntry;
 // class IndexDef;
 //
 export class SegmentEntry;
-
-export struct SegmentVersion {
-public:
-    explicit inline SegmentVersion(SizeT capacity) : created_(capacity), deleted_(capacity), txn_ptr_(capacity) {
-        for (SizeT i = 0; i < capacity; ++i) {
-            created_[i] = 0;
-            deleted_[i] = 0;
-            txn_ptr_[i] = (u64)(nullptr);
-        }
-    }
-    Vector<au64> created_{};
-    Vector<au64> deleted_{};
-    Vector<aptr> txn_ptr_{};
-
-public:
-    static Json Serialize(SegmentVersion *segment_version);
-
-    static UniquePtr<SegmentVersion> Deserialize(const Json &table_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
-};
 
 struct SegmentEntry : public BaseEntry {
 public:
@@ -81,7 +72,7 @@ public:
 
     static u64 AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
+    static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     static void CreateIndexScalar(SegmentEntry *segment_entry,
                                   Txn *txn_ptr,
@@ -102,7 +93,7 @@ public:
 
     static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
-    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>>& block_row_hashmap);
+    static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     static u16 GetMaxBlockID(const SegmentEntry *segment_entry);
 

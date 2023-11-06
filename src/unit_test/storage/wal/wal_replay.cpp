@@ -1,3 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
@@ -20,7 +33,7 @@ import column_buffer;
 import table_collection_entry;
 import wal_entry;
 import infinity_exception;
-import infinity_assert;
+
 import column_vector;
 import physical_import;
 import txn;
@@ -490,7 +503,6 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry, segment_id, buffer_manager);
             EXPECT_EQ(segment_entry->segment_id_, 0);
             auto last_block_entry = segment_entry->block_entries_.back().get();
-            txn4->AddTxnTableStore("tbl1", MakeUnique<TxnTableStore>("tbl1", table_collection_entry, txn4));
 
             Vector<SharedPtr<ColumnVector>> columns_vector;
             {
@@ -549,7 +561,8 @@ TEST_F(WalReplayTest, WalReplayImport) {
             last_block_entry->row_count_ = 1;
             segment_entry->row_count_ = 1;
 
-            PhysicalImport::SaveSegmentData(txn4, segment_entry, "default", "tbl1");
+            auto txn_store = txn4->GetTxnTableStore(table_collection_entry);
+            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
             txn4->CommitTxn();
         }
 
