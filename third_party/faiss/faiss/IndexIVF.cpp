@@ -27,6 +27,7 @@
 #include <faiss/impl/CodePacker.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/IDSelector.h>
+#include <iostream>
 
 namespace faiss {
 
@@ -302,6 +303,18 @@ void IndexIVF::search(
     const size_t nprobe =
             std::min(nlist, params ? params->nprobe : this->nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
+    // TODO:remove this
+    {
+        int i = 1472;
+        float dis;
+        idx_t cid;
+        quantizer->search(1, x + i * d, 1, &dis, &cid, nullptr);
+        int selected_centroid = cid;
+        auto v_ids = ((faiss::ArrayInvertedLists *)invlists)->ids[selected_centroid];
+        // output i, selected_centroid, with description
+        std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << std::endl;
+        std::cout << "\ncontain 567736: " << (std::find(v_ids.begin(), v_ids.end(), 567736) != v_ids.end()) << std::endl;
+    }
 
     // search function for a subset of queries
     auto sub_search_func = [this, k, nprobe, params](

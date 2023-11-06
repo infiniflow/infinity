@@ -1,5 +1,6 @@
 
 module;
+#include <algorithm>
 #include <iostream>
 import stl;
 import knn_heap;
@@ -90,8 +91,16 @@ public:
                                    base_ivf->centroids_.data(),
                                    assign_centroid_ids.data());
             for (int i = 0; i < this->query_count_; i++) {
-                if (i == 5) {
-                    ;
+                if (i == 1472) {
+                    int selected_centroid = assign_centroid_ids[i];
+                    // output i, selected_centroid, with description
+                    std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << std::endl;
+                    // check if base_ivf->ids_[selected_centroid] contain 567736
+                    std::cout << "\ncontain 567736: "
+                              << (std::find_if(base_ivf->ids_[selected_centroid].begin(),
+                                               base_ivf->ids_[selected_centroid].end(),
+                                               [](auto &R) { return R.segment_offset_ == 567736; }) != base_ivf->ids_[selected_centroid].end())
+                              << std::endl;
                 }
                 int selected_centroid = assign_centroid_ids[i];
                 int contain_nums = base_ivf->ids_[selected_centroid].size();
