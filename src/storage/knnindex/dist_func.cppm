@@ -1,7 +1,7 @@
 module;
 
+#include "header.h"
 #include <concepts>
-#include <immintrin.h>
 
 import stl;
 
@@ -9,14 +9,22 @@ export module dist_func;
 
 namespace infinity {
 
-#ifdef __AVX__
-#define USE_AVX
-#ifdef __AVX512F__
-#define USE_AVX512
-#endif
-#endif
+template <typename T>
+concept L2DataType = requires(T data) {
+    { data *data } -> std::same_as<T>;
+    { data - data } -> std::same_as<T>;
+};
 
-template<typename T>
+export template <typename DataType>
+using DistFunc = DataType(*)(const DataType *, const DataType *, size_t);
+
+export template <typename DataType, typename SpaceType>
+concept SpaceConcept = requires(SpaceType space) {
+    { space.DistFuncPtr() } -> std::same_as<DistFunc<DataType>>;
+};
+
+template <typename T>
+    requires L2DataType<T>
 static T L2Sqr(const T *v1, const T *v2, size_t dim) {
     T res = 0;
     for (size_t i = 0; i < dim; ++i) {
@@ -28,12 +36,42 @@ static T L2Sqr(const T *v1, const T *v2, size_t dim) {
     return res;
 }
 
+#if defined(USE_AVX512)
+
+// Favor using AVX512 if available.
+static float FloatL2SqrSIMD16ExtAVX512(const float *pVect1, const float *pVect2, size_t qty) {
+    float PORTABLE_ALIGN64 TmpRes[16];
+    size_t qty16 = qty >> 4;
+
+    const float *pEnd1 = pVect1 + (qty16 << 4);
+
+    __m512 diff, v1, v2;
+    __m512 sum = _mm512_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        v1 = _mm512_loadu_ps(pVect1);
+        pVect1 += 16;
+        v2 = _mm512_loadu_ps(pVect2);
+        pVect2 += 16;
+        diff = _mm512_sub_ps(v1, v2);
+        // sum = _mm512_fmadd_ps(diff, diff, sum);
+        sum = _mm512_add_ps(sum, _mm512_mul_ps(diff, diff));
+    }
+
+    _mm512_store_ps(TmpRes, sum);
+    float res = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7] + TmpRes[8] + TmpRes[9] + TmpRes[10] +
+                TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + TmpRes[15];
+
+    return (res);
+}
+#endif
+
 #if defined(USE_AVX)
 
 // Favor using AVX if available.
-static float FloatL2SqrSIMD16ExtAVX(const float *pVect1, const float *pVect2, size_t dim) {
-    float  TmpRes[8];
-    size_t qty16 = dim >> 4;
+static float FloatL2SqrSIMD16ExtAVX(const float *pVect1, const float *pVect2, size_t qty) {
+    float PORTABLE_ALIGN32 TmpRes[8];
+    size_t qty16 = qty >> 4;
 
     const float *pEnd1 = pVect1 + (qty16 << 4);
 
@@ -62,39 +100,136 @@ static float FloatL2SqrSIMD16ExtAVX(const float *pVect1, const float *pVect2, si
 
 #endif
 
-export template <typename DataType>
-using DistFunc = DataType(*)(const DataType *, const DataType *, size_t);
+#if defined(USE_SSE)
 
-export template <typename DataType, typename SpaceType>
-concept SpaceConcept = requires(SpaceType space) {
-    { space.Dimension() } -> std::same_as<size_t>;
-    { space.template DistFuncPtr<DataType>() } -> std::same_as<DistFunc<DataType>>;
-};
+static float FloatL2SqrSIMD16ExtSSE(const float *pVect1, const float *pVect2, size_t qty) {
+    float PORTABLE_ALIGN32 TmpRes[8];
+    size_t qty16 = qty >> 4;
 
-export class DistFuncL2 {
-    const size_t dim_;
+    const float *pEnd1 = pVect1 + (qty16 << 4);
+
+    __m128 diff, v1, v2;
+    __m128 sum = _mm_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        //_mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+    }
+
+    _mm_store_ps(TmpRes, sum);
+    return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+}
+#endif
+
+#if defined(USE_SSE) || defined(USE_AVX) || defined(USE_AVX512)
+static DistFunc<float> FloatL2SqrSIMD16Ext = FloatL2SqrSIMD16ExtSSE;
+
+static float FloatL2SqrSIMD16ExtResiduals(const float *pVect1v, const float *pVect2v, size_t qty) {
+    size_t qty16 = qty >> 4 << 4;
+    float res = FloatL2SqrSIMD16Ext(pVect1v, pVect2v, qty16);
+    float *pVect1 = (float *)pVect1v + qty16;
+    float *pVect2 = (float *)pVect2v + qty16;
+
+    size_t qty_left = qty - qty16;
+    float res_tail = L2Sqr<float>(pVect1, pVect2, qty_left);
+    return (res + res_tail);
+}
+#endif
+
+#if defined(USE_SSE)
+static float FloatL2SqrSIMD4Ext(const float *pVect1, const float *pVect2, size_t qty) {
+    float PORTABLE_ALIGN32 TmpRes[8];
+
+    size_t qty4 = qty >> 2;
+
+    const float *pEnd1 = pVect1 + (qty4 << 2);
+
+    __m128 diff, v1, v2;
+    __m128 sum = _mm_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        v1 = _mm_loadu_ps(pVect1);
+        pVect1 += 4;
+        v2 = _mm_loadu_ps(pVect2);
+        pVect2 += 4;
+        diff = _mm_sub_ps(v1, v2);
+        sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+    }
+    _mm_store_ps(TmpRes, sum);
+    return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+}
+
+static float FloatL2SqrSIMD4ExtResiduals(const float *pVect1v, const float *pVect2v, size_t qty) {
+    size_t qty4 = qty >> 2 << 2;
+
+    float res = FloatL2SqrSIMD4Ext(pVect1v, pVect2v, qty4);
+    size_t qty_left = qty - qty4;
+
+    float *pVect1 = (float *)pVect1v + qty4;
+    float *pVect2 = (float *)pVect2v + qty4;
+    float res_tail = L2Sqr<float>(pVect1, pVect2, qty_left);
+
+    return (res + res_tail);
+}
+#endif
+
+export template <typename T>
+    requires L2DataType<T>
+class DistFuncL2 {
+    DistFunc<T> fstdistfunc_;
 
 public:
-    DistFuncL2(size_t dim) : dim_(dim) {}
+    DistFuncL2(size_t dim) {
+        fstdistfunc_ = L2Sqr<T>;
+#if defined(USE_SSE) || defined(USE_AVX) || defined(USE_AVX512)
+#if defined(USE_AVX512)
+        if (AVX512Capable())
+            FloatL2SqrSIMD16Ext = FloatL2SqrSIMD16ExtAVX512;
+        else if (AVXCapable())
+            FloatL2SqrSIMD16Ext = FloatL2SqrSIMD16ExtAVX;
+#elif defined(USE_AVX)
+        if (AVXCapable())
+            FloatL2SqrSIMD16Ext = FloatL2SqrSIMD16ExtAVX;
+#endif
 
-    size_t Dimension() const { return dim_; }
-
-    template <typename DataType>
-    DistFunc<DataType> DistFuncPtr() = delete;
-
-    template <>
-    inline DistFunc<float> DistFuncPtr<float>() {
-        // return L2Sqr<float>;
-        if (dim_ % 16 != 0) {
-            return nullptr;
-        }
-        return FloatL2SqrSIMD16ExtAVX;
-        // if (dim_ % 16 == 0) {
-        // } else if (dim_ % 4 == 0) {
-        // } else if (dim_ > 16) {
-        // } else if (dim_ > 4) {
-        // }
+        if (dim % 16 == 0)
+            fstdistfunc_ = FloatL2SqrSIMD16Ext;
+        else if (dim % 4 == 0)
+            fstdistfunc_ = FloatL2SqrSIMD4Ext;
+        else if (dim > 16)
+            fstdistfunc_ = FloatL2SqrSIMD16ExtResiduals;
+        else if (dim > 4)
+            fstdistfunc_ = FloatL2SqrSIMD4ExtResiduals;
+#endif
     }
+
+    DistFunc<T> DistFuncPtr() { return fstdistfunc_; }
 };
 
 } // namespace infinity
