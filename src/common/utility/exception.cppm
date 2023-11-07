@@ -133,6 +133,12 @@ public:
     explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
 };
 
+export class ProfilerException : public Exception {
+public:
+    template <typename... Args>
+    explicit ProfilerException(Args... params) : Exception(BuildMessage(String("Profiler Error:"), params...)) {}
+};
+
 #ifdef INFINITY_DEBUG
 
 export template <typename ExceptionType>

@@ -15,6 +15,7 @@
 module;
 
 import fragment_context;
+import profiler;
 import stl;
 import third_party;
 import logger;
@@ -50,12 +51,16 @@ void FragmentTask::OnExecute(i64 worker_id) {
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
+    OperatorProfiler profiler;
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
-            operator_refs[op_idx]->Execute(fragment_context->query_context(),
+            auto op = operator_refs[op_idx];
+            profiler.StartOperator(op);
+            op->Execute(fragment_context->query_context(),
                                            operator_input_state_[op_idx].get(),
                                            operator_output_state_[op_idx].get());
+            profiler.StopOperator(operator_input_state_[op_idx].get(), operator_output_state_[op_idx].get());
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
@@ -65,6 +70,8 @@ void FragmentTask::OnExecute(i64 worker_id) {
         sink_state_->error_message_ = Move(err_msg);
     } else {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
+
+        fragment_context->FlushProfiler(profiler);
         sink_op->Execute(fragment_context->query_context(), sink_state_.get());
     }
 }

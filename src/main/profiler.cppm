@@ -64,6 +64,41 @@ export enum class QueryPhase : i8 {
     kInvalid,
 };
 
+struct OperatorInformation {
+    OperatorInformation() = default;
+
+    OperatorInformation(const OperatorInformation& other)
+        : name_(other.name_), time_(other.time_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+
+    }
+
+    OperatorInformation(OperatorInformation&& other)
+        : name_(Move(other.name_)), time_(other.time_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+    }
+
+    OperatorInformation(String name, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows)
+        : name_(Move(name)), time_(time), input_rows_(input_rows), input_data_size_(input_data_size), output_rows_(output_rows) {
+    }
+
+    OperatorInformation& operator=(OperatorInformation&& other) {
+        if (this != &other) {
+            name_ = Move(other.name_);
+            time_ = other.time_;
+            input_rows_ = other.input_rows_;
+            output_rows_ = other.output_rows_;
+            input_data_size_ = other.input_data_size_;
+        }
+        return *this;
+    }
+
+    i64 time_ = 0;
+    u16 input_rows_ = 0;
+    u16 output_rows_ = 0;
+    i32 input_data_size_ = 0;
+
+    String name_;
+};
+
 export class OptimizerProfiler {
 public:
     void StartRule(const String &rule_name);
@@ -76,11 +111,56 @@ private:
     Vector<BaseProfiler> profilers_;
 };
 
+class PhysicalOperator;
+class InputState;
+class OutputState;
+
+export class OperatorProfiler {
+public:
+    void StartOperator(const PhysicalOperator *op);
+
+    void StopOperator(const InputState *input_state, const OutputState *output_state);
+
+    HashMap<String, OperatorInformation> timings_;
+
+private:
+    void AddTiming(const PhysicalOperator *op, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows);
+
+    BaseProfiler profiler_;
+    const PhysicalOperator *active_operator_ = nullptr;
+};
+
 export class QueryProfiler {
 public:
+    struct TreeNode {
+        OperatorInformation info_ {"", 0, 0, 0, 0};
+        Vector<SharedPtr<TreeNode>> children_ {};
+        idx_t depth_ = 0;
+
+        TreeNode() {}
+
+        TreeNode(const TreeNode& other)
+            : info_(other.info_), depth_(other.depth_) {
+
+            for (int i = 0; i < other.children_.size(); ++i) {
+                children_[i] = MakeUnique<TreeNode>(*other.children_[i]);
+            }
+        }
+
+        TreeNode(TreeNode&& other)
+            : info_(Move(other.info_)),
+              children_(Move(other.children_)),
+              depth_(other.depth_) {
+        }
+    };
+
+    void Init(const PhysicalOperator *root);
+
     void StartPhase(QueryPhase phase);
 
     void StopPhase(QueryPhase phase);
+
+    void Flush(OperatorProfiler &profiler);
 
     OptimizerProfiler &optimizer() { return optimizer_; }
 
@@ -88,10 +168,17 @@ public:
 
     static String QueryPhaseToString(QueryPhase phase);
 
+    using TreeMap = HashMap<String, SharedPtr<TreeNode>>;
+
 private:
+    Mutex flush_lock_{};
+    SharedPtr<TreeNode> root_;
+    TreeMap plan_tree_;
     Vector<BaseProfiler> profilers_{EnumInteger(QueryPhase::kInvalid)};
     OptimizerProfiler optimizer_;
     QueryPhase current_phase_{QueryPhase::kInvalid};
+
+    SharedPtr<QueryProfiler::TreeNode> CreateTree(const PhysicalOperator *root, idx_t depth = 0);
 };
 
 } // namespace infinity

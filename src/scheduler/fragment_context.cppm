@@ -17,6 +17,7 @@ module;
 import stl;
 import fragment_task;
 import query_context;
+import profiler;
 import physical_operator;
 import physical_source;
 import physical_sink;
@@ -53,6 +54,10 @@ public:
     virtual ~FragmentContext() = default;
 
     inline void IncreaseTask() { task_n_.fetch_add(1); }
+
+    inline void FlushProfiler(OperatorProfiler &profiler) {
+        query_context_->FlushProfiler(profiler);
+    }
 
     inline void FinishTask() {
         u64 unfinished_task = task_n_.fetch_sub(1);

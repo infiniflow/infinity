@@ -23,7 +23,7 @@ import storage;
 import resource_manager;
 import txn;
 import parser;
-
+import profiler;
 import infinity_exception;
 import logical_planner;
 import logical_node_type;
@@ -104,9 +104,11 @@ void QueryContext::Init(const Config *global_config_ptr,
     optimizer_ = MakeUnique<Optimizer>(this);
     physical_planner_ = MakeUnique<PhysicalPlanner>(this);
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
+    query_metrics_ = MakeShared<QueryProfiler>();
 }
 
 QueryResponse QueryContext::Query(const String &query) {
+    query_metrics_->StartPhase(QueryPhase::kParser);
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
     parser_->Parse(query, parsed_result);
 
@@ -115,6 +117,7 @@ QueryResponse QueryContext::Query(const String &query) {
     }
 
     Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
+    query_metrics_->StopPhase(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResponse query_response = QueryStatement(statement);
         return query_response;
@@ -133,19 +136,28 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
                         session_ptr_->txn()->BeginTS(),
                         statement->ToString()));
 
+        query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
         // Build unoptimized logical plan for each SQL statement.
         SharedPtr<BindContext> bind_context;
         logical_planner_->Build(statement, bind_context);
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
+        query_metrics_->StopPhase(QueryPhase::kLogicalPlan);
 
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
 
+        query_metrics_->StartPhase(QueryPhase::kOptimizer);
         // Apply optimized rule to the logical plan
         SharedPtr<LogicalNode> optimized_plan = optimizer_->optimize(unoptimized_plan);
+        query_metrics_->StopPhase(QueryPhase::kOptimizer);
 
+        query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
         // Build physical plan
         SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
+        query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
+        // Initialize each operator of profiler
+        query_metrics_->Init(physical_plan.get());
 
+        query_metrics_->StartPhase(QueryPhase::kExecution);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
@@ -153,6 +165,7 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
         scheduler_->Schedule(this, plan_fragment.get());
         query_response.result_ = plan_fragment->GetResult();
         query_response.root_operator_type_ = unoptimized_plan->operator_type();
+        query_metrics_->StopPhase(QueryPhase::kExecution);
 
         this->CommitTxn();
     } catch (const Exception &e) {
