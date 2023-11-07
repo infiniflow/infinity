@@ -14,6 +14,9 @@ pg_port                 = 25432
 http_port               = 8089
 sdk_port                = 24817
 
+[profiler]
+enable                  = false
+
 [log]
 log_filename            = "info.log"
 log_dir                 = "/var/infinity/log"

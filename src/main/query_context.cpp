@@ -104,7 +104,7 @@ void QueryContext::Init(const Config *global_config_ptr,
     optimizer_ = MakeUnique<Optimizer>(this);
     physical_planner_ = MakeUnique<PhysicalPlanner>(this);
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
-    query_metrics_ = MakeShared<QueryProfiler>();
+    query_metrics_ = MakeShared<QueryProfiler>(global_config_ptr->enable_profiler());
 }
 
 QueryResponse QueryContext::Query(const String &query) {

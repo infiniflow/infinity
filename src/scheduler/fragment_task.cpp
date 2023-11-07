@@ -51,7 +51,8 @@ void FragmentTask::OnExecute(i64 worker_id) {
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
-    OperatorProfiler profiler;
+    bool enable_profiler = fragment_context->query_context()->enable_profiler();
+    OperatorProfiler profiler(enable_profiler);
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {

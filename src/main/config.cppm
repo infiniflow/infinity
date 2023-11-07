@@ -32,6 +32,9 @@ export struct Options {
     u64 query_cpu_limit{};
     u64 query_memory_limit{};
 
+    // Profiler
+    bool enable = false;
+
     // Network
     String listen_address{};
     u16 pg_port{};
@@ -93,6 +96,9 @@ public:
     [[nodiscard]] inline u32 http_port() const { return option_.http_port; }
 
     [[nodiscard]] inline u32 sdk_port() const { return option_.sdk_port; }
+
+    // Profiler
+    [[nodiscard]] inline bool enable_profiler() const { return option_.enable; }
 
     // Log
     [[nodiscard]] inline SharedPtr<String> log_filename() const { return option_.log_filename; }

@@ -80,6 +80,9 @@ String OptimizerProfiler::ToString(SizeT intent) const {
 }
 
 void OperatorProfiler::StartOperator(const PhysicalOperator *op) {
+    if (!enable_) {
+        return;
+    }
     if (active_operator_) {
         Error<ProfilerException>("Attempting to call StartOperator while another operator is active.", __FILE_NAME__, __LINE__);
     }
@@ -87,6 +90,9 @@ void OperatorProfiler::StartOperator(const PhysicalOperator *op) {
     profiler_.Begin();
 }
 void OperatorProfiler::StopOperator(const InputState *input_state, const OutputState *output_state) {
+    if (!enable_) {
+        return;
+    }
     if (!active_operator_) {
         Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
     }
@@ -140,10 +146,16 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
 }
 
 void QueryProfiler::Init(const PhysicalOperator *root) {
+    if (!enable_) {
+        return;
+    }
     root_ = CreateTree(root);
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {
+    if (!enable_) {
+        return;
+    }
     SizeT phase_idx = EnumInteger(phase);
 
     // Validate current query phase.
@@ -158,6 +170,10 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
 }
 
 void QueryProfiler::StopPhase(QueryPhase phase) {
+    if (!enable_) {
+        return;
+    }
+
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
         Error<ExecutorException>("Query phase isn't started, yet");
@@ -168,7 +184,7 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 }
 
 void QueryProfiler::Flush(OperatorProfiler &profiler) {
-    if (plan_tree_.empty()) {
+    if (!enable_ || plan_tree_.empty()) {
         return;
     }
 

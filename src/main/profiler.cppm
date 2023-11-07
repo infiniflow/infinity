@@ -117,6 +117,10 @@ class OutputState;
 
 export class OperatorProfiler {
 public:
+    OperatorProfiler() {}
+
+    OperatorProfiler(bool enable) : enable_(enable) {}
+
     void StartOperator(const PhysicalOperator *op);
 
     void StopOperator(const InputState *input_state, const OutputState *output_state);
@@ -126,12 +130,17 @@ public:
 private:
     void AddTiming(const PhysicalOperator *op, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows);
 
+    bool enable_ = false;
+
     BaseProfiler profiler_;
     const PhysicalOperator *active_operator_ = nullptr;
 };
 
 export class QueryProfiler {
 public:
+    QueryProfiler() {};
+
+    QueryProfiler(bool enable) : enable_(enable) {};
     struct TreeNode {
         OperatorInformation info_ {"", 0, 0, 0, 0};
         Vector<SharedPtr<TreeNode>> children_ {};
@@ -171,9 +180,11 @@ public:
     using TreeMap = HashMap<String, SharedPtr<TreeNode>>;
 
 private:
+    bool enable_ = false;
+
     Mutex flush_lock_{};
-    SharedPtr<TreeNode> root_;
-    TreeMap plan_tree_;
+    SharedPtr<TreeNode> root_ = nullptr;
+    TreeMap plan_tree_{};
     Vector<BaseProfiler> profilers_{EnumInteger(QueryPhase::kInvalid)};
     OptimizerProfiler optimizer_;
     QueryPhase current_phase_{QueryPhase::kInvalid};
