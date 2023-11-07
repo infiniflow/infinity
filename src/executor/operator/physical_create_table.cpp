@@ -49,14 +49,14 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
 
 void PhysicalCreateTable::Init() {}
 
-void PhysicalCreateTable::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     auto result = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
-    auto create_table_output_state = (CreateTableOutputState *)output_state;
+    auto create_table_operator_state = (CreateTableOperatorState *)operator_state;
     if (result.err_.get() != nullptr) {
-        create_table_output_state->error_message_ = Move(result.err_);
+        create_table_operator_state->error_message_ = Move(result.err_);
     }
-    output_state->SetComplete();
+    operator_state->SetComplete();
 }
 
 } // namespace infinity

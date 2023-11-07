@@ -15,17 +15,29 @@
 module;
 
 import data_block;
+import stl;
+import physical_operator_type;
 
 module operator_state;
 
 namespace infinity {
 
 void QueueSourceState::PushData(DataBlock *input_data_block) {
-    next_input_state_->input_data_block_ = input_data_block;
-    ++next_input_state_->received_data_count_;
-    if (next_input_state_->received_data_count_ >= next_input_state_->total_data_count_) {
-        complete_ = true;
+    switch(next_op_state_->operator_type_) {
+        case PhysicalOperatorType::kMergeKnn: {
+            MergeKnnOperatorState* merge_knn_op_state = (MergeKnnOperatorState*)next_op_state_;
+            merge_knn_op_state->input_data_block_ = input_data_block;
+            ++merge_knn_op_state->received_data_count_;
+            if (merge_knn_op_state->received_data_count_ >= merge_knn_op_state->total_data_count_) {
+                merge_knn_op_state->input_complete_ = true;
+            }
+            break;
+        }
+        default: {
+            break;
+        }
     }
+
 }
 
 } // namespace infinity

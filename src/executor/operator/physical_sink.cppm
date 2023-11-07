@@ -42,7 +42,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *output_state) final;
 
     void Execute(QueryContext *query_context, SinkState *sink_state);
 
@@ -53,15 +53,15 @@ public:
     inline SinkType sink_type() const { return type_; }
 
 private:
-    void FillSinkStateFromLastOutputState(MaterializeSinkState *materialize_sink_state, OutputState *task_output_state);
+    void FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_operator_state);
 
-    void FillSinkStateFromLastOutputState(ResultSinkState *result_sink_state, OutputState *task_output_state);
+    void FillSinkStateFromLastOperatorState(ResultSinkState *result_sink_state, OperatorState *task_operator_state);
 
-    void FillSinkStateFromLastOutputState(MessageSinkState *message_sink_state, OutputState *task_output_state);
+    void FillSinkStateFromLastOperatorState(MessageSinkState *message_sink_state, OperatorState *task_operator_state);
 
-    void FillSinkStateFromLastOutputState(SummarySinkState *message_sink_state, OutputState *task_output_state);
+    void FillSinkStateFromLastOperatorState(SummarySinkState *message_sink_state, OperatorState *task_operator_state);
 
-    void FillSinkStateFromLastOutputState(QueueSinkState *queue_sink_state, OutputState *task_output_state);
+    void FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink_state, OperatorState *task_operator_state);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

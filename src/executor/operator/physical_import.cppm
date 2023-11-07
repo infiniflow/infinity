@@ -64,19 +64,19 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);
+    void ImportFVECS(QueryContext *query_context, ImportOperatorState* import_op_state);
 
     /// for push based execution
-    void ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);
+    void ImportCSV(QueryContext *query_context, ImportOperatorState* import_op_state);
 
     /// for push based execution
-    void ImportJSON(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state);
+    void ImportJSON(QueryContext *query_context, ImportOperatorState* import_op_state);
 
     inline const TableCollectionEntry *table_collection_entry() const { return table_collection_entry_; }
 

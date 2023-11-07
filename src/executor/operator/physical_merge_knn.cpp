@@ -39,13 +39,13 @@ namespace infinity {
 
 void PhysicalMergeKnn::Init() {}
 
-void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    if (input_state->Complete()) {
+void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);
+    if (merge_knn_op_state->input_complete_) {
         LOG_TRACE("PhysicalMergeKnn::Execute complete");
     }
-    auto merge_knn_input = static_cast<MergeKnnInputState *>(input_state);
-    auto merge_knn_output = static_cast<MergeKnnOutputState *>(output_state);
-    auto &merge_knn_data = *merge_knn_input->merge_knn_function_data_;
+
+    auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
             Error<ExecutorException>("Invalid elem type");
@@ -56,11 +56,11 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
                     Error<ExecutorException>("Invalid heap type");
                 }
                 case MergeKnnHeapType::kMaxHeap: {
-                    ExecuteInner<f32, FaissCMax>(query_context, merge_knn_input, merge_knn_output);
+                    ExecuteInner<f32, FaissCMax>(query_context, merge_knn_op_state);
                     break;
                 }
                 case MergeKnnHeapType::kMinHeap: {
-                    ExecuteInner<f32, FaissCMin>(query_context, merge_knn_input, merge_knn_output);
+                    ExecuteInner<f32, FaissCMin>(query_context, merge_knn_op_state);
                     break;
                 }
             }
@@ -73,13 +73,13 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
 }
 
 template <typename DataType, template <typename, typename> typename C>
-void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state) {
-    auto &merge_knn_data = *input_state->merge_knn_function_data_;
+void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperatorState *merge_knn_state) {
+    auto &merge_knn_data = *merge_knn_state->merge_knn_function_data_;
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
         return;
     }
 
-    auto &input_data = *input_state->input_data_block_;
+    auto &input_data = *merge_knn_state->input_data_block_;
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
@@ -96,7 +96,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
     merge_knn_data.current_parallel_idx_++;
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
-        auto &output_data = *output_state->data_block_;
+        auto &output_data = *merge_knn_state->data_block_;
 
         i64 result_n = Min(merge_knn_data.topk_, merge_knn->total_count());
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; query_idx++) {
@@ -132,7 +132,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputSt
         output_data.Finalize();
 
         merge_knn->End();
-        output_state->SetComplete();
+        merge_knn_state->SetComplete();
     }
 }
 

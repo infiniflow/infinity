@@ -34,7 +34,7 @@ namespace infinity {
 
 void PhysicalCrossProduct::Init() {}
 
-void PhysicalCrossProduct::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalCrossProduct::Execute(QueryContext *query_context, OperatorState *operator_state) {
 #if 0
 
     Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.");

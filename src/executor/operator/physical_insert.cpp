@@ -37,7 +37,7 @@ namespace infinity {
 
 void PhysicalInsert::Init() {}
 
-void PhysicalInsert::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     SizeT row_count = value_list_.size();
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_collection_entry_->columns_.size();
@@ -77,17 +77,17 @@ void PhysicalInsert::Execute(QueryContext *query_context, InputState *input_stat
     txn->Append(db_name, table_name, output_block);
 
     UniquePtr<String> result_msg = MakeUnique<String>(Format("INSERTED {} Rows", output_block->row_count()));
-    if (output_state == nullptr) {
+    if (operator_state == nullptr) {
         // Generate the result table
         Vector<SharedPtr<ColumnDef>> column_defs;
         SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
         output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
         output_->SetResultMsg(Move(result_msg));
     } else {
-        InsertOutputState *insert_output_state = static_cast<InsertOutputState *>(output_state);
-        insert_output_state->result_msg_ = Move(result_msg);
+        InsertOperatorState *insert_operator_state = static_cast<InsertOperatorState *>(operator_state);
+        insert_operator_state->result_msg_ = Move(result_msg);
     }
-    output_state->SetComplete();
+    operator_state->SetComplete();
 }
 
 } // namespace infinity

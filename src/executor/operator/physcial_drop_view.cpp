@@ -28,6 +28,6 @@ namespace infinity {
 
 void PhysicalDropView::Init() {}
 
-void PhysicalDropView::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
+void PhysicalDropView::Execute(QueryContext *query_context, OperatorState *output_state) {}
 
 } // namespace infinity

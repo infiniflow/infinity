@@ -39,7 +39,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline const SharedPtr<CreateViewInfo> &bound_select_statement() const { return create_view_info_; };
 

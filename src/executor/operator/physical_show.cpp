@@ -120,26 +120,25 @@ void PhysicalShow::Init() {
     }
 }
 
-void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
-    auto show_input_state = (ShowInputState *)(input_state);
-    auto show_output_state = (ShowOutputState *)(output_state);
+    auto show_operator_state = (ShowOperatorState *)(operator_state);
 
     switch (scan_type_) {
         case ShowType::kShowDatabases: {
-            ExecuteShowDatabases(query_context, show_input_state, show_output_state);
+            ExecuteShowDatabases(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowTables: {
-            ExecuteShowTable(query_context, show_input_state, show_output_state);
+            ExecuteShowTable(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowColumn: {
-            ExecuteShowColumns(query_context, show_input_state, show_output_state);
+            ExecuteShowColumns(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowIndexes: {
-            ExecuteShowIndexes(query_context, show_input_state, show_output_state);
+            ExecuteShowIndexes(query_context, show_operator_state);
             break;
         }
         default: {
@@ -147,7 +146,7 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
         }
     }
 
-    output_state->SetComplete();
+    show_operator_state->SetComplete();
 }
 
 /**
@@ -156,7 +155,7 @@ void PhysicalShow::Execute(QueryContext *query_context, InputState *input_state,
  * @param input_state
  * @param output_state
  */
-void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState* show_operator_state) {
     // Define output table schema
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -184,7 +183,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowInputSt
     }
 
     output_block_ptr->Finalize();
-    output_state->output_.emplace_back(output_block_ptr);
+    show_operator_state->output_.emplace_back(output_block_ptr);
 }
 
 /**
@@ -193,7 +192,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowInputSt
  * @param input_state
  * @param output_state
  */
-void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorState* show_operator_state) {
     // Define output table schema
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -340,7 +339,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState 
     }
 
     output_block_ptr->Finalize();
-    output_state->output_.emplace_back(output_block_ptr);
+    show_operator_state->output_.emplace_back(output_block_ptr);
 }
 
 /**
@@ -349,11 +348,11 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowInputState 
  * @param input_state
  * @param output_state
  */
-void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState* show_operator_state) {
 
     auto txn = query_context->GetTxn();
     auto result = txn->GetTableByName(db_name_, object_name_);
-    output_state->error_message_ = Move(result.err_);
+    show_operator_state->error_message_ = Move(result.err_);
     if (result.entry_ != nullptr) {
         auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
 
@@ -418,14 +417,14 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowInputStat
             output_block_ptr->Finalize();
         }
 
-        output_state->output_.emplace_back(Move(output_block_ptr));
+        show_operator_state->output_.emplace_back(Move(output_block_ptr));
     }
 }
 
-void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state) {
+void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState* show_operator_state) {
     auto txn = query_context->GetTxn();
     auto result = txn->GetTableByName(db_name_, object_name_);
-    output_state->error_message_ = Move(result.err_);
+    show_operator_state->error_message_ = Move(result.err_);
     if (result.entry_ == nullptr) {
         return;
     }
@@ -506,7 +505,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputStat
         }
     }
     output_block_ptr->Finalize();
-    output_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {

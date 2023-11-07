@@ -34,7 +34,7 @@ namespace infinity {
 
 void PhysicalAggregate::Init() {}
 
-void PhysicalAggregate::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *output_state) {
 #if 0
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");

@@ -46,9 +46,9 @@ void PhysicalProject::Init() {
     //    outputs_[output_table_index_] = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalProject::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    auto *project_input_state = static_cast<ProjectionInputState *>(input_state);
-    auto *project_output_state = static_cast<ProjectionOutputState *>(output_state);
+void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    OperatorState* prev_op_state = operator_state->prev_op_state_;
+    auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
 
     // FIXME: need to handle statement like: SELECT 1;
 
@@ -57,7 +57,7 @@ void PhysicalProject::Execute(QueryContext *query_context, InputState *input_sta
 
     // Loop aggregate expression
     ExpressionEvaluator evaluator;
-    evaluator.Init(project_input_state->input_data_block_);
+    evaluator.Init(prev_op_state->data_block_.get());
 
     SizeT expression_count = expressions_.size();
 
@@ -73,12 +73,12 @@ void PhysicalProject::Execute(QueryContext *query_context, InputState *input_sta
     for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
         //        Vector<SharedPtr<ColumnVector>> blocks_column;
         //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-        evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], project_output_state->data_block_->column_vectors[expr_idx]);
+        evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], project_operator_state->data_block_->column_vectors[expr_idx]);
     }
 
-    project_output_state->data_block_->Finalize();
-    if (project_input_state->Complete()) {
-        project_output_state->SetComplete();
+    project_operator_state->data_block_->Finalize();
+    if (prev_op_state->Complete()) {
+        project_operator_state->SetComplete();
     }
 }
 

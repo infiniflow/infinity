@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalMergeLimit::Init() {}
 
-void PhysicalMergeLimit::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
+void PhysicalMergeLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {}
 
 } // namespace infinity

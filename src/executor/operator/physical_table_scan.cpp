@@ -40,11 +40,10 @@ namespace infinity {
 
 void PhysicalTableScan::Init() {}
 
-void PhysicalTableScan::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    auto *table_scan_input_state = static_cast<TableScanInputState *>(input_state);
-    auto *table_scan_output_state = static_cast<TableScanOutputState *>(output_state);
+void PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *table_scan_operator_state = static_cast<TableScanOperatorState *>(operator_state);
 
-    ExecuteInternal(query_context, table_scan_input_state, table_scan_output_state);
+    ExecuteInternal(query_context, table_scan_operator_state);
 }
 
 SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
@@ -111,19 +110,18 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
 }
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
-                                        TableScanInputState *table_scan_input_state,
-                                        TableScanOutputState *table_scan_output_state) {
-    DataBlock *output_ptr = table_scan_output_state->data_block_.get();
+                                        TableScanOperatorState *table_scan_operator_state) {
+    DataBlock *output_ptr = table_scan_operator_state->data_block_.get();
     output_ptr->Reset();
 
-    TableScanFunctionData *table_scan_function_data_ptr = table_scan_input_state->table_scan_function_data_.get();
+    TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
     i64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
     if (block_ids_idx >= block_ids->size()) {
         // No data or all data is read
-        table_scan_output_state->SetComplete();
+        table_scan_operator_state->SetComplete();
         return;
     }
 
@@ -164,7 +162,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
         }
     }
     if (block_ids_idx >= block_ids->size()) {
-        table_scan_output_state->SetComplete();
+        table_scan_operator_state->SetComplete();
     }
 
     output_ptr->Finalize();

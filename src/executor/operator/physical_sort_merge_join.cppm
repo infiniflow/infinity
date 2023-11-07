@@ -33,7 +33,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

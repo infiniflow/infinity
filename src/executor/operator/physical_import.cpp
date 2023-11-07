@@ -69,27 +69,26 @@ void PhysicalImport::Init() {}
  * @param input_state
  * @param output_state
  */
-void PhysicalImport::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    auto import_input_state = static_cast<ImportInputState *>(input_state);
-    auto import_output_state = static_cast<ImportOutputState *>(output_state);
+void PhysicalImport::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    ImportOperatorState* import_op_state = static_cast<ImportOperatorState *>(operator_state);
     switch (file_type_) {
         case CopyFileType::kCSV: {
-            ImportCSV(query_context, import_input_state, import_output_state);
+            ImportCSV(query_context, import_op_state);
             break;
         }
         case CopyFileType::kJSON: {
-            ImportJSON(query_context, import_input_state, import_output_state);
+            ImportJSON(query_context, import_op_state);
             break;
         }
         case CopyFileType::kFVECS: {
-            ImportFVECS(query_context, import_input_state, import_output_state);
+            ImportFVECS(query_context, import_op_state);
             break;
         }
     }
-    output_state->SetComplete();
+    import_op_state->SetComplete();
 }
 
-void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState* import_op_state) {
     if (table_collection_entry_->columns_.size() != 1) {
         Error<ExecutorException>("FVECS file must have only one column.");
     }
@@ -169,10 +168,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
         }
     }
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));
-    output_state->result_msg_ = Move(result_msg);
+    import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
+void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState* import_op_state) {
     // opts, parser and parser_context points to each other.
     // opt -> parser_context
     // parser->opt
@@ -224,10 +223,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     table_collection_entry_->row_count_ += parser_context->row_count_;
 
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", parser_context->row_count_));
-    output_state->result_msg_ = Move(result_msg);
+    import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {}
+void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState* import_op_state) {}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext *>(context);

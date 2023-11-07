@@ -29,12 +29,12 @@ namespace infinity {
 
 void PhysicalCreateSchema::Init() {}
 
-void PhysicalCreateSchema::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalCreateSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     auto result = txn->CreateDatabase(*schema_name_, conflict_type_);
-    auto create_database_output_state = (CreateDatabaseOutputState *)(output_state);
-    create_database_output_state->error_message_ = Move(result.err_);
-    output_state->SetComplete();
+    auto create_database_operator_state = (CreateDatabaseOperatorState *)(operator_state);
+    create_database_operator_state->error_message_ = Move(result.err_);
+    operator_state->SetComplete();
 }
 
 } // namespace infinity

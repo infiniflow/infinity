@@ -54,21 +54,21 @@ void PhysicalFilter::Init() {
     //    output_ = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalFilter::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalFilter::Execute(QueryContext *query_context, OperatorState *operator_state) {
     SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
 
-    auto *filter_input_state = static_cast<FilterInputState *>(input_state);
-    auto *filter_output_state = static_cast<FilterOutputState *>(output_state);
+    auto* prev_op_state = operator_state->prev_op_state_;
+    auto* filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
 
     SizeT selected_count = selector_.Select(condition_,
                                             condition_state,
-                                            filter_input_state->input_data_block_,
-                                            filter_output_state->data_block_.get(),
-                                            filter_input_state->input_data_block_->row_count());
+                                            prev_op_state->data_block_.get(),
+                                            filter_operator_state->data_block_.get(),
+                                            prev_op_state->data_block_->row_count());
 
     LOG_TRACE(Format("{} rows after filter", selected_count));
-    if (filter_input_state->Complete()) {
-        filter_output_state->SetComplete();
+    if (prev_op_state->Complete()) {
+        filter_operator_state->SetComplete();
     }
     return;
 }

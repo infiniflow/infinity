@@ -114,7 +114,7 @@ void PhysicalExplain::Init() {
     }
 }
 
-void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+void PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operator_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -178,9 +178,9 @@ void PhysicalExplain::Execute(QueryContext *query_context, InputState *input_sta
     }
     output_data_block->Init(column_vectors);
 
-    ExplainOutputState *explain_output_state = static_cast<ExplainOutputState *>(output_state);
-    explain_output_state->data_block_ = output_data_block;
-    output_state->SetComplete();
+    ExplainOperatorState *explain_operator_state = static_cast<ExplainOperatorState *>(operator_state);
+    explain_operator_state->data_block_ = output_data_block;
+    operator_state->SetComplete();
 }
 
 } // namespace infinity

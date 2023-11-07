@@ -42,7 +42,7 @@ public:
     u64 node_id() const { return operator_id_; }
 
     /// for push based execution
-    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) = 0;
+    virtual void Execute(QueryContext *query_context, OperatorState *output_state) = 0;
 
     const SharedPtr<DataTable> &output() const { return output_; }
 
