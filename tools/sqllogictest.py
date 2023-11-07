@@ -94,7 +94,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Generating file...")
-    generate1(args.generate_if_exists)
-    generate2(args.generate_if_exists)
+    generate1(args.generate_if_exists, args.copy)
+    generate2(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
     test_process(args.path, args.test, args.data, args.copy)
