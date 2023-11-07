@@ -43,8 +43,7 @@ Level1Quantizer::Level1Quantizer(Index* quantizer, size_t nlist)
     // here we set a low # iterations because this is typically used
     // for large clusterings (nb this is not used for the MultiIndex,
     // for which quantizer_trains_alone = true)
-    // cp.niter = 10;
-    cp.niter = 1;
+    cp.niter = 10;
 }
 
 Level1Quantizer::Level1Quantizer() {}

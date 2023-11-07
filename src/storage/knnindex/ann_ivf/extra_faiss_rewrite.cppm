@@ -236,7 +236,7 @@ void faiss_exhaustive_L2sqr_blas_cmax_avx2(const float *x,
     }
 }
 
-// export template <>
+export template <>
 void faiss_exhaustive_L2sqr_blas_cmax_avx2(const float *x,
                                            const float *y,
                                            size_t d,

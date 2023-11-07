@@ -145,7 +145,25 @@ void benchmark_faiss_ivfflatl2() {
 
         delete[] xb;
     }
-
+    if constexpr (false) {
+        // output min, max of partition_element_count
+        u32 min = std::numeric_limits<u32>::max();
+        u32 max = std::numeric_limits<u32>::min();
+        for (u32 i = 0; i < (((faiss::ArrayInvertedLists *)index->invlists)->nlist); ++i) {
+            int num = ((faiss::ArrayInvertedLists *)index->invlists)->ids[i].size();
+            if (num < min) {
+                min = num;
+            }
+            if (num > max) {
+                max = num;
+            }
+        }
+        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "max of partition_element_count: " << max << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                  << "min of partition_element_count: " << min << std::endl;
+        std::cout << std::endl;
+    }
 #ifdef bucketcontent
     {
         // output 100th bucket content
@@ -475,32 +493,7 @@ void benchmark_annivfflatl2() {
         }
         std::cout << "############################" << std::endl;
 
-        if (true) {
-            // compare I1,I2, D1,D2
-            int dif = 0, difI = 0;
-            std::cout << "############################" << std::endl;
-            std::cout << "D1 and D2 difference:\n";
-            for (i32 i = 0; i < nq * k; ++i) {
-                if (D1[i] != D2[i]) {
-                    if (++dif > 10)
-                        break;
-                    std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
-                              << "\tdifference: " << D1[i] - D2[i] << std::endl;
-                }
-            }
-            std::cout << "############################" << std::endl;
-            std::cout << "I1 and I2 difference:\n";
-            for (i32 i = 0; i < nq * k; ++i) {
-                if (I1[i] != I2[i].segment_offset_) {
-                    if (++difI > 10)
-                        break;
-                    std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
-                              << "]: " << I2[i].segment_offset_ << std::endl;
-                }
-            }
-            std::cout << "############################" << std::endl;
-        }
-        {
+        if constexpr (false) {
             int vacant_1 = 0, vacant_10 = 0, vacant_100 = 0;
             // count D2 that == numeric_limits<float>::max()
             for (i32 i = 0; i < nq; ++i) {
@@ -573,7 +566,61 @@ void benchmark_annivfflatl2() {
         printf("R@1 = %.4f\n", n_1 / float(nq));
         printf("R@10 = %.4f\n", n_10 / float(nq * 10));
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
+
+        std::cout << "\n######################################\n" << std::endl;
+        if (true) {
+            // compare I1,I2, D1,D2
+            {
+                int dif = 0, difI = 0;
+                std::cout << "############################" << std::endl;
+                std::cout << "D1 and D2 difference:\n";
+                for (i32 i = 0; i < (nq / 2) * k; ++i) {
+                    if (D1[i] != D2[i]) {
+                        if (++dif > 10)
+                            break;
+                        std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
+                                  << "\tdifference: " << D1[i] - D2[i] << std::endl;
+                    }
+                }
+                std::cout << "############################" << std::endl;
+                std::cout << "I1 and I2 difference:\n";
+                for (i32 i = 0; i < (nq / 2) * k; ++i) {
+                    if (I1[i] != I2[i].segment_offset_) {
+                        if (++difI > 10)
+                            break;
+                        std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
+                                  << "]: " << I2[i].segment_offset_ << std::endl;
+                    }
+                }
+                std::cout << "############################" << std::endl;
+            }
+            {
+                int dif = 0, difI = 0;
+                std::cout << "############################" << std::endl;
+                std::cout << "D1 and D2 difference:\n";
+                for (i32 i = ((nq / 2) + 1) * k; i < nq * k; ++i) {
+                    if (D1[i] != D2[i]) {
+                        if (++dif > 10)
+                            break;
+                        std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
+                                  << "\tdifference: " << D1[i] - D2[i] << std::endl;
+                    }
+                }
+                std::cout << "############################" << std::endl;
+                std::cout << "I1 and I2 difference:\n";
+                for (i32 i = ((nq / 2) + 1) * k; i < nq * k; ++i) {
+                    if (I1[i] != I2[i].segment_offset_) {
+                        if (++difI > 10)
+                            break;
+                        std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
+                                  << "]: " << I2[i].segment_offset_ << std::endl;
+                    }
+                }
+                std::cout << "############################" << std::endl;
+            }
+        }
     }
+
     delete[] xq;
     delete[] gt;
     // delete index;
@@ -588,7 +635,9 @@ TEST_F(AnnIVFFlatL2Benchmark, test1) {
     // output max omp threads
     std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
     benchmark_faiss_ivfflatl2();
+    std::cout << "##########################################################" << std::endl;
     std::cout << "Hello ?" << std::endl;
+    std::cout << "##########################################################" << std::endl;
     benchmark_annivfflatl2();
     delete[] I1;
     delete[] D1;

@@ -132,7 +132,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
                                          CentroidsOutputType *centroids_output,
                                          u32 partition_num = 0,
                                          u32 iteration_max = 0) {
-    constexpr int default_iteration_max = 1;
+    constexpr int default_iteration_max = 10;
     constexpr bool b_debug_info = false;
 #ifdef rectime
     // Record time now.
@@ -374,49 +374,52 @@ void k_means_partition_only_centroids_l2(u32 dimension,
         // output centroids
         {
 #ifdef rectime
-            // output content of centroids, 128 per line
-            std::cout << "######################################################" << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "first 3 centroids:\n";
-            for (u32 i = 0; i < 3; ++i) {
-                std::cout << "partition " << i << ": ";
-                for (u32 j = 0; j < dimension; ++j) {
-                    std::cout << centroids[i * dimension + j] << " ";
-                }
-                std::cout << std::endl;
-            }
-            std::cout << "######################################################" << std::endl;
-            std::cout << std::endl;
+//            // output content of centroids, 128 per line
+//            std::cout << "######################################################" << std::endl;
+//            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+//                      << "first 3 centroids:\n";
+//            for (u32 i = 0; i < 3; ++i) {
+//                std::cout << "partition " << i << ": ";
+//                for (u32 j = 0; j < dimension; ++j) {
+//                    std::cout << centroids[i * dimension + j] << " ";
+//                }
+//                std::cout << std::endl;
+//            }
+//            std::cout << "######################################################" << std::endl;
+//            std::cout << std::endl;
 #endif
         }
 
         // output imbalance factor
         {
 #ifdef rectime
-            // output content of partition_element_count, 70 per line
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "partition_element_count:\n";
-            for (u32 i = 0; i < partition_num; ++i) {
-                std::cout << partition_element_count[i] << " ";
-                if (i % 70 == 69)
-                    std::cout << std::endl;
-            }
+            // // output content of partition_element_count, 70 per line
+            // std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            //           << "partition_element_count:\n";
+            // for (u32 i = 0; i < partition_num; ++i) {
+            //     std::cout << partition_element_count[i] << " ";
+            //     if (i % 70 == 69)
+            //         std::cout << std::endl;
+            // }
+            //
             // output min, max of partition_element_count
-            u32 min = std::numeric_limits<u32>::max();
-            u32 max = std::numeric_limits<u32>::min();
-            for (u32 i = 0; i < partition_num; ++i) {
-                if (partition_element_count[i] < min) {
-                    min = partition_element_count[i];
+            if constexpr (false) {
+                u32 min = std::numeric_limits<u32>::max();
+                u32 max = std::numeric_limits<u32>::min();
+                for (u32 i = 0; i < partition_num; ++i) {
+                    if (partition_element_count[i] < min) {
+                        min = partition_element_count[i];
+                    }
+                    if (partition_element_count[i] > max) {
+                        max = partition_element_count[i];
+                    }
                 }
-                if (partition_element_count[i] > max) {
-                    max = partition_element_count[i];
-                }
+                std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "max of partition_element_count: " << max << std::endl;
+                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                          << "min of partition_element_count: " << min << std::endl;
+                std::cout << std::endl;
             }
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "max of partition_element_count: " << max << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "min of partition_element_count: " << min << std::endl;
-            std::cout << std::endl;
 
             std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                       << "\nimbalance factor: " << std::fixed << std::setprecision(10)
