@@ -13,6 +13,7 @@
 // limitations under the License.
 module;
 
+import std;
 import stl;
 import third_party;
 
@@ -190,6 +191,8 @@ private:
     QueryPhase current_phase_{QueryPhase::kInvalid};
 
     SharedPtr<QueryProfiler::TreeNode> CreateTree(const PhysicalOperator *root, idx_t depth = 0);
+
+    static void Render(const TreeNode *node,  std::stringstream &ss);
 };
 
 } // namespace infinity

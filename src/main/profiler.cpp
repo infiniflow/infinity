@@ -220,6 +220,27 @@ SharedPtr<QueryProfiler::TreeNode> QueryProfiler::CreateTree(const PhysicalOpera
     return node;
 }
 
+void QueryProfiler::Render(const QueryProfiler::TreeNode *node,  std::stringstream &ss) {
+    if (!node) {
+        return;
+    }
+
+    String tab = "";
+    for (int i = 0; i < node->depth_; ++i) {
+        tab += "  ";
+    }
+
+    ss << tab << "Operator: " << node->info_.name_ << std::endl;
+    ss << tab << "-> consumption time: " << node->info_.time_ << std::endl;
+    ss << tab << "-> input rows: " << node->info_.input_rows_ << std::endl;
+    ss << tab << "-> output rows: " << node->info_.output_rows_ << std::endl;
+    ss << tab << "-> data size: " << node->info_.input_data_size_ << std::endl;
+
+    for (const auto child : node->children_) {
+        QueryProfiler::Render(child.get(), ss);
+    }
+}
+
 String QueryProfiler::ToString() const {
     std::stringstream ss;
     constexpr SizeT profilers_count = magic_enum::enum_integer(QueryPhase::kInvalid);
@@ -239,6 +260,10 @@ String QueryProfiler::ToString() const {
            << std::endl;
         if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kOptimizer) {
             ss << optimizer_.ToString(4) << std::endl;
+        }
+        if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kExecution) {
+            ss << "--------------------------------" << std::endl;
+            Render(root_.get(), ss);
         }
     }
     return ss.str();
