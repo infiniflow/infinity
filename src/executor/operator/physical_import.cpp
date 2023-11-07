@@ -439,7 +439,7 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
     block_row_counts.reserve(segment_entry->block_entries_.size());
     for (auto &block_entry : segment_entry->block_entries_) {
         BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
-        auto size = std::max(segment_entry->block_entries_.size(), static_cast<SizeT>(block_entry->block_id_ + 1));
+        auto size = Max(segment_entry->block_entries_.size(), static_cast<SizeT>(block_entry->block_id_ + 1));
         block_row_counts.resize(size);
         block_row_counts[block_entry->block_id_] = block_entry->row_count_;
     }

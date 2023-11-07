@@ -53,7 +53,7 @@ public:
 
     void SendComplete(const String &complete_message);
     //
-    //    std::pair<String, String> read_parse_packet();
+    //    pair<String, String> read_parse_packet();
     //    void read_sync_packet();
     //
     //    void send_status_message(const PGMessageType message_type);

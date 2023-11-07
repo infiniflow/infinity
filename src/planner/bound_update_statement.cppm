@@ -21,7 +21,7 @@ import bind_context;
 import logical_node;
 import query_context;
 import stl;
-import std;
+import std_lib;
 
 export module bound_update_statement;
 
@@ -34,11 +34,11 @@ namespace infinity {
 export struct BoundUpdateStatement final : public BoundStatement {
 public:
     static inline SharedPtr<BoundUpdateStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeShared<BoundUpdateStatement>(std::move(bind_context));
+        return MakeShared<BoundUpdateStatement>(Move(bind_context));
     }
 
 public:
-    inline explicit BoundUpdateStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+    inline explicit BoundUpdateStatement(SharedPtr<BindContext> bind_context) : bind_context_(Move(bind_context)) {}
 
     SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 

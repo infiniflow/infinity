@@ -13,7 +13,7 @@
 // limitations under the License.
 module;
 
-import std;
+#include <sstream>
 import stl;
 import function;
 import parser;

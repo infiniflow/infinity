@@ -54,9 +54,9 @@ BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 col
 
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
     if (!is_replay) {
-        block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Allocate(Move(file_worker));
     } else {
-        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Get(Move(file_worker));
     }
 
     if (block_column_entry->column_type_->type() == kVarchar) {
@@ -70,7 +70,7 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entr
     if (block_column_entry->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, 0);
-        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Get(Move(file_worker));
     }
 
     bool outline = block_column_entry->column_type_->type() == kVarchar;
@@ -129,7 +129,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                         outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
                         auto file_name = BlockColumnEntry::OutlineFilename(outline_info->next_file_idx++);
                         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
-                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
+                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();

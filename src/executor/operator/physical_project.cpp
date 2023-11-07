@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import query_context;
 import table_def;

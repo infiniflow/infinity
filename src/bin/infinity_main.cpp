@@ -19,7 +19,7 @@ import compilation_config;
 import stl;
 import third_party;
 import db_server;
-import std;
+import std_lib;
 
 namespace {
 

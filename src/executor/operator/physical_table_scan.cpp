@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import txn;
 import query_context;

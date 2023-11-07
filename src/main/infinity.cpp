@@ -14,6 +14,8 @@
 
 module;
 
+#include <iostream>
+
 module infinity;
 
 import stl;
@@ -23,7 +25,6 @@ import resource_manager;
 import fragment_scheduler;
 import storage;
 import local_file_system;
-import std;
 import third_party;
 import query_options;
 import query_result;
@@ -36,7 +37,7 @@ import parser;
 
 namespace infinity {
 
-Infinity::Infinity() : DatabaseObject(ObjectType::kDatabase), session_(std::move(MakeShared<EmbeddedSession>())) {}
+Infinity::Infinity() : DatabaseObject(ObjectType::kDatabase), session_(Move(MakeShared<EmbeddedSession>())) {}
 
 Infinity::~Infinity() { Disconnect(); }
 

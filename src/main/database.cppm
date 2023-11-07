@@ -20,14 +20,14 @@ import query_options;
 import table;
 import table_collection_detail;
 import session;
-import std;
+import std_lib;
 import parser;
 
 namespace infinity {
 
 export class Database {
 public:
-    explicit Database(const String &db_name, SharedPtr<EmbeddedSession> session) : db_name_(db_name), session_(std::move(session)) {}
+    explicit Database(const String &db_name, SharedPtr<EmbeddedSession> session) : db_name_(db_name), session_(Move(session)) {}
 
     QueryResult CreateTable(const String &table_name,
                             Vector<ColumnDef *> column_defs,

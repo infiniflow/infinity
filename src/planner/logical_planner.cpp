@@ -419,7 +419,7 @@ void LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr
     SharedPtr<LogicalNode> logical_create_view_operator = LogicalCreateView::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                                                                   columns_ptr,
                                                                                   bound_statement_ptr->types_ptr_,
-                                                                                  std::static_pointer_cast<CreateViewInfo>(statement->create_info_));
+                                                                                  static_pointer_cast<CreateViewInfo>(statement->create_info_));
 
     this->logical_plan_ = logical_create_view_operator;
     this->names_ptr_->emplace_back("OK");

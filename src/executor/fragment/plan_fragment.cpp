@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+import std_lib;
 import stl;
 import parser;
 import physical_source;

@@ -73,7 +73,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpressio
                                                          QueryContext *query_context,
                                                          const SharedPtr<BindContext> &bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
-    auto subquery_expr = std::static_pointer_cast<SubqueryExpression>(expr_ptr);
+    auto subquery_expr = static_pointer_cast<SubqueryExpression>(expr_ptr);
 
     auto right = subquery_expr->bound_select_statement_ptr_->BuildPlan(query_context);
     // TODO: if the correlated information of the subquery should be stored in bind context.
@@ -113,7 +113,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
                                                                           limit_column_binding.column_idx,
                                                                           0);
 
-            auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
+            auto aggregate_function_set_ptr = static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
             AggregateFunction first_function = aggregate_function_set_ptr->GetMostMatchFunction(argument);
 
             Vector<SharedPtr<BaseExpression>> arguments;
@@ -182,7 +182,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             } else {
                 function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "<>");
             }
-            auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+            auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
 
             SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function, function_arguments);
@@ -293,7 +293,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             Vector<SharedPtr<BaseExpression>> function_arguments;
             function_arguments.reserve(1);
             function_arguments.emplace_back(mark_column);
-            auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+            auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
 
             SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function, function_arguments);
@@ -422,7 +422,7 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         function_arguments.emplace_back(left_column_expr);
         function_arguments.emplace_back(right_column_expr);
 
-        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
 
         SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function, function_arguments);

@@ -162,7 +162,7 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryC
             Error<PlannerException>("KNN is not supported on JOIN relation, now.");
         }
         case TableRefType::kTable: {
-            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
 
             // Change function table to knn table scan function
             base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(), "knn_scan");
@@ -216,7 +216,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<BaseTableRef> base_table_ref
-    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
+    auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
 
     SharedPtr<LogicalTableScan> table_scan_node = MakeShared<LogicalTableScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
     return table_scan_node;
@@ -225,7 +225,7 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContex
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<SubqueryTableRef> subquery_table_ref
-    auto subquery_table_ref = std::static_pointer_cast<SubqueryTableRef>(table_ref);
+    auto subquery_table_ref = static_pointer_cast<SubqueryTableRef>(table_ref);
     SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(query_context);
     return subquery;
 }
@@ -234,7 +234,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(SharedPtr<Ta
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<CrossProductTableRef> cross_product_table_ref
-    auto cross_product_table_ref = std::static_pointer_cast<CrossProductTableRef>(table_ref);
+    auto cross_product_table_ref = static_pointer_cast<CrossProductTableRef>(table_ref);
 
     auto left_node = BuildFrom(cross_product_table_ref->left_table_ref_, query_context, bind_context);
     auto right_node = BuildFrom(cross_product_table_ref->right_table_ref_, query_context, bind_context);
@@ -249,7 +249,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(SharedPtr<Ta
 SharedPtr<LogicalNode>
 BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<JoinTableRef> join_table_ref
-    auto join_table_ref = std::static_pointer_cast<JoinTableRef>(table_ref);
+    auto join_table_ref = static_pointer_cast<JoinTableRef>(table_ref);
 
     auto left_node = BuildFrom(join_table_ref->left_table_ref_, query_context, bind_context);
     auto right_node = BuildFrom(join_table_ref->right_table_ref_, query_context, bind_context);

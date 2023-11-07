@@ -16,7 +16,7 @@ module;
 
 export module default_values;
 
-import std;
+import std_lib;
 import stl;
 
 namespace infinity {
@@ -56,9 +56,9 @@ export {
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
-    constexpr std::string WAL_FILE_TEMP_FILE = "wal.log";
-    constexpr std::string WAL_FILE_PREFIX = "wal.log.";
-    constexpr std::string CATALOG_FILE_DIR = "catalog";
+    constexpr std_lib::string WAL_FILE_TEMP_FILE = "wal.log";
+    constexpr std_lib::string WAL_FILE_PREFIX = "wal.log.";
+    constexpr std_lib::string CATALOG_FILE_DIR = "catalog";
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

@@ -17,7 +17,7 @@ module;
 #include "../header.h"
 #include <cassert>
 
-import std;
+import std_lib;
 import stl;
 import parser;
 import knn_distance;
@@ -64,7 +64,7 @@ private:
 
     // 1 / log(1.0 * M_)
     const double mult_;
-    std::default_random_engine level_rng_{};
+    std_lib::default_random_engine level_rng_{};
 
     // The offset of data structure. Init not in initialize list. const
     const SizeT data_offset_;
@@ -125,7 +125,7 @@ private:
     }
     LabelType *GetLabelMut(VertexType vertex_idx) { return reinterpret_cast<LabelType *>(graph_ + vertex_idx * level0_size_ + label_offset_); }
 
-    void ReleaseVisited() { std::fill(visited_.begin(), visited_.begin() + cur_vertex_n_, false); }
+    void ReleaseVisited() { std_lib::fill(visited_.begin(), visited_.begin() + cur_vertex_n_, false); }
 
 public:
     template <typename SpaceType>
@@ -136,7 +136,7 @@ public:
           ef_(10), ef_construction_(Max(M_, ef_construction)),                                           //
           dist_func_(space.DistFuncPtr()),                                                               //
           cur_vertex_n_(0), max_layer_(-1), enterpoint_(-1),                                             //
-          mult_(1 / std::log(1.0 * M_)),                                                                 //
+          mult_(1 / std_lib::log(1.0 * M_)),                                                                 //
           data_offset_(0),                                                                               //
           neighbor_n0_offset_(AlignTo(sizeof(DataType) * dim_, sizeof(VertexListSize))),                 //
           neighbors0_offset_(AlignTo(neighbor_n0_offset_ + sizeof(VertexListSize), sizeof(VertexType))), //
@@ -162,8 +162,8 @@ public:
 private:
     // >= 0
     i32 GenerateRandomLayer() {
-        std::uniform_real_distribution<double> distribution(0.0, 1.0);
-        double r = -std::log(distribution(level_rng_)) * mult_;
+        std_lib::uniform_real_distribution<double> distribution(0.0, 1.0);
+        double r = -std_lib::log(distribution(level_rng_)) * mult_;
         return static_cast<i32>(r);
     }
 
@@ -171,7 +171,7 @@ private:
 
     void InitVertex(VertexType vertex_idx, i32 layer_n, const DataType *data, LabelType label) {
         DataType *vertex_data = GetDataMut(vertex_idx);
-        std::copy(data, data + dim_, vertex_data);
+        std_lib::copy(data, data + dim_, vertex_data);
         *GetNeighborsMut(vertex_idx, 0).second = 0;
         *GetLabelMut(vertex_idx) = label;
         *GetLayerNMut(vertex_idx) = layer_n;
@@ -287,7 +287,7 @@ private:
         const auto [q_neighbors_p, q_neighbor_size_p] = GetNeighborsMut(vertex_idx, layer_idx);
         VertexListSize q_neighbor_size = neighbors.size();
         *q_neighbor_size_p = q_neighbor_size;
-        std::reverse_copy(neighbors.begin(), neighbors.end(), q_neighbors_p);
+        std_lib::reverse_copy(neighbors.begin(), neighbors.end(), q_neighbors_p);
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
             auto [n_neighbors_p, n_neighbor_size_p] = GetNeighborsMut(n_idx, layer_idx);
@@ -309,7 +309,7 @@ private:
             }
             Vector<VertexType> shrink_neighbors = SelectNeighborsHeuristic(candidates, Mmax);
             *n_neighbor_size_p = shrink_neighbors.size();
-            std::reverse_copy(shrink_neighbors.begin(), shrink_neighbors.end(), n_neighbors_p);
+            std_lib::reverse_copy(shrink_neighbors.begin(), shrink_neighbors.end(), n_neighbors_p);
         }
     }
 
@@ -389,19 +389,19 @@ public:
     }
 
     // void DumpGraph(const String filename) {
-    //     std::fstream fo(filename, std::ios::out);
-    //     fo << std::endl << "---------------------------------------------" << std::endl;
-    //     fo << "M_: " << M_ << std::endl;
-    //     fo << "Mmax_: " << Mmax_ << std::endl;
-    //     fo << "Mmax0_: " << Mmax0_ << std::endl;
-    //     fo << "ef_: " << ef_ << std::endl;
-    //     fo << "ef_construction_: " << ef_construction_ << std::endl;
-    //     fo << "dim_: " << dim_ << std::endl;
-    //     fo << std::endl;
+    //     std_lib::fstream fo(filename, std_lib::ios::out);
+    //     fo << std_lib::endl << "---------------------------------------------" << std_lib::endl;
+    //     fo << "M_: " << M_ << std_lib::endl;
+    //     fo << "Mmax_: " << Mmax_ << std_lib::endl;
+    //     fo << "Mmax0_: " << Mmax0_ << std_lib::endl;
+    //     fo << "ef_: " << ef_ << std_lib::endl;
+    //     fo << "ef_construction_: " << ef_construction_ << std_lib::endl;
+    //     fo << "dim_: " << dim_ << std_lib::endl;
+    //     fo << std_lib::endl;
 
-    //     fo << "current element number: " << cur_vertex_n_ << std::endl;
-    //     fo << "max layer: " << max_layer_ << std::endl;
-    //     fo << std::endl;
+    //     fo << "current element number: " << cur_vertex_n_ << std_lib::endl;
+    //     fo << "max layer: " << max_layer_ << std_lib::endl;
+    //     fo << std_lib::endl;
 
     //     Vector<Vector<VertexType>> layer2vertex(max_layer_ + 1);
     //     for (VertexType v = 0; v < cur_vertex_n_; ++v) {
@@ -411,38 +411,38 @@ public:
     //         }
     //     }
     //     for (i32 layer = 0; layer <= max_layer_; ++layer) {
-    //         fo << "layer " << layer << std::endl;
+    //         fo << "layer " << layer << std_lib::endl;
     //         for (VertexType v : layer2vertex[layer]) {
     //             fo << v << ": ";
     //             auto [neighbors, neighbor_n] = GetNeighbors(v, layer);
     //             for (int i = 0; i < neighbor_n; ++i) {
     //                 fo << neighbors[i] << ", ";
     //             }
-    //             fo << std::endl;
+    //             fo << std_lib::endl;
     //         }
     //     }
-    //     fo << "---------------------------------------------" << std::endl;
+    //     fo << "---------------------------------------------" << std_lib::endl;
     // }
 
     // void TmpSave(const String &file_name) {
-    //     std::fstream fo(file_name, std::ios::out);
-    //     fo << max_layer_ << std::endl;
-    //     fo << enterpoint_ << std::endl;
-    //     fo << graph_.size() << std::endl;
+    //     std_lib::fstream fo(file_name, std_lib::ios::out);
+    //     fo << max_layer_ << std_lib::endl;
+    //     fo << enterpoint_ << std_lib::endl;
+    //     fo << graph_.size() << std_lib::endl;
     //     for (const auto &vertex : graph_) {
-    //         fo << vertex.label_ << std::endl;
+    //         fo << vertex.label_ << std_lib::endl;
     //         for (const auto &data : vertex.data_) {
     //             fo << data << " ";
     //         }
-    //         fo << vertex.neighbor_layers_.size() << std::endl;
+    //         fo << vertex.neighbor_layers_.size() << std_lib::endl;
     //         for (const auto &layer : vertex.neighbor_layers_) {
-    //             fo << layer.size() << std::endl;
+    //             fo << layer.size() << std_lib::endl;
     //             for (const auto &neighbor : layer) {
     //                 fo << neighbor << " ";
     //             }
-    //             fo << std::endl;
+    //             fo << std_lib::endl;
     //         }
-    //         fo << std::endl;
+    //         fo << std_lib::endl;
     //     }
     // }
 
@@ -450,9 +450,9 @@ public:
     //     requires SpaceConcept<DataType, SpaceType>
     // KnnHnsw(SpaceType space, const String &file_name)
     //     : M_(16), Mmax_(M_), Mmax0_(2 * Mmax_), ef_(10), ef_construction_(200), dim_(space.Dimension()),
-    //       dist_func_(space.template DistFuncPtr<DataType>()), mult_(1 / std::log(1.0 * M_)) {
+    //       dist_func_(space.template DistFuncPtr<DataType>()), mult_(1 / std_lib::log(1.0 * M_)) {
     //     level_rng_.seed(100);
-    //     std::fstream fo(file_name, std::ios::in);
+    //     std_lib::fstream fo(file_name, std_lib::ios::in);
     //     fo >> max_layer_;
     //     fo >> enterpoint_;
     //     int vertex_num = -1;

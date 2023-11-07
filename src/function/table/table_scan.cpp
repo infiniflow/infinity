@@ -16,7 +16,7 @@ module;
 
 #include <memory>
 
-import std;
+import std_lib;
 import stl;
 import table_function;
 import data_block;

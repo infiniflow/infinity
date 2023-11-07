@@ -136,7 +136,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
     switch (expression->type()) {
 
         case ExpressionType::kAggregate: {
-            auto aggregate_expression = std::static_pointer_cast<AggregateExpression>(expression);
+            auto aggregate_expression = static_pointer_cast<AggregateExpression>(expression);
             for (auto &argument : aggregate_expression->arguments()) {
                 VisitExpression(argument);
             }
@@ -148,7 +148,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kCast: {
-            auto cast_expression = std::static_pointer_cast<CastExpression>(expression);
+            auto cast_expression = static_pointer_cast<CastExpression>(expression);
             for (auto &argument : cast_expression->arguments()) {
                 VisitExpression(argument);
             }
@@ -160,7 +160,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kCase: {
-            auto case_expression = std::static_pointer_cast<CaseExpression>(expression);
+            auto case_expression = static_pointer_cast<CaseExpression>(expression);
             Assert<PlannerException>(case_expression->arguments().empty(), "Case expression shouldn't have arguments");
             for (auto &case_expr : case_expression->CaseExpr()) {
                 VisitExpression(case_expr.then_expr_);
@@ -176,7 +176,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kConjunction: {
-            auto conjunction_expression = std::static_pointer_cast<ConjunctionExpression>(expression);
+            auto conjunction_expression = static_pointer_cast<ConjunctionExpression>(expression);
             for (auto &argument : conjunction_expression->arguments()) {
                 VisitExpression(argument);
             }
@@ -188,7 +188,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kColumn: {
-            auto column_expression = std::static_pointer_cast<ColumnExpression>(expression);
+            auto column_expression = static_pointer_cast<ColumnExpression>(expression);
             Assert<PlannerException>(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
 
             result = VisitReplace(column_expression);
@@ -199,7 +199,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kFunction: {
-            auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
+            auto function_expression = static_pointer_cast<FunctionExpression>(expression);
             for (auto &argument : function_expression->arguments()) {
                 VisitExpression(argument);
             }
@@ -211,7 +211,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kValue: {
-            auto value_expression = std::static_pointer_cast<ValueExpression>(expression);
+            auto value_expression = static_pointer_cast<ValueExpression>(expression);
 
             Assert<PlannerException>(value_expression->arguments().empty(), "Column expression shouldn't have arguments");
 
@@ -222,7 +222,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kIn: {
-            auto in_expression = std::static_pointer_cast<InExpression>(expression);
+            auto in_expression = static_pointer_cast<InExpression>(expression);
 
             VisitExpression(in_expression->left_operand());
             for (auto &argument : in_expression->arguments()) {
@@ -236,7 +236,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kSubQuery: {
-            auto subquery_expression = std::static_pointer_cast<SubqueryExpression>(expression);
+            auto subquery_expression = static_pointer_cast<SubqueryExpression>(expression);
 
             result = VisitReplace(subquery_expression);
             if (result.get() != nullptr) {
@@ -245,7 +245,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         case ExpressionType::kKnn: {
-            auto knn_expression = std::static_pointer_cast<KnnExpression>(expression);
+            auto knn_expression = static_pointer_cast<KnnExpression>(expression);
             VisitExpression(knn_expression->arguments()[0]);
 
             result = VisitReplace(knn_expression);

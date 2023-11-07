@@ -14,9 +14,8 @@
 
 module;
 
-import std;
+#include <sstream>
 import stl;
-import std;
 
 import infinity_exception;
 import parser;

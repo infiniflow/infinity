@@ -32,7 +32,7 @@
 #include "hnswlib/hnswlib.h"
 
 // import stl;
-// import std;
+// import std_lib;
 import compilation_config;
 
 class KnnBenchTest : public BaseTest {};

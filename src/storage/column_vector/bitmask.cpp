@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+import std_lib;
 import bitmask_buffer;
 import global_resource_usage;
 
@@ -95,7 +95,7 @@ void Bitmask::Resize(SizeT new_count) {
 }
 
 String Bitmask::ToString(SizeT from, SizeT to) {
-    std::stringstream ss;
+    std_lib::stringstream ss;
     ss << "BITMASK(" << to - from << "): ";
     if (data_ptr_ == nullptr) {
         for (SizeT i = from; i <= to; ++i) {

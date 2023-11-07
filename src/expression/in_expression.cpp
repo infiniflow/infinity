@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 
 import infinity_exception;
 import stl;

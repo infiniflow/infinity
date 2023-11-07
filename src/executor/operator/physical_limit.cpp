@@ -46,12 +46,12 @@ void PhysicalLimit::Execute(QueryContext *query_context) {
 
     Assert<ExecutorException>(limit_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
 
-    i64 limit = (std::static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
+    i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
     Assert<ExecutorException>(limit > 0, "Limit should be larger than 0");
     i64 offset = 0;
     if (offset_expr_ != nullptr) {
         Assert<ExecutorException>(offset_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
-        offset = (std::static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
+        offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
         Assert<ExecutorException>(offset >= 0 && offset < input_table_->row_count(),
                                   "Offset should be larger or equal than 0 and less than row number");
     }

@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import std;
+import std_lib;
 import byte_slice;
 import byte_slice_reader;
 

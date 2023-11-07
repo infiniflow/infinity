@@ -71,7 +71,7 @@ private:
     Mutex locker_{};
     CondVar cv_;
     UniquePtr<String> err_msg_{};
-    //    std::atomic_bool flag_{false};
+    //    atomic_bool flag_{false};
 };
 
 } // namespace infinity
