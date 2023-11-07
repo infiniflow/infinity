@@ -2,25 +2,12 @@ module;
 
 import stl;
 import singleton;
+import iresearch_analyzer;
 import third_party;
 
-export module iresearch;
+export module iresearch_document;
 
 namespace infinity {
-
-export using AnalyzerFactory = StdFunction<IResearchAnalyzer::ptr>;
-
-export class AnalyzerPool : public Singleton<AnalyzerPool> {
-public:
-    using CacheType = flat_hash_map<StringView, IResearchAnalyzer::ptr>;
-
-    IResearchAnalyzer::ptr Get(const String &name);
-
-    void Set(const String &name, const String &args);
-
-private:
-    CacheType cache_;
-};
 
 export struct IndexField {
     StringView name_;

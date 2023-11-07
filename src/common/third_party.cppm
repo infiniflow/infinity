@@ -206,6 +206,6 @@ export template <class K,
                  class Hash = HashDefaultHash<K>,
                  class Eq = HashDefaultEQ<K>,
                  class Alloc = PHAlloc<PHPair<const K, V>>> // alias for std::allocator
-using flat_hash_map = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
+using FlatHashMap = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
 
 } // namespace infinity

@@ -3,7 +3,7 @@ module;
 import stl;
 import third_party;
 
-module iresearch;
+module iresearch_analyzer;
 
 namespace infinity {
 
