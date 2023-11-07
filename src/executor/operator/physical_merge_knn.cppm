@@ -31,6 +31,7 @@ namespace infinity {
 export class PhysicalMergeKnn final : public PhysicalOperator {
 public:
     explicit PhysicalMergeKnn(u64 id,
+                              SharedPtr<BaseTableRef> table_ref,
                               SharedPtr<PhysicalOperator> left,
                               SharedPtr<Vector<String>> output_names,
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
@@ -38,9 +39,9 @@ public:
                               SharedPtr<BaseExpression> limit_expr,
                               OrderType order_by_type,
                               u64 knn_table_index)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)),
-          order_by_type_(order_by_type), knn_table_index_(knn_table_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id), table_ref_(table_ref), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)), order_by_type_(order_by_type),
+          knn_table_index_(knn_table_index) {}
 
     ~PhysicalMergeKnn() override = default;
 

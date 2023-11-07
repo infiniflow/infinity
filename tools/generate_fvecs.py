@@ -4,15 +4,16 @@ import os
 import argparse
 
 
-def generate(generate_if_exists: bool):
+def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 1000
     dim = 128
-    fvecs_dir = "/tmp/infinity/test_data"
+    fvecs_dir = "./test/data/fvecs"
     slt_dir = "./test/sql/dml/import"
 
     table_name = "test_fvecs"
     fvecs_path = fvecs_dir + "/test.fvecs"
     slt_path = slt_dir + "/test_fvecs.slt"
+    copy_path = copy_dir + "/test.fvecs"
 
     os.makedirs(fvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
@@ -35,7 +36,7 @@ def generate(generate_if_exists: bool):
         slt_file.write("query I\n")
         slt_file.write(
             "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT fvecs);\n".format(
-                table_name, fvecs_path
+                table_name, copy_path
             )
         )
         slt_file.write("----\n")
@@ -68,5 +69,12 @@ if __name__ == "__main__":
         default=False,
         dest="generate_if_exists",
     )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default="/tmp/infinity/test_data",
+        dest="copy_dir",
+    )
     args = parser.parse_args()
-    generate(args.generate_if_exists)
+    generate(args.generate_if_exists, args.copy_dir)

@@ -6,6 +6,7 @@ import argparse
 def generate_test_varchar(
     slt_path: str,
     csv_path: str,
+    copy_path: str,
     num: int,
     dim: int,
     generate_if_exists: bool,
@@ -32,7 +33,7 @@ def generate_test_varchar(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, csv_path)
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path)
         )
         slt_file.write("----\n")
         slt_file.write("\n")
@@ -57,6 +58,7 @@ def generate_test_varchar(
 def generate_test_embedding(
     slt_path: str,
     csv_path: str,
+    copy_path: str,
     num: int,
     dim: int,
     generate_if_exists: bool,
@@ -85,7 +87,7 @@ def generate_test_embedding(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, csv_path)
+            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path)
         )
         slt_file.write("----\n")
         slt_file.write("\n")
@@ -110,22 +112,24 @@ def generate_test_embedding(
         slt_file.write("DROP TABLE {};\n".format(table_name))
 
 
-def generate(generate_if_exists):
+def generate(generate_if_exists, copy_dir: str):
     print("Note: this script must be run under root directory of the project.")
     row_n = 1000
     dim = 128
     slt_dir = "./test/sql/dml/import"
-    csv_dir = "/tmp/infinity/test_data"
+    csv_dir = "./test/data/csv"
 
     os.makedirs(slt_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
 
     slt_path = slt_dir + "/test_big_embedding.slt"
     csv_path = csv_dir + "/big_embedding.csv"
-    generate_test_embedding(slt_path, csv_path, row_n, dim, generate_if_exists)
+    copy_path = copy_dir + "/big_embedding.csv"
+    generate_test_embedding(slt_path, csv_path, copy_path, row_n, dim, generate_if_exists)
     slt_path = slt_dir + "/test_big_varchar.slt"
     csv_path = csv_dir + "/big_varchar.csv"
-    generate_test_varchar(slt_path, csv_path, row_n, dim, generate_if_exists)
+    copy_path = copy_dir + "/big_embedding.csv"
+    generate_test_varchar(slt_path, csv_path, copy_path, row_n, dim, generate_if_exists)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate big data for test")
@@ -137,5 +141,12 @@ if __name__ == "__main__":
         default=False,
         dest="generate_if_exists",
     )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default="/tmp/infinity/test_data",
+        dest="copy_dir",
+    )
     args = parser.parse_args()
-    generate(args.generate_if_exists)
+    generate(args.generate_if_exists, args.copy_dir)
