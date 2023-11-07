@@ -7,7 +7,7 @@ import argparse
 def generate(generate_if_exists: bool):
     row_n = 1000
     dim = 128
-    fvecs_dir = "/tmp/infinity/test_data"
+    fvecs_dir = "./test/data/fvecs"
     slt_dir = "./test/sql/dml/import"
 
     table_name = "test_fvecs"

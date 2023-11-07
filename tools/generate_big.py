@@ -115,7 +115,7 @@ def generate(generate_if_exists):
     row_n = 1000
     dim = 128
     slt_dir = "./test/sql/dml/import"
-    csv_dir = "/tmp/infinity/test_data"
+    csv_dir = "./test/data/csv"
 
     os.makedirs(slt_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
