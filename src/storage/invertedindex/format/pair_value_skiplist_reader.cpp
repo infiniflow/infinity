@@ -118,13 +118,13 @@ Pair<int, bool> PairValueSkipListReader::LoadBuffer() {
 
         if (key_num != value_num) {
             // LOG_ERROR(fmt::format("SKipList decode error, key_num = {} offset_num = {}", key_num, value_num));
-            return std::make_pair(-1, false);
+            return MakePair(-1, false);
         }
         num_in_buffer_ = key_num;
         current_cursor_ = 0;
-        return std::make_pair(0, true);
+        return MakePair(0, true);
     }
-    return std::make_pair(0, false);
+    return MakePair(0, false);
 }
 
 u32 PairValueSkipListReader::GetLastValueInBuffer() const {

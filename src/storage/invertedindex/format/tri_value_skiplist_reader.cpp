@@ -128,13 +128,13 @@ Pair<int, bool> TriValueSkipListReader::LoadBuffer() {
 
         if (doc_num != ttf_num || ttf_num != len_num) {
             // LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} offset_num = {} ttf_num = {}", doc_num, len_num, ttf_num));
-            return std::make_pair(-1, false);
+            return MakePair(-1, false);
         }
         num_in_buffer_ = doc_num;
         current_cursor_ = 0;
-        return std::make_pair(0, true);
+        return MakePair(0, true);
     }
-    return std::make_pair(0, false);
+    return MakePair(0, false);
 }
 
 } // namespace infinity

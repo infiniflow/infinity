@@ -31,31 +31,31 @@ Pair<int, bool> InMemTriValueSkipListReader::LoadBuffer() {
         decode_count = flush_count;
     }
     if (decode_count == 0) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
 
     SizeT doc_num = 0;
     if (!skiplist_reader_.Decode(doc_id_buffer_, decode_count, doc_num)) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
 
     SizeT ttf_num = 0;
     if (!skiplist_reader_.Decode(ttf_buffer_, decode_count, ttf_num)) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
 
     SizeT len_num = 0;
     if (!skiplist_reader_.Decode(offset_buffer_, decode_count, len_num)) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
 
     if (doc_num != ttf_num || ttf_num != len_num) {
         // LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} ttf_num = {} len_num = {}", doc_num, ttf_num, len_num));
-        return std::make_pair(-1, false);
+        return MakePair(-1, false);
     }
     num_in_buffer_ = doc_num;
     current_cursor_ = 0;
-    return std::make_pair(0, true);
+    return MakePair(0, true);
 }
 
 u32 InMemTriValueSkipListReader::GetLastValueInBuffer() const {
