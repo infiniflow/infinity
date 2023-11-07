@@ -81,7 +81,7 @@ private:
     const SizeT loaded_vertex_n_;
     const char *loaded_layers_;
 
-    HnswMemPool mem_pool_;
+    VisitedMemPool visited_pool_;
 
 private:
     const DataType *GetData(VertexType vertex_idx) const {
@@ -144,8 +144,8 @@ public:
           neighbor_n1_offset_(0),                                                                        //
           neighbors1_offset_(AlignTo(sizeof(VertexListSize), sizeof(VertexType))),                       //
           layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax_, sizeof(VertexListSize))), //
-          loaded_vertex_n_(0), loaded_layers_(nullptr),                                                  //
-          mem_pool_(max_vertex) {
+          loaded_vertex_n_(0), loaded_layers_(nullptr)                                                   //
+    {
         ef_ = 10;
         cur_vertex_n_ = 0;
         max_layer_ = -1;
@@ -207,8 +207,10 @@ public:
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
-        auto visited = mem_pool_.GetVisited();
-        // Vector<bool> visited(cur_vertex_n_, false);
+        // auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
+        // auto &visited = *pooled_visited;
+
+        Vector<bool> visited(cur_vertex_n_, false);
         visited[enter_point] = true;
 
         while (!candidate.empty()) {
@@ -248,7 +250,7 @@ public:
             }
         }
         // std::fill(visited.begin(), visited.begin() + cur_vertex_n_, false);
-        mem_pool_.ReleaseVisited(std::move(visited), cur_vertex_n_);
+        // mem_pool_.ReleaseVisited(std::move(visited), cur_vertex_n_);
         return result;
     }
 
