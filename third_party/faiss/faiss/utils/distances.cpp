@@ -510,16 +510,6 @@ void exhaustive_L2sqr_blas_cmax_avx2(
                 for (; idx_j < count; idx_j++, ip_line++) {
                     float ip = *ip_line;
                     float dis = x_norms[i] + y_norms[idx_j + j0] - 2 * ip;
-                    // TODO:delete this
-                    if (false) {
-                        if (i == 567736) {
-                            ;
-                        }
-                        size_t j = idx_j + j0;
-                        if (i == 567736 && (j == 88 || j == 286)) {
-                            printf("\ni = %d, j = %d, dis = %f\n", i, j, dis);
-                        }
-                    }
                     // negative values can occur for identical vectors
                     //    due to roundoff errors.
                     if (dis < 0)
