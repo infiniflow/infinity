@@ -3,7 +3,7 @@
 
 import stl;
 import std;
-import knn_knsw;
+import knn_hnsw;
 import dist_func;
 import local_file_system;
 

@@ -1,7 +1,7 @@
 import stl;
 import std;
 import local_file_system;
-import knn_knsw;
+import knn_hnsw;
 import dist_func;
 
 using namespace infinity;
