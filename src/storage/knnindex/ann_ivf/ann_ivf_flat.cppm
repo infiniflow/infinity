@@ -41,7 +41,7 @@ public:
     static SharedPtr<IVFFlatIndexData<DistType>>
     CreateIndex(i32 dimension, SizeT vector_count, const DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
-        k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, partition_num, index_data->centroids_.data());
+        k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, index_data->centroids_.data(), partition_num);
         add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
         return index_data;
     }
@@ -49,11 +49,12 @@ public:
     static SharedPtr<IVFFlatIndexData<DistType>>
     CreateIndex(i32 dimension, SizeT train_count, DistType *train_ptr, SizeT vector_count, DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
-        k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, partition_num, index_data->centroids_.data());
+        k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
         add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
         return index_data;
     }
 
+    /*
     static SharedPtr<IVFFlatIndexData<DistType>> CreateIndex_use_faiss(i32 dimension,
                                                                        SizeT train_count,
                                                                        DistType *train_ptr,
@@ -66,6 +67,7 @@ public:
         add_data_to_partition_faiss(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
         return index_data;
     }
+    */
 
     void Begin() final {
         if (begin_ || this->query_count_ == 0) {
@@ -98,12 +100,12 @@ public:
         i32 counter_1 = 0, counter_10 = 0, counter_100 = 0;
         if (n_probes == 1) {
             Vector<i32> assign_centroid_ids(this->query_count_);
-            search_top_1<DistType>(this->dimension_,
-                                   this->query_count_,
-                                   this->queries_,
-                                   base_ivf->partition_num_,
-                                   base_ivf->centroids_.data(),
-                                   assign_centroid_ids.data());
+            search_top_1_without_dis<DistType>(this->dimension_,
+                                               this->query_count_,
+                                               this->queries_,
+                                               base_ivf->partition_num_,
+                                               base_ivf->centroids_.data(),
+                                               assign_centroid_ids.data());
             for (i32 i = 0; i < this->query_count_; i++) {
                 if constexpr (b_debug_info) {
                     if (i == 1472) {

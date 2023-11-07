@@ -10,5 +10,6 @@ namespace infinity {
 export template <typename T>
 using FaissSingleBestResultHandler = faiss::SingleBestResultHandler<T>;
 
-export using float_maxheap_array_t = faiss::HeapArray<FaissCMax<float, int64_t>>;
+export template <typename T = int64_t>
+using float_maxheap_array_t = faiss::HeapArray<FaissCMax<float, T>>;
 } // namespace infinity

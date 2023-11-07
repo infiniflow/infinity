@@ -3,12 +3,12 @@
 
 #include "unit_test/base_test.h"
 
-#include <cmath>
-#include <cstdio>
-#include <cstring>
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVFFlat.h"
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 #include <omp.h>
 
 import parser;
@@ -336,7 +336,7 @@ void benchmark_annivfflatl2() {
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
         // ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
-        ann_index_data = AnnIVFFlatL2<float>::CreateIndex_use_faiss(d, nt, xt, nb, xb, partition_num, 0);
+        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
         // TODO:remove this
         {
             int c1 = 88, c2 = 286;
@@ -357,33 +357,35 @@ void benchmark_annivfflatl2() {
         memcpy(c2, ann_index_data->centroids_.data(), partition_num * d * sizeof(float));
 
         // compare c1 and c2,output difference
-        std::cout << "############################" << std::endl;
         if (false) {
-            // first 10 lines of c1 and c2
-            std::cout << "c1:\n";
-            for (i32 i = 0; i < 10; ++i) {
-                std::cout << "c1 row " << i << ": ";
-                for (i32 j = 0; j < d; ++j) {
-                    std::cout << c1[i * d + j] << " ";
+            std::cout << "############################" << std::endl;
+            {
+                // first 10 lines of c1 and c2
+                std::cout << "c1:\n";
+                for (i32 i = 0; i < 10; ++i) {
+                    std::cout << "c1 row " << i << ": ";
+                    for (i32 j = 0; j < d; ++j) {
+                        std::cout << c1[i * d + j] << " ";
+                    }
+                    std::cout << std::endl;
                 }
-                std::cout << std::endl;
-            }
-            std::cout << "c2:\n";
-            for (i32 i = 0; i < 10; ++i) {
-                std::cout << "c2 row " << i << ": ";
-                for (i32 j = 0; j < d; ++j) {
-                    std::cout << c2[i * d + j] << " ";
+                std::cout << "c2:\n";
+                for (i32 i = 0; i < 10; ++i) {
+                    std::cout << "c2 row " << i << ": ";
+                    for (i32 j = 0; j < d; ++j) {
+                        std::cout << c2[i * d + j] << " ";
+                    }
+                    std::cout << std::endl;
                 }
-                std::cout << std::endl;
             }
-        }
-        std::cout << "c1 and c2 difference:\n";
-        for (i32 i = 0; i < 316 * 128; ++i) {
-            if (c1[i] != c2[i]) {
-                std::cout << "c1[" << i << "]: " << c1[i] << " c2[" << i << "]: " << c2[i] << "difference: " << c1[i] - c2[i] << std::endl;
+            std::cout << "c1 and c2 difference:\n";
+            for (i32 i = 0; i < 316 * 128; ++i) {
+                if (c1[i] != c2[i]) {
+                    std::cout << "c1[" << i << "]: " << c1[i] << " c2[" << i << "]: " << c2[i] << "difference: " << c1[i] - c2[i] << std::endl;
+                }
             }
+            std::cout << "############################" << std::endl;
         }
-        std::cout << "############################" << std::endl;
 
 #ifdef bucketcontent
         // output the 100th vector content of ann_index_data->vectors_ and ann_index_data->ids_
@@ -476,11 +478,14 @@ void benchmark_annivfflatl2() {
 
         if (true) {
             // compare I1,I2, D1,D2
+            int dif = 0, difI = 0;
             std::cout << "############################" << std::endl;
             std::cout << "D1 and D2 difference:\n";
             for (i32 i = 0; i < nq * k; ++i) {
                 if (D1[i] != D2[i]) {
-                    std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << i << "]: " << D2[i]
+                    if (++dif > 10)
+                        break;
+                    std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
                               << "\tdifference: " << D1[i] - D2[i] << std::endl;
                 }
             }
@@ -488,7 +493,10 @@ void benchmark_annivfflatl2() {
             std::cout << "I1 and I2 difference:\n";
             for (i32 i = 0; i < nq * k; ++i) {
                 if (I1[i] != I2[i].segment_offset_) {
-                    std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << i << "]: " << I2[i].segment_offset_ << std::endl;
+                    if (++difI > 10)
+                        break;
+                    std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
+                              << "]: " << I2[i].segment_offset_ << std::endl;
                 }
             }
             std::cout << "############################" << std::endl;
