@@ -33,6 +33,17 @@ module;
 #include "faiss/Index.h"
 #include "faiss/utils/distances.h"
 
+#include "analysis/analyzers.hpp"
+#include "analysis/jieba_analyzer.hpp"
+#include "analysis/segmentation_token_stream.hpp"
+#include "analysis/token_attributes.hpp"
+#include "analysis/token_streams.hpp"
+#include "index/index_writer.hpp"
+#include "utils/noncopyable.hpp"
+#include "utils/object_pool.hpp"
+
+#include "parallel_hashmap/phmap.h"
+
 export module third_party;
 
 namespace infinity {
@@ -169,6 +180,31 @@ export constexpr int faiss_distance_compute_blas_query_bs = 4096;
 export constexpr int faiss_distance_compute_blas_database_bs = 1024;
 export constexpr int faiss_distance_compute_min_k_reservoir = 100;
 
+export using features_t = irs::features_t;
+export using IndexFeatures = irs::IndexFeatures;
+export using token_stream = irs::token_stream;
+export using data_output = irs::data_output;
+export using string_token_stream = irs::string_token_stream;
+export using numeric_token_stream = irs::numeric_token_stream;
+export using iresearch_analyzer_t = irs::analysis::analyzer;
+export using iresearch_jieba_analyzer_t = irs::analysis::jieba_analyzer;
+export using iresearch_segmentation_analyzer_t = irs::analysis::segmentation_token_stream;
+export inline void write_string(data_output &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
+export inline void write_zvlong(data_output &out, int64_t v) { return irs::write_zvlong(out, v); }
 
+export template <class T>
+using hash_default_hash = phmap::priv::hash_default_hash<T>;
+export template <class T>
+using hash_default_eq = phmap::priv::hash_default_eq<T>;
+export template <typename K, typename V>
+using PHPair = phmap::priv::Pair<const K, V>;
+export template <class T>
+using PHAlloc = phmap::priv::Allocator<T>;
+export template <class K,
+                 class V,
+                 class Hash = hash_default_hash<K>,
+                 class Eq = hash_default_eq<K>,
+                 class Alloc = PHAlloc<PHPair<const K, V>>> // alias for std::allocator
+using flat_hash_map = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
 
 } // namespace infinity
