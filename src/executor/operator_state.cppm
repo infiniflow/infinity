@@ -30,14 +30,268 @@ export module operator_state;
 
 namespace infinity {
 
+export struct OperatorState {
+    inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
+
+    // Input status
+    OperatorState *prev_op_state_{nullptr};
+    i64 received_data_count_{0};
+    i64 total_data_count_{0};
+
+    inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) {
+        prev_op_state_ = prev_op_state;
+    }
+
+    // Output status
+    PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
+    SharedPtr<DataBlock> data_block_{};
+    UniquePtr<String> error_message_{};
+    u64 count_{0};
+    u64 sum_{0};
+
+    bool complete_{false};
+
+    inline void SetComplete() { complete_ = true; }
+
+    inline bool Complete() const { return complete_; }
+};
+
+// Aggregate
+export struct AggregateOperatorState : public OperatorState {
+    inline explicit AggregateOperatorState() : OperatorState(PhysicalOperatorType::kAggregate) {}
+};
+
+// Merge Parallel Aggregate
+export struct MergeParallelAggregateOperatorState : public OperatorState {
+    inline explicit MergeParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeParallelAggregate) {}
+};
+
+// Parallel Aggregate
+export struct ParallelAggregateOperatorState : public OperatorState {
+    inline explicit ParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kParallelAggregate) {}
+};
+
+// UnionAll
+export struct UnionAllOperatorState : public OperatorState {
+    inline explicit UnionAllOperatorState() : OperatorState(PhysicalOperatorType::kUnionAll) {}
+};
+
+// TableScan
+export struct TableScanOperatorState : public OperatorState {
+    inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
+
+    SharedPtr<TableScanFunctionData> table_scan_function_data_{};
+};
+
+// KnnScan
+export struct KnnScanOperatorState : public OperatorState {
+    inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
+
+    SharedPtr<KnnScanFunctionData> knn_scan_function_data_{};
+};
+
+// Merge Knn
+export struct MergeKnnOperatorState : public OperatorState {
+    inline explicit MergeKnnOperatorState() : OperatorState(PhysicalOperatorType::kMergeKnn) {}
+
+    SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
+};
+
+// Filter
+export struct FilterOperatorState : public OperatorState {
+    inline explicit FilterOperatorState() : OperatorState(PhysicalOperatorType::kFilter) {}
+};
+// IndexScan
+export struct IndexScanOperatorState : public OperatorState {
+    inline explicit IndexScanOperatorState() : OperatorState(PhysicalOperatorType::kIndexScan) {}
+};
+
+// Hash
+export struct HashOperatorState : public OperatorState {
+    inline explicit HashOperatorState() : OperatorState(PhysicalOperatorType::kHash) {}
+};
+
+// Merge Hash
+export struct MergeHashOperatorState : public OperatorState {
+    inline explicit MergeHashOperatorState() : OperatorState(PhysicalOperatorType::kMergeHash) {}
+};
+
+// Hash Join
+export struct HashJoinOperatorState : public OperatorState {
+    inline explicit HashJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinHash) {}
+};
+
+// Nested Loop
+export struct NestedLoopOperatorState : public OperatorState {
+    inline explicit NestedLoopOperatorState() : OperatorState(PhysicalOperatorType::kJoinNestedLoop) {}
+};
+
+// Merge Join
+export struct MergeJoinOperatorState : public OperatorState {
+    inline explicit MergeJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinMerge) {}
+};
+
+// Index Join
+export struct IndexJoinOperatorState : public OperatorState {
+    inline explicit IndexJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinIndex) {}
+};
+
+// Cross Product
+export struct CrossProductOperatorState : public OperatorState {
+    inline explicit CrossProductOperatorState() : OperatorState(PhysicalOperatorType::kCrossProduct) {}
+};
+
+// Limit
+export struct LimitOperatorState : public OperatorState {
+    inline explicit LimitOperatorState() : OperatorState(PhysicalOperatorType::kLimit) {}
+};
+
+// Merge Limit
+export struct MergeLimitOperatorState : public OperatorState {
+    inline explicit MergeLimitOperatorState() : OperatorState(PhysicalOperatorType::kMergeLimit) {}
+};
+
+// Merge Top
+export struct MergeTopOperatorState : public OperatorState {
+    inline explicit MergeTopOperatorState() : OperatorState(PhysicalOperatorType::kMergeTop) {}
+};
+
+// Top
+export struct TopOperatorState : public OperatorState {
+    inline explicit TopOperatorState() : OperatorState(PhysicalOperatorType::kTop) {}
+};
+
+// Projection
+export struct ProjectionOperatorState : public OperatorState {
+    inline explicit ProjectionOperatorState() : OperatorState(PhysicalOperatorType::kProjection) {}
+};
+
+// Sort
+export struct SortOperatorState : public OperatorState {
+    inline explicit SortOperatorState() : OperatorState(PhysicalOperatorType::kSort) {}
+};
+
+// Merge Sort
+export struct MergeSortOperatorState : public OperatorState {
+    inline explicit MergeSortOperatorState() : OperatorState(PhysicalOperatorType::kMergeSort) {}
+};
+
+// Delete
+export struct DeleteOperatorState : public OperatorState {
+    inline explicit DeleteOperatorState() : OperatorState(PhysicalOperatorType::kDelete) {}
+};
+// Update
+export struct UpdateOperatorState : public OperatorState {
+    inline explicit UpdateOperatorState() : OperatorState(PhysicalOperatorType::kUpdate) {}
+};
+
+// Insert
+export struct InsertOperatorState : public OperatorState {
+    inline explicit InsertOperatorState() : OperatorState(PhysicalOperatorType::kInsert) {}
+
+    UniquePtr<String> result_msg_{};
+};
+
+// Import
+export struct ImportOperatorState : public OperatorState {
+    inline explicit ImportOperatorState() : OperatorState(PhysicalOperatorType::kImport) {}
+
+    Vector<SharedPtr<DataBlock>> output_{};
+    SharedPtr<TableDef> table_def_{};
+    // For insert, update, delete, update
+    UniquePtr<String> result_msg_{};
+};
+
+// Export
+export struct ExportOperatorState : public OperatorState {
+    inline explicit ExportOperatorState() : OperatorState(PhysicalOperatorType::kExport) {}
+};
+
+// Alter
+export struct AlterOperatorState : public OperatorState {
+    inline explicit AlterOperatorState() : OperatorState(PhysicalOperatorType::kAlter) {}
+};
+
+// Create Table
+export struct CreateTableOperatorState : public OperatorState {
+    inline explicit CreateTableOperatorState() : OperatorState(PhysicalOperatorType::kCreateTable) {}
+};
+
+export struct CreateIndexOperatorState : public OperatorState {
+    inline explicit CreateIndexOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndex) {}
+};
+
+// Create Collection
+export struct CreateCollectionOperatorState : public OperatorState {
+    inline explicit CreateCollectionOperatorState() : OperatorState(PhysicalOperatorType::kCreateCollection) {}
+};
+
+// Create Database
+export struct CreateDatabaseOperatorState : public OperatorState {
+    inline explicit CreateDatabaseOperatorState() : OperatorState(PhysicalOperatorType::kCreateDatabase) {}
+};
+
+// Create View
+export struct CreateViewOperatorState : public OperatorState {
+    inline explicit CreateViewOperatorState() : OperatorState(PhysicalOperatorType::kCreateView) {}
+};
+
+// Drop Table
+export struct DropTableOperatorState : public OperatorState {
+    inline explicit DropTableOperatorState() : OperatorState(PhysicalOperatorType::kDropTable) {}
+};
+
+export struct DropIndexOperatorState : public OperatorState {
+    inline explicit DropIndexOperatorState() : OperatorState(PhysicalOperatorType::kDropIndex) {}
+};
+
+// Drop Collection
+export struct DropCollectionOperatorState : public OperatorState {
+    inline explicit DropCollectionOperatorState() : OperatorState(PhysicalOperatorType::kDropCollection) {}
+};
+
+// Drop Database
+export struct DropDatabaseOperatorState : public OperatorState {
+    inline explicit DropDatabaseOperatorState() : OperatorState(PhysicalOperatorType::kDropDatabase) {}
+};
+
+// Drop View
+export struct DropViewOperatorState : public OperatorState {
+    inline explicit DropViewOperatorState() : OperatorState(PhysicalOperatorType::kDropView) {}
+};
+
+// Command
+export struct CommandOperatorState : public OperatorState {
+    inline explicit CommandOperatorState() : OperatorState(PhysicalOperatorType::kCommand) {}
+};
+
+// Explain
+export struct ExplainOperatorState : public OperatorState {
+    inline explicit ExplainOperatorState() : OperatorState(PhysicalOperatorType::kExplain) {}
+};
+
+// Show
+export struct ShowOperatorState : public OperatorState {
+    inline explicit ShowOperatorState() : OperatorState(PhysicalOperatorType::kShow) {}
+
+    Vector<SharedPtr<DataBlock>> output_{};
+};
+
+// Flush
+export struct FlushOperatorState : public OperatorState {
+    inline explicit FlushOperatorState() : OperatorState(PhysicalOperatorType::kFlush) {}
+};
+
+// Legacy implementation
+
 export struct OutputState {
-    inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type), count_(0), sum_(0) {}
+    inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
 
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
     UniquePtr<String> error_message_{};
-    u64 count_;
-    u64 sum_;
+    u64 count_{0};
+    u64 sum_{0};
 
     bool complete_{false};
 
