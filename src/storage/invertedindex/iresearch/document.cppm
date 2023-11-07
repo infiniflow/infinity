@@ -86,4 +86,8 @@ export struct NumericField : public IndexField {
     }
 };
 
+export struct FieldIterator {
+    FieldIterator();
+};
+
 } // namespace infinity
