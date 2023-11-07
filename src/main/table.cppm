@@ -19,7 +19,6 @@ import query_result;
 import query_options;
 import value;
 import parser;
-import std_lib;
 import session;
 
 namespace infinity {

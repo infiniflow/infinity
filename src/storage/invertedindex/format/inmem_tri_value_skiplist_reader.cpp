@@ -1,7 +1,6 @@
 module;
 
 import stl;
-import std_lib;
 import memory_pool;
 import buffered_byte_slice;
 import buffered_byte_slice_reader;

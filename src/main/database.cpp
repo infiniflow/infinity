@@ -17,7 +17,6 @@ module;
 module database;
 
 import stl;
-import std_lib;
 import query_options;
 import query_result;
 import table;

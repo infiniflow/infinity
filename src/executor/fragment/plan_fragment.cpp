@@ -14,7 +14,8 @@
 
 module;
 
-import std_lib;
+#include <vector>
+
 import stl;
 import parser;
 import physical_source;

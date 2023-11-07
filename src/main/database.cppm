@@ -20,7 +20,6 @@ import query_options;
 import table;
 import table_collection_detail;
 import session;
-import std_lib;
 import parser;
 
 namespace infinity {

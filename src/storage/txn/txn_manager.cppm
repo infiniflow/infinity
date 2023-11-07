@@ -81,7 +81,7 @@ private:
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     Mutex mutex_;
     TxnTimeStamp txn_ts_{};
-    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std_lib::flat_map?
+    Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};
 };
