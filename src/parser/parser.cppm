@@ -14,10 +14,8 @@
 module;
 
 #include "type/info/array_info.h"
-#include "type/logical_type.h"
-#include "type/number/float16.h"
-#include "definition/column_def.h"
 #include "sql_parser.h"
+#include "type/number/float16.h"
 
 export module parser;
 
