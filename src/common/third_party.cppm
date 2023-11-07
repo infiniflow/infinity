@@ -180,30 +180,31 @@ export constexpr int faiss_distance_compute_blas_query_bs = 4096;
 export constexpr int faiss_distance_compute_blas_database_bs = 1024;
 export constexpr int faiss_distance_compute_min_k_reservoir = 100;
 
-export using features_t = irs::features_t;
+export using Features = irs::features_t;
 export using IndexFeatures = irs::IndexFeatures;
-export using token_stream = irs::token_stream;
-export using data_output = irs::data_output;
-export using string_token_stream = irs::string_token_stream;
-export using numeric_token_stream = irs::numeric_token_stream;
-export using iresearch_analyzer_t = irs::analysis::analyzer;
-export using iresearch_jieba_analyzer_t = irs::analysis::jieba_analyzer;
-export using iresearch_segmentation_analyzer_t = irs::analysis::segmentation_token_stream;
-export inline void write_string(data_output &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
-export inline void write_zvlong(data_output &out, int64_t v) { return irs::write_zvlong(out, v); }
+export using TokenStream = irs::token_stream;
+export using StringTokenStream = irs::string_token_stream;
+export using NumericTokenStream = irs::numeric_token_stream;
+export using DataOutput = irs::data_output;
+export using IResearchAnalyzer = irs::analysis::analyzer;
+export using IResearchJiebaAnalyzer = irs::analysis::jieba_analyzer;
+export using IResearchSegmentationAnalyzer = irs::analysis::segmentation_token_stream;
+export using IResearchIndexWriter = irs::IndexWriter;
+export inline void IResearchWriteString(DataOutput &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
+export inline void IResearchWriteZVlong(DataOutput &out, int64_t v) { return irs::write_zvlong(out, v); }
 
 export template <class T>
-using hash_default_hash = phmap::priv::hash_default_hash<T>;
+using HashDefaultHash = phmap::priv::hash_default_hash<T>;
 export template <class T>
-using hash_default_eq = phmap::priv::hash_default_eq<T>;
+using HashDefaultEQ = phmap::priv::hash_default_eq<T>;
 export template <typename K, typename V>
 using PHPair = phmap::priv::Pair<const K, V>;
 export template <class T>
 using PHAlloc = phmap::priv::Allocator<T>;
 export template <class K,
                  class V,
-                 class Hash = hash_default_hash<K>,
-                 class Eq = hash_default_eq<K>,
+                 class Hash = HashDefaultHash<K>,
+                 class Eq = HashDefaultEQ<K>,
                  class Alloc = PHAlloc<PHPair<const K, V>>> // alias for std::allocator
 using flat_hash_map = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
 
