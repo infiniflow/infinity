@@ -27,7 +27,6 @@
 #include <faiss/impl/CodePacker.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/IDSelector.h>
-#include <iostream>
 
 namespace faiss {
 
@@ -179,59 +178,10 @@ void IndexIVF::add(idx_t n, const float* x) {
     add_with_ids(n, x, nullptr);
 }
 
-template <typename DiffType, typename ElemType1, typename ElemType2>
-DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, int dimension) {
-    DiffType distance{};
-    for (int i = 0; i < dimension; ++i) {
-        DiffType diff = vector1[i] - vector2[i];
-        distance += diff * diff;
-    }
-    return distance;
-}
-
 void IndexIVF::add_with_ids(idx_t n, const float* x, const idx_t* xids) {
     std::unique_ptr<idx_t[]> coarse_idx(new idx_t[n]);
     quantizer->assign(n, x, coarse_idx.get());
     add_core(n, x, xids, coarse_idx.get());
-    // TODO:delete this
-    {
-        // check coarse_idx of 567736
-        std::cout << "#####################################################"
-                  << "\nfaiss coarse_idx of 567736:\n";
-        std::cout << coarse_idx[567736] << std::endl;
-        std::cout << "#####################################################\n" << std::endl;
-        auto v_ids = ((faiss::ArrayInvertedLists *)invlists)->ids[coarse_idx[567736]];
-        // output i, selected_centroid, with description
-        std::cout << "\ni: " << 567736 << ", assigned centroid: " << coarse_idx[567736] << std::endl;
-        std::cout << "\n" << coarse_idx[567736] << " contain 567736: " << (std::find(v_ids.begin(), v_ids.end(), 567736) != v_ids.end()) << std::endl;
-
-        // specially check 567736,find 2 nearest centroids
-        int dimension = quantizer->d;
-        int partition_num = quantizer->ntotal;
-        float *centroids = (float *)(((IndexFlatCodes *)quantizer)->codes.data());
-        const float *x_ = x + 567736 * dimension;
-        std::pair<int, float> nearest_centroids[2] = {{0, L2Distance<float>(x_, centroids, dimension)},
-                                                      {1, L2Distance<float>(x_, centroids + dimension, dimension)}};
-        if (nearest_centroids[0].second > nearest_centroids[1].second) {
-            std::swap(nearest_centroids[0], nearest_centroids[1]);
-        }
-        for (int i = 2; i < partition_num; ++i) {
-            auto distance = L2Distance<float>(x_, centroids + i * dimension, dimension);
-            if (distance < nearest_centroids[0].second) {
-                nearest_centroids[1] = nearest_centroids[0];
-                nearest_centroids[0] = {i, distance};
-            } else if (distance < nearest_centroids[1].second) {
-                nearest_centroids[1] = {i, distance};
-            }
-        }
-        // output nearest_centroids
-        std::cout << "#####################################################"
-                  << "\nfaiss nearest_centroids of 567736 (float):\n";
-        for (int i = 0; i < 2; ++i) {
-            std::cout << nearest_centroids[i].first << " " << nearest_centroids[i].second << std::endl;
-        }
-        std::cout << "#####################################################\n" << std::endl;
-    }
 }
 
 void IndexIVF::add_sa_codes(idx_t n, const uint8_t* codes, const idx_t* xids) {
@@ -351,20 +301,6 @@ void IndexIVF::search(
     const size_t nprobe =
             std::min(nlist, params ? params->nprobe : this->nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
-    // TODO:remove this
-    if (n == 10000) {
-        int i = 1472;
-        float dis;
-        idx_t cid;
-        quantizer->search(1, x + i * d, 1, &dis, &cid, nullptr);
-        int selected_centroid = cid;
-        auto v_ids = ((faiss::ArrayInvertedLists *)invlists)->ids[selected_centroid];
-        auto v_ids_286 = ((faiss::ArrayInvertedLists *)invlists)->ids[286];
-        // output i, selected_centroid, with description
-        std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << std::endl;
-        std::cout << "\n" << cid << " contain 567736: " << (std::find(v_ids.begin(), v_ids.end(), 567736) != v_ids.end()) << std::endl;
-        std::cout << "\n" << 286 << " contain 567736: " << (std::find(v_ids_286.begin(), v_ids_286.end(), 567736) != v_ids_286.end()) << std::endl;
-    }
 
     // search function for a subset of queries
     auto sub_search_func = [this, k, nprobe, params](
