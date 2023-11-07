@@ -5,6 +5,7 @@
 
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
+#include "faiss/IndexIVF.h"
 #include "faiss/IndexIVFFlat.h"
 #include <cmath>
 #include <cstdio>
@@ -37,7 +38,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int global_nb = 100'000;
 int n_lists;
-int n_probes = 1;
+int n_probes = 3;
 size_t k;
 
 faiss::idx_t *I1;
@@ -145,25 +146,6 @@ void benchmark_faiss_ivfflatl2() {
 
         delete[] xb;
     }
-    if constexpr (false) {
-        // output min, max of partition_element_count
-        u32 min = std::numeric_limits<u32>::max();
-        u32 max = std::numeric_limits<u32>::min();
-        for (u32 i = 0; i < (((faiss::ArrayInvertedLists *)index->invlists)->nlist); ++i) {
-            int num = ((faiss::ArrayInvertedLists *)index->invlists)->ids[i].size();
-            if (num < min) {
-                min = num;
-            }
-            if (num > max) {
-                max = num;
-            }
-        }
-        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "max of partition_element_count: " << max << std::endl;
-        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "min of partition_element_count: " << min << std::endl;
-        std::cout << std::endl;
-    }
 #ifdef bucketcontent
     {
         // output 100th bucket content
@@ -218,15 +200,6 @@ void benchmark_faiss_ivfflatl2() {
             gt[i] = gt_int[i];
         }
         delete[] gt_int;
-        if (false) {
-            // output the 1472nd line of gt
-            std::cout << "############################" << std::endl;
-            std::cout << "gt[1472]:\n";
-            for (int j = 0; j < k; j++) {
-                std::cout << gt[1472 * k + j] << " ";
-            }
-            std::cout << std::endl;
-        }
     }
 
     { // Perform a search
@@ -242,32 +215,10 @@ void benchmark_faiss_ivfflatl2() {
             memset(I1, 0, nq * ksearch * sizeof(faiss::idx_t));
             memset(D1, 0, nq * ksearch * sizeof(float));
 
-            index->search(nq, xq, ksearch, D1, I1);
+            faiss::IVFSearchParameters p;
+            p.nprobe = n_probes;
+            index->search(nq, xq, ksearch, D1, I1, &p);
 
-            if (false) {
-                // output the 1472nd line of I1
-                std::cout << "############################" << std::endl;
-                std::cout << "I1[1472]:\n";
-                for (int j = 0; j < ksearch; j++) {
-                    std::cout << I1[1472 * ksearch + j] << " ";
-                }
-                std::cout << std::endl;
-            }
-
-            if (false) { // output first 3 lines of I1 and D1
-                std::cout << "############################" << std::endl;
-                for (int i = 0; i < 3; i++) {
-                    std::cout << "line " << i << ":\nI:\t";
-                    for (int j = 0; j < k; j++) {
-                        std::cout << I1[i * k + j] << " ";
-                    }
-                    std::cout << "\nD:\t";
-                    for (int j = 0; j < k; j++) {
-                        std::cout << D1[i * k + j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
             std::cout << "############################" << std::endl;
             printf("[%.3f s] Compute recalls\n", elapsed() - t0);
             std::cout << "############################" << std::endl;
@@ -373,37 +324,6 @@ void benchmark_annivfflatl2() {
         // copy content of ann_index_data->centroids_ to c2, use memcpy
         memcpy(c2, ann_index_data->centroids_.data(), partition_num * d * sizeof(float));
 
-        // compare c1 and c2,output difference
-        if (false) {
-            std::cout << "############################" << std::endl;
-            {
-                // first 10 lines of c1 and c2
-                std::cout << "c1:\n";
-                for (i32 i = 0; i < 10; ++i) {
-                    std::cout << "c1 row " << i << ": ";
-                    for (i32 j = 0; j < d; ++j) {
-                        std::cout << c1[i * d + j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
-                std::cout << "c2:\n";
-                for (i32 i = 0; i < 10; ++i) {
-                    std::cout << "c2 row " << i << ": ";
-                    for (i32 j = 0; j < d; ++j) {
-                        std::cout << c2[i * d + j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
-            std::cout << "c1 and c2 difference:\n";
-            for (i32 i = 0; i < 316 * 128; ++i) {
-                if (c1[i] != c2[i]) {
-                    std::cout << "c1[" << i << "]: " << c1[i] << " c2[" << i << "]: " << c2[i] << "difference: " << c1[i] - c2[i] << std::endl;
-                }
-            }
-            std::cout << "############################" << std::endl;
-        }
-
 #ifdef bucketcontent
         // output the 100th vector content of ann_index_data->vectors_ and ann_index_data->ids_
         {
@@ -477,59 +397,13 @@ void benchmark_annivfflatl2() {
         I2 = test_ivf.GetIDs();
         D2 = test_ivf.GetDistances();
 
-        if (false) { // output first 3 lines of I and D
-            std::cout << "############################" << std::endl;
-            for (int i = 0; i < 3; i++) {
-                std::cout << "line " << i << ":\nI:\t";
-                for (int j = 0; j < k; j++) {
-                    std::cout << I2[i * k + j].segment_offset_ << " ";
-                }
-                std::cout << "\nD:\t";
-                for (int j = 0; j < k; j++) {
-                    std::cout << D2[i * k + j] << " ";
-                }
-                std::cout << std::endl;
-            }
-        }
         std::cout << "############################" << std::endl;
-
-        if constexpr (false) {
-            int vacant_1 = 0, vacant_10 = 0, vacant_100 = 0;
-            // count D2 that == numeric_limits<float>::max()
-            for (i32 i = 0; i < nq; ++i) {
-                for (i32 j = 0; j < k; ++j) {
-                    if (D2[i * k + j] == std::numeric_limits<float>::max()) {
-                        if (j < 1) {
-                            ++vacant_1;
-                        }
-                        if (j < 10) {
-                            ++vacant_10;
-                        }
-                        if (j < 100) {
-                            ++vacant_100;
-                        }
-                    }
-                }
-            }
-            // output vacant_1, vacant_10, vacant_100
-            std::cout << "############################" << std::endl;
-            std::cout << "vacant_1: " << vacant_1 << std::endl;
-            std::cout << "vacant_10: " << vacant_10 << std::endl;
-            std::cout << "vacant_100: " << vacant_100 << std::endl;
-            // output nq
-            std::cout << "nq: " << nq << std::endl;
-            std::cout << "############################" << std::endl;
-            printf("vacant@1 = %.4f\n", vacant_1 / float(nq));
-            printf("vacant@10 = %.4f\n", vacant_10 / float(nq * 10));
-            printf("vacant@100 = %.4f\n", vacant_100 / float(nq * 100));
-        }
 
         std::cout << "############################" << std::endl;
         printf("[%.3f s] Compute recalls\n", elapsed() - t0);
         std::cout << "############################" << std::endl;
 
         int n_1 = 0, n_10 = 0, n_100 = 0;
-        // std::unordered_set<int32_t> gt1, gt10, gt100;
         for (int i = 0; i < nq; i++) {
             std::unordered_set<int32_t> gt1, gt10, gt100;
             for (int j = 0; j < k; ++j) {
@@ -571,49 +445,27 @@ void benchmark_annivfflatl2() {
         if (true) {
             // compare I1,I2, D1,D2
             {
-                int dif = 0, difI = 0;
                 std::cout << "############################" << std::endl;
                 std::cout << "D1 and D2 difference:\n";
-                for (i32 i = 0; i < (nq / 2) * k; ++i) {
-                    if (D1[i] != D2[i]) {
-                        if (++dif > 10)
-                            break;
-                        std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
-                                  << "\tdifference: " << D1[i] - D2[i] << std::endl;
-                    }
-                }
-                std::cout << "############################" << std::endl;
-                std::cout << "I1 and I2 difference:\n";
-                for (i32 i = 0; i < (nq / 2) * k; ++i) {
-                    if (I1[i] != I2[i].segment_offset_) {
-                        if (++difI > 10)
-                            break;
-                        std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
-                                  << "]: " << I2[i].segment_offset_ << std::endl;
-                    }
-                }
-                std::cout << "############################" << std::endl;
-            }
-            {
-                int dif = 0, difI = 0;
-                std::cout << "############################" << std::endl;
-                std::cout << "D1 and D2 difference:\n";
-                for (i32 i = ((nq / 2) + 1) * k; i < nq * k; ++i) {
-                    if (D1[i] != D2[i]) {
-                        if (++dif > 10)
-                            break;
-                        std::cout << "D1[" << (i / k) << " : " << (i % k) << "]: " << D1[i] << " D2[" << (i / k) << " : " << (i % k) << "]: " << D2[i]
-                                  << "\tdifference: " << D1[i] - D2[i] << std::endl;
-                    }
-                }
-                std::cout << "############################" << std::endl;
-                std::cout << "I1 and I2 difference:\n";
-                for (i32 i = ((nq / 2) + 1) * k; i < nq * k; ++i) {
-                    if (I1[i] != I2[i].segment_offset_) {
-                        if (++difI > 10)
-                            break;
-                        std::cout << "I1[" << (i / k) << " : " << (i % k) << "]: " << I1[i] << " I2[" << (i / k) << " : " << (i % k)
-                                  << "]: " << I2[i].segment_offset_ << std::endl;
+                for (int id1 = 0, id2 = 0, diffc1 = 0; diffc1 < 50 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
+                    if (D1[id1] == D2[id2]) {
+                        ++id1;
+                        ++id2;
+                    } else {
+                        ++diffc1;
+                        if (D1[id1] < D2[id2]) {
+                            // warn: D1 found result which is not in D2
+                            std::cout << "D1 found result which is not in D2: "
+                                      << "D1[" << (id1 / k) << " : " << (id1 % k) << "]: " << D1[id1] << " D2[" << (id2 / k) << " : " << (id2 % k)
+                                      << "]: " << D2[id2] << " difference: " << D1[id1] - D2[id2] << std::endl;
+                            ++id1;
+                        } else {
+                            // warn: D2 found result which is not in D1
+                            std::cout << "D2 found result which is not in D1: "
+                                      << "D1[" << (id1 / k) << " : " << (id1 % k) << "]: " << D1[id1] << " D2[" << (id2 / k) << " : " << (id2 % k)
+                                      << "]: " << D2[id2] << " difference: " << D1[id1] - D2[id2] << std::endl;
+                            ++id2;
+                        }
                     }
                 }
                 std::cout << "############################" << std::endl;

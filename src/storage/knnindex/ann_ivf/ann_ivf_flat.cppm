@@ -136,10 +136,10 @@ public:
             if constexpr (true) {
                 using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, u32>>;
                 using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
+                Vector<DistType> centroid_dists(n_probes);
+                Vector<u32> centroid_ids(n_probes);
                 for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
-                    Vector<DistType> centroid_dists(n_probes);
-                    Vector<u32> centroid_ids(n_probes);
                     HeapResultHandler_INT centroid_heap_result(1, centroid_dists.data(), centroid_ids.data(), n_probes);
                     HeapSingleHandler_INT centroid_single_heap_result(centroid_heap_result, 1);
                     centroid_single_heap_result.begin(0);
@@ -152,23 +152,25 @@ public:
                     for (u32 k = 0; k < n_probes; k++) {
                         const u32 selected_centroid = centroid_ids[k];
                         const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                        if (contain_nums < 100) {
-                            // output i, k, selected_centroid, contain_nums, with description
-                            std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid
-                                      << ", contain_nums: " << contain_nums << std::endl;
+                        if constexpr (false) {
                             if (contain_nums < 100) {
-                                counter_100++;
-                                if (contain_nums < 10) {
-                                    counter_10++;
-                                    if (contain_nums < 1) {
-                                        counter_1++;
+                                // output i, k, selected_centroid, contain_nums, with description
+                                std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid
+                                          << ", contain_nums: " << contain_nums << std::endl;
+                                if (contain_nums < 100) {
+                                    counter_100++;
+                                    if (contain_nums < 10) {
+                                        counter_10++;
+                                        if (contain_nums < 1) {
+                                            counter_1++;
+                                        }
                                     }
                                 }
                             }
-                        }
-                        // for i = 0, 10, output contain_nums
-                        if (i < 10) {
-                            std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
+                            // for i = 0, 10, output contain_nums
+                            if (i < 10) {
+                                std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
+                            }
                         }
                         const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                         for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
