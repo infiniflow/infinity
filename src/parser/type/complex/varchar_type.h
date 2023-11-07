@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 namespace infinity {
 
@@ -48,9 +58,9 @@ public:
 
     bool operator<(const VarcharType &other) const;
 
-    [[nodiscard]] inline char* GetDataPtr() const {
+    [[nodiscard]] inline char *GetDataPtr() const {
         if (IsInlined()) {
-            return (char*)(prefix);
+            return (char *)(prefix);
         } else {
             return this->ptr;
         }
@@ -75,10 +85,10 @@ public:
 
     [[nodiscard]] std::string ToString() const;
 
-    uint16_t length{0};                  // 65535 will be the limitation.
+    uint16_t length{0};           // 65535 will be the limitation.
     char prefix[PREFIX_LENGTH]{}; // prefix of the varchar
     // If length <= 14, ptr will be used as prefix.
-    char* ptr{nullptr}; // pointer to the varchar value buffer.
+    char *ptr{nullptr}; // pointer to the varchar value buffer.
 };
 
 } // namespace infinity

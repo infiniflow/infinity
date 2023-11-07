@@ -1,15 +1,28 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 import stl;
 import serialize;
 import ivfflat_index_def;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 
 module index_def;
@@ -101,7 +114,7 @@ void IndexDef::WriteAdv(char *&ptr) const {
 
 SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
     char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexDef");
     SharedPtr<String> index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
     IndexMethod method_type = ReadBufAdv<IndexMethod>(ptr);
     Vector<String> column_names;
@@ -119,13 +132,13 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
             break;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Error index method while reading", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Error index method while reading");
         }
         default: {
-            Error<StorageException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Not implemented");
         }
     }
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexDef", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexDef");
     return res;
 }
 
@@ -164,10 +177,10 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
             break;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Error index method while deserializing", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Error index method while deserializing");
         }
         default: {
-            Error<StorageException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Not implemented");
         }
     }
     return res;

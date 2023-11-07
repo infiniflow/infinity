@@ -4,6 +4,8 @@ module;
 export module std:algorithm;
 export namespace std {
 using std::copy;
+using std::reverse_copy;
+using std::fill;
 using std::count;
 using std::find;
 using std::find_if;

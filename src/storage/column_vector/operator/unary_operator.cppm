@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/11/11.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import column_vector;
-import infinity_assert;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
@@ -27,10 +37,10 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                Error<TypeException>("Invalid column vector type.", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
-                Assert<TypeException>(result->vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.", __FILE_NAME__, __LINE__);
+                Assert<TypeException>(result->vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.");
                 if (nullable) {
                     ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr);
 
@@ -42,7 +52,7 @@ public:
                 return;
             }
             case ColumnVectorType::kConstant: {
-                Assert<TypeException>(count == 1, "Attempting to execute more than one row of the constant column vector.", __FILE_NAME__, __LINE__);
+                Assert<TypeException>(count == 1, "Attempting to execute more than one row of the constant column vector.");
                 if (nullable) {
                     if (input->nulls_ptr_->IsAllTrue()) {
                         result_null->SetAllTrue();
@@ -62,7 +72,7 @@ public:
             }
         }
 
-        Error<TypeException>("Unexpected error.", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Unexpected error.");
     }
 
 private:

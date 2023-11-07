@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-25.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import stl;
 import parser;
 import knn_heap;
 import knn_partition;
-import infinity_assert;
+
 import infinity_exception;
 
 export module knn_result_handler;
@@ -155,7 +165,7 @@ struct ReservoirTopN {
     ReservoirTopN() {}
 
     ReservoirTopN(SizeT n, SizeT capacity, T *vals, TI *ids) : vals(vals), ids(ids), i(0), n(n), capacity(capacity) {
-        Assert<ExecutorException>(n < capacity, "n >= capacity", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(n < capacity, "n >= capacity");
         threshold = C::neutral();
     }
 
@@ -173,7 +183,7 @@ struct ReservoirTopN {
     // reduce storage from capacity to anything
     // between n and (capacity + n) / 2
     void shrink_fuzzy() {
-        Assert<ExecutorException>(i == capacity, "n != capacity", __FILE_NAME__, __LINE__);
+        Assert<ExecutorException>(i == capacity, "n != capacity");
 
         threshold = partition_fuzzy<C>(vals, ids, capacity, n, (capacity + n) / 2, &i);
     }

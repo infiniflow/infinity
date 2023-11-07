@@ -9,7 +9,7 @@ import index_defines;
 import posting_value;
 import pos_list_format_option;
 import doc_list_format_option;
-import infinity_assert;
+
 import infinity_exception;
 
 module posting_decoder;
@@ -70,14 +70,14 @@ u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpay
     if (tf_list_encoder_) {
         auto tf_len = tf_list_encoder_->Decode((u32 *)tf_list_buf, len, *posting_list_reader_);
         if (doc_len != tf_len) {
-            Error<StorageException>("doc/tf-list collapsed: ", __FILE_NAME__, __LINE__);
+            Error<StorageException>("doc/tf-list collapsed: ");
         }
     }
 
     if (doc_payload_encoder_) {
         auto payload_len = doc_payload_encoder_->Decode(doc_payload_buf, len, *posting_list_reader_);
         if (payload_len != doc_len) {
-            Error<StorageException>("doc/docpayload-list collapsed: ", __FILE_NAME__, __LINE__);
+            Error<StorageException>("doc/docpayload-list collapsed: ");
         }
     }
 
@@ -109,7 +109,7 @@ void PostingDecoder::InitDocListEncoder(const DocListFormatOption &doc_list_form
     }
 
     if (doc_list_format_option.HasTfBitmap() && tf_bitmap_.get() == nullptr) {
-        Error<StorageException>("PositionBitmap is Null when HasTfBitmap ", __FILE_NAME__, __LINE__);
+        Error<StorageException>("PositionBitmap is Null when HasTfBitmap ");
     }
 }
 

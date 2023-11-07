@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-14.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -66,7 +76,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -86,7 +96,7 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -104,7 +114,7 @@ QueryResult Infinity::ListDatabases() {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -120,14 +130,14 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
     QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
-    if(response.result_msg_.get() == nullptr) {
+    if (response.result_msg_.get() == nullptr) {
         return MakeShared<Database>(db_name, session_);
     } else {
         return nullptr;
     }
 }
 
-QueryResult Infinity::Query(const String& query_text) {
+QueryResult Infinity::Query(const String &query_text) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().fragment_scheduler(),
@@ -136,7 +146,7 @@ QueryResult Infinity::Query(const String& query_text) {
     QueryResponse response = query_context_ptr->Query(query_text);
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }

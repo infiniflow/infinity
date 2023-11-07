@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -38,7 +48,7 @@ import wal_entry;
 import file_system_type;
 import file_system;
 import buffer_handle;
-import infinity_assert;
+
 import infinity_exception;
 import table_collection_entry;
 import segment_entry;
@@ -83,15 +93,15 @@ void PhysicalImport::Execute(QueryContext *query_context) {}
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
     if (table_collection_entry_->columns_.size() != 1) {
-        Error<ExecutorException>("FVECS file must have only one column.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one column.");
     }
     auto &column_type = table_collection_entry_->columns_[0]->column_type_;
     if (column_type->type() != kEmbedding) {
-        Error<ExecutorException>("FVECS file must have only one embedding column.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one embedding column.");
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     if (embedding_info->Type() != kElemFloat) {
-        Error<ExecutorException>("FVECS file must have only one embedding column with float element.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("FVECS file must have only one embedding column with float element.");
     }
 
     LocalFileSystem fs;
@@ -103,25 +113,20 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
-        Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes));
     }
     if (embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        Error<ExecutorException>("Weird file size.", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 
     Txn *txn = query_context->GetTxn();
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
-    const String &table_name = *table_collection_entry_->table_collection_name_;
-    txn->AddTxnTableStore(table_name, MakeUnique<TxnTableStore>(table_name, table_collection_entry_, txn));
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_name);
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_collection_entry_);
 
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     SharedPtr<SegmentEntry> segment_entry =
@@ -134,9 +139,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension),
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
         }
         ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut()) + row_idx * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -154,11 +157,11 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *
 
         row_idx++;
         if (row_idx == vector_n) {
-            SaveSegmentData(txn, segment_entry, db_name, table_name);
+            SaveSegmentData(txn_store, segment_entry);
             break;
         }
         if (SegmentEntry::Room(segment_entry.get()) <= 0) {
-            SaveSegmentData(txn, segment_entry, db_name, table_name);
+            SaveSegmentData(txn_store, segment_entry);
 
             segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
@@ -178,11 +181,9 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
     // parser_context -> parser
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
-        Error<ExecutorException>(strerror(errno), __FILE_NAME__, __LINE__);
+        Error<ExecutorException>(strerror(errno));
     }
     Txn *txn = query_context->GetTxn();
-    txn->AddTxnTableStore(*table_collection_entry_->table_collection_name_,
-                          MakeUnique<TxnTableStore>(*table_collection_entry_->table_collection_name_, table_collection_entry_, txn));
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
 
@@ -209,18 +210,17 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportInputState *in
 
     // add the last segment entry
     if (parser_context->segment_entry_->row_count_ > 0) {
-        const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
-        const String &table_name = *table_collection_entry_->table_collection_name_;
-        SaveSegmentData(parser_context->txn_, parser_context->segment_entry_, db_name, table_name);
+        auto txn_store = parser_context->txn_->GetTxnTableStore(table_collection_entry_);
+        SaveSegmentData(txn_store, parser_context->segment_entry_);
     }
     fclose(fp);
 
     if (csv_parser_status != zsv_status_no_more_input) {
         if (parser_context->err_msg_.get() != nullptr) {
-            Error<ExecutorException>(*parser_context->err_msg_, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(*parser_context->err_msg_);
         } else {
             String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
-            Error<ExecutorException>(err_msg, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(err_msg);
         }
     }
     table_collection_entry_->row_count_ += parser_context->row_count_;
@@ -264,7 +264,7 @@ namespace {
 Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Error<TypeException>("Embedding data must be surrounded by [ and ]", __FILE_NAME__, __LINE__);
+        Error<TypeException>("Embedding data must be surrounded by [ and ]");
     }
     Vector<StringView> ret;
     SizeT i = 1, j = 1;
@@ -314,14 +314,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
     auto *table = parser_context->table_collection_entry_;
     SizeT column_count = parser_context->parser_.CellCount();
     auto *txn = parser_context->txn_;
-    auto txn_store = txn->GetTxnTableStore(*table->table_collection_name_);
+    auto txn_store = txn->GetTxnTableStore(table);
 
     auto segment_entry = parser_context->segment_entry_;
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table)->db_name_;
-    const String &table_name = *table->table_collection_name_;
     // we have already used all space of the segment
     if (SegmentEntry::Room(segment_entry.get()) <= 0) {
-        SaveSegmentData(txn, segment_entry, db_name, table_name);
+        SaveSegmentData(txn_store, segment_entry);
         parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
@@ -347,7 +345,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (column_type->type() == kVarchar) {
             auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
             if (varchar_info->dimension() < str_view.size()) {
-                Error<ExecutorException>("Varchar data size exceeds dimension.", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Varchar data size exceeds dimension.");
             }
 
             AppendVarcharData(block_column_entry, str_view, dst_offset);
@@ -356,12 +354,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                Error<ExecutorException>("Embedding data size exceeds dimension.", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Embedding data size exceeds dimension.");
             }
 
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    Error<ExecutorException>("Embedding bit type is not implemented.", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Embedding bit type is not implemented.");
                 }
                 case kElemInt8: {
                     AppendEmbeddingData<TinyIntT>(block_column_entry, ele_str_views, dst_offset);
@@ -388,7 +386,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                     break;
                 }
                 case kElemInvalid: {
-                    Error<ExecutorException>("Embedding element type is invalid.", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Embedding element type is invalid.");
                 }
             }
         } else {
@@ -423,10 +421,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 }
                 case kMissing:
                 case kInvalid: {
-                    Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid data type");
                 }
                 default: {
-                    Error<ExecutorException>("Not supported now in append data in column", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Not supported now in append data in column");
                 }
             }
         }
@@ -435,7 +433,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++segment_entry->row_count_;
     ++parser_context->row_count_;
 }
-void PhysicalImport::SaveSegmentData(Txn *txn, SharedPtr<SegmentEntry> &segment_entry, const String &db_name, const String &table_name) {
+void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
     Vector<u16> block_row_counts;
 
     block_row_counts.reserve(segment_entry->block_entries_.size());
@@ -451,14 +449,16 @@ void PhysicalImport::SaveSegmentData(Txn *txn, SharedPtr<SegmentEntry> &segment_
         LOG_TRACE(Format("Block {} rows count {}", i, block_row_counts[i]));
     }
 
-    txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
-                                            table_name,
-                                            *segment_entry->segment_dir_,
-                                            segment_entry->segment_id_,
-                                            segment_entry->block_entries_.size(),
-                                            block_row_counts));
+    const String &db_name = *TableCollectionEntry::GetDBName(txn_store->table_entry_);
+    const String &table_name = *txn_store->table_entry_->table_collection_name_;
+    txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                        table_name,
+                                                        *segment_entry->segment_dir_,
+                                                        segment_entry->segment_id_,
+                                                        segment_entry->block_entries_.size(),
+                                                        block_row_counts));
 
-    txn->GetTxnTableStore(table_name)->Import(segment_entry);
+    txn_store->Import(segment_entry);
 }
 
 } // namespace infinity

@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include "faiss/impl/FaissException.h"
@@ -6,7 +20,7 @@ module;
 
 import stl;
 import infinity_exception;
-import infinity_assert;
+
 import file_system;
 import third_party;
 
@@ -41,7 +55,7 @@ struct FSIOWriter : faiss::IOWriter {
 
 void FaissIndexFileWorker::AllocateInMemory() {
     if (data_) {
-        Error<StorageException>("Data is already allocated.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Data is already allocated.");
     }
     auto faiss_index_ptr = new FaissIndexPtr(nullptr, nullptr);
     data_ = static_cast<void *>(faiss_index_ptr);
@@ -49,7 +63,7 @@ void FaissIndexFileWorker::AllocateInMemory() {
 
 void FaissIndexFileWorker::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("Data is not allocated.", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Data is not allocated.");
     }
     auto faiss_index_ptr = static_cast<FaissIndexPtr *>(data_);
     delete faiss_index_ptr->index_;
@@ -65,7 +79,7 @@ void FaissIndexFileWorker::WriteToFileImpl(bool &prepare_success) {
         faiss::write_index(faiss_index_ptr->index_, &writer);
         prepare_success = true; // Not run defer_fn
     } catch (faiss::FaissException &xcp) {
-        Error<StorageException>(Format("Faiss exception: {}", xcp.what()), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Faiss exception: {}", xcp.what()));
     }
 }
 

@@ -1,13 +1,23 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
-#include <string>
 #include <filesystem>
 #include <functional>
 #include <regex>
+#include <string>
 
 import base_entry;
 import config;
@@ -24,7 +34,6 @@ import logger;
 import parser;
 import txn;
 import infinity_exception;
-import infinity_assert;
 
 module storage;
 
@@ -66,6 +75,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
+    Printf("Shutdown storage ...\n");
     txn_mgr_->Stop();
     wal_mgr_->Stop();
 
@@ -75,6 +85,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
+    Printf("Shutdown storage successfully\n");
 }
 
 SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
@@ -112,7 +123,7 @@ void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     create_res = new_txn->CreateDatabase("default", ConflictType::kError);
     new_txn->CommitTxn();
     if (create_res.err_ != nullptr) {
-        Error<StorageException>(*create_res.err_, __FILE_NAME__, __LINE__);
+        Error<StorageException>(*create_res.err_);
     }
 }
 

@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/9/14.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
@@ -20,15 +30,17 @@ namespace infinity {
 template <typename ValueType, typename ResultType>
 struct AvgState {
 public:
-    inline void Initialize() { Error<NotImplementException>("Initialize average state.", __FILE_NAME__, __LINE__); }
+    inline void Initialize() { Error<NotImplementException>("Initialize average state."); }
 
-    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Update average state.", __FILE_NAME__, __LINE__); }
+    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Update average state."); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Constant update average state.", __FILE_NAME__, __LINE__); }
+    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+        Error<NotImplementException>("Constant update average state.");
+    }
 
-    inline ptr_t Finalize() { Error<NotImplementException>("Finalize average state.", __FILE_NAME__, __LINE__); }
+    inline ptr_t Finalize() { Error<NotImplementException>("Finalize average state."); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>(Format("Average state type size: {}", data_type.ToString()), __FILE_NAME__, __LINE__); }
+    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>(Format("Average state type size: {}", data_type.ToString())); }
 };
 
 template <>
@@ -45,7 +57,7 @@ public:
 
     inline void Update(const TinyIntT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -78,7 +90,7 @@ public:
 
     inline void Update(const SmallIntT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -112,7 +124,7 @@ public:
 
     inline void Update(const IntegerT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -146,7 +158,7 @@ public:
 
     inline void Update(const BigIntT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -180,7 +192,7 @@ public:
 
     inline void Update(const FloatT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -214,7 +226,7 @@ public:
 
     inline void Update(const DoubleT *__restrict input, SizeT idx) {
         if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_), __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-17.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ import parser;
 import stl;
 import global_resource_usage;
 import logger;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import bound_cast_func;
@@ -268,175 +278,175 @@ Value Value::MakeNull() {
 // Value getter
 template <>
 BooleanT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBoolean, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kBoolean, Format("Not matched type: {}", type_.ToString()));
     return value_.boolean;
 }
 
 template <>
 TinyIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTinyInt, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kTinyInt, Format("Not matched type: {}", type_.ToString()));
     return value_.tiny_int;
 }
 
 template <>
 SmallIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kSmallInt, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kSmallInt, Format("Not matched type: {}", type_.ToString()));
     return value_.small_int;
 }
 
 template <>
 IntegerT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kInteger, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kInteger, Format("Not matched type: {}", type_.ToString()));
     return value_.integer;
 }
 
 template <>
 BigIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBigInt, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kBigInt, Format("Not matched type: {}", type_.ToString()));
     return value_.big_int;
 }
 
 template <>
 HugeIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kHugeInt, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kHugeInt, Format("Not matched type: {}", type_.ToString()));
     return value_.huge_int;
 }
 
 template <>
 FloatT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kFloat, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kFloat, Format("Not matched type: {}", type_.ToString()));
     return value_.float32;
 }
 
 template <>
 DoubleT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDouble, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kDouble, Format("Not matched type: {}", type_.ToString()));
     return value_.float64;
 }
 
 template <>
 DecimalT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDecimal, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kDecimal, Format("Not matched type: {}", type_.ToString()));
     return value_.decimal;
 }
 
 template <>
 VarcharT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kVarchar, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kVarchar, Format("Not matched type: {}", type_.ToString()));
     return value_.varchar;
 }
 
 template <>
 DateT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDate, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kDate, Format("Not matched type: {}", type_.ToString()));
     return value_.date;
 }
 
 template <>
 TimeT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTime, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kTime, Format("Not matched type: {}", type_.ToString()));
     return value_.time;
 }
 
 template <>
 DateTimeT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDateTime, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kDateTime, Format("Not matched type: {}", type_.ToString()));
     return value_.datetime;
 }
 
 template <>
 TimestampT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()));
     return value_.timestamp;
 }
 
 template <>
 IntervalT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kInterval, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kInterval, Format("Not matched type: {}", type_.ToString()));
     return value_.interval;
 }
 
 template <>
 ArrayT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kArray, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kArray, Format("Not matched type: {}", type_.ToString()));
     return array;
 }
 
 template <>
 PointT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPoint, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kPoint, Format("Not matched type: {}", type_.ToString()));
     return value_.point;
 }
 
 template <>
 LineT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kLine, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kLine, Format("Not matched type: {}", type_.ToString()));
     return value_.line;
 }
 
 template <>
 LineSegT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kLineSeg, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kLineSeg, Format("Not matched type: {}", type_.ToString()));
     return value_.line_segment;
 }
 
 template <>
 BoxT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBox, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kBox, Format("Not matched type: {}", type_.ToString()));
     return value_.box;
 }
 
 template <>
 PathT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPath, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kPath, Format("Not matched type: {}", type_.ToString()));
     return value_.path;
 }
 
 template <>
 PolygonT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPolygon, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kPolygon, Format("Not matched type: {}", type_.ToString()));
     return value_.polygon;
 }
 
 template <>
 CircleT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kCircle, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kCircle, Format("Not matched type: {}", type_.ToString()));
     return value_.circle;
 }
 
 template <>
 BitmapT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBitmap, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kBitmap, Format("Not matched type: {}", type_.ToString()));
     return value_.bitmap;
 }
 
 template <>
 UuidT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kUuid, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kUuid, Format("Not matched type: {}", type_.ToString()));
     return value_.uuid;
 }
 
 template <>
 BlobT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBlob, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kBlob, Format("Not matched type: {}", type_.ToString()));
     return value_.blob;
 }
 
 template <>
 EmbeddingT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kEmbedding, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kEmbedding, Format("Not matched type: {}", type_.ToString()));
     return value_.embedding;
 }
 
 template <>
 RowT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kRowID, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kRowID, Format("Not matched type: {}", type_.ToString()));
     return value_.row;
 }
 
 template <>
 MixedT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kMixed, Format("Not matched type: {}", type_.ToString()), __FILE_NAME__, __LINE__);
+    Assert<TypeException>(type_.type() == LogicalType::kMixed, Format("Not matched type: {}", type_.ToString()));
     return value_.mixed_value;
 }
 
@@ -1115,7 +1125,7 @@ String Value::ToString() const {
             return ToStr(value_.float64);
         }
         case kDecimal: {
-            Error<NotImplementException>("Decimal", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Decimal");
             break;
         }
         case kVarchar: {
@@ -1125,76 +1135,76 @@ String Value::ToString() const {
             return value_.date.ToString();
         }
         case kTime: {
-            Error<NotImplementException>("Time", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Time");
             break;
         }
         case kDateTime: {
-            Error<NotImplementException>("DateTime", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("DateTime");
             break;
         }
         case kTimestamp: {
-            Error<NotImplementException>("Timestamp", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Timestamp");
             break;
         }
         case kInterval: {
             return value_.interval.ToString();
         }
         case kArray: {
-            Error<NotImplementException>("Array", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Array");
             break;
         }
         case kTuple: {
-            Error<NotImplementException>("Tuple", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Tuple");
             break;
         }
         case kPoint: {
-            Error<NotImplementException>("Point", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Point");
             break;
         }
         case kLine: {
-            Error<NotImplementException>("Line", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Line");
             break;
         }
         case kLineSeg: {
-            Error<NotImplementException>("Line Seg", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Line Seg");
             break;
         }
         case kBox: {
-            Error<NotImplementException>("Box", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Box");
             break;
         }
         case kPath: {
-            Error<NotImplementException>("Path", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Path");
             break;
         }
         case kPolygon: {
-            Error<NotImplementException>("Polygon", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Polygon");
             break;
         }
         case kCircle: {
-            Error<NotImplementException>("Circle", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Circle");
             break;
         }
         case kBitmap: {
-            Error<NotImplementException>("Bitmap", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Bitmap");
             break;
         }
         case kUuid: {
-            Error<NotImplementException>("Uuid", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Uuid");
             break;
         }
         case kBlob: {
             return value_.blob.ToString();
         }
         case kEmbedding: {
-            Error<NotImplementException>("Embedding", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Embedding");
             break;
         }
         case kRowID: {
             return value_.row.ToString();
         }
         case kMixed: {
-            Error<NotImplementException>("Embedding", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Embedding");
             break;
         }
         case kNull:
@@ -1204,6 +1214,6 @@ String Value::ToString() const {
         case kInvalid:
             break;
     }
-    Error<TypeException>("Unexpected error.", __FILE_NAME__, __LINE__);
+    Error<TypeException>("Unexpected error.");
 }
 } // namespace infinity

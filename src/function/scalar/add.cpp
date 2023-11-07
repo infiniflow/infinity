@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/9/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -22,7 +32,7 @@ namespace infinity {
 struct AddFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implemented", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implemented");
     }
 };
 
@@ -65,7 +75,7 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT + HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool AddFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
-    Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT");
 }
 
 // FloatT + FloatT = FloatT, and check overflow
@@ -91,7 +101,7 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal + Decimal = Decimal
 template <>
 inline bool AddFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
-    Error<NotImplementException>("Not implemented: Decimal + Decimal", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: Decimal + Decimal");
 }
 
 // Date + Interval
@@ -109,7 +119,7 @@ inline bool AddFunction::Run(IntervalT left, DateT right, DateT &result) {
 // DateTime + Interval
 template <>
 inline bool AddFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
-    Error<NotImplementException>("Not implemented: DateTimeT + IntervalT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: DateTimeT + IntervalT");
 }
 
 // Interval + DateTime
@@ -121,7 +131,7 @@ inline bool AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT &result)
 // TimestampT + Interval
 template <>
 inline bool AddFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
-    Error<NotImplementException>("Not implemented: TimestampT + IntervalT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: TimestampT + IntervalT");
 }
 
 // Interval + TimestampT
@@ -133,7 +143,7 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 // Mixed Type + i64
 template <>
 inline bool AddFunction::Run(MixedT left, BigIntT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + BigIntT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + BigIntT");
 }
 
 // i64 + Mixed Type
@@ -145,7 +155,7 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type + f64
 template <>
 inline bool AddFunction::Run(MixedT left, DoubleT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + DoubleT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + DoubleT");
 }
 
 // f64 + Mixed Type
@@ -157,7 +167,7 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type + Mixed Type
 template <>
 inline bool AddFunction::Run(MixedT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implemented: MixedT + MixedT", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implemented: MixedT + MixedT");
 }
 
 void RegisterAddFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

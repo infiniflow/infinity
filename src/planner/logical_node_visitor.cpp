@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-2-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -11,7 +21,7 @@ import stl;
 import base_expression;
 import logical_node_type;
 import infinity_exception;
-import infinity_assert;
+
 import third_party;
 import expression_type;
 import logical_node_type;
@@ -109,8 +119,8 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kUpdate: {
             auto &node = (LogicalUpdate &)op;
-            for(auto &update_column_pair: node.update_columns_) {
-                SharedPtr<BaseExpression>& expression = update_column_pair.second;
+            for (auto &update_column_pair : node.update_columns_) {
+                SharedPtr<BaseExpression> &expression = update_column_pair.second;
                 VisitExpression(expression);
             }
             break;
@@ -151,7 +161,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         }
         case ExpressionType::kCase: {
             auto case_expression = std::static_pointer_cast<CaseExpression>(expression);
-            Assert<PlannerException>(case_expression->arguments().empty(), "Case expression shouldn't have arguments", __FILE_NAME__, __LINE__);
+            Assert<PlannerException>(case_expression->arguments().empty(), "Case expression shouldn't have arguments");
             for (auto &case_expr : case_expression->CaseExpr()) {
                 VisitExpression(case_expr.then_expr_);
                 VisitExpression(case_expr.when_expr_);
@@ -179,11 +189,11 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         }
         case ExpressionType::kColumn: {
             auto column_expression = std::static_pointer_cast<ColumnExpression>(expression);
-            Assert<PlannerException>(column_expression->arguments().empty(), "Column expression shouldn't have arguments", __FILE_NAME__, __LINE__);
+            Assert<PlannerException>(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
 
             result = VisitReplace(column_expression);
             if (result.get() == nullptr) {
-                Error<PlannerException>("Visit column expression will always rewrite the expression", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("Visit column expression will always rewrite the expression");
             }
             expression = result;
             break;
@@ -203,7 +213,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kValue: {
             auto value_expression = std::static_pointer_cast<ValueExpression>(expression);
 
-            Assert<PlannerException>(value_expression->arguments().empty(), "Column expression shouldn't have arguments", __FILE_NAME__, __LINE__);
+            Assert<PlannerException>(value_expression->arguments().empty(), "Column expression shouldn't have arguments");
 
             result = VisitReplace(value_expression);
             if (result.get() != nullptr) {
@@ -230,7 +240,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
 
             result = VisitReplace(subquery_expression);
             if (result.get() != nullptr) {
-                Error<PlannerException>("Visit subquery expression will always rewrite the expression", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("Visit subquery expression will always rewrite the expression");
             }
             break;
         }
@@ -245,7 +255,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         default: {
-            Error<PlannerException>(Format("Unexpected expression type: {}", expression->Name()), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("Unexpected expression type: {}", expression->Name()));
         }
     }
 }

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/8/11.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -10,7 +20,7 @@ import parser;
 import bind_context;
 import column_expression;
 import function;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import function_set;
@@ -59,7 +69,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             return result;
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
-            Error<PlannerException>("Aggregate function is called in another aggregate function.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Aggregate function is called in another aggregate function.");
         }
     }
 
@@ -82,9 +92,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
         return result;
 
     } else {
-        Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()),
-                                __FILE_NAME__,
-                                __LINE__);
+        Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
     }
 }
 
@@ -93,7 +101,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            Error<PlannerException>("Aggregate function is called in another aggregate function.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Aggregate function is called in another aggregate function.");
         } else {
             this->binding_agg_func_ = true;
         }
@@ -124,7 +132,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 }
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Error<PlannerException>("KNN expression isn't supported in having clause", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("KNN expression isn't supported in having clause");
 }
 
 } // namespace infinity

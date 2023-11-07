@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-1.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -21,6 +31,7 @@ namespace infinity {
 export class PhysicalMergeKnn final : public PhysicalOperator {
 public:
     explicit PhysicalMergeKnn(u64 id,
+                              SharedPtr<BaseTableRef> table_ref,
                               SharedPtr<PhysicalOperator> left,
                               SharedPtr<Vector<String>> output_names,
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
@@ -28,9 +39,9 @@ public:
                               SharedPtr<BaseExpression> limit_expr,
                               OrderType order_by_type,
                               u64 knn_table_index)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)),
-          order_by_type_(order_by_type), knn_table_index_(knn_table_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id), table_ref_(table_ref), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)), order_by_type_(order_by_type),
+          knn_table_index_(knn_table_index) {}
 
     ~PhysicalMergeKnn() override = default;
 

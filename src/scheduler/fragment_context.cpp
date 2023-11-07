@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-8.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -9,7 +19,7 @@ module;
 import stl;
 import parser;
 import fragment_task;
-import infinity_assert;
+
 import infinity_exception;
 import operator_state;
 import physical_operator;
@@ -54,7 +64,7 @@ void MakeTableScanState(UniquePtr<InputState> &input_state,
     SourceState *source_state = task->source_state_.get();
 
     if (source_state->state_type_ != SourceStateType::kTableScan) {
-        Error<SchedulerException>("Expect table scan source state", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Expect table scan source state");
     }
 
     auto *table_scan_source_state = static_cast<TableScanSourceState *>(source_state);
@@ -75,12 +85,12 @@ void MakeKnnScanState(UniquePtr<InputState> &input_state,
                       FragmentTask *task) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kKnnScan) {
-        Error<SchedulerException>("Expect knn scan source state", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Expect knn scan source state");
     }
     auto *knn_scan_source_state = static_cast<KnnScanSourceState *>(source_state);
 
     if (physical_knn_scan->knn_expressions_.size() != 1) {
-        Error<SchedulerException>("Currently, we only support one knn column scenario", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Currently, we only support one knn column scenario");
     }
     KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_knn_scan->knn_expressions_[0].get());
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
@@ -89,7 +99,7 @@ void MakeKnnScanState(UniquePtr<InputState> &input_state,
 
     ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_knn_scan->limit_expression_.get());
     if (limit_expr == nullptr) {
-        Error<SchedulerException>("No limit in KNN select is not supported now", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("No limit in KNN select is not supported now");
     }
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
@@ -116,13 +126,13 @@ void MakeMergeKnnState(UniquePtr<InputState> &input_state,
                        PhysicalMergeKnn *physical_merge_knn,
                        FragmentTask *task) {
     // if (physical_merge_knn->knn_expressions_.size() != 1) {
-    //     Error<SchedulerException>("Currently, we only support one knn column scenario", __FILE_NAME__, __LINE__);
+    //     Error<SchedulerException>("Currently, we only support one knn column scenario");
     // }
     KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_merge_knn->knn_expressions_[0].get());
 
     ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_merge_knn->limit_expression_.get());
     if (limit_expr == nullptr) {
-        Error<SchedulerException>("No limit in KNN select is not supported now", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("No limit in KNN select is not supported now");
     }
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
@@ -143,16 +153,16 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
                    FragmentTask *task) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            Error<SchedulerException>("Invalid physical operator type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Invalid physical operator type");
             break;
         }
         case PhysicalOperatorType::kTableScan: {
             if (operator_id != physical_ops.size() - 1) {
-                Error<SchedulerException>("Table scan operator must be the first operator of the fragment.", __FILE_NAME__, __LINE__);
+                Error<SchedulerException>("Table scan operator must be the first operator of the fragment.");
             }
 
             if (operator_id == 0) {
-                Error<SchedulerException>("Table scan shouldn't be the last operator of the fragment.", __FILE_NAME__, __LINE__);
+                Error<SchedulerException>("Table scan shouldn't be the last operator of the fragment.");
             }
             auto physical_table_scan = static_cast<PhysicalTableScan *>(physical_ops[operator_id]);
             MakeTableScanState(input_state, output_state, physical_table_scan, task);
@@ -313,9 +323,7 @@ void MakeTaskState(UniquePtr<InputState> &input_state,
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kSink:
         case PhysicalOperatorType::kSource: {
-            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())),
-                                      __FILE_NAME__,
-                                      __LINE__);
+            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())));
             break;
         }
     }
@@ -325,11 +333,11 @@ void SetMergeKnnState(MergeKnnInputState &input_state,
                       PhysicalMergeKnn *physical_merge_knn,
                       const Vector<UniquePtr<PlanFragment>> &children_fragment) {
     if (children_fragment.size() != 1) {
-        Error<SchedulerException>("Merge Knn child number must 1", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Merge Knn child number must 1");
     }
     auto child_fragment = children_fragment[0]->GetContext();
     if (child_fragment->GetOperators().back()->operator_type() != PhysicalOperatorType::kKnnScan) {
-        Error<SchedulerException>("Merge Knn child must be KnnScan", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("Merge Knn child must be KnnScan");
     }
     auto real_parallel_count = child_fragment->Tasks().size();
     input_state.merge_knn_function_data_->total_parallel_n_ = real_parallel_count;
@@ -388,13 +396,13 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
-        Error<SchedulerException>("No operators in the fragment.", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("No operators in the fragment.");
     }
 
     UniquePtr<FragmentContext> fragment_context = nullptr;
     switch (fragment_ptr->GetFragmentType()) {
         case FragmentType::kInvalid: {
-            Error<SchedulerException>("Invalid fragment type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
             fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context);
@@ -459,7 +467,7 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
                             break;
                         }
                         case SinkStateType::kInvalid: {
-                            Error<SchedulerException>("Invalid sink operator state type.", __FILE_NAME__, __LINE__);
+                            Error<SchedulerException>("Invalid sink operator state type.");
                         }
                         default: {
                             break;
@@ -556,7 +564,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
     switch (fragment_type_) {
         case FragmentType::kInvalid: {
-            Error<SchedulerException>("Invalid fragment type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
             UniqueLock<std::mutex> locker(locker_);
@@ -580,20 +588,16 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     // Determine which type of source state.
     switch (first_operator->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            Error<SchedulerException>("Unexpected operator type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Unexpected operator type");
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             // Partition the hash range to each source state
@@ -614,9 +618,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kUpdate:
         case PhysicalOperatorType::kDelete: {
             Error<SchedulerException>(
-                Format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                __FILE_NAME__,
-                __LINE__);
+                Format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())));
         }
         case PhysicalOperatorType::kMergeParallelAggregate:
         case PhysicalOperatorType::kMergeHash:
@@ -626,15 +628,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeKnn: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should be serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should be serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != 1) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
@@ -652,22 +650,16 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kFlush: {
-            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())),
-                                      __FILE_NAME__,
-                                      __LINE__);
+            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
         }
         case PhysicalOperatorType::kTableScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             // Partition the hash range to each source state
@@ -681,15 +673,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             // Partition the hash range to each source state
@@ -719,15 +707,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != 1) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
@@ -735,9 +719,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
 
         default: {
-            Error<SchedulerException>(Format("Unexpected operator type: {}", PhysicalOperatorToString(first_operator->operator_type())),
-                                      __FILE_NAME__,
-                                      __LINE__);
+            Error<SchedulerException>(Format("Unexpected operator type: {}", PhysicalOperatorToString(first_operator->operator_type())));
         }
     }
 
@@ -746,7 +728,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     switch (last_operator->operator_type()) {
 
         case PhysicalOperatorType::kInvalid: {
-            Error<SchedulerException>("Unexpected operator type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Unexpected operator type");
         }
         case PhysicalOperatorType::kAggregate:
         case PhysicalOperatorType::kParallelAggregate:
@@ -756,15 +738,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kSort: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
@@ -782,15 +760,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != 1) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
@@ -802,15 +776,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ == FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
@@ -824,15 +794,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kIndexScan: {
             if (fragment_type_ == FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
@@ -846,7 +812,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kProjection: {
             if (fragment_type_ == FragmentType::kSerialMaterialize) {
                 if (tasks_.size() != 1) {
-                    Error<SchedulerException>("SerialMaterialize type fragment should only have 1 task.", __FILE_NAME__, __LINE__);
+                    Error<SchedulerException>("SerialMaterialize type fragment should only have 1 task.");
                 }
 
                 tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
@@ -855,9 +821,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             } else {
                 if (tasks_.size() != parallel_count) {
-                    Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                              __FILE_NAME__,
-                                              __LINE__);
+                    Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
                 }
 
                 for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
@@ -881,9 +845,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kFlush: {
-            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type())),
-                                      __FILE_NAME__,
-                                      __LINE__);
+            Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type())));
         }
         case PhysicalOperatorType::kDelete:
         case PhysicalOperatorType::kUpdate: {
@@ -897,15 +859,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kExport: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != 1) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
@@ -924,24 +882,18 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kDropView: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())),
-                    __FILE_NAME__,
-                    __LINE__);
+                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if (tasks_.size() != 1) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())),
-                                          __FILE_NAME__,
-                                          __LINE__);
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
             break;
         }
         default: {
-            Error<SchedulerException>(Format("Unexpected operator type: {}", PhysicalOperatorToString(last_operator->operator_type())),
-                                      __FILE_NAME__,
-                                      __LINE__);
+            Error<SchedulerException>(Format("Unexpected operator type: {}", PhysicalOperatorToString(last_operator->operator_type())));
         }
     }
 }
@@ -949,17 +901,17 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
     // Only one sink state
     if (tasks_.size() != 1) {
-        Error<SchedulerException>("There should be one sink state in serial materialized fragment", __FILE_NAME__, __LINE__);
+        Error<SchedulerException>("There should be one sink state in serial materialized fragment");
     }
     for (const auto &task : tasks_) {
         if (task->sink_state_->error_message_ != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(*task->sink_state_->error_message_);
         }
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {
         case SinkStateType::kInvalid: {
-            Error<SchedulerException>("Invalid sink state type", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Invalid sink state type");
             break;
         }
         case SinkStateType::kMaterialize: {
@@ -987,7 +939,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         case SinkStateType::kMessage: {
             auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
             if (message_sink_state->message_ == nullptr) {
-                Error<SchedulerException>("No response message", __FILE_NAME__, __LINE__);
+                Error<SchedulerException>("No response message");
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
@@ -1005,17 +957,17 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             return result_table;
         }
         case SinkStateType::kQueue: {
-            Error<SchedulerException>("Can't get result from Queue sink type.", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Can't get result from Queue sink type.");
         }
     }
-    Error<SchedulerException>("Unreachable", __FILE_NAME__, __LINE__);
+    Error<SchedulerException>("Unreachable");
 }
 
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
         if (task->sink_state_->error_message_ != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(*task->sink_state_->error_message_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
@@ -1042,7 +994,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 
     for (const auto &task : tasks_) {
         if (task->sink_state_->state_type() != SinkStateType::kMaterialize) {
-            Error<SchedulerException>("Parallel materialized fragment will only have common sink stte", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Parallel materialized fragment will only have common sink stte");
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
@@ -1062,7 +1014,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
         if (task->sink_state_->error_message_ != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_, __FILE_NAME__, __LINE__);
+            Error<ExecutorException>(*task->sink_state_->error_message_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
@@ -1089,7 +1041,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
 
     for (const auto &task : tasks_) {
         if (task->sink_state_->state_type() != SinkStateType::kMaterialize) {
-            Error<SchedulerException>("Parallel materialized fragment will only have common sink state", __FILE_NAME__, __LINE__);
+            Error<SchedulerException>("Parallel materialized fragment will only have common sink state");
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());

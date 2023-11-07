@@ -5,7 +5,7 @@ import byte_slice;
 import memory_chunk;
 import memory_pool;
 import file_writer;
-import infinity_assert;
+
 import infinity_exception;
 
 export module byte_slice_writer;

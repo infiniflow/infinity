@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-4.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -14,7 +24,7 @@ import logger;
 import third_party;
 import buffer_manager;
 import txn_state;
-import infinity_assert;
+
 import infinity_exception;
 
 module db_meta;
@@ -265,8 +275,8 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *b
 
 void DBMeta::MergeFrom(DBMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(IsEqual(*this->db_name_, *other.db_name_), "DBMeta::MergeFrom requires db_name_ match", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(IsEqual(*this->data_dir_, *other.data_dir_), "DBMeta::MergeFrom requires db_dir_ match", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(IsEqual(*this->db_name_, *other.db_name_), "DBMeta::MergeFrom requires db_name_ match");
+    Assert<StorageException>(IsEqual(*this->data_dir_, *other.data_dir_), "DBMeta::MergeFrom requires db_dir_ match");
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

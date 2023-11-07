@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-16.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -13,7 +23,7 @@ import storage;
 import resource_manager;
 import txn;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import logical_planner;
 import logical_node_type;
@@ -101,16 +111,16 @@ QueryResponse QueryContext::Query(const String &query) {
     parser_->Parse(query, parsed_result);
 
     if (parsed_result->IsError()) {
-        Error<PlannerException>(parsed_result->error_message_, __FILE_NAME__, __LINE__);
+        Error<PlannerException>(parsed_result->error_message_);
     }
 
-    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResponse query_response = QueryStatement(statement);
         return query_response;
     }
 
-    Error<NetworkException>("Not reachable", __FILE_NAME__, __LINE__);
+    Error<NetworkException>("Not reachable");
 }
 
 QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {

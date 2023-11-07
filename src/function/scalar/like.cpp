@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-3-18.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -64,7 +74,7 @@ bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, S
 struct LikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -81,7 +91,7 @@ inline void LikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 

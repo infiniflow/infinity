@@ -1,15 +1,24 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/30.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
-
 
 import std;
 import stl;
 import selection;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 import bitmask;
@@ -26,8 +35,8 @@ module column_vector;
 namespace infinity {
 
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
-    Assert<StorageException>(!initialized, "Column vector is already initialized.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!initialized, "Column vector is already initialized.");
+    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
 
     vector_type_ = other.vector_type_;
     data_type_size_ = data_type_->Size();
@@ -55,7 +64,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            Error<TypeException>("Unexpected data type for column vector.", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Unexpected data type for column vector.");
         }
         default: {
             vector_buffer_type = VectorBufferType::kStandard;
@@ -74,7 +83,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.");
             buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
         }
     }
@@ -212,13 +221,13 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kNull: {
-                Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Not implemented");
             }
             case kMissing: {
-                Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Not implemented");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Invalid data type");
             }
         }
     }
@@ -229,12 +238,9 @@ void ColumnVector::Initialize(const ColumnVector &other, SizeT start_idx, SizeT 
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    Assert<StorageException>(!initialized, "Column vector is already initialized.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(vector_type != ColumnVectorType::kInvalid,
-                             "Attempt to initialize column vector to invalid type.",
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<StorageException>(!initialized, "Column vector is already initialized.");
+    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
+    Assert<StorageException>(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.");
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
@@ -256,7 +262,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            Error<TypeException>("Unexpected data type for column vector.", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Unexpected data type for column vector.");
         }
         default: {
             vector_buffer_type = VectorBufferType::kStandard;
@@ -274,7 +280,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.");
             buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
         }
     }
@@ -284,9 +290,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
 
-    Assert<StorageException>(!initialized, "Column vector is already initialized.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(end_idx > start_idx, "End index should larger than start index.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(!initialized, "Column vector is already initialized.");
+    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
+    Assert<StorageException>(end_idx > start_idx, "End index should larger than start index.");
 
     vector_type_ = vector_type;
     capacity_ = end_idx - start_idx;
@@ -308,7 +314,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
         case LogicalType::kInvalid:
         case LogicalType::kNull:
         case LogicalType::kMissing: {
-            Error<TypeException>("Unexpected data type for column vector.", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Unexpected data type for column vector.");
         }
         default: {
             vector_buffer_type = VectorBufferType::kStandard;
@@ -327,7 +333,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.", __FILE_NAME__, __LINE__);
+            Assert<StorageException>(buffer_->heap_mgr_.get() == nullptr, "Vector heap should be null.");
             buffer_->heap_mgr_ = MakeUnique<StringHeapMgr>();
         }
     }
@@ -462,34 +468,34 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 break;
             }
             case kNull: {
-                Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Not implemented");
             }
             case kMissing: {
-                Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Not implemented");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<ExecutorException>("Invalid data type");
             }
         }
     }
 }
 
 void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(*data_type_ == *other.data_type_, "Data type isn't assigned.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
+    Assert<StorageException>(*data_type_ == *other.data_type_, "Data type isn't assigned.");
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(dst_idx == 0, "Attempting to access non-zero position of constant vector", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(dst_idx == 0, "Attempting to access non-zero position of constant vector");
         tail_index_ = 1;
     } else {
-        Assert<StorageException>(dst_idx < tail_index_, "Attempting to access invalid position of target column vector", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(dst_idx < tail_index_, "Attempting to access invalid position of target column vector");
     }
     if (other.vector_type_ == ColumnVectorType::kConstant) {
         // Copy from constant vector, only first row have value.
         src_idx = 0;
     }
 
-    Assert<StorageException>(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector");
     switch (data_type_->type()) {
         case kBoolean: {
             CopyRowFrom<BooleanT>(other.data(), src_idx, this->data(), dst_idx);
@@ -612,19 +618,19 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kNull: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
         case kMissing: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
         case kInvalid: {
-            Error<ExecutorException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented");
         }
     }
 }
 
 String ColumnVector::ToString() const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     StringStream ss;
     switch (data_type_->type()) {
         case kBoolean: {
@@ -718,10 +724,10 @@ String ColumnVector::ToString() const {
             break;
         }
         case kArray: {
-            Error<NotImplementException>("Not implemented.", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implemented.");
         }
         case kTuple: {
-            Error<NotImplementException>("Not implemented.", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not implemented.");
         }
         case kPoint: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
@@ -802,14 +808,14 @@ String ColumnVector::ToString() const {
             break;
         }
         default: {
-            Error<TypeException>("Unexpected type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Unexpected type");
         }
     }
     return ss.str();
 }
 
 String ColumnVector::ToString(SizeT row_index) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
 
     // Not valid, make a same data type with null indicator
     if (!(this->nulls_ptr_->IsTrue(row_index))) {
@@ -833,7 +839,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return ToStr(((BigIntT *)data_ptr_)[row_index]);
         }
         case kHugeInt: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kFloat: {
             return ToStr(((FloatT *)data_ptr_)[row_index]);
@@ -842,7 +848,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return ToStr(((DoubleT *)data_ptr_)[row_index]);
         }
         case kDecimal: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kVarchar: {
             VarcharT varchar_ptr = ((VarcharT *)data_ptr_)[row_index];
@@ -853,60 +859,60 @@ String ColumnVector::ToString(SizeT row_index) const {
             }
         }
         case kDate: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kTime: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kDateTime: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kTimestamp: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kInterval: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kArray: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kTuple: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kPoint: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kLine: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kLineSeg: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kBox: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kPath: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kPolygon: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kCircle: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kBitmap: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kUuid: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kBlob: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         case kEmbedding: {
-            //            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            //            Error<TypeException>("Not implemented");
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Not implemented");
             }
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr);
@@ -919,19 +925,19 @@ String ColumnVector::ToString(SizeT row_index) const {
             return (((RowT *)data_ptr_)[row_index]).ToString();
         }
         case kMixed: {
-            Error<TypeException>("Not implemented", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Not implemented");
         }
         default: {
-            Error<TypeException>("Attempt to access an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
         }
     }
 }
 
 Value ColumnVector::GetValue(SizeT index) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     if (index >= tail_index_) {
-        Error<TypeException>(Format("Attempt to access an invalid index of column vector: {}", ToStr(index)), __FILE_NAME__, __LINE__);
+        Error<TypeException>(Format("Attempt to access an invalid index of column vector: {}", ToStr(index)));
     }
 
     // Not valid, make a same data type with null indicator
@@ -990,7 +996,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeArray(((ArrayT *)data_ptr_)[index]);
         }
         case kTuple: {
-            Error<TypeException>("Shouldn't access tuple directly, a tuple is flatten as many columns", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Shouldn't access tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
             return Value::MakePoint(((PointT *)data_ptr_)[index]);
@@ -1033,25 +1039,23 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeMixedData(((MixedT *)data_ptr_)[index]);
         }
         default: {
-            Error<TypeException>("Attempt to access an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to access an unaccepted type");
             // Null/Missing/Invalid
         }
     }
 }
 
 void ColumnVector::SetValue(SizeT index, const Value &value) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     Assert<StorageException>(index <= tail_index_,
                              Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                                     ToStr(index),
                                     ToStr(tail_index_),
-                                    ToStr(capacity_)),
-                             __FILE_NAME__,
-                             __LINE__);
+                                    ToStr(capacity_)));
 
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
-    Assert<StorageException>(value.type() == *data_type_, "Attempt to store a different type value into column vector.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(value.type() == *data_type_, "Attempt to store a different type value into column vector.");
 
     // TODO: Check if the value is null, then set the column vector validity.
     switch (data_type_->type()) {
@@ -1132,7 +1136,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kTuple: {
-            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
             ((PointT *)data_ptr_)[index] = value.GetValue<PointT>();
@@ -1224,34 +1228,26 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         default: {
-            Error<TypeException>("Attempt to store an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to store an unaccepted type");
             // Null/Missing/Invalid
         }
     }
 }
 
 void ColumnVector::Finalize(SizeT index) {
-    Assert<StorageException>(index <= capacity_,
-                             Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_),
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     tail_index_ = index;
 }
 
 void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(index <= capacity_,
-                             Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_),
-                             __FILE_NAME__,
-                             __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
 
     Assert<StorageException>(index <= tail_index_,
                              Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                                     ToStr(index),
                                     ToStr(tail_index_),
-                                    ToStr(capacity_)),
-                             __FILE_NAME__,
-                             __LINE__);
+                                    ToStr(capacity_)));
 
     // We assume the value_ptr point to the same type data.
 
@@ -1334,7 +1330,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         case kTuple: {
-            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
             ((PointT *)data_ptr_)[index] = *(PointT *)(raw_ptr);
@@ -1430,7 +1426,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         default: {
-            Error<TypeException>("Attempt to store an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to store an unaccepted type");
             // Null/Missing/Invalid
         }
     }
@@ -1447,30 +1443,24 @@ void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
 }
 
 void ColumnVector::AppendValue(const Value &value) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1,
-                                 Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
 
     if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
     SetValue(tail_index_++, value);
 }
 
 void ColumnVector::AppendByRawPtr(const_ptr_t raw_ptr) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1,
-                                 Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_),
-                                 __FILE_NAME__,
-                                 __LINE__);
+        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
     }
     if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_), __FILE_NAME__, __LINE__);
+        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
     SetByRawPtr(tail_index_++, raw_ptr);
 }
@@ -1480,15 +1470,12 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     if (data_type_->type() == LogicalType::kEmbedding) {
         AppendByRawPtr(value_ptr);
     } else {
-        Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(initialized, "Column vector isn't initialized.");
         if (vector_type_ == ColumnVectorType::kConstant) {
-            Assert<StorageException>(tail_index_ < 1,
-                                     Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_),
-                                     __FILE_NAME__,
-                                     __LINE__);
+            Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
         }
         if (tail_index_ >= capacity_) {
-            Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_), __FILE_NAME__, __LINE__);
+            Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
         }
 
         SetByPtr(tail_index_++, value_ptr);
@@ -1504,15 +1491,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
 
     Assert<StorageException>(
         *this->data_type_ == *other.data_type_,
-        Format("Attempt to append column vector{} to column vector{}", other.data_type()->ToString(), this->data_type()->ToString()),
-        __FILE_NAME__,
-        __LINE__);
+        Format("Attempt to append column vector{} to column vector{}", other.data_type()->ToString(), this->data_type()->ToString()));
 
     Assert<StorageException>(
         this->tail_index_ + count <= this->capacity_,
-        Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_),
-        __FILE_NAME__,
-        __LINE__);
+        Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
 
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1647,11 +1630,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         case kArray: {
-            Error<NotImplementException>("Array copy", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Array copy");
             break;
         }
         case kTuple: {
-            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
             auto *src_ptr = (PointT *)(other.data_ptr_);
@@ -1807,7 +1790,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         default: {
-            Error<TypeException>("Attempt to store an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to store an unaccepted type");
             // Null/Missing/Invalid
         }
     }
@@ -1874,15 +1857,15 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
         case kMixed:
         case kNull: {
             LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
-            Error<NotImplementException>("Not supported now in append data in column", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Not supported now in append data in column");
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(Format("Invalid data type {}", data_type_->ToString()));
-            Error<StorageException>("Invalid data type", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Invalid data type");
         }
         default: {
-            Error<TypeException>("Attempt to store an unaccepted type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Attempt to store an unaccepted type");
             // Null/Missing/Invalid
         }
     }
@@ -1890,7 +1873,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 }
 
 SizeT ColumnVector::AppendWith(RowT from, SizeT row_count) {
-    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only RowID column vector supports this method", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only RowID column vector supports this method");
     if (row_count == 0) {
         return 0;
     }
@@ -1914,9 +1897,8 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
         LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
         Error<StorageException>(
-            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
+        ;
     }
     if (this->buffer_.get() != other.buffer_.get()) {
         this->buffer_ = other.buffer_;
@@ -1933,8 +1915,8 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
 }
 
 void ColumnVector::Reserve(SizeT new_capacity) {
-    Assert<StorageException>(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value");
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
 
     if (new_capacity <= capacity_)
         return;
@@ -2022,18 +2004,16 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
             return 0 == Memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
         }
         default: {
-            Error<NotImplementException>(Format("Not supported data_type {}", int(data_type_->type())), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Not supported data_type {}", int(data_type_->type())));
         }
     }
     return true;
 }
 
 i32 ColumnVector::GetSizeInBytes() const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     Assert<StorageException>(vector_type_ == ColumnVectorType::kFlat || vector_type_ == ColumnVectorType::kConstant,
-                             Format("Not supported vector_type {}", int(vector_type_)),
-                             __FILE_NAME__,
-                             __LINE__);
+                             Format("Not supported vector_type {}", int(vector_type_)));
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     switch (data_type_->type()) {
         case kBoolean:
@@ -2063,18 +2043,16 @@ i32 ColumnVector::GetSizeInBytes() const {
         }
         default:
             // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
     }
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
 }
 
 void ColumnVector::WriteAdv(char *&ptr) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
     Assert<NotImplementException>(vector_type_ == ColumnVectorType::kFlat || vector_type_ == ColumnVectorType::kConstant,
-                                  Format("Not supported vector_type {}", int(vector_type_)),
-                                  __FILE_NAME__,
-                                  __LINE__);
+                                  Format("Not supported vector_type {}", int(vector_type_)));
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     switch (data_type_->type()) {
@@ -2107,7 +2085,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         }
         default:
             // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
     }
     this->nulls_ptr_->WriteAdv(ptr);
     return;
@@ -2151,13 +2129,13 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         }
         default:
             // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()), __FILE_NAME__, __LINE__);
+            Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
     }
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading ColumnVector", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading ColumnVector");
     column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading ColumnVector", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading ColumnVector");
     return column_vector;
 }
 

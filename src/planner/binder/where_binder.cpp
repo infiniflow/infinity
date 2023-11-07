@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/8/12.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -9,7 +19,7 @@ import base_expression;
 import parser;
 import function;
 import bind_context;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import bind_alias_proxy;
@@ -41,12 +51,12 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
         result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
     }
 
-    Assert<PlannerException>(result.get() != nullptr, Format("Can't bind the expr: {}", expr.GetName()), __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(result.get() != nullptr, Format("Can't bind the expr: {}", expr.GetName()));
     return result;
 }
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
-    Assert<PlannerException>(func_type == FunctionType::kScalar, "Only scalar function are allowed in where clause", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(func_type == FunctionType::kScalar, "Only scalar function are allowed in where clause");
 }
 
 } // namespace infinity

@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/12/4.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +32,6 @@ class ColumnVectorDateTimeTest : public BaseTest {};
 
 TEST_F(ColumnVectorDateTimeTest, flat_date) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
@@ -147,7 +156,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
 
@@ -237,7 +245,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -274,7 +281,6 @@ TEST_F(ColumnVectorDateTimeTest, date_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDate);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -309,7 +315,6 @@ TEST_F(ColumnVectorDateTimeTest, date_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_time) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
@@ -434,7 +439,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
 
@@ -524,7 +528,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -561,7 +564,6 @@ TEST_F(ColumnVectorDateTimeTest, time_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -596,7 +598,6 @@ TEST_F(ColumnVectorDateTimeTest, time_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
@@ -725,7 +726,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
 
@@ -818,7 +818,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -857,7 +856,6 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kDateTime);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -894,7 +892,6 @@ TEST_F(ColumnVectorDateTimeTest, datetime_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
@@ -1023,7 +1020,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
 
@@ -1116,7 +1112,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1155,7 +1150,6 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_vector_select) {
 TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTimestamp);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1192,7 +1186,6 @@ TEST_F(ColumnVectorDateTimeTest, timestamp_column_slice_init) {
 
 TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
@@ -1320,7 +1313,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
 
@@ -1412,7 +1404,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1449,7 +1440,6 @@ TEST_F(ColumnVectorDateTimeTest, interval_column_vector_select) {
 
 TEST_F(ColumnVectorDateTimeTest, interval_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInterval);
     ColumnVector column_vector(data_type);

@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/12/4.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +32,6 @@ class ColumnVectorIntegerTest : public BaseTest {};
 
 TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
@@ -147,7 +156,6 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
 
@@ -235,7 +243,6 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -270,7 +277,6 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -304,7 +310,6 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
 
 TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
@@ -424,7 +429,6 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
 
@@ -512,7 +516,6 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -547,7 +550,6 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -581,7 +583,6 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
 
 TEST_F(ColumnVectorIntegerTest, flat_int) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
@@ -701,7 +702,6 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
 
@@ -789,7 +789,6 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
 TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -824,7 +823,6 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -858,7 +856,6 @@ TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
 
 TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
@@ -978,7 +975,6 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
 
@@ -1066,7 +1062,6 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1101,7 +1096,6 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
 TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1135,7 +1129,6 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
 
 TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
@@ -1257,7 +1250,6 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
 
@@ -1347,7 +1339,6 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
 TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1384,7 +1375,6 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
 
 TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
     ColumnVector column_vector(data_type);

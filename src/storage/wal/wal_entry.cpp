@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <fstream>
@@ -6,7 +20,7 @@ import stl;
 import serialize;
 import table_def;
 import data_block;
-import infinity_assert;
+
 import infinity_exception;
 import parser;
 import third_party;
@@ -100,10 +114,10 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             break;
         }
         default:
-            Error<StorageException>(Format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)), __FILE_NAME__, __LINE__);
+            Error<StorageException>(Format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
     max_bytes = ptr_end - ptr;
-    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalCmd", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalCmd");
     return cmd;
 }
 
@@ -332,7 +346,7 @@ void WalEntry::WriteAdv(char *&ptr) const {
 
 SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
-    Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry");
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     auto *header = (WalEntryHeader *)ptr;
     entry->size = header->size;
@@ -352,13 +366,13 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (SizeT i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
-        Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry", __FILE_NAME__, __LINE__);
+        Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry");
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds.push_back(cmd);
     }
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
-    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalEntry", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalEntry");
     return entry;
 }
 
@@ -405,9 +419,10 @@ String WalEntry::ToString() const {
         }
         if (cmd->GetType() == WalCommandType::IMPORT) {
             auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
+            ss << "db name: " << import_cmd->db_name << std::endl;
+            ss << "table name: " << import_cmd->table_name << std::endl;
             ss << "segment dir: " << import_cmd->segment_dir << std::endl;
             ss << "segment id: " << import_cmd->segment_id << std::endl;
-            ss << "table name: " << import_cmd->table_name << std::endl;
             ss << "block entries size: " << import_cmd->block_entries_size << std::endl;
         }
         if (cmd->GetType() == WalCommandType::APPEND) {
@@ -447,14 +462,14 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::DROP_INDEX:
             return "DROP_INDEX";
         default:
-            Error<StorageException>("Unknown command type", __FILE_NAME__, __LINE__);
+            Error<StorageException>("Unknown command type");
     }
 }
 
 void WalEntryIterator::Init() {
     std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
-        Error<StorageException>("Wal open failed", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Wal open failed");
     }
     wal_size_ = ifs.tellg();
     Vector<char> buf(wal_size_);

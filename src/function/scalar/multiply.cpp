@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/9/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -8,7 +18,7 @@ module;
 
 import stl;
 import new_catalog;
-import infinity_assert;
+
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -22,7 +32,7 @@ namespace infinity {
 struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
-        Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+        Error<NotImplementException>("Not implement");
     }
 };
 
@@ -85,13 +95,13 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal * Decimal = Decimal
 template <>
 inline bool MulFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // Mixed Type * i64
 template <>
 inline bool MulFunction::Run(MixedT left, BigIntT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // i64 * Mixed Type
@@ -103,7 +113,7 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type * f64
 template <>
 inline bool MulFunction::Run(MixedT left, DoubleT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 // f64 * Mixed Type
@@ -115,7 +125,7 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type * Mixed Type
 template <>
 inline bool MulFunction::Run(MixedT left, MixedT right, MixedT &result) {
-    Error<NotImplementException>("Not implement", __FILE_NAME__, __LINE__);
+    Error<NotImplementException>("Not implement");
 }
 
 void RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

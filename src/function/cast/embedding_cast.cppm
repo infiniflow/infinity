@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 22-12-24.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -10,7 +20,7 @@ import vector_buffer;
 import bound_cast_func;
 import parser;
 import column_vector_cast;
-import infinity_assert;
+
 import infinity_exception;
 import third_party;
 import logger;
@@ -27,7 +37,7 @@ export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()), __FILE_NAME__, __LINE__);
+            Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
         }
     }
 }
@@ -40,9 +50,7 @@ struct EmbeddingTryCastToVarlen {
                            const DataType &target_type,
                            const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()),
-            __FILE_NAME__,
-            __LINE__);
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
     }
 };
 
@@ -53,9 +61,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           const SharedPtr<ColumnVector> &vector_ptr) {
     Assert<TypeException>(source_type.type() == LogicalType::kEmbedding,
-                          Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()),
-                          __FILE_NAME__,
-                          __LINE__);
+                          Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
 
@@ -71,9 +77,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer.",
-                              __FILE_NAME__,
-                              __LINE__);
+                              "Varchar column vector should use MemoryVectorBuffer.");
 
         // Set varchar prefix
         Memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);

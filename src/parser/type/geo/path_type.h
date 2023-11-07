@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/30.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -12,9 +22,9 @@ namespace infinity {
 // Path type is a variable length type
 struct PathType {
 public:
-    char* ptr{nullptr};
+    char *ptr{nullptr};
     uint32_t point_count{0}; // 65535 point are the max point count
-    int32_t closed{0};      // Is a closed polygon?
+    int32_t closed{0};       // Is a closed polygon?
 
 public:
     PathType() = default;

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/10/30.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -14,7 +24,7 @@ enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, k
 
 struct EmbeddingType {
 public:
-    char* ptr = nullptr;
+    char *ptr = nullptr;
 
     static size_t embedding_type_width[];
 
@@ -92,7 +102,7 @@ private:
         std::stringstream ss;
         ParserAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.");
 
-            int64_t *array = (int64_t *)(embedding.ptr);
+        int64_t *array = (int64_t *)(embedding.ptr);
 
         for (size_t i = 0; i < dimension / 8; ++i) {
             ss << std::bitset<8>(array[i]);
@@ -101,7 +111,7 @@ private:
     }
 
 public:
-    inline explicit EmbeddingType(char* &&from_ptr) : ptr(from_ptr) { from_ptr = nullptr; }
+    inline explicit EmbeddingType(char *&&from_ptr) : ptr(from_ptr) { from_ptr = nullptr; }
 
     inline EmbeddingType(EmbeddingDataType type, size_t dimension) {
         size_t mem_size = EmbeddingSize(type, dimension);
@@ -125,7 +135,7 @@ public:
         if (this == &other)
             return *this;
         if (ptr != nullptr) {
-//            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
+            //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
             //            Reset();
         }
         ptr = other.ptr;
@@ -136,7 +146,7 @@ public:
         if (this == &other)
             return *this;
         if (ptr != nullptr) {
-//            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
+            //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
             //            Reset();
         }
         ptr = other.ptr;

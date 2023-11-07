@@ -2,7 +2,7 @@ module;
 
 import stl;
 import byte_slice;
-import infinity_assert;
+
 import infinity_exception;
 
 module skiplist_reader;
@@ -19,8 +19,8 @@ SkipListReader::SkipListReader(const SkipListReader &other)
 SkipListReader::~SkipListReader() {}
 
 void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
-    Assert<StorageException>(start <= byte_slice_list->GetTotalSize(), "start <= byte_slice_list->GetTotalSize().", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(end <= byte_slice_list->GetTotalSize(), "end <= byte_slice_list->GetTotalSize().", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(start <= byte_slice_list->GetTotalSize(), "start <= byte_slice_list->GetTotalSize().");
+    Assert<StorageException>(end <= byte_slice_list->GetTotalSize(), "end <= byte_slice_list->GetTotalSize().");
     start_ = start;
     end_ = end;
     byte_slice_reader_.Open(const_cast<ByteSliceList *>(byte_slice_list));
@@ -28,8 +28,8 @@ void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 e
 }
 
 void SkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end) {
-    Assert<StorageException>(start <= byte_slice->size_, "start <= byte_slice->size_.", __FILE_NAME__, __LINE__);
-    Assert<StorageException>(end <= byte_slice->size_, "end <= byte_slice->size_.", __FILE_NAME__, __LINE__);
+    Assert<StorageException>(start <= byte_slice->size_, "start <= byte_slice->size_.");
+    Assert<StorageException>(end <= byte_slice->size_, "end <= byte_slice->size_.");
 
     start_ = start;
     end_ = end;

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-17.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -14,7 +24,7 @@ import new_catalog;
 import knn_scan_data;
 import block_index;
 import global_block_id;
-import infinity_assert;
+
 import infinity_exception;
 import block_entry;
 import column_buffer;
@@ -34,7 +44,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     if (knn_column_ids.size() != 1) {
-        Error<ExecutorException>("More than one knn column", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("More than one knn column");
     }
 
     SizeT knn_column_id = knn_column_ids[0];
@@ -51,7 +61,7 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
     switch (knn_scan_function_data_ptr->knn_distance_type_) {
 
         case KnnDistanceType::kInvalid: {
-            Error<ExecutorException>("Invalid Knn distance type", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2: {
             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -72,10 +82,8 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
-                                                 row_id[id].segment_id_,
-                                                 row_id[id].segment_offset_,
-                                                 top_distance[id]));
+                                LOG_TRACE(
+                                    Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_, top_distance[id]));
                             }
                         }
                     }
@@ -200,13 +208,13 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid element data type");
                 }
             }
             break;
         }
         case KnnDistanceType::kCosine: {
-            Error<ExecutorException>("Not implemented Cosine", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Cosine");
         }
         case KnnDistanceType::kInnerProduct: {
             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -227,10 +235,8 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
 
                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
-                                LOG_TRACE(Format("Row offset: {}: {}, distance {}",
-                                                 row_id[id].segment_id_,
-                                                 row_id[id].segment_offset_,
-                                                 top_distance[id]));
+                                LOG_TRACE(
+                                    Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_, top_distance[id]));
                             }
                         }
                     }
@@ -355,13 +361,13 @@ void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_
                     break;
                 }
                 case EmbeddingDataType::kElemInvalid: {
-                    Error<ExecutorException>("Invalid element data type", __FILE_NAME__, __LINE__);
+                    Error<ExecutorException>("Invalid element data type");
                 }
             }
             break;
         }
         case KnnDistanceType::kHamming: {
-            Error<ExecutorException>("Not implemented Hamming", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Not implemented Hamming");
         }
     }
 

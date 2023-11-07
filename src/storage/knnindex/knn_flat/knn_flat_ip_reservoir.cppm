@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-9-27.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -12,7 +22,7 @@ import knn_partition;
 import faiss;
 import parser;
 import third_party;
-import infinity_assert;
+
 import infinity_exception;
 import default_values;
 
@@ -50,7 +60,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPReservoir isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("KnnFlatIPReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -89,14 +99,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return reservoir_result_handler_->heap_dis_tab + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return reservoir_result_handler_->heap_ids_tab + idx * this->top_k_;
     }

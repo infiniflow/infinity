@@ -1,12 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/11/6.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
 import stl;
 import global_resource_usage;
-import infinity_assert;
+
 import infinity_exception;
 
 module bitmask_buffer;
@@ -30,7 +40,7 @@ BitmaskBuffer::BitmaskBuffer() { GlobalResourceUsage::IncrObjectCount(); }
 BitmaskBuffer::~BitmaskBuffer() { GlobalResourceUsage::DecrObjectCount(); }
 
 void BitmaskBuffer::Initialize(SizeT count) {
-    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.", __FILE_NAME__, __LINE__);
+    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length
     data_ptr_ = MakeUnique<u64[]>(unit_count);
@@ -40,7 +50,7 @@ void BitmaskBuffer::Initialize(SizeT count) {
 }
 
 void BitmaskBuffer::Initialize(const u64 *input_ptr, SizeT count) {
-    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.", __FILE_NAME__, __LINE__);
+    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length
     data_ptr_ = MakeUnique<u64[]>(unit_count);

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-11-1.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -35,7 +45,7 @@ QueryResult Database::CreateTable(const String &table_name,
     QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -56,7 +66,7 @@ QueryResult Database::DropTable(const String &table_name, const DropTableOptions
     QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -74,7 +84,7 @@ QueryResult Database::ListTables() {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
@@ -92,26 +102,26 @@ QueryResult Database::DescribeTable(const String &db_name) {
     QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
     QueryResult result;
     result.result_table_ = response.result_;
-    if(response.result_msg_.get() != nullptr) {
+    if (response.result_msg_.get() != nullptr) {
         result.error_message_ = response.result_msg_;
         result.error_code_ = -1;
     }
 }
 
 SharedPtr<Table> Database::GetTable(const String &table_name) {
-        UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
-        query_context_ptr->Init(InfinityContext::instance().config(),
-                                InfinityContext::instance().fragment_scheduler(),
-                                InfinityContext::instance().storage(),
-                                InfinityContext::instance().resource_manager());
-        UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-        command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
-        QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
-        if(response.result_msg_.get() == nullptr) {
-            return MakeShared<Table>(table_name, session_);
-        } else {
-            return nullptr;
-        }
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager());
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
+    QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
+    if (response.result_msg_.get() == nullptr) {
+        return MakeShared<Table>(table_name, session_);
+    } else {
+        return nullptr;
+    }
 }
 
 } // namespace infinity

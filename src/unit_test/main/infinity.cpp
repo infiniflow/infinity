@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-10-31.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
@@ -114,7 +124,7 @@ TEST_F(InfinityTest, test1) {
         CreateTableOptions create_table_opts;
 
         SizeT column_count = 2;
-//        Vector<SharedPtr<ColumnDef>> columns;
+        //        Vector<SharedPtr<ColumnDef>> columns;
         Vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
@@ -159,16 +169,16 @@ TEST_F(InfinityTest, test1) {
     }
 
     {
-        SharedPtr <Database> db1_ptr = infinity->GetDatabase("default");
+        SharedPtr<Database> db1_ptr = infinity->GetDatabase("default");
         EXPECT_EQ(db1_ptr->db_name(), "default");
 
         CreateTableOptions create_table_opts;
 
         SizeT column_count = 1;
-        Vector<ColumnDef*> column_defs;
+        Vector<ColumnDef *> column_defs;
         column_defs.reserve(column_count);
 
-        SharedPtr<DataType>col_type = MakeShared<DataType>(LogicalType::kBigInt);
+        SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kBigInt);
         String col1_name = "col1";
         auto col_def = new ColumnDef(0, col_type, col1_name, HashSet<ConstraintType>());
         column_defs.emplace_back(col_def);
@@ -178,43 +188,43 @@ TEST_F(InfinityTest, test1) {
         col_def = new ColumnDef(1, col_type, col2_name, HashSet<ConstraintType>());
         column_defs.emplace_back(col_def);
 
-        QueryResult result = db1_ptr->CreateTable("table1", column_defs, Vector<TableConstraint*>(), create_table_opts);
+        QueryResult result = db1_ptr->CreateTable("table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
         SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
         EXPECT_NE(table1, nullptr);
 
-//        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
+        //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
 
-        Vector<String>* columns = new Vector<String>();
+        Vector<String> *columns = new Vector<String>();
         columns->emplace_back(col1_name);
         columns->emplace_back(col2_name);
 
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->emplace_back(new Vector<ParsedExpr *>());
 
-        ConstantExpr* value1 = new ConstantExpr(LiteralType::kInteger);
+        ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
         value1->integer_value_ = 11;
         values->at(0)->emplace_back(value1);
 
-        ConstantExpr* value2 = new ConstantExpr(LiteralType::kInteger);
+        ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
         value2->integer_value_ = 22;
         values->at(0)->emplace_back(value2);
         table1->Insert(columns, values);
 
-//        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
-//                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
-//                           ParsedExpr *filter,
-//                           Vector<ParsedExpr *> *output_columns,
-//                           ParsedExpr *offset,
-//                           ParsedExpr *limit);
+        //        QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
+        //                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
+        //                           ParsedExpr *filter,
+        //                           Vector<ParsedExpr *> *output_columns,
+        //                           ParsedExpr *offset,
+        //                           ParsedExpr *limit);
 
-        Vector<ParsedExpr *>* output_columns = new Vector<ParsedExpr *>();
-        ColumnExpr* col1 = new ColumnExpr();
+        Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+        ColumnExpr *col1 = new ColumnExpr();
         col1->names_.emplace_back(col1_name);
         output_columns->emplace_back(col1);
 
-        ColumnExpr* col2 = new ColumnExpr();
+        ColumnExpr *col2 = new ColumnExpr();
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 

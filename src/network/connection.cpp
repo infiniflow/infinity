@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/20.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -11,7 +21,7 @@ import boost;
 import stl;
 import session;
 import infinity_exception;
-import infinity_assert;
+
 import pg_message;
 import logger;
 import query_context;
@@ -30,7 +40,6 @@ Connection::Connection(AsioIOService &io_service)
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
-    // FIXME
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     HandleConnection();
@@ -106,7 +115,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            Error<NetworkException>("Unknown command type", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("Unknown PG command type");
         }
     }
 }
@@ -209,7 +218,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    Error<TypeException>("Not embedding type", __FILE_NAME__, __LINE__);
+                    Error<TypeException>("Not embedding type");
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -251,13 +260,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                        Error<TypeException>("Invalid embedding data type");
                     }
                 }
                 break;
             }
             default: {
-                Error<TypeException>("Unexpected type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Unexpected type");
             }
         }
 

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by jinhai on 23-6-4.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -11,7 +21,7 @@ import third_party;
 import parser;
 import table_collection_entry;
 import table_collection_meta;
-import infinity_assert;
+
 import infinity_exception;
 import segment_entry;
 import data_block;
@@ -83,14 +93,14 @@ UniquePtr<String> TxnTableStore::CreateIndexFile(u32 segment_id, SharedPtr<Index
 }
 
 UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
-//    auto &rows = delete_state_.rows_;
+    //    auto &rows = delete_state_.rows_;
     HashMap<u32, HashMap<u16, Vector<RowID>>> &row_hash_table = delete_state_.rows_;
-    for(auto row_id: row_ids) {
+    for (auto row_id : row_ids) {
         auto seg_it = row_hash_table.find(row_id.segment_id_);
-        if(seg_it != row_hash_table.end()) {
+        if (seg_it != row_hash_table.end()) {
             u16 block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
             auto block_it = seg_it->second.find(block_id);
-            if(block_it != seg_it->second.end()) {
+            if (block_it != seg_it->second.end()) {
                 block_it->second.push_back(row_id);
             } else {
                 seg_it->second.emplace(block_id, Vector<RowID>{row_id});
@@ -124,7 +134,7 @@ void TxnTableStore::PrepareCommit() {
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
-    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", this->table_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->table_collection_name_));
     Txn *txn_ptr = (Txn *)txn_;
     TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
 
@@ -139,7 +149,7 @@ void TxnTableStore::PrepareCommit() {
 
     TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
 
-    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", this->table_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->table_collection_name_));
 }
 
 /**

@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/7/28.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -13,7 +23,7 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
-import infinity_assert;
+
 import infinity_exception;
 import data_block;
 import column_vector;
@@ -27,8 +37,8 @@ void PhysicalCrossProduct::Init() {}
 void PhysicalCrossProduct::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
 void PhysicalCrossProduct::Execute(QueryContext *query_context) {
-    Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.", __FILE_NAME__, __LINE__);
-    Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.", __FILE_NAME__, __LINE__);
+    Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.");
+    Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.");
     left_table_ = left_->output();
     right_table_ = right_->output();
 

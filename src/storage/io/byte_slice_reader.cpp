@@ -2,7 +2,7 @@ module;
 
 import stl;
 import byte_slice;
-import infinity_assert;
+
 import infinity_exception;
 
 module byte_slice_reader;
@@ -24,7 +24,7 @@ void ByteSliceReader::Open(ByteSliceList *slice_list) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Read past EOF");
     }
 }
 
@@ -35,7 +35,7 @@ void ByteSliceReader::Open(ByteSlice *slice) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        Error<StorageException>("Read past EOF", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Read past EOF");
     }
 }
 
@@ -107,7 +107,7 @@ SizeT ByteSliceReader::ReadMayCopy(void *&value, SizeT len) {
 SizeT ByteSliceReader::Seek(SizeT offset) {
     if (offset < global_offset_) {
         // fmt::format("invalid offset value: seek offset = {}, State: list length = {}, offset = {}", offset, GetSize(), global_offset_));
-        Error<StorageException>("Invalide offset value", __FILE_NAME__, __LINE__);
+        Error<StorageException>("Invalide offset value");
     }
 
     SizeT len = offset - global_offset_;

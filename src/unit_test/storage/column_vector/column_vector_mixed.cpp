@@ -1,11 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/12/11.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-import infinity_assert;
+
 import logger;
 import column_vector;
 import value;
@@ -22,7 +32,6 @@ class ColumnVectorMixedTest : public BaseTest {};
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -159,7 +168,6 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -202,7 +210,6 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -243,7 +250,6 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -380,7 +386,6 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -423,7 +428,6 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -464,7 +468,6 @@ TEST_F(ColumnVectorMixedTest, mixed_float_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -611,7 +614,6 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -659,7 +661,6 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -705,7 +706,6 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -885,7 +885,6 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -946,7 +945,6 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1005,7 +1003,6 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1134,7 +1131,6 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
 TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1173,7 +1169,6 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1210,7 +1205,6 @@ TEST_F(ColumnVectorMixedTest, mixed_null_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -1339,7 +1333,6 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1378,7 +1371,6 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -1415,7 +1407,6 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -2338,7 +2329,6 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -2671,7 +2661,6 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_vector_select) {
 TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -3002,7 +2991,6 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_column_slice_init) {
 
 TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
@@ -4057,7 +4045,6 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
     using namespace infinity;
 
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
@@ -4440,7 +4427,6 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_vector_select) {
 
 TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
     using namespace infinity;
-
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kMixed);
     ColumnVector column_vector(data_type);

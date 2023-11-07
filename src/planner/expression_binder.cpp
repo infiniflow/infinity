@@ -1,6 +1,16 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Created by JinHai on 2022/8/11.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
 
@@ -9,7 +19,7 @@ module;
 
 import stl;
 import parser;
-import infinity_assert;
+
 import infinity_exception;
 import bind_context;
 import third_party;
@@ -51,7 +61,7 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     // Call implemented BuildExpression
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
-        Assert<PlannerException>(result.get() != nullptr, Format("Fail to bind the expression: {}", expr.GetName()), __FILE_NAME__, __LINE__);
+        Assert<PlannerException>(result.get() != nullptr, Format("Fail to bind the expression: {}", expr.GetName()));
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }
@@ -96,7 +106,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
             return BuildKnnExpr((const KnnExpr &)expr, bind_context_ptr, depth, root);
         }
         default: {
-            Error<PlannerException>("Unexpected expression type.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unexpected expression type.");
         }
     }
 
@@ -177,7 +187,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
-                Error<PlannerException>("Invalid time unit", __FILE_NAME__, __LINE__);
+                Error<PlannerException>("Invalid time unit");
             }
             interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
@@ -188,10 +198,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kIntegerArray: {
-            Error<PlannerException>("Unexpected literal type: integer array.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unexpected literal type: integer array.");
         }
         case LiteralType::kDoubleArray: {
-            Error<PlannerException>("Unexpected literal type: float array.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Unexpected literal type: float array.");
         }
         case LiteralType::kNull: {
             Value value = Value::MakeNull();
@@ -199,7 +209,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
     }
 
-    Error<PlannerException>("Unreachable.", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Unreachable.");
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
@@ -269,9 +279,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             return aggregate_function_ptr;
         }
         case FunctionType::kTable:
-            Error<PlannerException>("Table function shouldn't be bound here.", __FILE_NAME__, __LINE__);
+            Error<PlannerException>("Table function shouldn't be bound here.");
         default: {
-            Error<PlannerException>(Format("Unknown function type: {}", function_set_ptr->name()), __FILE_NAME__, __LINE__);
+            Error<PlannerException>(Format("Unknown function type: {}", function_set_ptr->name()));
         }
     }
 }
@@ -282,8 +292,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    Assert<PlannerException>(expr.case_check_array_, "No when and then expression", __FILE_NAME__, __LINE__);
-    Assert<PlannerException>(!expr.case_check_array_->empty(), "No when and then expression list", __FILE_NAME__, __LINE__);
+    Assert<PlannerException>(expr.case_check_array_, "No when and then expression");
+    Assert<PlannerException>(!expr.case_check_array_->empty(), "No when and then expression list");
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
     // two kinds of case statement, please check:
@@ -373,7 +383,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        Error<PlannerException>("Knn expression expect a column expression", __FILE_NAME__, __LINE__);
+        Error<PlannerException>("Knn expression expect a column expression");
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     arguments.emplace_back(expr_ptr);
@@ -423,11 +433,11 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            Error<NotImplementException>("Any", __FILE_NAME__, __LINE__);
+            Error<NotImplementException>("Any");
         }
     }
 
-    Error<PlannerException>("Unreachable", __FILE_NAME__, __LINE__);
+    Error<PlannerException>("Unreachable");
 }
 //
 //// Bind window function.
