@@ -482,9 +482,20 @@ void Clustering::train_encoded(
             std::vector<float> hassign(k);
 
             size_t k_frozen = frozen_centroids ? n_input_centroids : 0;
-            compute_centroids(d, k, nx, k_frozen, x, codec, assign.get(), weights, hassign.data(), centroids.data());
+            compute_centroids(
+                    d,
+                    k,
+                    nx,
+                    k_frozen,
+                    x,
+                    codec,
+                    assign.get(),
+                    weights,
+                    hassign.data(),
+                    centroids.data());
 
-            int nsplit = split_clusters(d, k, nx, k_frozen, hassign.data(), centroids.data());
+            int nsplit = split_clusters(
+                    d, k, nx, k_frozen, hassign.data(), centroids.data());
 
             // collect statistics
             ClusteringIterationStats stats = {
