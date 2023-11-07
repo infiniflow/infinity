@@ -509,35 +509,6 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowInputStat
     output_state->output_.emplace_back(Move(output_block_ptr));
 }
 
-void PhysicalShow::Execute(QueryContext *query_context) {
-
-    switch (scan_type_) {
-        case ShowType::kShowTables: {
-            ExecuteShowTable(query_context);
-            break;
-        }
-        case ShowType::kShowColumn: {
-            ExecuteShowColumns(query_context);
-            break;
-        }
-        case ShowType::kShowIndexes: {
-            Error<ExecutorException>("Not implemented the deprecated call of execute");
-            break;
-        }
-        case ShowType::kShowViews: {
-            ExecuteShowViews(query_context);
-            break;
-        }
-        case ShowType::kIntermediate: {
-            Error<ExecutorException>("Intermediate type of chunk scan isn't supported now.");
-            break;
-        }
-        default: {
-            Error<ExecutorException>("Invalid chunk scan type");
-        }
-    }
-}
-
 void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
     // Define output table schema
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);

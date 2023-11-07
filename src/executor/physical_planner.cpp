@@ -573,6 +573,7 @@ SharedPtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<Logi
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
     Error<NotImplementException>("BuildViewScan");
+    return nullptr;
 }
 
 SharedPtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {

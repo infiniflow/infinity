@@ -40,8 +40,6 @@ namespace infinity {
 
 void PhysicalKnnScan::Init() {}
 
-void PhysicalKnnScan::Execute(QueryContext *query_context) {}
-
 void PhysicalKnnScan::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto *knn_scan_input_state = static_cast<KnnScanInputState *>(input_state);
     auto *knn_scan_output_state = static_cast<KnnScanOutputState *>(output_state);

@@ -29,8 +29,6 @@ namespace infinity {
 
 void PhysicalCommand::Init() {}
 
-void PhysicalCommand::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated execute function should not be called."); }
-
 void PhysicalCommand::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     switch (command_info_->type()) {
         case CommandType::kUse: {

@@ -72,8 +72,6 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, InputState *input_st
     }
 }
 
-void PhysicalMergeKnn::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated function"); }
-
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state) {
     auto &merge_knn_data = *input_state->merge_knn_function_data_;

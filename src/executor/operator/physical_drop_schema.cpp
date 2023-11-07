@@ -48,20 +48,4 @@ void PhysicalDropSchema::Execute(QueryContext *query_context, InputState *input_
     output_state->SetComplete();
 }
 
-void PhysicalDropSchema::Execute(QueryContext *query_context) {
-
-    Txn *txn = query_context->GetTxn();
-    EntryResult res = txn->DropDatabase(*schema_name_, conflict_type_);
-    if (res.err_.get() != nullptr) {
-        Error<ExecutorException>(*res.err_);
-    }
-
-    // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
-}
-
 } // namespace infinity

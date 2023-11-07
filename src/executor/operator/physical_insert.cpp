@@ -90,6 +90,4 @@ void PhysicalInsert::Execute(QueryContext *query_context, InputState *input_stat
     output_state->SetComplete();
 }
 
-void PhysicalInsert::Execute(QueryContext *query_context) { Execute(query_context, nullptr, nullptr); }
-
 } // namespace infinity

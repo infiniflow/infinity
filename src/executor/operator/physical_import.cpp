@@ -89,8 +89,6 @@ void PhysicalImport::Execute(QueryContext *query_context, InputState *input_stat
     output_state->SetComplete();
 }
 
-void PhysicalImport::Execute(QueryContext *query_context) {}
-
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportInputState *input_state, ImportOutputState *output_state) {
     if (table_collection_entry_->columns_.size() != 1) {
         Error<ExecutorException>("FVECS file must have only one column.");

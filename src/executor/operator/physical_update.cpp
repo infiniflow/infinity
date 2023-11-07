@@ -80,6 +80,4 @@ void PhysicalUpdate::Execute(QueryContext *query_context, InputState *input_stat
         output_state->SetComplete();
 }
 
-void PhysicalUpdate::Execute(QueryContext *query_context) {}
-
 } // namespace infinity

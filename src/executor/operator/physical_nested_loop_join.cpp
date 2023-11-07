@@ -28,8 +28,6 @@ void PhysicalNestedLoopJoin::Init() {}
 
 void PhysicalNestedLoopJoin::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void PhysicalNestedLoopJoin::Execute(QueryContext *query_context) {}
-
 SharedPtr<Vector<String>> PhysicalNestedLoopJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
     SharedPtr<Vector<String>> left_output_names = left_->GetOutputNames();

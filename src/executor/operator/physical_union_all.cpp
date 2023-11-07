@@ -25,6 +25,4 @@ void PhysicalUnionAll::Init() {}
 
 void PhysicalUnionAll::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void PhysicalUnionAll::Execute(QueryContext *query_context) {}
-
 } // namespace infinity

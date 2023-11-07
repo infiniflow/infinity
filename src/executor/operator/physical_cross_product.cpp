@@ -34,9 +34,9 @@ namespace infinity {
 
 void PhysicalCrossProduct::Init() {}
 
-void PhysicalCrossProduct::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
+void PhysicalCrossProduct::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
+#if 0
 
-void PhysicalCrossProduct::Execute(QueryContext *query_context) {
     Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.");
     Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.");
     left_table_ = left_->output();
@@ -115,6 +115,8 @@ void PhysicalCrossProduct::Execute(QueryContext *query_context) {
     }
 
     output_ = cross_product_table;
+
+#endif
 }
 
 SharedPtr<Vector<String>> PhysicalCrossProduct::GetOutputNames() const {

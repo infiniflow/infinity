@@ -28,9 +28,8 @@ import infinity_exception;
 module physical_create_index;
 
 namespace infinity {
-void PhysicalCreateIndex::Init() {}
 
-void PhysicalCreateIndex::Execute(QueryContext *query_context) { Error<NotImplementException>("The old execute function is to be deleted."); }
+void PhysicalCreateIndex::Init() {}
 
 void PhysicalCreateIndex::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto create_index_input_state = static_cast<CreateIndexInputState *>(input_state);

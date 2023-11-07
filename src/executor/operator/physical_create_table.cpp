@@ -59,16 +59,4 @@ void PhysicalCreateTable::Execute(QueryContext *query_context, InputState *input
     output_state->SetComplete();
 }
 
-void PhysicalCreateTable::Execute(QueryContext *query_context) {
-    //    ResponseError("Execute: Create table: " + table_def_ptr_->name());
-    Txn *txn = query_context->GetTxn();
-    txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
-
-    // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-
-    output_ = DataTable::MakeResultTable(column_defs);
-}
-
 } // namespace infinity

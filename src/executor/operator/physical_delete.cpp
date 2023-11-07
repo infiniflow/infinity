@@ -58,6 +58,4 @@ void PhysicalDelete::Execute(QueryContext *query_context, InputState *input_stat
         output_state->SetComplete();
 }
 
-void PhysicalDelete::Execute(QueryContext *query_context) {}
-
 } // namespace infinity

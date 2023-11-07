@@ -29,8 +29,6 @@ namespace infinity {
 
 void PhysicalDropIndex::Init() {}
 
-void PhysicalDropIndex::Execute(QueryContext *query_context) { Error<NotImplementException>("Deprecated execute function should not be called."); }
-
 void PhysicalDropIndex::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
     auto txn = query_context->GetTxn();
     auto res = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
@@ -46,4 +44,5 @@ void PhysicalDropIndex::Execute(QueryContext *query_context, InputState *input_s
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     output_state->SetComplete();
 }
+
 } // namespace infinity

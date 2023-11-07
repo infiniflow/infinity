@@ -25,6 +25,4 @@ void PhysicalMergeSort::Init() {}
 
 void PhysicalMergeSort::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void PhysicalMergeSort::Execute(QueryContext *query_context) {}
-
 } // namespace infinity

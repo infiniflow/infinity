@@ -25,6 +25,4 @@ void PhysicalTop::Init() {}
 
 void PhysicalTop::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
 
-void PhysicalTop::Execute(QueryContext *query_context) {}
-
 } // namespace infinity
