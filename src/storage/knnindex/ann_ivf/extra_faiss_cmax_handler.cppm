@@ -2,8 +2,8 @@
 // Created by yzq on 11/7/23.
 //
 module;
-#include <algorithm>
-#include <random>
+#include <cmath>
+#include <limits>
 export module extra_faiss_cmax_handler;
 
 namespace infinity {

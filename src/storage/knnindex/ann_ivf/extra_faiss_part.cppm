@@ -5,7 +5,7 @@ module;
 #include "faiss/impl/ResultHandler.h"
 #include "faiss/utils/Heap.h"
 import faiss;
-export module extra_faiss_part;
+export module extra_faiss_part_deprecated;
 namespace infinity {
 export template <typename T>
 using FaissSingleBestResultHandler = faiss::SingleBestResultHandler<T>;

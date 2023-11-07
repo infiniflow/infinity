@@ -11,9 +11,10 @@ module;
 #endif
 import faiss;
 import third_party;
-import extra_faiss_part;
+import extra_faiss_part_deprecated;
 import extra_sgemm;
-export module extra_faiss_f;
+
+export module extra_faiss_f_deprecated;
 namespace infinity {
 // FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float fvec_norm_L2sqr(const float *x, size_t d) {

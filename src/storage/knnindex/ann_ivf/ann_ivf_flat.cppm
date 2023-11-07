@@ -3,14 +3,13 @@ module;
 #include <algorithm>
 #include <iostream>
 import stl;
-import knn_heap;
+// import knn_heap;
 import knn_result_handler;
 import knn_distance;
-import knn_partition;
+// import knn_partition;
 import faiss;
 import parser;
 import third_party;
-import infinity_assert;
 import infinity_exception;
 import index_data;
 import kmeans_partition;
@@ -39,42 +38,27 @@ public:
     }
 
     static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(i32 dimension, SizeT vector_count, const DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
+    CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num, u32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, segment_id, index_data.get());
         return index_data;
     }
 
     static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(i32 dimension, SizeT train_count, DistType *train_ptr, SizeT vector_count, DistType *vectors_ptr, i32 partition_num, i32 segment_id) {
+    CreateIndex(u32 dimension, u32 train_count, DistType *train_ptr, u32 vector_count, DistType *vectors_ptr, u32 partition_num, u32 segment_id) {
         auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, segment_id, index_data.get());
         return index_data;
     }
-
-    /*
-    static SharedPtr<IVFFlatIndexData<DistType>> CreateIndex_use_faiss(i32 dimension,
-                                                                       SizeT train_count,
-                                                                       DistType *train_ptr,
-                                                                       SizeT vector_count,
-                                                                       DistType *vectors_ptr,
-                                                                       i32 partition_num,
-                                                                       i32 segment_id) {
-        auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
-        k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, partition_num, index_data->centroids_.data());
-        add_data_to_partition_faiss(dimension, vector_count, vectors_ptr, partition_num, segment_id, index_data.get());
-        return index_data;
-    }
-    */
 
     void Begin() final {
         if (begin_ || this->query_count_ == 0) {
             return;
         }
 
-        for (SizeT i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_heap_result_handler_->begin(i);
         }
 
@@ -99,14 +83,14 @@ public:
         // TODO:remove this counter
         i32 counter_1 = 0, counter_10 = 0, counter_100 = 0;
         if (n_probes == 1) {
-            Vector<i32> assign_centroid_ids(this->query_count_);
+            Vector<u32> assign_centroid_ids(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
                                                this->query_count_,
                                                this->queries_,
                                                base_ivf->partition_num_,
                                                base_ivf->centroids_.data(),
                                                assign_centroid_ids.data());
-            for (i32 i = 0; i < this->query_count_; i++) {
+            for (u64 i = 0; i < this->query_count_; i++) {
                 if constexpr (b_debug_info) {
                     if (i == 1472) {
                         i32 selected_centroid = assign_centroid_ids[i];
@@ -120,8 +104,8 @@ public:
                                   << std::endl;
                     }
                 }
-                i32 selected_centroid = assign_centroid_ids[i];
-                i32 contain_nums = base_ivf->ids_[selected_centroid].size();
+                u32 selected_centroid = assign_centroid_ids[i];
+                u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                 if constexpr (b_debug_info) {
                     if (contain_nums < 100) {
                         // output i, selected_centroid, contain_nums, with description
@@ -143,31 +127,31 @@ public:
                 }
                 const DistType *x_i = this->queries_ + i * this->dimension_;
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
+                for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                     single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
                 }
             }
         } else {
             if constexpr (true) {
-                using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, i32>>;
+                using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, u32>>;
                 using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
-                for (i64 i = 0; i < this->query_count_; i++) {
+                for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
                     Vector<DistType> centroid_dists(n_probes);
-                    Vector<i32> centroid_ids(n_probes);
+                    Vector<u32> centroid_ids(n_probes);
                     HeapResultHandler_INT centroid_heap_result(1, centroid_dists.data(), centroid_ids.data(), n_probes);
                     HeapSingleHandler_INT centroid_single_heap_result(centroid_heap_result, 1);
                     centroid_single_heap_result.begin(0);
-                    for (i32 j = 0; j < base_ivf->partition_num_; j++) {
+                    for (u32 j = 0; j < base_ivf->partition_num_; j++) {
                         const DistType *y_j = base_ivf->centroids_.data() + j * this->dimension_;
                         DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                         centroid_single_heap_result.add_result(ip, j, 0);
                     }
                     centroid_single_heap_result.end(0);
-                    for (i32 k = 0; k < n_probes; k++) {
-                        const i32 selected_centroid = centroid_ids[k];
-                        const i32 contain_nums = base_ivf->ids_[selected_centroid].size();
+                    for (u32 k = 0; k < n_probes; k++) {
+                        const u32 selected_centroid = centroid_ids[k];
+                        const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                         if (contain_nums < 100) {
                             // output i, k, selected_centroid, contain_nums, with description
                             std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid
@@ -187,7 +171,7 @@ public:
                             std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
                         }
                         const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                        for (i32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
+                        for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                             DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                             single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
                         }
@@ -210,7 +194,7 @@ public:
         if (!begin_)
             return;
 
-        for (i32 i = 0; i < this->query_count_; ++i) {
+        for (u64 i = 0; i < this->query_count_; ++i) {
             single_heap_result_handler_->end(i);
         }
 
