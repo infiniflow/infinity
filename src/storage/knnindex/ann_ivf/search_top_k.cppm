@@ -7,7 +7,7 @@ module;
 
 import stl;
 // import extra_faiss_rewrite;
-import extra_faiss_cmax_handler;
+// import extra_faiss_cmax_handler;
 import vector_distance;
 import search_top_1_sgemm;
 // import some_simd_functions;
