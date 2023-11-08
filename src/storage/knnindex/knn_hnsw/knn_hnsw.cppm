@@ -81,7 +81,7 @@ private:
     const SizeT loaded_vertex_n_;
     const char *loaded_layers_;
 
-    // VisitedMemPool visited_pool_;
+    VisitedMemPool visited_pool_;
 
 private:
     const DataType *GetData(VertexType vertex_idx) const {
@@ -207,10 +207,10 @@ public:
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
-        // auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
-        // auto &visited = *pooled_visited;
+        auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
+        auto &visited = *pooled_visited;
 
-        Vector<bool> visited(cur_vertex_n_, false);
+        // Vector<bool> visited(cur_vertex_n_, false);
         visited[enter_point] = true;
 
         while (!candidate.empty()) {
@@ -220,16 +220,16 @@ public:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = GetNeighbors(c_idx, layer_idx);
-            // TODO:: store GetData address
             // TODO:: prefetch visited
 #ifdef USE_SSE
-            _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
-            _mm_prefetch(GetData(neighbors_p[1]), _MM_HINT_T0);
+            if (neighbor_size) [[likely]]
+                _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
 #endif
             for (int i = 0; i < neighbor_size; ++i) {
                 VertexType n_idx = neighbors_p[i];
 #ifdef USE_SSE
-                _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+                if (i + 1 < neighbor_size) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
 #endif
                 if (visited[n_idx]) {
                     continue;
@@ -239,9 +239,6 @@ public:
                 dist = dist_func_(query, GetData(n_idx), dim_);
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
-#ifdef USE_SSE
-                    _mm_prefetch(GetData(result.top().second), _MM_HINT_T0);
-#endif
                     result.emplace(dist, n_idx);
                     if (result.size() > candidate_n) {
                         result.pop();
@@ -259,8 +256,16 @@ public:
         while (check) {
             check = false;
             const auto [neighbors_p, neighbor_size] = GetNeighbors(cur_p, layer_idx);
+#ifdef USE_SSE
+            if (neighbor_size) [[likely]]
+                _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
+#endif
             for (int i = 0; i < neighbor_size; ++i) {
-                VertexType n_idx = neighbors_p[i]; // TODO:: prefetch
+#ifdef USE_SSE
+                if (i + 1 < neighbor_size) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+#endif
+                VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func_(query, GetData(n_idx), dim_);
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
@@ -290,8 +295,16 @@ public:
             const auto &[minus_c_dist, c_idx] = candidates.top();
             const DataType *c_data = GetData(c_idx);
             bool check = true;
-            for (VertexType r_idx : result) {
-                DataType cr_dist = dist_func_(c_data, GetData(r_idx), dim_);
+#ifdef USE_SSE
+            if (!result.empty()) [[likely]]
+                _mm_prefetch(GetData(result[0]), _MM_HINT_T0);
+#endif
+            for (SizeT i = 0; i < result.size(); ++i) {
+#ifdef USE_SSE
+                if (i + 1 < result.size()) [[likely]]
+                    _mm_prefetch(GetData(result[i + 1]), _MM_HINT_T0);
+#endif
+                DataType cr_dist = dist_func_(c_data, GetData(result[i]), dim_);
                 if (cr_dist < -minus_c_dist) {
                     check = false;
                     break;
@@ -311,7 +324,7 @@ public:
         *q_neighbor_size_p = q_neighbor_size;
         std::reverse_copy(neighbors.begin(), neighbors.end(), q_neighbors_p); // TODO:: memcopy
         for (int i = 0; i < q_neighbor_size; ++i) {
-            VertexType n_idx = q_neighbors_p[i]; // TODO:: prefetch
+            VertexType n_idx = q_neighbors_p[i];
             auto [n_neighbors_p, n_neighbor_size_p] = GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
             SizeT Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
@@ -320,15 +333,25 @@ public:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            DistHeap candidates; // TODO:: use pool
             const DataType *n_data = GetData(n_idx);
             DataType n_dist = dist_func_(n_data, GetData(vertex_idx), dim_);
-            candidates.emplace(-n_dist, vertex_idx);
+
+            Vector<PDV> tmp;
+            tmp.reserve(n_neighbor_size + 1);
+            tmp.emplace_back(-n_dist, vertex_idx);
+#ifdef USE_SSE
+            if (n_neighbor_size) [[likely]]
+                _mm_prefetch(GetData(n_neighbors_p[0]), _MM_HINT_T0);
+#endif
             for (int i = 0; i < n_neighbor_size; ++i) {
-                VertexType nn_idx = n_neighbors_p[i];
-                DataType nn_dist = dist_func_(GetData(nn_idx), n_data, dim_);
-                candidates.emplace(-nn_dist, nn_idx);
+#ifdef USE_SSE
+                if (i + 1 < n_neighbor_size) [[likely]]
+                    _mm_prefetch(GetData(n_neighbors_p[i + 1]), _MM_HINT_T0);
+#endif
+                tmp.emplace_back(-dist_func_(n_data, GetData(n_neighbors_p[i]), dim_), n_neighbors_p[i]);
             }
+            DistHeap candidates(tmp.begin(), tmp.end());
+
             Vector<VertexType> shrink_neighbors = SelectNeighborsHeuristic(candidates, Mmax); // write in memory
             *n_neighbor_size_p = shrink_neighbors.size();
             std::reverse_copy(shrink_neighbors.begin(), shrink_neighbors.end(), n_neighbors_p); // memcpy
@@ -345,7 +368,7 @@ public:
         }
         for (i32 cur_layer = Min(q_layer, max_layer_); cur_layer >= 0; --cur_layer) {
             DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_); // TODO:: use pool
-            DistHeap candidates;                                                          // TODO:: use pool
+            DistHeap candidates;
             while (!search_result.empty()) {
                 const auto &[dist, idx] = search_result.top();
                 candidates.emplace(-dist, idx);
