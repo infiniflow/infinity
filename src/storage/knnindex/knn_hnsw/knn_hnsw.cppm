@@ -19,6 +19,8 @@ module;
 #include <random>
 #include <algorithm>
 
+import std;
+import cmp;
 import stl;
 import dist_func;
 import file_system;
@@ -31,6 +33,7 @@ namespace infinity {
 
 export template <typename DataType>
 class KnnHnsw {
+public:
     static SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
 
     using LabelType = u32;
@@ -38,10 +41,8 @@ class KnnHnsw {
     using VertexType = i32;
 
     using PDV = Pair<DataType, VertexType>;
-    struct CompareByFirst {
-        constexpr bool operator()(const PDV &lhs, const PDV &rhs) const { return lhs.first < rhs.first; }
-    };
-    using DistHeap = Heap<PDV, CompareByFirst>;
+    using CMP = CompareByFirst<DataType, VertexType>;
+    using DistHeap = Heap<PDV, CMP>;
 
     using VertexListSize = i32;
     using LayerSize = i32;
@@ -81,7 +82,11 @@ private:
     const SizeT loaded_vertex_n_;
     const char *loaded_layers_;
 
-    VisitedMemPool visited_pool_;
+    // VisitedMemPool visited_pool_;
+
+    // using DistHeapPool = MaxHeapMemPool<PDV, CMP>;
+    // using PooledDistHeap = DistHeapPool::PooledT;
+    // DistHeapPool dist_heap_pool_;
 
 private:
     const DataType *GetData(VertexType vertex_idx) const {
@@ -207,10 +212,10 @@ public:
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
-        auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
-        auto &visited = *pooled_visited;
+        // auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
+        // Vector<bool> &visited = *pooled_visited;
 
-        // Vector<bool> visited(cur_vertex_n_, false);
+        Vector<bool> visited(cur_vertex_n_, false);
         visited[enter_point] = true;
 
         while (!candidate.empty()) {
@@ -223,13 +228,13 @@ public:
             // TODO:: prefetch visited
 #ifdef USE_SSE
             if (neighbor_size) [[likely]]
-                _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
+                _mm_prefetch(GetData(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
-            for (int i = 0; i < neighbor_size; ++i) {
+            for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
 #ifdef USE_SSE
-                if (i + 1 < neighbor_size) [[likely]]
-                    _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+                if (i - 1 >= 0) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
                 if (visited[n_idx]) {
                     continue;
@@ -258,12 +263,12 @@ public:
             const auto [neighbors_p, neighbor_size] = GetNeighbors(cur_p, layer_idx);
 #ifdef USE_SSE
             if (neighbor_size) [[likely]]
-                _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
+                _mm_prefetch(GetData(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
-            for (int i = 0; i < neighbor_size; ++i) {
+            for (int i = neighbor_size - 1; i >= 0; --i) {
 #ifdef USE_SSE
-                if (i + 1 < neighbor_size) [[likely]]
-                    _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+                if (i - 1 >= 0) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func_(query, GetData(n_idx), dim_);
@@ -281,48 +286,44 @@ public:
     // result distance is increasing
     // TODO:: write directly into query's neighbors
 
-    Vector<VertexType> SelectNeighborsHeuristic(DistHeap &candidates, SizeT M) const {
-        Vector<VertexType> result;
+    void SelectNeighborsHeuristic(DistHeap &candidates, SizeT M, VertexType *result_p, VertexListSize *result_size_p) const {
+        VertexListSize result_size = 0;
         if (SizeT c_size = candidates.size(); c_size < M) {
-            result.reserve(c_size);
             while (!candidates.empty()) {
-                result.emplace_back(candidates.top().second);
+                result_p[result_size++] = candidates.top().second;
                 candidates.pop();
             }
-            return result;
-        }                                                  // TODO:: reserve
-        while (!candidates.empty() && result.size() < M) { // TODO:: store result.size() into variable
-            const auto &[minus_c_dist, c_idx] = candidates.top();
-            const DataType *c_data = GetData(c_idx);
-            bool check = true;
+        } else {
+            while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
+                const auto &[minus_c_dist, c_idx] = candidates.top();
+                const DataType *c_data = GetData(c_idx);
+                bool check = true;
 #ifdef USE_SSE
-            if (!result.empty()) [[likely]]
-                _mm_prefetch(GetData(result[0]), _MM_HINT_T0);
+                if (!result_size) [[likely]]
+                    _mm_prefetch(GetData(result_p[0]), _MM_HINT_T0);
 #endif
-            for (SizeT i = 0; i < result.size(); ++i) {
+                for (SizeT i = 0; i < result_size; ++i) {
 #ifdef USE_SSE
-                if (i + 1 < result.size()) [[likely]]
-                    _mm_prefetch(GetData(result[i + 1]), _MM_HINT_T0);
+                    if (i + 1 < result_size) [[likely]]
+                        _mm_prefetch(GetData(result_p[i + 1]), _MM_HINT_T0);
 #endif
-                DataType cr_dist = dist_func_(c_data, GetData(result[i]), dim_);
-                if (cr_dist < -minus_c_dist) {
-                    check = false;
-                    break;
+                    VertexType r_idx = result_p[i];
+                    DataType cr_dist = dist_func_(c_data, GetData(r_idx), dim_);
+                    if (cr_dist < -minus_c_dist) {
+                        check = false;
+                        break;
+                    }
                 }
+                if (check) {
+                    result_p[result_size++] = c_idx;
+                }
+                candidates.pop();
             }
-            if (check) {
-                result.emplace_back(c_idx);
-            }
-            candidates.pop();
         }
-        return result;
+        *result_size_p = result_size;
     }
 
-    void ConnectNeighbors(VertexType vertex_idx, const Vector<VertexType> &neighbors, i32 layer_idx) {
-        const auto [q_neighbors_p, q_neighbor_size_p] = GetNeighborsMut(vertex_idx, layer_idx);
-        VertexListSize q_neighbor_size = neighbors.size();
-        *q_neighbor_size_p = q_neighbor_size;
-        std::reverse_copy(neighbors.begin(), neighbors.end(), q_neighbors_p); // TODO:: memcopy
+    void ConnectNeighbors(VertexType vertex_idx, const VertexType *q_neighbors_p, VertexListSize q_neighbor_size, i32 layer_idx) {
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
             auto [n_neighbors_p, n_neighbor_size_p] = GetNeighborsMut(n_idx, layer_idx);
@@ -350,11 +351,9 @@ public:
 #endif
                 tmp.emplace_back(-dist_func_(n_data, GetData(n_neighbors_p[i]), dim_), n_neighbors_p[i]);
             }
-            DistHeap candidates(tmp.begin(), tmp.end());
 
-            Vector<VertexType> shrink_neighbors = SelectNeighborsHeuristic(candidates, Mmax); // write in memory
-            *n_neighbor_size_p = shrink_neighbors.size();
-            std::reverse_copy(shrink_neighbors.begin(), shrink_neighbors.end(), n_neighbors_p); // memcpy
+            DistHeap candidates(tmp.begin(), tmp.end());
+            SelectNeighborsHeuristic(candidates, Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
         }
     }
 
@@ -374,9 +373,10 @@ public:
                 candidates.emplace(-dist, idx);
                 search_result.pop();
             }
-            Vector<VertexType> neighbors = SelectNeighborsHeuristic(candidates, M_);
-            ep = neighbors.front();
-            ConnectNeighbors(q_vertex, neighbors, cur_layer);
+            const auto [q_neighbors_p, q_neighbor_size_p] = GetNeighborsMut(q_vertex, cur_layer);
+            SelectNeighborsHeuristic(candidates, M_, q_neighbors_p, q_neighbor_size_p);
+            ep = q_neighbors_p[0];
+            ConnectNeighbors(q_vertex, q_neighbors_p, *q_neighbor_size_p, cur_layer);
         }
         if (q_layer > max_layer_) {
             max_layer_ = q_layer;
