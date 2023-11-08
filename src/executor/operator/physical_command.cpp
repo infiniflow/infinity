@@ -34,16 +34,24 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kUse: {
             UseCmd *use_command = (UseCmd *)(command_info_.get());
             query_context->set_current_schema(use_command->db_name());
-            operator_state->SetComplete();
+            break;
+        }
+        case CommandType::kSet: {
+            SetCmd *set_command = (SetCmd *)(command_info_.get());
+            break;
+        }
+        case CommandType::kExport: {
+            ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             break;
         }
         case CommandType::kCheckTable: {
-            operator_state->SetComplete();
+
             break;
         }
         case CommandType::kInvalid: {
             Error<ExecutorException>("Invalid command type.");
         }
     }
+    operator_state->SetComplete();
 }
 } // namespace infinity
