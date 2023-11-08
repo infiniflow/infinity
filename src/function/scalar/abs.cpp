@@ -14,7 +14,8 @@
 
 module;
 
-import std;
+#include <numeric>
+
 import stl;
 import new_catalog;
 

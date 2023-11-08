@@ -737,7 +737,7 @@ void Value::CopyUnionValue(const Value &other) {
         }
         case kArray:
         case kTuple: {
-            // std::vector copy-assignment
+            // vector copy-assignment
             array = other.array;
             break;
         }

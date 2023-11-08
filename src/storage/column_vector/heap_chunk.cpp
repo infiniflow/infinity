@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 import stl;
 
 import infinity_exception;
@@ -57,14 +57,14 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
 }
 
 String StringHeapMgr::Stats() const {
-    StringStream ss;
+    std::stringstream ss;
     SizeT chunk_count = chunks_.size();
-    ss << "Chunk count: " << chunk_count << std::endl;
+    ss << "Chunk count: " << chunk_count <<std::endl;;
     ;
     for (SizeT idx = 0; idx < chunk_count; ++idx) {
         auto &chunk = chunks_[idx];
         ss << "Chunk id: " << idx++ << ", Capacity: " << chunk->capacity_ << ", Current pos: " << chunk->current_offset_
-           << ", object count: " << chunk->object_count_ << std::endl;
+           << ", object count: " << chunk->object_count_ <<std::endl;;
         ;
     }
     return ss.str();

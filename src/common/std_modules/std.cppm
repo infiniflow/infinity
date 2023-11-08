@@ -1,5 +1,5 @@
 # 1 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std;
+export module std_lib;
 
 export import :string;
 export import :iostream;

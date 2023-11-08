@@ -48,6 +48,7 @@ export module stl;
 export namespace std {
 
 using std::experimental::source_location;
+//using std::stringstream;
 
 }
 
@@ -259,6 +260,11 @@ export {
     template <typename T, typename... Args>
     inline UniquePtr<T> MakeUnique(Args && ...args) {
         return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T, typename U>
+    inline constexpr Pair<T, U> MakePair(T&& first, U&& second) {
+        return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
 
     // DB Type

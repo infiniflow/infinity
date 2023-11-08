@@ -139,7 +139,7 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
     }
 
     block_version_ = MakeUnique<BlockVersion>(row_capacity_);
-    block_version_->created_.emplace_back(std::make_pair(min_row_ts_, row_count_));
+    block_version_->created_.emplace_back(MakePair((u64)min_row_ts_, (i32)row_count_));
 }
 
 Pair<u16, u16> BlockEntry::VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin) {

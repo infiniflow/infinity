@@ -3,8 +3,8 @@ module;
 #include <iomanip>
 #include <fstream>
 # 5 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:iostream;
-export namespace std {
+export module std_lib:iostream;
+export namespace std_lib {
     using std::cout;
     using std::cerr;
     using std::endl;

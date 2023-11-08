@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 import stl;
 import bound_select_statement;
 import expression_type;

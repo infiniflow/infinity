@@ -1,8 +1,8 @@
 module;
 #include <functional>
 # 3 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:functional;
-export namespace std {
+export module std_lib:functional;
+export namespace std_lib {
     using std::function;
     using std::invoke;
     using std::bind;
@@ -24,7 +24,7 @@ export namespace std {
 }
 
 // FIXME: We couldn't export noninline-const variables.
-namespace std::placeholders {
+namespace std_lib::placeholders {
     export inline constexpr decltype(std::placeholders::_1) _1_placeholder = std::placeholders::_1;
     export inline constexpr decltype(std::placeholders::_2) _2_placeholder = std::placeholders::_2;
     export inline constexpr decltype(std::placeholders::_3) _3_placeholder = std::placeholders::_3;

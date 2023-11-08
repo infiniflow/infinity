@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import query_context;
 import parser;
@@ -32,149 +32,121 @@ namespace infinity {
 
 void PhysicalSink::Init() {}
 
-void PhysicalSink::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
-
-void PhysicalSink::Execute(QueryContext *query_context) {}
+void PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) {}
 
 void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
-        case SinkStateType::kInvalid:
+        case SinkStateType::kInvalid: {
+            Error<ExecutorException>("Invalid sinker type");
             break;
+        }
         case SinkStateType::kMaterialize: {
             // Output general output
             auto *materialize_sink_state = static_cast<MaterializeSinkState *>(sink_state);
-            FillSinkStateFromLastOutputState(materialize_sink_state, materialize_sink_state->prev_output_state_);
+            FillSinkStateFromLastOperatorState(materialize_sink_state, materialize_sink_state->prev_op_state_);
             break;
         }
         case SinkStateType::kResult: {
             // Output result
             auto *result_sink_state = static_cast<ResultSinkState *>(sink_state);
-            FillSinkStateFromLastOutputState(result_sink_state, result_sink_state->prev_output_state_);
+            FillSinkStateFromLastOperatorState(result_sink_state, result_sink_state->prev_op_state_);
             break;
         }
         case SinkStateType::kMessage: {
             // Output message
             auto *message_sink_state = static_cast<MessageSinkState *>(sink_state);
-            FillSinkStateFromLastOutputState(message_sink_state, message_sink_state->prev_output_state_);
+            FillSinkStateFromLastOperatorState(message_sink_state, message_sink_state->prev_op_state_);
             break;
         }
         case SinkStateType::kSummary: {
             // Output summary
             auto *summary_sink_state = static_cast<SummarySinkState *>(sink_state);
-            FillSinkStateFromLastOutputState(summary_sink_state, summary_sink_state->prev_output_state_);
+            FillSinkStateFromLastOperatorState(summary_sink_state, summary_sink_state->prev_op_state_);
             break;
         }
         case SinkStateType::kQueue: {
             QueueSinkState *queue_sink_state = static_cast<QueueSinkState *>(sink_state);
-            FillSinkStateFromLastOutputState(queue_sink_state, queue_sink_state->prev_output_state_);
+            FillSinkStateFromLastOperatorState(queue_sink_state, queue_sink_state->prev_op_state_);
             break;
         }
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOutputState(MaterializeSinkState *materialize_sink_state, OutputState *task_output_state) {
-    switch (task_output_state->operator_type_) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {
+    switch (task_op_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
             Error<ExecutorException>("Invalid operator");
         }
         case PhysicalOperatorType::kShow: {
-            ShowOutputState *show_output_state = static_cast<ShowOutputState *>(task_output_state);
+            ShowOperatorState *show_output_state = static_cast<ShowOperatorState *>(task_op_state);
             materialize_sink_state->data_block_array_ = Move(show_output_state->output_);
             break;
         }
         case PhysicalOperatorType::kExplain: {
-            ExplainOutputState *explain_output_state = static_cast<ExplainOutputState *>(task_output_state);
+            ExplainOperatorState *explain_output_state = static_cast<ExplainOperatorState *>(task_op_state);
             if (explain_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty explain output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kProjection: {
-            ProjectionOutputState *projection_output_state = static_cast<ProjectionOutputState *>(task_output_state);
+            ProjectionOperatorState *projection_output_state = static_cast<ProjectionOperatorState *>(task_op_state);
             if (projection_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty projection output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
-            KnnScanOutputState *knn_output_state = static_cast<KnnScanOutputState *>(task_output_state);
+            KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_op_state);
             if (knn_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty knn scan output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
             materialize_sink_state->data_block_array_.emplace_back(new_data_block);
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
         }
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOutputState(SummarySinkState *summary_sink_state, OutputState *task_output_state) {
-    switch (task_output_state->operator_type_) {
-        case PhysicalOperatorType::kDelete:
+void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_sink_state, OperatorState *task_operator_state) {
+    switch (task_operator_state->operator_type_) {
+        case PhysicalOperatorType::kInvalid: {
+            Error<ExecutorException>("Invalid operator");
+            break;
+        }
+        case PhysicalOperatorType::kDelete: {
+            DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(task_operator_state);
+            summary_sink_state->count_ = delete_operator_state->count_;
+            summary_sink_state->sum_ = delete_operator_state->sum_;
+            break;
+        }
         case PhysicalOperatorType::kUpdate: {
-            summary_sink_state->count_ = task_output_state->count_;
-            summary_sink_state->sum_ = task_output_state->sum_;
+            UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(task_operator_state);
+            summary_sink_state->count_ = update_operator_state->count_;
+            summary_sink_state->sum_ = update_operator_state->sum_;
             break;
         }
         default: {
-            Error<ExecutorException>("Invalid operator");
+            Error<ExecutorException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink_state, OutputState *task_output_state) {
-    switch (task_output_state->operator_type_) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_sink_state, OperatorState *task_operator_state) {
+    switch (task_operator_state->operator_type_) {
 
         case PhysicalOperatorType::kInvalid: {
             Error<ExecutorException>("Invalid operator");
         }
-        case PhysicalOperatorType::kAggregate:
-        case PhysicalOperatorType::kParallelAggregate:
-        case PhysicalOperatorType::kMergeParallelAggregate:
-        case PhysicalOperatorType::kUnionAll:
-        case PhysicalOperatorType::kIntersect:
-        case PhysicalOperatorType::kExcept:
-        case PhysicalOperatorType::kTableScan:
-        case PhysicalOperatorType::kKnnScan:
-        case PhysicalOperatorType::kFilter:
-        case PhysicalOperatorType::kIndexScan:
-        case PhysicalOperatorType::kDummyScan:
-        case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kMergeHash:
-        case PhysicalOperatorType::kJoinHash:
-        case PhysicalOperatorType::kJoinNestedLoop:
-        case PhysicalOperatorType::kJoinMerge:
-        case PhysicalOperatorType::kJoinIndex:
-        case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kLimit:
-        case PhysicalOperatorType::kMergeLimit:
-        case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kMergeTop:
-        case PhysicalOperatorType::kProjection:
-        case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kInsert:
-        case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kAlter:
-        case PhysicalOperatorType::kFlush:
-        case PhysicalOperatorType::kSink:
-        case PhysicalOperatorType::kSource:
-        case PhysicalOperatorType::kExplain:
-        case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kShow: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
-        }
         case PhysicalOperatorType::kCreateTable: {
-            auto *output_state = static_cast<CreateTableOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -184,7 +156,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCreateIndex: {
-            auto *output_state = static_cast<CreateIndexOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateIndexOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -195,7 +167,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCreateCollection: {
-            auto *output_state = static_cast<CreateCollectionOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateCollectionOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -205,7 +177,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCreateDatabase: {
-            auto *output_state = static_cast<CreateDatabaseOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateDatabaseOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -215,7 +187,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCreateView: {
-            auto *output_state = static_cast<CreateViewOutputState *>(task_output_state);
+            auto *output_state = static_cast<CreateViewOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -225,7 +197,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kDropTable: {
-            auto *output_state = static_cast<DropTableOutputState *>(task_output_state);
+            auto *output_state = static_cast<DropTableOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -235,7 +207,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kDropIndex: {
-            auto *output_state = static_cast<DropIndexOutputState *>(task_output_state);
+            auto *output_state = static_cast<DropIndexOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -246,7 +218,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kDropCollection: {
-            auto *output_state = static_cast<DropCollectionOutputState *>(task_output_state);
+            auto *output_state = static_cast<DropCollectionOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -256,7 +228,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kDropDatabase: {
-            auto *output_state = static_cast<DropDatabaseOutputState *>(task_output_state);
+            auto *output_state = static_cast<DropDatabaseOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -266,7 +238,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kDropView: {
-            auto *output_state = static_cast<DropViewOutputState *>(task_output_state);
+            auto *output_state = static_cast<DropViewOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -276,7 +248,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             break;
         }
         case PhysicalOperatorType::kCommand: {
-            auto *output_state = static_cast<CommandOutputState *>(task_output_state);
+            auto *output_state = static_cast<CommandOperatorState *>(task_operator_state);
             if (output_state->error_message_.get() != nullptr) {
                 result_sink_state->error_message_ = Move(output_state->error_message_);
             } else {
@@ -285,34 +257,37 @@ void PhysicalSink::FillSinkStateFromLastOutputState(ResultSinkState *result_sink
             }
             break;
         }
+        default: {
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+        }
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOutputState(MessageSinkState *message_sink_state, OutputState *task_output_state) {
-    switch (task_output_state->operator_type_) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_sink_state, OperatorState *task_operator_state) {
+    switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kImport: {
-            auto *import_output_state = static_cast<ImportOutputState *>(task_output_state);
+            auto *import_output_state = static_cast<ImportOperatorState *>(task_operator_state);
             message_sink_state->message_ = Move(import_output_state->result_msg_);
             break;
         }
         case PhysicalOperatorType::kInsert: {
-            auto *insert_output_state = static_cast<InsertOutputState *>(task_output_state);
+            auto *insert_output_state = static_cast<InsertOperatorState *>(task_operator_state);
             message_sink_state->message_ = Move(insert_output_state->result_msg_);
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
         }
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState *message_sink_state, OutputState *task_output_state) {
-    switch (task_output_state->operator_type_) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *message_sink_state, OperatorState *task_operator_state) {
+    switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kKnnScan: {
-            KnnScanOutputState *knn_output_state = static_cast<KnnScanOutputState *>(task_output_state);
+            KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_operator_state);
             SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-            auto new_data_block = DataBlock::MoveFrom(task_output_state->data_block_);
+            auto new_data_block = DataBlock::MoveFrom(task_operator_state->data_block_);
             fragment_data->data_block_ = new_data_block;
             fragment_data->data_count_ = 1;
             fragment_data->data_idx_ = 1;
@@ -322,7 +297,7 @@ void PhysicalSink::FillSinkStateFromLastOutputState(QueueSinkState *message_sink
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_output_state->operator_type_)));
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
         }
     }

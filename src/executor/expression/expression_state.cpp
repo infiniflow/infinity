@@ -46,19 +46,19 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 
     switch (expression->type()) {
         case ExpressionType::kAggregate:
-            return CreateState(std::static_pointer_cast<AggregateExpression>(expression));
+            return CreateState(static_pointer_cast<AggregateExpression>(expression));
         case ExpressionType::kCast:
-            return CreateState(std::static_pointer_cast<CastExpression>(expression));
+            return CreateState(static_pointer_cast<CastExpression>(expression));
         case ExpressionType::kCase:
-            return CreateState(std::static_pointer_cast<CaseExpression>(expression));
+            return CreateState(static_pointer_cast<CaseExpression>(expression));
         case ExpressionType::kFunction:
-            return CreateState(std::static_pointer_cast<FunctionExpression>(expression));
+            return CreateState(static_pointer_cast<FunctionExpression>(expression));
         case ExpressionType::kValue:
-            return CreateState(std::static_pointer_cast<ValueExpression>(expression));
+            return CreateState(static_pointer_cast<ValueExpression>(expression));
         case ExpressionType::kReference:
-            return CreateState(std::static_pointer_cast<ReferenceExpression>(expression));
+            return CreateState(static_pointer_cast<ReferenceExpression>(expression));
         case ExpressionType::kIn:
-            return CreateState(std::static_pointer_cast<InExpression>(expression));
+            return CreateState(static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
             Error<ExecutorException>("Unexpected expression type: KNN");
         }

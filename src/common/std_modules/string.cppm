@@ -1,8 +1,8 @@
 module;
 #include <string>
 # 3 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:string;
-export namespace std {
+export module std_lib:string;
+export namespace std_lib {
     using std::string;
     using std::basic_string;
     using std::string_view;

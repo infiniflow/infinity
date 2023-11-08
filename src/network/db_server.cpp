@@ -28,7 +28,7 @@ import connection;
 
 namespace infinity {
 
-void DBServer::Init(const StartupParameter &parameter) { config_path_ = std::move(parameter.config_path); }
+void DBServer::Init(const StartupParameter &parameter) { config_path_ = Move(parameter.config_path); }
 
 void DBServer::Run() {
     if (initialized) {

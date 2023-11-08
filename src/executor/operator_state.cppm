@@ -30,14 +30,22 @@ export module operator_state;
 
 namespace infinity {
 
-export struct OutputState {
-    inline explicit OutputState(PhysicalOperatorType operator_type) : operator_type_(operator_type), count_(0), sum_(0) {}
+export struct OperatorState {
+    inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
 
+    // Input status
+    OperatorState *prev_op_state_{nullptr};
+    i64 received_data_count_{0};
+    i64 total_data_count_{0};
+
+    inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) {
+        prev_op_state_ = prev_op_state;
+    }
+
+    // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
     UniquePtr<String> error_message_{};
-    u64 count_;
-    u64 sum_;
 
     bool complete_{false};
 
@@ -46,271 +54,153 @@ export struct OutputState {
     inline bool Complete() const { return complete_; }
 };
 
-export struct InputState {
-    inline explicit InputState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
-
-    PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    DataBlock *input_data_block_{nullptr}; // this is pointed to the previous operator output
-    bool *input_complete_ptr_{nullptr};
-    i64 received_data_count_{0};
-    i64 total_data_count_{0};
-
-    inline bool Complete() const { return *input_complete_ptr_ == true; }
-
-    inline void ConnectToPrevOutputOpState(OutputState *output_state) {
-        input_data_block_ = output_state->data_block_.get();
-        input_complete_ptr_ = &output_state->complete_;
-    }
-};
-
 // Aggregate
-export struct AggregateInputState : public InputState {
-    inline explicit AggregateInputState() : InputState(PhysicalOperatorType::kAggregate) {}
-};
-
-export struct AggregateOutputState : public OutputState {
-    inline explicit AggregateOutputState() : OutputState(PhysicalOperatorType::kAggregate) {}
+export struct AggregateOperatorState : public OperatorState {
+    inline explicit AggregateOperatorState() : OperatorState(PhysicalOperatorType::kAggregate) {}
 };
 
 // Merge Parallel Aggregate
-export struct MergeParallelAggregateInputState : public InputState {
-    inline explicit MergeParallelAggregateInputState() : InputState(PhysicalOperatorType::kMergeParallelAggregate) {}
-};
-
-export struct MergeParallelAggregateOutputState : public OutputState {
-    inline explicit MergeParallelAggregateOutputState() : OutputState(PhysicalOperatorType::kMergeParallelAggregate) {}
+export struct MergeParallelAggregateOperatorState : public OperatorState {
+    inline explicit MergeParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeParallelAggregate) {}
 };
 
 // Parallel Aggregate
-export struct ParallelAggregateInputState : public InputState {
-    inline explicit ParallelAggregateInputState() : InputState(PhysicalOperatorType::kParallelAggregate) {}
-};
-
-export struct ParallelAggregateOutputState : public OutputState {
-    inline explicit ParallelAggregateOutputState() : OutputState(PhysicalOperatorType::kParallelAggregate) {}
+export struct ParallelAggregateOperatorState : public OperatorState {
+    inline explicit ParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kParallelAggregate) {}
 };
 
 // UnionAll
-export struct UnionAllInputState : public InputState {
-    inline explicit UnionAllInputState() : InputState(PhysicalOperatorType::kUnionAll) {}
-};
-
-export struct UnionAllOutputState : public OutputState {
-    inline explicit UnionAllOutputState() : OutputState(PhysicalOperatorType::kUnionAll) {}
+export struct UnionAllOperatorState : public OperatorState {
+    inline explicit UnionAllOperatorState() : OperatorState(PhysicalOperatorType::kUnionAll) {}
 };
 
 // TableScan
-export struct TableScanInputState : public InputState {
-    inline explicit TableScanInputState() : InputState(PhysicalOperatorType::kTableScan) {}
+export struct TableScanOperatorState : public OperatorState {
+    inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
 
     SharedPtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
-export struct TableScanOutputState : public OutputState {
-    inline explicit TableScanOutputState() : OutputState(PhysicalOperatorType::kTableScan) {}
-};
-
 // KnnScan
-export struct KnnScanInputState : public InputState {
-    inline explicit KnnScanInputState() : InputState(PhysicalOperatorType::kKnnScan) {}
+export struct KnnScanOperatorState : public OperatorState {
+    inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 
     SharedPtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
-export struct KnnScanOutputState : public OutputState {
-    inline explicit KnnScanOutputState() : OutputState(PhysicalOperatorType::kKnnScan) {}
-};
-
 // Merge Knn
-export struct MergeKnnInputState : public InputState {
-    inline explicit MergeKnnInputState() : InputState(PhysicalOperatorType::kMergeKnn) {}
+export struct MergeKnnOperatorState : public OperatorState {
+    inline explicit MergeKnnOperatorState() : OperatorState(PhysicalOperatorType::kMergeKnn) {}
 
+    DataBlock* input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    bool input_complete_{false};
     SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
 
-export struct MergeKnnOutputState : public OutputState {
-    inline explicit MergeKnnOutputState() : OutputState(PhysicalOperatorType::kMergeKnn) {}
-};
-
 // Filter
-export struct FilterInputState : public InputState {
-    inline explicit FilterInputState() : InputState(PhysicalOperatorType::kFilter) {}
+export struct FilterOperatorState : public OperatorState {
+    inline explicit FilterOperatorState() : OperatorState(PhysicalOperatorType::kFilter) {}
 };
-
-export struct FilterOutputState : public OutputState {
-    inline explicit FilterOutputState() : OutputState(PhysicalOperatorType::kFilter) {}
-};
-
 // IndexScan
-export struct IndexScanInputState : public InputState {
-    inline explicit IndexScanInputState() : InputState(PhysicalOperatorType::kIndexScan) {}
-};
-
-export struct IndexScanOutputState : public OutputState {
-    inline explicit IndexScanOutputState() : OutputState(PhysicalOperatorType::kIndexScan) {}
+export struct IndexScanOperatorState : public OperatorState {
+    inline explicit IndexScanOperatorState() : OperatorState(PhysicalOperatorType::kIndexScan) {}
 };
 
 // Hash
-export struct HashInputState : public InputState {
-    inline explicit HashInputState() : InputState(PhysicalOperatorType::kHash) {}
-};
-
-export struct HashOutputState : public OutputState {
-    inline explicit HashOutputState() : OutputState(PhysicalOperatorType::kHash) {}
+export struct HashOperatorState : public OperatorState {
+    inline explicit HashOperatorState() : OperatorState(PhysicalOperatorType::kHash) {}
 };
 
 // Merge Hash
-export struct MergeHashInputState : public InputState {
-    inline explicit MergeHashInputState() : InputState(PhysicalOperatorType::kMergeHash) {}
-};
-
-export struct MergeHashOutputState : public OutputState {
-    inline explicit MergeHashOutputState() : OutputState(PhysicalOperatorType::kMergeHash) {}
+export struct MergeHashOperatorState : public OperatorState {
+    inline explicit MergeHashOperatorState() : OperatorState(PhysicalOperatorType::kMergeHash) {}
 };
 
 // Hash Join
-export struct HashJoinInputState : public InputState {
-    inline explicit HashJoinInputState() : InputState(PhysicalOperatorType::kJoinHash) {}
-};
-
-export struct HashJoinOutputState : public OutputState {
-    inline explicit HashJoinOutputState() : OutputState(PhysicalOperatorType::kJoinHash) {}
+export struct HashJoinOperatorState : public OperatorState {
+    inline explicit HashJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinHash) {}
 };
 
 // Nested Loop
-export struct NestedLoopInputState : public InputState {
-    inline explicit NestedLoopInputState() : InputState(PhysicalOperatorType::kJoinNestedLoop) {}
-};
-
-export struct NestedLoopOutputState : public OutputState {
-    inline explicit NestedLoopOutputState() : OutputState(PhysicalOperatorType::kJoinNestedLoop) {}
+export struct NestedLoopOperatorState : public OperatorState {
+    inline explicit NestedLoopOperatorState() : OperatorState(PhysicalOperatorType::kJoinNestedLoop) {}
 };
 
 // Merge Join
-export struct MergeJoinInputState : public InputState {
-    inline explicit MergeJoinInputState() : InputState(PhysicalOperatorType::kJoinMerge) {}
-};
-
-export struct MergeJoinOutputState : public OutputState {
-    inline explicit MergeJoinOutputState() : OutputState(PhysicalOperatorType::kJoinMerge) {}
+export struct MergeJoinOperatorState : public OperatorState {
+    inline explicit MergeJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinMerge) {}
 };
 
 // Index Join
-export struct IndexJoinInputState : public InputState {
-    inline explicit IndexJoinInputState() : InputState(PhysicalOperatorType::kJoinIndex) {}
-};
-
-export struct IndexJoinOutputState : public OutputState {
-    inline explicit IndexJoinOutputState() : OutputState(PhysicalOperatorType::kJoinIndex) {}
+export struct IndexJoinOperatorState : public OperatorState {
+    inline explicit IndexJoinOperatorState() : OperatorState(PhysicalOperatorType::kJoinIndex) {}
 };
 
 // Cross Product
-export struct CrossProductInputState : public InputState {
-    inline explicit CrossProductInputState() : InputState(PhysicalOperatorType::kCrossProduct) {}
-};
-
-export struct CrossProductOutputState : public OutputState {
-    inline explicit CrossProductOutputState() : OutputState(PhysicalOperatorType::kCrossProduct) {}
+export struct CrossProductOperatorState : public OperatorState {
+    inline explicit CrossProductOperatorState() : OperatorState(PhysicalOperatorType::kCrossProduct) {}
 };
 
 // Limit
-export struct LimitInputState : public InputState {
-    inline explicit LimitInputState() : InputState(PhysicalOperatorType::kLimit) {}
-};
-
-export struct LimitOutputState : public OutputState {
-    inline explicit LimitOutputState() : OutputState(PhysicalOperatorType::kLimit) {}
+export struct LimitOperatorState : public OperatorState {
+    inline explicit LimitOperatorState() : OperatorState(PhysicalOperatorType::kLimit) {}
 };
 
 // Merge Limit
-export struct MergeLimitInputState : public InputState {
-    inline explicit MergeLimitInputState() : InputState(PhysicalOperatorType::kMergeLimit) {}
-};
-
-export struct MergeLimitOutputState : public OutputState {
-    inline explicit MergeLimitOutputState() : OutputState(PhysicalOperatorType::kMergeLimit) {}
+export struct MergeLimitOperatorState : public OperatorState {
+    inline explicit MergeLimitOperatorState() : OperatorState(PhysicalOperatorType::kMergeLimit) {}
 };
 
 // Merge Top
-export struct MergeTopInputState : public InputState {
-    inline explicit MergeTopInputState() : InputState(PhysicalOperatorType::kMergeTop) {}
-};
-
-export struct MergeTopOutputState : public OutputState {
-    inline explicit MergeTopOutputState() : OutputState(PhysicalOperatorType::kMergeTop) {}
+export struct MergeTopOperatorState : public OperatorState {
+    inline explicit MergeTopOperatorState() : OperatorState(PhysicalOperatorType::kMergeTop) {}
 };
 
 // Top
-export struct TopInputState : public InputState {
-    inline explicit TopInputState() : InputState(PhysicalOperatorType::kTop) {}
-};
-
-export struct TopOutputState : public OutputState {
-    inline explicit TopOutputState() : OutputState(PhysicalOperatorType::kTop) {}
+export struct TopOperatorState : public OperatorState {
+    inline explicit TopOperatorState() : OperatorState(PhysicalOperatorType::kTop) {}
 };
 
 // Projection
-export struct ProjectionInputState : public InputState {
-    inline explicit ProjectionInputState() : InputState(PhysicalOperatorType::kProjection) {}
-};
-
-export struct ProjectionOutputState : public OutputState {
-    inline explicit ProjectionOutputState() : OutputState(PhysicalOperatorType::kProjection) {}
+export struct ProjectionOperatorState : public OperatorState {
+    inline explicit ProjectionOperatorState() : OperatorState(PhysicalOperatorType::kProjection) {}
 };
 
 // Sort
-export struct SortInputState : public InputState {
-    inline explicit SortInputState() : InputState(PhysicalOperatorType::kSort) {}
-};
-
-export struct SortOutputState : public OutputState {
-    inline explicit SortOutputState() : OutputState(PhysicalOperatorType::kSort) {}
+export struct SortOperatorState : public OperatorState {
+    inline explicit SortOperatorState() : OperatorState(PhysicalOperatorType::kSort) {}
 };
 
 // Merge Sort
-export struct MergeSortInputState : public InputState {
-    inline explicit MergeSortInputState() : InputState(PhysicalOperatorType::kMergeSort) {}
-};
-
-export struct MergeSortOutputState : public OutputState {
-    inline explicit MergeSortOutputState() : OutputState(PhysicalOperatorType::kMergeSort) {}
+export struct MergeSortOperatorState : public OperatorState {
+    inline explicit MergeSortOperatorState() : OperatorState(PhysicalOperatorType::kMergeSort) {}
 };
 
 // Delete
-export struct DeleteInputState : public InputState {
-    inline explicit DeleteInputState() : InputState(PhysicalOperatorType::kDelete) {}
-};
+export struct DeleteOperatorState : public OperatorState {
+    inline explicit DeleteOperatorState() : OperatorState(PhysicalOperatorType::kDelete) {}
 
-export struct DeleteOutputState : public OutputState {
-    inline explicit DeleteOutputState() : OutputState(PhysicalOperatorType::kDelete) {}
+    u64 count_{0};
+    u64 sum_{0};
 };
-
 // Update
-export struct UpdateInputState : public InputState {
-    inline explicit UpdateInputState() : InputState(PhysicalOperatorType::kUpdate) {}
-};
+export struct UpdateOperatorState : public OperatorState {
+    inline explicit UpdateOperatorState() : OperatorState(PhysicalOperatorType::kUpdate) {}
 
-export struct UpdateOutputState : public OutputState {
-    inline explicit UpdateOutputState() : OutputState(PhysicalOperatorType::kUpdate) {}
+    u64 count_{0};
+    u64 sum_{0};
 };
 
 // Insert
-export struct InsertInputState : public InputState {
-    inline explicit InsertInputState() : InputState(PhysicalOperatorType::kInsert) {}
-};
+export struct InsertOperatorState : public OperatorState {
+    inline explicit InsertOperatorState() : OperatorState(PhysicalOperatorType::kInsert) {}
 
-export struct InsertOutputState : public OutputState {
-    inline explicit InsertOutputState() : OutputState(PhysicalOperatorType::kInsert) {}
     UniquePtr<String> result_msg_{};
 };
 
 // Import
-export struct ImportInputState : public InputState {
-    inline explicit ImportInputState() : InputState(PhysicalOperatorType::kImport) {}
-};
-
-export struct ImportOutputState : public OutputState {
-    inline explicit ImportOutputState() : OutputState(PhysicalOperatorType::kImport) {}
+export struct ImportOperatorState : public OperatorState {
+    inline explicit ImportOperatorState() : OperatorState(PhysicalOperatorType::kImport) {}
 
     Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
@@ -319,147 +209,83 @@ export struct ImportOutputState : public OutputState {
 };
 
 // Export
-export struct ExportInputState : public InputState {
-    inline explicit ExportInputState() : InputState(PhysicalOperatorType::kExport) {}
-};
-
-export struct ExportOutputState : public OutputState {
-    inline explicit ExportOutputState() : OutputState(PhysicalOperatorType::kExport) {}
+export struct ExportOperatorState : public OperatorState {
+    inline explicit ExportOperatorState() : OperatorState(PhysicalOperatorType::kExport) {}
 };
 
 // Alter
-export struct AlterInputState : public InputState {
-    inline explicit AlterInputState() : InputState(PhysicalOperatorType::kAlter) {}
-};
-
-export struct AlterOutputState : public OutputState {
-    inline explicit AlterOutputState() : OutputState(PhysicalOperatorType::kAlter) {}
+export struct AlterOperatorState : public OperatorState {
+    inline explicit AlterOperatorState() : OperatorState(PhysicalOperatorType::kAlter) {}
 };
 
 // Create Table
-export struct CreateTableInputState : public InputState {
-    inline explicit CreateTableInputState() : InputState(PhysicalOperatorType::kCreateTable) {}
+export struct CreateTableOperatorState : public OperatorState {
+    inline explicit CreateTableOperatorState() : OperatorState(PhysicalOperatorType::kCreateTable) {}
 };
 
-export struct CreateTableOutputState : public OutputState {
-    inline explicit CreateTableOutputState() : OutputState(PhysicalOperatorType::kCreateTable) {}
-};
-
-export struct CreateIndexInputState : public InputState {
-    inline explicit CreateIndexInputState() : InputState(PhysicalOperatorType::kCreateIndex) {}
-};
-
-export struct CreateIndexOutputState : public OutputState {
-    inline explicit CreateIndexOutputState() : OutputState(PhysicalOperatorType::kCreateIndex) {}
+export struct CreateIndexOperatorState : public OperatorState {
+    inline explicit CreateIndexOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndex) {}
 };
 
 // Create Collection
-export struct CreateCollectionInputState : public InputState {
-    inline explicit CreateCollectionInputState() : InputState(PhysicalOperatorType::kCreateCollection) {}
-};
-
-export struct CreateCollectionOutputState : public OutputState {
-    inline explicit CreateCollectionOutputState() : OutputState(PhysicalOperatorType::kCreateCollection) {}
+export struct CreateCollectionOperatorState : public OperatorState {
+    inline explicit CreateCollectionOperatorState() : OperatorState(PhysicalOperatorType::kCreateCollection) {}
 };
 
 // Create Database
-export struct CreateDatabaseInputState : public InputState {
-    inline explicit CreateDatabaseInputState() : InputState(PhysicalOperatorType::kCreateDatabase) {}
-};
-
-export struct CreateDatabaseOutputState : public OutputState {
-    inline explicit CreateDatabaseOutputState() : OutputState(PhysicalOperatorType::kCreateDatabase) {}
+export struct CreateDatabaseOperatorState : public OperatorState {
+    inline explicit CreateDatabaseOperatorState() : OperatorState(PhysicalOperatorType::kCreateDatabase) {}
 };
 
 // Create View
-export struct CreateViewInputState : public InputState {
-    inline explicit CreateViewInputState() : InputState(PhysicalOperatorType::kCreateView) {}
-};
-
-export struct CreateViewOutputState : public OutputState {
-    inline explicit CreateViewOutputState() : OutputState(PhysicalOperatorType::kCreateView) {}
+export struct CreateViewOperatorState : public OperatorState {
+    inline explicit CreateViewOperatorState() : OperatorState(PhysicalOperatorType::kCreateView) {}
 };
 
 // Drop Table
-export struct DropTableInputState : public InputState {
-    inline explicit DropTableInputState() : InputState(PhysicalOperatorType::kDropTable) {}
+export struct DropTableOperatorState : public OperatorState {
+    inline explicit DropTableOperatorState() : OperatorState(PhysicalOperatorType::kDropTable) {}
 };
 
-export struct DropTableOutputState : public OutputState {
-    inline explicit DropTableOutputState() : OutputState(PhysicalOperatorType::kDropTable) {}
-};
-
-export struct DropIndexInputState : public InputState {
-    inline explicit DropIndexInputState() : InputState(PhysicalOperatorType::kDropIndex) {}
-};
-
-export struct DropIndexOutputState : public OutputState {
-    inline explicit DropIndexOutputState() : OutputState(PhysicalOperatorType::kDropIndex) {}
+export struct DropIndexOperatorState : public OperatorState {
+    inline explicit DropIndexOperatorState() : OperatorState(PhysicalOperatorType::kDropIndex) {}
 };
 
 // Drop Collection
-export struct DropCollectionInputState : public InputState {
-    inline explicit DropCollectionInputState() : InputState(PhysicalOperatorType::kDropCollection) {}
-};
-
-export struct DropCollectionOutputState : public OutputState {
-    inline explicit DropCollectionOutputState() : OutputState(PhysicalOperatorType::kDropCollection) {}
+export struct DropCollectionOperatorState : public OperatorState {
+    inline explicit DropCollectionOperatorState() : OperatorState(PhysicalOperatorType::kDropCollection) {}
 };
 
 // Drop Database
-export struct DropDatabaseInputState : public InputState {
-    inline explicit DropDatabaseInputState() : InputState(PhysicalOperatorType::kDropDatabase) {}
-};
-
-export struct DropDatabaseOutputState : public OutputState {
-    inline explicit DropDatabaseOutputState() : OutputState(PhysicalOperatorType::kDropDatabase) {}
+export struct DropDatabaseOperatorState : public OperatorState {
+    inline explicit DropDatabaseOperatorState() : OperatorState(PhysicalOperatorType::kDropDatabase) {}
 };
 
 // Drop View
-export struct DropViewInputState : public InputState {
-    inline explicit DropViewInputState() : InputState(PhysicalOperatorType::kDropView) {}
-};
-
-export struct DropViewOutputState : public OutputState {
-    inline explicit DropViewOutputState() : OutputState(PhysicalOperatorType::kDropView) {}
+export struct DropViewOperatorState : public OperatorState {
+    inline explicit DropViewOperatorState() : OperatorState(PhysicalOperatorType::kDropView) {}
 };
 
 // Command
-export struct CommandInputState : public InputState {
-    inline explicit CommandInputState() : InputState(PhysicalOperatorType::kCommand) {}
-};
-
-export struct CommandOutputState : public OutputState {
-    inline explicit CommandOutputState() : OutputState(PhysicalOperatorType::kCommand) {}
+export struct CommandOperatorState : public OperatorState {
+    inline explicit CommandOperatorState() : OperatorState(PhysicalOperatorType::kCommand) {}
 };
 
 // Explain
-export struct ExplainInputState : public InputState {
-    inline explicit ExplainInputState() : InputState(PhysicalOperatorType::kExplain) {}
-};
-
-export struct ExplainOutputState : public OutputState {
-    inline explicit ExplainOutputState() : OutputState(PhysicalOperatorType::kExplain) {}
+export struct ExplainOperatorState : public OperatorState {
+    inline explicit ExplainOperatorState() : OperatorState(PhysicalOperatorType::kExplain) {}
 };
 
 // Show
-export struct ShowInputState : public InputState {
-    inline explicit ShowInputState() : InputState(PhysicalOperatorType::kShow) {}
-};
-
-export struct ShowOutputState : public OutputState {
-    inline explicit ShowOutputState() : OutputState(PhysicalOperatorType::kShow) {}
+export struct ShowOperatorState : public OperatorState {
+    inline explicit ShowOperatorState() : OperatorState(PhysicalOperatorType::kShow) {}
 
     Vector<SharedPtr<DataBlock>> output_{};
 };
 
 // Flush
-export struct FlushInputState : public InputState {
-    inline explicit FlushInputState() : InputState(PhysicalOperatorType::kFlush) {}
-};
-
-export struct FlushOutputState : public OutputState {
-    inline explicit FlushOutputState() : OutputState(PhysicalOperatorType::kFlush) {}
+export struct FlushOperatorState : public OperatorState {
+    inline explicit FlushOperatorState() : OperatorState(PhysicalOperatorType::kFlush) {}
 };
 
 // Sink
@@ -476,11 +302,11 @@ export struct SinkState {
     virtual ~SinkState(){};
     inline explicit SinkState(SinkStateType state_type) : state_type_(state_type) {}
 
-    inline void SetPrevState(OutputState *prev_state) { prev_output_state_ = prev_state; }
+    inline void SetPrevOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
 
     inline SinkStateType state_type() const { return state_type_; }
 
-    OutputState *prev_output_state_{};
+    OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
     UniquePtr<String> error_message_{};
 };
@@ -525,13 +351,12 @@ export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kK
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}
 
-    inline void SetNextState(InputState *next_state) {
-        next_input_state_ = next_state;
-        next_input_state_->input_complete_ptr_ = &complete_;
+    inline void SetNextOpState(OperatorState *op_state) {
+        next_op_state_ = op_state;
     }
 
     bool complete_{false};
-    InputState *next_input_state_{};
+    OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
 };
 
@@ -539,8 +364,8 @@ export struct QueueSourceState : public SourceState {
     inline explicit QueueSourceState() : SourceState(SourceStateType::kQueue) {}
 
     inline void SetTotalDataCount(i64 data_count) {
-        if (next_input_state_->total_data_count_ == 0) {
-            next_input_state_->total_data_count_ = data_count;
+        if (next_op_state_->total_data_count_ == 0) {
+            next_op_state_->total_data_count_ = data_count;
         }
     }
 

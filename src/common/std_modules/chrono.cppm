@@ -2,8 +2,8 @@ module;
 #include <chrono>
 #include <ratio>
 # 4 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:chrono;
-export namespace std {
+export module std_lib:chrono;
+export namespace std_lib {
     namespace chrono {
         using std::chrono::seconds;
         using std::chrono::nanoseconds;
@@ -33,7 +33,7 @@ export namespace std {
         using std::chrono::system_clock;
     }
 }
-export namespace std {
+export namespace std_lib {
     using std::deca;
     using std::nano;
     using std::centi;
@@ -43,7 +43,7 @@ export namespace std {
     using std::ratio_multiply;
 }
 
-export namespace std {
+export namespace std_lib {
     inline namespace literals {
         inline namespace chrono_literals {
             using std::literals::chrono_literals::operator""s;

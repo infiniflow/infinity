@@ -1,8 +1,8 @@
 module;
 #include <atomic>
 # 3 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:atomic;
-export namespace std {
+export module std_lib:atomic;
+export namespace std_lib {
     using std::memory_order;
     using std::memory_order_relaxed;
     using std::memory_order_consume;

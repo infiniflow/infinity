@@ -14,7 +14,8 @@
 
 module;
 
-import std;
+#include <sstream>
+
 import stl;
 import selection;
 

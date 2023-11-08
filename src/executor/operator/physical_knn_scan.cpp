@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import query_context;
 import parser;
@@ -40,15 +40,12 @@ namespace infinity {
 
 void PhysicalKnnScan::Init() {}
 
-void PhysicalKnnScan::Execute(QueryContext *query_context) {}
+void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
 
-void PhysicalKnnScan::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    auto *knn_scan_input_state = static_cast<KnnScanInputState *>(input_state);
-    auto *knn_scan_output_state = static_cast<KnnScanOutputState *>(output_state);
-
-    switch (knn_scan_input_state->knn_scan_function_data_->elem_type_) {
+    switch (knn_scan_operator_state->knn_scan_function_data_->elem_type_) {
         case kElemFloat: {
-            ExecuteInternal<f32>(query_context, knn_scan_input_state, knn_scan_output_state);
+            ExecuteInternal<f32>(query_context, knn_scan_operator_state);
             break;
         }
         case kElemInvalid: {
@@ -93,8 +90,8 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalKnnScan::PlanBlockEntries(i64 p
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
 template <typename T>
-void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputState *input_state, KnnScanOutputState *output_state) {
-    auto *knn_scan_function_data_ptr = input_state->knn_scan_function_data_.get();
+void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
+    auto *knn_scan_function_data_ptr = operator_state->knn_scan_function_data_.get();
     BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
@@ -153,11 +150,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
                     const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].segment_offset_, *output_types_->at(column_id));
-                    output_state->data_block_->AppendValueByPtr(column_id, ptr);
+                    operator_state->data_block_->AppendValueByPtr(column_id, ptr);
                 }
 
-                output_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-                output_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
+                operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
+                operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
             }
 
             for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -166,10 +163,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanInputS
         }
 
         // Last segment, Get the result according to the topk row.
-        output_state->SetComplete();
+        operator_state->SetComplete();
     }
 
-    output_state->data_block_->Finalize();
+    operator_state->data_block_->Finalize();
 }
 
 } // namespace infinity

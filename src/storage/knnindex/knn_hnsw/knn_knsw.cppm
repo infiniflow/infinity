@@ -16,8 +16,9 @@ module;
 
 #include "../header.h"
 #include <cassert>
+#include <random>
+#include <algorithm>
 
-import std;
 import stl;
 import parser;
 import knn_distance;

@@ -78,7 +78,7 @@ SegmentEntry::MakeReplaySegmentEntry(const TableCollectionEntry *table_entry, u3
 
     const auto *table_ptr = (const TableCollectionEntry *)table_entry;
     new_entry->column_count_ = table_ptr->columns_.size();
-    new_entry->segment_dir_ = std::move(segment_dir);
+    new_entry->segment_dir_ = Move(segment_dir);
     return new_entry;
 }
 
@@ -320,7 +320,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             auto block_entries_size = segment_entry->block_entries_.size();
             segment_entry->block_entries_.resize(Max(block_entries_size, static_cast<SizeT>(block_entry->block_id_ + 1)));
-            segment_entry->block_entries_[block_entry->block_id_] = std::move(block_entry);
+            segment_entry->block_entries_[block_entry->block_id_] = Move(block_entry);
         }
     }
     LOG_TRACE(Format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
