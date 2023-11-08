@@ -100,6 +100,12 @@ struct OperatorInformation {
     String name_;
 };
 
+export struct TaskBinding {
+    u64 fragment_id_ {};
+    i64 task_id_ {};
+    Vector<u64> child_fragment_id_ {};
+};
+
 export class OptimizerProfiler {
 public:
     void StartRule(const String &rule_name);
@@ -113,24 +119,26 @@ private:
 };
 
 class PhysicalOperator;
+class PlanFragment;
 class InputState;
 class OutputState;
 
-export class OperatorProfiler {
+export class TaskProfiler {
 public:
-    OperatorProfiler() {}
+    TaskProfiler(TaskBinding binding, bool enable, SizeT operators_len)
+        : enable_(enable), binding_(binding) {
 
-    OperatorProfiler(bool enable) : enable_(enable) {}
+        timings_.reserve(operators_len);
+    }
 
     void StartOperator(const PhysicalOperator *op);
 
     void StopOperator(const InputState *input_state, const OutputState *output_state);
 
-    HashMap<String, OperatorInformation> timings_;
 
+    TaskBinding binding_;
+    Vector<OperatorInformation> timings_{};
 private:
-    void AddTiming(const PhysicalOperator *op, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows);
-
     bool enable_ = false;
 
     BaseProfiler profiler_;
@@ -142,35 +150,12 @@ public:
     QueryProfiler() {};
 
     QueryProfiler(bool enable) : enable_(enable) {};
-    struct TreeNode {
-        OperatorInformation info_ {"", 0, 0, 0, 0};
-        Vector<SharedPtr<TreeNode>> children_ {};
-        idx_t depth_ = 0;
-
-        TreeNode() {}
-
-        TreeNode(const TreeNode& other)
-            : info_(other.info_), depth_(other.depth_) {
-
-            for (int i = 0; i < other.children_.size(); ++i) {
-                children_[i] = MakeUnique<TreeNode>(*other.children_[i]);
-            }
-        }
-
-        TreeNode(TreeNode&& other)
-            : info_(Move(other.info_)),
-              children_(Move(other.children_)),
-              depth_(other.depth_) {
-        }
-    };
-
-    void Init(const PhysicalOperator *root);
 
     void StartPhase(QueryPhase phase);
 
     void StopPhase(QueryPhase phase);
 
-    void Flush(OperatorProfiler &profiler);
+    void Flush(TaskProfiler &&profiler);
 
     OptimizerProfiler &optimizer() { return optimizer_; }
 
@@ -178,21 +163,16 @@ public:
 
     static String QueryPhaseToString(QueryPhase phase);
 
-    using TreeMap = HashMap<String, SharedPtr<TreeNode>>;
-
 private:
     bool enable_ = false;
 
     Mutex flush_lock_{};
-    SharedPtr<TreeNode> root_ = nullptr;
-    TreeMap plan_tree_{};
+    HashMap<u64, HashMap<i64, Vector<TaskProfiler>>> records_{};
     Vector<BaseProfiler> profilers_{EnumInteger(QueryPhase::kInvalid)};
     OptimizerProfiler optimizer_;
     QueryPhase current_phase_{QueryPhase::kInvalid};
 
-    SharedPtr<QueryProfiler::TreeNode> CreateTree(const PhysicalOperator *root, idx_t depth = 0);
-
-    static void Render(const TreeNode *node,  std::stringstream &ss);
+    void ExecuteRender(std::stringstream &ss) const;
 };
 
 } // namespace infinity

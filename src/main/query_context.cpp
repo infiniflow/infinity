@@ -154,8 +154,6 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
         // Build physical plan
         SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
         query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
-        // Initialize each operator of profiler
-        query_metrics_->Init(physical_plan.get());
 
         query_metrics_->StartPhase(QueryPhase::kExecution);
         // Fragment Builder, only for test now.

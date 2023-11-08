@@ -19,6 +19,7 @@ import std;
 import stl;
 import third_party;
 import physical_operator;
+import plan_fragment;
 import operator_state;
 
 import infinity_exception;
@@ -79,7 +80,7 @@ String OptimizerProfiler::ToString(SizeT intent) const {
     return result;
 }
 
-void OperatorProfiler::StartOperator(const PhysicalOperator *op) {
+void TaskProfiler::StartOperator(const PhysicalOperator *op) {
     if (!enable_) {
         return;
     }
@@ -89,7 +90,7 @@ void OperatorProfiler::StartOperator(const PhysicalOperator *op) {
     active_operator_ = op;
     profiler_.Begin();
 }
-void OperatorProfiler::StopOperator(const InputState *input_state, const OutputState *output_state) {
+void TaskProfiler::StopOperator(const InputState *input_state, const OutputState *output_state) {
     if (!enable_) {
         return;
     }
@@ -99,24 +100,14 @@ void OperatorProfiler::StopOperator(const InputState *input_state, const OutputS
     profiler_.End();
     auto input_block = input_state->input_data_block_;
     auto output_block = output_state->data_block_;
-    auto input_row = input_block ? input_block->row_count() : 0;
+    auto input_rows = input_block ? input_block->row_count() : 0;
     auto input_data_size = input_block ? input_block->GetSizeInBytes() : 0;
-    auto output_row = output_block ? output_block->row_count() : 0;
+    auto output_rows = output_block ? output_block->row_count() : 0;
 
-    AddTiming(active_operator_, profiler_.Elapsed(), input_row, input_data_size, output_row);
+    OperatorInformation info(active_operator_->GetName(), profiler_.Elapsed(), input_rows, input_data_size, output_rows);
+
+    timings_.push_back(Move(info));
     active_operator_ = nullptr;
-}
-void OperatorProfiler::AddTiming(const PhysicalOperator *op, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows) {
-    auto entry = timings_.find(op->GetName());
-    if (entry == timings_.end()) {
-        OperatorInformation info(op->GetName(), time, input_rows, input_data_size, output_rows);
-        timings_[op->GetName()] = Move(info);
-    } else {
-        entry->second.time_ += time;
-        entry->second.input_rows_ += input_rows;
-        entry->second.output_rows_ += output_rows;
-        entry->second.input_data_size_ += input_data_size;
-    }
 }
 
 String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
@@ -143,13 +134,6 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             Error<ExecutorException>("Invalid query phase in query profiler");
         }
     }
-}
-
-void QueryProfiler::Init(const PhysicalOperator *root) {
-    if (!enable_) {
-        return;
-    }
-    root_ = CreateTree(root);
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {
@@ -183,61 +167,37 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
     profilers_[EnumInteger(phase)].End();
 }
 
-void QueryProfiler::Flush(OperatorProfiler &profiler) {
-    if (!enable_ || plan_tree_.empty()) {
+void QueryProfiler::Flush(TaskProfiler &&profiler) {
+    if (!enable_) {
         return;
     }
 
     UniqueLock<Mutex> lk(flush_lock_);
-    for (auto const &node : profiler.timings_) {
-        auto op_name = node.first;
-        auto entry = plan_tree_.find(op_name);
-        Assert<ProfilerException>(entry != plan_tree_.end(), "Should have been initialized using PhysicalPlan.", __FILE_NAME__, __LINE__);
-        auto &tree_node = entry->second;
-
-        tree_node->info_.time_ += node.second.time_;
-        tree_node->info_.input_rows_ += node.second.input_rows_;
-        tree_node->info_.output_rows_ += node.second.output_rows_;
-        tree_node->info_.input_data_size_ += node.second.input_data_size_;
-    }
-    profiler.timings_.clear();
+    records_[profiler.binding_.fragment_id_][profiler.binding_.task_id_].push_back(profiler);
 }
 
-SharedPtr<QueryProfiler::TreeNode> QueryProfiler::CreateTree(const PhysicalOperator *root, idx_t depth) {
-    auto node = MakeShared<QueryProfiler::TreeNode>();
-    node->depth_ = depth;
-
-    if (root->left()) {
-        auto left_node = CreateTree(root->left().get(), depth + 1);
-        node->children_.push_back(std::move(left_node));
-    }
-    if (root->right()) {
-        auto right_node = CreateTree(root->right().get(), depth + 1);
-        node->children_.push_back(std::move(right_node));
-    }
-    plan_tree_.emplace(root->GetName(), node);
-
-    return node;
-}
-
-void QueryProfiler::Render(const QueryProfiler::TreeNode *node,  std::stringstream &ss) {
-    if (!node) {
+void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
+    if (!enable_) {
         return;
     }
-
-    String tab = "";
-    for (int i = 0; i < node->depth_; ++i) {
-        tab += "  ";
-    }
-
-    ss << tab << "Operator: " << node->info_.name_ << std::endl;
-    ss << tab << "-> consumption time: " << node->info_.time_ << std::endl;
-    ss << tab << "-> input rows: " << node->info_.input_rows_ << std::endl;
-    ss << tab << "-> output rows: " << node->info_.output_rows_ << std::endl;
-    ss << tab << "-> data size: " << node->info_.input_data_size_ << std::endl;
-
-    for (const auto child : node->children_) {
-        QueryProfiler::Render(child.get(), ss);
+    for (const auto &fragment : records_) {
+        ss << "Fragment #" << fragment.first << std::endl;
+        for (const auto &task : fragment.second) {
+            ss << "|- Task #" << task.first << std::endl;
+            SizeT times = 0;
+            for (const auto &operators : task.second) {
+                ss << "  |- Times: " << times << std::endl;
+                for (const auto &op : operators.timings_) {
+                    ss << "    -> " << op.name_
+                       << ": ConsumingTime: " << op.time_
+                       << ", InputRows: " << op.input_rows_
+                       << ", OutputRows: " << op.output_rows_
+                       << ", InputDataSize: " << op.input_data_size_
+                       << std::endl;
+                }
+                times ++;
+            }
+        }
     }
 }
 
@@ -263,7 +223,7 @@ String QueryProfiler::ToString() const {
         }
         if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kExecution) {
             ss << "--------------------------------" << std::endl;
-            Render(root_.get(), ss);
+            ExecuteRender(ss);
         }
     }
     return ss.str();

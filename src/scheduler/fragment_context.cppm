@@ -55,8 +55,8 @@ public:
 
     inline void IncreaseTask() { task_n_.fetch_add(1); }
 
-    inline void FlushProfiler(OperatorProfiler &profiler) {
-        query_context_->FlushProfiler(profiler);
+    inline void FlushProfiler(TaskProfiler &&profiler) {
+        query_context_->FlushProfiler(Move(profiler));
     }
 
     inline void FinishTask() {
@@ -92,6 +92,8 @@ public:
     }
 
     inline QueryContext *query_context() { return query_context_; }
+
+    inline PlanFragment *fragment_ptr() { return fragment_ptr_; }
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 

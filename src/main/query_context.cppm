@@ -83,8 +83,8 @@ public:
 
     [[nodiscard]] inline u64 max_node_id() const { return current_max_node_id_; }
 
-    void FlushProfiler(OperatorProfiler &profiler) {
-        query_metrics_->Flush(profiler);
+    void FlushProfiler(TaskProfiler &&profiler) {
+        query_metrics_->Flush(Move(profiler));
     }
 
     inline void set_max_node_id(u64 node_id) { current_max_node_id_ = node_id; }
