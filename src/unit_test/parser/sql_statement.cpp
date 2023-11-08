@@ -32,7 +32,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -62,7 +62,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "UPDATE t1 SET a = 1, b = 2 WHERE c = 'O''K';";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -92,7 +92,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "INSERT INTO t1 VALUES ('abc', 333);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -115,7 +115,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "INSERT INTO t1 VALUES ('abc', 333), ('def', 444);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -143,7 +143,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1, c2) USING IVFFlat WITH(metric = l2);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -171,7 +171,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "DROP INDEX index1 ON table1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -191,7 +191,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "DROP TABLE t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -211,7 +211,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "SHOW TABLES;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -229,7 +229,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "DESCRIBE t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -247,7 +247,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "copy t1 to '/usr/filename' with (format csv, header, delimiter '|');";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -269,7 +269,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "copy t1 to '/usr/filename' with (format json, header, delimiter '|');";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -291,7 +291,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "copy t2 from '/usr/filename' with (format csv, header, delimiter '|');";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -312,7 +312,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "copy t2 from '/usr/filename' with (format json, header, delimiter '|');";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -333,7 +333,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "select * from t1 except select * from t2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -355,7 +355,7 @@ TEST_F(StatementParsingTest, good_test1) {
 
     {
         String input_sql = "select * from t1 intersect select * from t2 union all select * from t3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);

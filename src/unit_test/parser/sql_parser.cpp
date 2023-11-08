@@ -94,7 +94,7 @@ TEST_F(SQLParserTest, good_test1) {
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
 
     for (const String &input : inputs) {
-        parser->Parse(input, result);
+        parser->Parse(input, result.get());
         std::cout << result->ToString() << std::endl;
         result->Reset();
     }
@@ -141,7 +141,7 @@ TEST_F(SQLParserTest, good_test2) {
                            "                 ae int not null, "
                            "                 af embedding(int, 32)); ";
 
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         for (auto &statement : *result->statements_ptr_) {
@@ -470,7 +470,7 @@ TEST_F(SQLParserTest, bad_test1) {
     {
         String input_sql = "create table t1 (a boolean primary key not null null unique,"
                            "                 b tinyint not null null unique,";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -482,7 +482,7 @@ TEST_F(SQLParserTest, bad_test1) {
         String input_sql = "create table t1 (a boolean primary key not null null unique,"
                            "                 b tinyint not null null unique "
                            "                 c smallint unique);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -492,7 +492,7 @@ TEST_F(SQLParserTest, bad_test1) {
 
     {
         String input_sql = "create table t1 t2 (a boolean primary key not null null unique);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
@@ -508,7 +508,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
     {
         String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -530,7 +530,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
     {
         String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -552,7 +552,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
     {
         String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -574,7 +574,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
     {
         String input_sql = "CREATE INDEX ON db1.t1 (a) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -596,7 +596,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
     {
         String input_sql = "CREATE INDEX ON t1 (a, b) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -619,7 +619,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
     }
     {
         String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat WITH (metric = l2);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         BaseStatement *statement = (*result->statements_ptr_)[0];
@@ -650,7 +650,7 @@ TEST_F(SQLParserTest, bad_create_index_1) {
 
     {
         String input_sql = "CREATE INDEX IF NOT EXISTS ON t1 (a) USING IVFFlat;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
