@@ -32,7 +32,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
 
     {
         String input_sql = "select a from t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -70,7 +70,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "select 1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -101,7 +101,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "select a, sum(b), function(c, nested(d)) from t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -177,7 +177,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "select * from t2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -212,7 +212,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT 10 - 20, 10 + -20, 10+-5.2, 9223372036854775807, -9223372036854775808";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -289,7 +289,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     }
     {
         String input_sql = "SELECT a, AVG(b) AS c FROM t1 GROUP BY a HAVING AVG(b) < 3.2";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -364,7 +364,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT a AS c FROM s1.t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -388,7 +388,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT count(distinct a), count(b) AS c FROM s3.t2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -429,7 +429,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT KNN(c1, [1, 2], 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -489,7 +489,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT a, b FROM s3.t2 ORDER BY a, b DESC;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -543,7 +543,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT a, b FROM s3.t2 WHERE a BETWEEN 1 AND 4;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -607,7 +607,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT * FROM s3.t2 WHERE a = (SELECT MIN(c) FROM t1) AND EXISTS (SELECT * FROM test WHERE x < y);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -695,7 +695,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT MIN(CASE WHEN c = 'xxx' THEN d ELSE 1 END) FROM s3.tx;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -752,7 +752,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT CASE WHEN a = 0 THEN 1 WHEN b > 3.5 THEN 2 END FROM s3.tx;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -821,7 +821,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT CASE b WHEN 1 THEN 10 WHEN 2 THEN 20 END FROM s3.tx;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -881,7 +881,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
     {
         String input_sql = "SELECT t1.a, t2.b, SUM(t2.price) FROM t3 INNER JOIN t1 ON t3.c = t1.c \
                            OUTER JOIN t2 ON t1.d = t2.d GROUP BY t1.a, t2.b;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -948,7 +948,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT * FROM t1, (SELECT a AS aa FROM aaa) AS t2, (SELECT b AS bb FROM bbb) AS t3";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -997,7 +997,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
 
     {
         String input_sql = "SELECT * FROM t1 AS xxx(a, b)";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1027,7 +1027,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     {
         String input_sql = "SELECT * FROM t1; \
                             SELECt * FROM t2; ";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1057,7 +1057,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 		                    SELECT * FROM t1 natural join t2; \
 		                    SELECT * FROM t1 cross join t2 on x = y; \
 		                    SELECT * FROM t1, t2 where x = y;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1120,7 +1120,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     {
         String input_sql = "SELECT * FROM t1 limit 1 + 1 offset 2 + 2; \
 		                    SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2); ";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1161,7 +1161,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
     {
         String input_sql = "SELECT extract('year' from date '2025-03-04'); \
 		                    SELECT * FROM t1 WHERE extract('year' from a) < 2023";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1193,7 +1193,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
     {
         String input_sql = "SELECT CAST(5.3 AS BIGINT);";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1211,7 +1211,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
     {
         String input_sql = "WITH t1 AS (SELECT a FROM x), t2 AS (SELECT b FROM y) SELECT * FROM t1, t2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1246,7 +1246,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
     {
         String input_sql = "select a + 3 day from t1;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1268,7 +1268,7 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
     {
         String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1300,7 +1300,7 @@ TEST_F(SelectStatementParsingTest, good_test4) {
 
     {
         String input_sql = "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 DAYS;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1334,7 +1334,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // integer with l2
         String input_sql = "SELECT KNN(c1, [1, 2], 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1395,7 +1395,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // bigint with cosine
         String input_sql = "SELECT KNN(c1, [3, 10, 1111], 'bigint', 'cosine') AS distance1 FROM t1 WHERE a < 0 ORDER BY distance1 LIMIT 2;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1457,7 +1457,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // double with cosine
         String input_sql = "SELECT KNN(c1, [1.0, 2.0], 'double', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1518,7 +1518,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // double with inner product
         String input_sql = "SELECT KNN(c1, [1.00, 2.00], 'double', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1580,7 +1580,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // bit with hamming
         String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0,0], 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1655,7 +1655,7 @@ TEST_F(SelectStatementParsingTest, good_knn_test) {
     {
         // float with inner product
         String input_sql = "SELECT KNN(c1, [1.00, 2.00], 'float', 'ip') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
@@ -1726,7 +1726,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
     {
         // bad dimension type double not match hamming
         String input_sql = "SELECT KNN(c1, [1.0, 2.0], 'double', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }
@@ -1734,7 +1734,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
     {
         // bit which length should be aligned with 8
         String input_sql = "SELECT KNN(c1, [1,0,1,0,1,1,0], 'bit', 'hamming') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }
@@ -1743,9 +1743,89 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
         // bit only support hamming
         String input_sql =
             "SELECT KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;";
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }
+}
+
+TEST_F(SelectStatementParsingTest, good_search_test) {
+
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    // integer with l2
+    String input_sql = R"##(
+    SELECT *
+    FROM t1
+    SEARCH
+        MATCH('author^2,name^5', 'frank dune'),
+        MATCH('name', 'to the star', 'operator=OR;fuzziness=AUTO:1,5;minimum_should_match=1'),
+        QUERY('name:dune'),
+        QUERY('_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~)', 'default_operator=and;default_field=name'),
+        FUSION('rrf', 'rank_constant=60;window_size=100')
+    WHERE a > 0
+    )##";
+    parser->Parse(input_sql, result.get());
+
+    EXPECT_TRUE(result->error_message_.empty());
+    EXPECT_TRUE(result->statements_ptr_ != nullptr);
+    EXPECT_TRUE(result->statements_ptr_->size() == 1);
+    auto &statement = result->statements_ptr_->at(0);
+
+    EXPECT_EQ(statement->type_, StatementType::kSelect);
+    auto *select_statement = (SelectStatement *)(statement);
+    EXPECT_NE(select_statement->search_expr_, nullptr);
+
+    EXPECT_EQ(select_statement->search_expr_->type_, ParsedExprType::kSearch);
+    auto *search_expr = (SearchExpr *)(select_statement->search_expr_);
+
+    EXPECT_EQ(search_expr->match_exprs_.size(), 2);
+    auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
+    EXPECT_EQ(match_expr0->fields_.size(), 2);
+    EXPECT_EQ(match_expr0->fields_[0].first, String("author"));
+    EXPECT_EQ(match_expr0->fields_[0].second, 2.0F);
+    EXPECT_EQ(match_expr0->fields_[1].first, String("name"));
+    EXPECT_EQ(match_expr0->fields_[1].second, 5.0F);
+    EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
+    EXPECT_EQ(match_expr0->options_.size(), 0);
+    auto *match_expr1 = (MatchExpr *)(search_expr->match_exprs_[1]);
+    EXPECT_EQ(match_expr1->fields_.size(), 1);
+    EXPECT_EQ(match_expr1->fields_[0].first, String("name"));
+    EXPECT_EQ(match_expr1->fields_[0].second, 1.0F);
+    EXPECT_EQ(match_expr1->matching_text_, String("to the star"));
+    EXPECT_EQ(match_expr1->options_.size(), 3);
+    EXPECT_EQ(match_expr1->options_[0].first, String("operator"));
+    EXPECT_EQ(match_expr1->options_[0].second, String("OR"));
+    EXPECT_EQ(match_expr1->options_[1].first, String("fuzziness"));
+    EXPECT_EQ(match_expr1->options_[1].second, String("AUTO:1,5"));
+    EXPECT_EQ(match_expr1->options_[2].first, String("minimum_should_match"));
+    EXPECT_EQ(match_expr1->options_[2].second, String("1"));
+
+    auto *query_expr0 = (QueryExpr *)(search_expr->query_exprs_[0]);
+    EXPECT_EQ(query_expr0->query_text_, String("name:dune"));
+    EXPECT_EQ(query_expr0->options_.size(), 0);
+    auto *query_expr1 = (QueryExpr *)(search_expr->query_exprs_[1]);
+    EXPECT_EQ(query_expr1->query_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
+    EXPECT_EQ(query_expr1->options_.size(), 2);
+    EXPECT_EQ(query_expr1->options_[0].first, String("default_operator"));
+    EXPECT_EQ(query_expr1->options_[0].second, String("and"));
+    EXPECT_EQ(query_expr1->options_[1].first, String("default_field"));
+    EXPECT_EQ(query_expr1->options_[1].second, String("name"));
+
+    EXPECT_NE(search_expr->fusion_expr_, nullptr);
+    auto *fusion_expr = search_expr->fusion_expr_;
+    EXPECT_EQ(fusion_expr->method_, String("rrf"));
+    EXPECT_EQ(fusion_expr->options_.size(), 2);
+    EXPECT_EQ(fusion_expr->options_[0].first, String("rank_constant"));
+    EXPECT_EQ(fusion_expr->options_[0].second, String("60"));
+    EXPECT_EQ(fusion_expr->options_[1].first, String("window_size"));
+    EXPECT_EQ(fusion_expr->options_[1].second, String("100"));
+
+    EXPECT_NE(select_statement->where_expr_, nullptr);
+    EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);
+
+    result->Reset();
 }

@@ -35,6 +35,7 @@ import infinity_exception;
 import singleton;
 import resource_manager;
 import storage;
+import query_result;
 
 module sql_runner;
 
@@ -61,7 +62,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
-    parser->Parse(sql_text, parsed_result);
+    parser->Parse(sql_text, parsed_result.get());
 
     if (parsed_result->IsError()) {
         Error<PlannerException>(parsed_result->error_message_);
@@ -96,12 +97,12 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
 
     // Initialize query result
-    QueryResponse query_response;
-    query_response.result_ = plan_fragment->GetResult();
-    query_response.root_operator_type_ = unoptimized_plan->operator_type();
+    QueryResult query_result;
+    query_result.result_table_ = plan_fragment->GetResult();
+    query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();
-    return query_response.result_;
+    return query_result.result_table_;
 }
 } // namespace infinity

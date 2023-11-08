@@ -30,6 +30,7 @@ import third_party;
 import data_table;
 import parser;
 import logical_node_type;
+import query_result;
 
 module connection;
 
@@ -125,16 +126,16 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     LOG_TRACE(Format("Query: {}", query));
 
     // Start to execute the query.
-    QueryResponse result = query_context->Query(query);
+    QueryResult result = query_context->Query(query);
 
     // Response to the result message to client
-    if (result.result_.get() == nullptr) {
+    if (result.result_table_.get() == nullptr) {
         HashMap<PGMessageType, String> error_message_map;
-        error_message_map[PGMessageType::kHumanReadableError] = *result.result_msg_;
+        error_message_map[PGMessageType::kHumanReadableError] = result.status_.message();
         pg_handler_->send_error_response(error_message_map);
     } else {
         // Have result
-        SendTableDescription(result.result_);
+        SendTableDescription(result.result_table_);
         SendQueryResponse(result);
     }
 
@@ -274,9 +275,9 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
     }
 }
 
-void Connection::SendQueryResponse(const QueryResponse &query_response) {
+void Connection::SendQueryResponse(const QueryResult &query_result) {
 
-    const SharedPtr<DataTable> &result_table = query_response.result_;
+    const SharedPtr<DataTable> &result_table = query_result.result_table_;
     SizeT column_count = result_table->ColumnCount();
     auto values_as_strings = Vector<Optional<String>>(column_count);
     SizeT block_count = result_table->DataBlockCount();
@@ -299,17 +300,17 @@ void Connection::SendQueryResponse(const QueryResponse &query_response) {
     }
 
     String message;
-    switch (query_response.root_operator_type_) {
+    switch (query_result.root_operator_type_) {
         case LogicalNodeType::kInsert: {
             message = "INSERT 0 1";
             break;
         }
         case LogicalNodeType::kImport: {
-            message = *query_response.result_->result_msg();
+            message = *query_result.result_table_->result_msg();
             break;
         }
         default: {
-            message = Format("SELECT {}", ToStr(query_response.result_->row_count()));
+            message = Format("SELECT {}", ToStr(query_result.result_table_->row_count()));
         }
     }
 

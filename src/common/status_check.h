@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "status.h"
-
 namespace infinity {
 
 #define STATUS_CHECK(func) \

@@ -39,13 +39,7 @@ QueryResult Table::CreateIndex(const String &index_name, Vector<String> *column_
     create_index_info->index_name_ = index_name;
     create_index_info->column_names_ = column_names;
 
-    QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
 }
 
@@ -62,13 +56,7 @@ QueryResult Table::DropIndex(const String &index_name) {
     drop_index_info->table_name_ = table_name_;
     drop_index_info->index_name_ = index_name;
 
-    QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;
 }
 
@@ -85,13 +73,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
     insert_statement->columns_ = columns;
     insert_statement->values_ = values;
 
-    QueryResponse response = query_context_ptr->QueryStatement(insert_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }
 
@@ -112,13 +94,7 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
     import_statement->copy_file_type_ = CopyFileType::kCSV;
     import_statement->delimiter_ = ',';
 
-    QueryResponse response = query_context_ptr->QueryStatement(import_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(import_statement.get());
     return result;
 }
 
@@ -132,13 +108,7 @@ QueryResult Table::Delete(ParsedExpr *filter) {
     delete_statement->schema_name_ = session_->current_database();
     delete_statement->table_name_ = table_name_;
     delete_statement->where_expr_ = filter;
-    QueryResponse response = query_context_ptr->QueryStatement(delete_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(delete_statement.get());
     return result;
 }
 
@@ -153,13 +123,7 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     update_statement->table_name_ = table_name_;
     update_statement->where_expr_ = filter;
     update_statement->update_expr_array_ = update_list;
-    QueryResponse response = query_context_ptr->QueryStatement(update_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
     return result;
 }
 
@@ -185,13 +149,7 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
 
-    QueryResponse response = query_context_ptr->QueryStatement(select_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;
 }
 

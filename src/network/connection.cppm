@@ -20,6 +20,7 @@ import session;
 import pg_protocol_handler;
 import query_context;
 import data_table;
+import query_result;
 
 export module connection;
 
@@ -44,7 +45,7 @@ private:
 
     void SendTableDescription(const SharedPtr<DataTable> &result_table);
 
-    void SendQueryResponse(const QueryResponse &query_response);
+    void SendQueryResponse(const QueryResult &query_result);
 
 private:
     const SharedPtr<AsioSocket> socket_{};

@@ -17,24 +17,30 @@ export module query_result;
 import stl;
 import data_table;
 import database_object;
+import status;
+import logical_node_type;
 
 namespace infinity {
 
-export struct QueryResult {
+export struct BaseResult {
 public:
 
-    [[nodiscard]] inline bool IsOk() const { return error_code_ == 0; }
-    [[nodiscard]] inline i64 ErrorCode() const { return error_code_; }
+    [[nodiscard]] inline bool IsOk() const { return status_.ok(); }
+    [[nodiscard]] inline ErrorCode ErrorCode() const { return status_.code(); }
     [[nodiscard]] inline DataTable* ResultTable() const { return result_table_.get(); }
 
-    template<typename ObjectType>
-    inline ObjectType* AsInfinity() { return static_cast<ObjectType*>(database_object_.get()); }
+//    template<typename ObjectType>
+//    inline ObjectType* AsInfinity() { return static_cast<ObjectType*>(database_object_.get()); }
 
 public:
-    i64 error_code_{};
-    SharedPtr<String> error_message_{};
+    Status status_{};
     SharedPtr<DataTable> result_table_{};
-    SharedPtr<DatabaseObject> database_object_{};
+//    SharedPtr<DatabaseObject> database_object_{};
+};
+
+export struct QueryResult : public BaseResult {
+    LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
+    String ToString() const;
 };
 
 }
