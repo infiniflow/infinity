@@ -12,7 +12,7 @@ module;
 import extra_sgemm;
 import extra_faiss_cmax_handler;
 
-export module extra_faiss_rewrite;
+export module extra_faiss_rewrite_deprecated;
 
 namespace infinity {
 

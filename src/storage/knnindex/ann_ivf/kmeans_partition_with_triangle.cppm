@@ -11,15 +11,15 @@ module;
 import stl;
 import infinity_exception;
 // import index_data;
-// import vector_distance;
+import vector_distance;
 import search_top_k;
 
-export module kmeans_partition;
+export module kmeans_partition_with_triangle;
 
 namespace infinity {
 
 // faiss helper
-struct ClusteringIterationStats {
+struct ClusteringIterationStats_ {
     float obj;               ///< objective values (sum of distances reported by index)
     double time;             ///< seconds for iteration
     double time_search;      ///< seconds for just search
@@ -29,7 +29,7 @@ struct ClusteringIterationStats {
 
 // from faiss
 template <typename T1, typename T2, typename T3>
-static double imbalance_factor(T1 n, T2 k, const T3 *hist) {
+static double imbalance_factor_(T1 n, T2 k, const T3 *hist) {
     double uf = 0;
     for (int i = 0; i < k; i++) {
         uf += ((double)hist[i]) * ((double)hist[i]);
@@ -38,13 +38,13 @@ static double imbalance_factor(T1 n, T2 k, const T3 *hist) {
 }
 
 // from faiss
-double elapsed() {
+double elapsed_() {
     struct timeval tv;
     gettimeofday(&tv, nullptr);
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
 
-Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0) {
+Vector<u32> random_permutation_id_partially_(u32 vector_count, u32 random_num = 0) {
     if (random_num == 0 || random_num > vector_count) {
         random_num = vector_count;
     }
@@ -68,18 +68,18 @@ Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0
 // partition_num: the number of partitions, default to sqrt(vector_count)
 // iteration_max: the max iteration count, default to 1
 export template <typename CentroidsType, typename ElemType, typename CentroidsOutputType>
-void k_means_partition_only_centroids_l2(u32 dimension,
-                                         u32 vector_count,
-                                         const ElemType *vectors_ptr,
-                                         CentroidsOutputType *centroids_output,
-                                         u32 partition_num = 0,
-                                         u32 iteration_max = 0) {
+void k_means_partition_only_centroids_with_triangle_l2(u32 dimension,
+                                                       u32 vector_count,
+                                                       const ElemType *vectors_ptr,
+                                                       CentroidsOutputType *centroids_output,
+                                                       u32 partition_num = 0,
+                                                       u32 iteration_max = 0) {
     constexpr int default_iteration_max = 10;
     constexpr bool b_debug_info = false;
 #ifdef rectime
     // Record time now.
     f64 t0;
-    std::cout << "\n[" << std::fixed << std::setprecision(3) << ((t0 = elapsed()), 0.f) << " s] "
+    std::cout << "\n[" << std::fixed << std::setprecision(3) << ((t0 = elapsed_()), 0.f) << " s] "
               << "k-means training begin." << std::endl;
 #endif
     if (dimension <= 0 || vector_count <= 0) {
@@ -120,7 +120,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
     // If input vectors are too many, randomly choose some vectors to train.
     {
 #ifdef rectime
-        auto t_prepare_training_data_now = elapsed();
+        auto t_prepare_training_data_now = elapsed_();
 #endif
         // TODO: user can change min max vectors per partition?
         u32 min_points_per_centroid = 39;
@@ -141,7 +141,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
             training_data_num = max_num;
             // generate random training data
             {
-                Vector<u32> random_ids = random_permutation_id_partially(vector_count, training_data_num);
+                Vector<u32> random_ids = random_permutation_id_partially_(vector_count, training_data_num);
                 random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
                 training_data = random_training_data_destructor.get();
                 for (u32 i = 0; i < training_data_num; ++i) {
@@ -152,17 +152,17 @@ void k_means_partition_only_centroids_l2(u32 dimension,
             }
         }
 #ifdef rectime
-        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                   << "training data prepared." << std::endl;
-        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "time for preparing training data: " << elapsed() - t_prepare_training_data_now << " s" << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
+                  << "time for preparing training data: " << elapsed_() - t_prepare_training_data_now << " s" << std::endl;
 #endif
     }
 
     // Initializing centroids
     {
 #ifdef rectime
-        auto t_init_centroids_now = elapsed();
+        auto t_init_centroids_now = elapsed_();
 #endif
         // If training vectors are randomly chosen, centroids can be copied from training data.
         // Otherwise, centroids need to be randomly generated.
@@ -175,7 +175,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
                 }
             }
         } else {
-            Vector<u32> random_ids = random_permutation_id_partially(training_data_num, partition_num);
+            Vector<u32> random_ids = random_permutation_id_partially_(training_data_num, partition_num);
             if constexpr (std::is_same_v<ElemType, CentroidsType>) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     memcpy(centroids + i * dimension, training_data + random_ids[i] * dimension, sizeof(ElemType) * dimension);
@@ -189,10 +189,10 @@ void k_means_partition_only_centroids_l2(u32 dimension,
             }
         }
 #ifdef rectime
-        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                   << "centroids initialized." << std::endl;
-        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "time for initializing centroids: " << elapsed() - t_init_centroids_now << " s" << std::endl;
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
+                  << "time for initializing centroids: " << elapsed_() - t_init_centroids_now << " s" << std::endl;
 #endif
     }
 
@@ -205,29 +205,72 @@ void k_means_partition_only_centroids_l2(u32 dimension,
     // Record the number of vectors in each partition
     Vector<u32> partition_element_count(partition_num);
 
+    // prepare space for triangle distance matrix
+    Vector<Vector<Pair<f32, u32>>> triangle_distance_matrix(partition_num, Vector<Pair<f32, u32>>(partition_num));
+
     // Iteration
     for (u32 iter = 1; iter <= iteration_max; ++iter) {
         // info
         f32 this_iter_distance = 0;
 #ifdef rectime
-        auto iter_begin_time = elapsed();
+        auto iter_begin_time = elapsed_();
         auto total_search_time = 0.0;
-        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+        std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                   << "iteration begin: " << iter << std::endl;
 #endif
+
+        // prepare distance matrix
+        {
+            for (u32 i = 0; i < partition_num; ++i) {
+                triangle_distance_matrix[i][i] = {0, i};
+                for (u32 j = i + 1; j < partition_num; ++j) {
+                    auto d = L2Distance<f32>(centroids + i * dimension, centroids + j * dimension, dimension);
+                    triangle_distance_matrix[i][j] = {d, j};
+                    triangle_distance_matrix[j][i] = {d, i};
+                }
+                std::sort(triangle_distance_matrix[i].begin(), triangle_distance_matrix[i].end());
+            }
+        }
+
         // First : assign each training vector to a partition
         {
 #ifdef rectime
-            auto t_search_now = elapsed();
+            auto t_search_now = elapsed_();
 #endif
-            // search top 1
-            search_top_1_with_dis(dimension,
-                                  training_data_num,
-                                  training_data,
-                                  partition_num,
-                                  centroids,
-                                  training_data_partition_id.data(),
-                                  partition_element_distance.data());
+            {
+                Vector<bool> visited(partition_num);
+                // use triangle information to assign partition
+                for (u32 i = 0; i < training_data_num; ++i) {
+                    // clear visited
+                    std::fill(visited.begin(), visited.end(), false);
+                    auto vector_pos_i = training_data + i * dimension;
+                    auto &partition_id = training_data_partition_id[i];
+                    // search
+                    f32 min_distance = L2Distance<f32>(vector_pos_i, centroids + partition_id * dimension, dimension);
+                    visited[partition_id] = true;
+                    for (u32 j = 0; j < partition_num; ++j) {
+                        if (!visited[j]) {
+                            auto d_j = L2Distance<f32>(vector_pos_i, centroids + j * dimension, dimension);
+                            if (d_j < min_distance) {
+                                min_distance = d_j;
+                                partition_id = j;
+                                visited[j] = true;
+                            } else {
+                                float bar = d_j - min_distance;
+                                for (auto [d_jk, k] : triangle_distance_matrix[j]) {
+                                    if (d_jk > bar) {
+                                        break;
+                                    }
+                                    if (!visited[k]) {
+                                        visited[k] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Clear partition_element_count
             memset(partition_element_count.data(), 0, sizeof(u32) * partition_num);
             // calculate partition_element_count
@@ -237,11 +280,11 @@ void k_means_partition_only_centroids_l2(u32 dimension,
             // add distance to this_iter_distance
             this_iter_distance += std::reduce(partition_element_distance.begin(), partition_element_distance.end());
 #ifdef rectime
-            total_search_time += elapsed() - t_search_now;
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            total_search_time += elapsed_() - t_search_now;
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                       << "training data partitioned." << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "time for partitioning training data: " << elapsed() - t_search_now << " s" << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
+                      << "time for partitioning training data: " << elapsed_() - t_search_now << " s" << std::endl;
 #endif
         }
 
@@ -252,7 +295,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
             for (u32 i = 0; i < partition_num; ++i) {
                 sum += partition_element_count[i];
             }
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                       << "sum of partition_element_count: " << sum << std::endl;
 #endif
         }
@@ -260,7 +303,7 @@ void k_means_partition_only_centroids_l2(u32 dimension,
         // Second : update centroids
         {
 #ifdef rectime
-            auto t_update_centroids_now = elapsed();
+            auto t_update_centroids_now = elapsed_();
 #endif
             // Clear old centroids data
             memset(centroids, 0, sizeof(CentroidsType) * partition_num * dimension);
@@ -282,10 +325,10 @@ void k_means_partition_only_centroids_l2(u32 dimension,
                 }
             }
 #ifdef rectime
-            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                       << "centroids updated." << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "time for updating centroids: " << elapsed() - t_update_centroids_now << " s" << std::endl;
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
+                      << "time for updating centroids: " << elapsed_() - t_update_centroids_now << " s" << std::endl;
 #endif
         }
 
@@ -304,16 +347,16 @@ void k_means_partition_only_centroids_l2(u32 dimension,
                         max = partition_element_count[i];
                     }
                 }
-                std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                           << "max of partition_element_count: " << max << std::endl;
-                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+                std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                           << "min of partition_element_count: " << min << std::endl;
                 std::cout << std::endl;
             }
 
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                       << "\nimbalance factor: " << std::fixed << std::setprecision(10)
-                      << imbalance_factor(training_data_num, partition_num, partition_element_count.data()) << std::endl;
+                      << imbalance_factor_(training_data_num, partition_num, partition_element_count.data()) << std::endl;
 #endif
         }
 
@@ -354,12 +397,12 @@ void k_means_partition_only_centroids_l2(u32 dimension,
 
         // output info
 #ifdef rectime
-        ClusteringIterationStats stats = {this_iter_distance,
-                                          elapsed() - iter_begin_time,
-                                          total_search_time,
-                                          imbalance_factor(training_data_num, partition_num, partition_element_count.data()),
-                                          (int)iter_split};
-        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
+        ClusteringIterationStats_ stats = {this_iter_distance,
+                                           elapsed_() - iter_begin_time,
+                                           total_search_time,
+                                           imbalance_factor_(training_data_num, partition_num, partition_element_count.data()),
+                                           (int)iter_split};
+        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed_() - t0 << " s] "
                   << "Iteration " << iter << " (" << std::fixed << std::setprecision(2) << stats.time << " s, search " << stats.time_search << " s): "
                   << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(7) << stats.imbalance_factor
                   << " nsplit=" << stats.nsplit << std::endl;

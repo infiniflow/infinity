@@ -9,7 +9,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 import parser;
-import knn_flat_ip;
+// import knn_flat_ip;
 import infinity;
 import ann_ivf_flat;
 
