@@ -104,7 +104,7 @@ void TaskProfiler::StopOperator(const InputState *input_state, const OutputState
     auto input_data_size = input_block ? input_block->GetSizeInBytes() : 0;
     auto output_rows = output_block ? output_block->row_count() : 0;
 
-    OperatorInformation info(active_operator_->GetName(), profiler_.Elapsed(), input_rows, input_data_size, output_rows);
+    OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, input_data_size, output_rows);
 
     timings_.push_back(Move(info));
     active_operator_ = nullptr;
@@ -177,9 +177,6 @@ void QueryProfiler::Flush(TaskProfiler &&profiler) {
 }
 
 void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
-    if (!enable_) {
-        return;
-    }
     for (const auto &fragment : records_) {
         ss << "Fragment #" << fragment.first << std::endl;
         for (const auto &task : fragment.second) {
@@ -189,7 +186,9 @@ void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
                 ss << "  |- Times: " << times << std::endl;
                 for (const auto &op : operators.timings_) {
                     ss << "    -> " << op.name_
-                       << ": ConsumingTime: " << op.time_
+                       << ": BeginTime: " << op.start_
+                       << ": EndTime: " << op.end_
+                       << ": ElapsedTime: " << op.elapsed_
                        << ", InputRows: " << op.input_rows_
                        << ", OutputRows: " << op.output_rows_
                        << ", InputDataSize: " << op.input_data_size_
@@ -227,6 +226,41 @@ String QueryProfiler::ToString() const {
         }
     }
     return ss.str();
+}
+
+Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
+    Json json;
+
+    for (const auto &fragment : profiler->records_) {
+        Json json_fragments;
+        for (const auto &task : fragment.second) {
+            Json json_tasks;
+            SizeT times = 1;
+            json_tasks["task_id"] = task.first;
+            for (const auto &operators : task.second) {
+                Json json_operators;
+                json_operators["times"] = times;
+                for (const auto &op : operators.timings_) {
+                    Json json_info;
+                    json_info["name"] = op.name_;
+                    json_info["start"] = op.start_;
+                    json_info["end"] = op.end_;
+                    json_info["elapsed"] = op.elapsed_;
+                    json_info["input_rows"] = op.input_rows_;
+                    json_info["output_rows"] = op.output_rows_;
+                    json_info["input_data_size"] = op.input_data_size_;
+                    json_operators["infos"].push_back(json_info);
+                }
+                times ++;
+                json_tasks["operators"].push_back(json_operators);
+            }
+            json_fragments["tasks"].push_back(json_tasks);
+        }
+        json_fragments["fragment_id"] = fragment.first;
+        json["fragments"].push_back(json_fragments);
+    }
+
+    return json;
 }
 
 } // namespace infinity

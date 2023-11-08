@@ -96,10 +96,6 @@ TaskBinding FragmentTask::TaskBinding() const {
 
     binding.task_id_ = task_id_;
     binding.fragment_id_ = fragment_context->fragment_ptr()->FragmentID();
-    auto &fragment_children = fragment_context->fragment_ptr()->Children();
-    for (int i = 0; i < fragment_children.size(); ++i) {
-        binding.child_fragment_id_.push_back(fragment_children[i]->FragmentID());
-    }
     return binding;
 }
 

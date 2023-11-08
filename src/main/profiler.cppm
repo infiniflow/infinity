@@ -38,6 +38,10 @@ public:
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline i64 Elapsed() const { return ElapsedInternal().count(); }
 
+    [[nodiscard]] inline i64 GetBegin() const { return begin_ts_.time_since_epoch().count(); }
+
+    [[nodiscard]] inline i64 GetEnd() const { return end_ts_.time_since_epoch().count(); }
+
     [[nodiscard]] const String &name() const { return name_; }
     void set_name(const String &name) { name_ = name; }
 
@@ -69,22 +73,24 @@ struct OperatorInformation {
     OperatorInformation() = default;
 
     OperatorInformation(const OperatorInformation& other)
-        : name_(other.name_), time_(other.time_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+        : name_(other.name_), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
 
     }
 
     OperatorInformation(OperatorInformation&& other)
-        : name_(Move(other.name_)), time_(other.time_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+        : name_(Move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
     }
 
-    OperatorInformation(String name, i64 time, u16 input_rows, i32 input_data_size, u16 output_rows)
-        : name_(Move(name)), time_(time), input_rows_(input_rows), input_data_size_(input_data_size), output_rows_(output_rows) {
+    OperatorInformation(String name, i64 start, i64 end, i64 elapsed, u16 input_rows, i32 input_data_size, u16 output_rows)
+        : name_(Move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), input_data_size_(input_data_size), output_rows_(output_rows) {
     }
 
     OperatorInformation& operator=(OperatorInformation&& other) {
         if (this != &other) {
             name_ = Move(other.name_);
-            time_ = other.time_;
+            start_ = Move(other.start_);
+            end_ = Move(other.end_);
+            elapsed_ = other.elapsed_;
             input_rows_ = other.input_rows_;
             output_rows_ = other.output_rows_;
             input_data_size_ = other.input_data_size_;
@@ -92,7 +98,9 @@ struct OperatorInformation {
         return *this;
     }
 
-    i64 time_ = 0;
+    i64 start_ = 0;
+    i64 end_ = 0;
+    i64 elapsed_ = 0;
     u16 input_rows_ = 0;
     u16 output_rows_ = 0;
     i32 input_data_size_ = 0;
@@ -103,7 +111,6 @@ struct OperatorInformation {
 export struct TaskBinding {
     u64 fragment_id_ {};
     i64 task_id_ {};
-    Vector<u64> child_fragment_id_ {};
 };
 
 export class OptimizerProfiler {
@@ -162,6 +169,8 @@ public:
     [[nodiscard]] String ToString() const;
 
     static String QueryPhaseToString(QueryPhase phase);
+
+    static Json Serialize(const QueryProfiler *profiler);
 
 private:
     bool enable_ = false;
