@@ -19,6 +19,7 @@ import base_entry;
 import buffer_handle;
 import third_party;
 import buffer_obj;
+import index_data;
 
 export module index_entry;
 
@@ -26,6 +27,7 @@ namespace infinity {
 
 class SegmentEntry;
 class FaissIndexPtr;
+class AnnIVFFlatIndexPtr;
 class BufferManager;
 
 export class IndexEntry : public BaseEntry {
@@ -38,6 +40,11 @@ public:
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
                                                FaissIndexPtr *index);
+    static SharedPtr<IndexEntry> NewAnnIVFFlatIndexEntry(SegmentEntry *segment_entry,
+                                                         SharedPtr<String> index_name,
+                                                         TxnTimeStamp create_ts,
+                                                         BufferManager *buffer_manager,
+                                                         AnnIVFFlatIndexPtr *index_ptr);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.

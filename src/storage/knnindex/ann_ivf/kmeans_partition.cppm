@@ -1,7 +1,6 @@
 
 module;
 #define rectime 0
-// #define usefaiss 0
 #include <algorithm>
 #include <cstring>
 #include <iomanip>
@@ -10,18 +9,10 @@ module;
 #include <sys/time.h>
 
 import stl;
-// import knn_heap;
-// import knn_result_handler;
-// import knn_distance;
-// import knn_partition;
-// import faiss;
-// import parser;
-// import third_party;
 import infinity_exception;
 import index_data;
 import vector_distance;
 import search_top_k;
-// import extra_faiss_part;
 
 export module kmeans_partition;
 
@@ -52,55 +43,6 @@ double elapsed() {
     gettimeofday(&tv, nullptr);
     return tv.tv_sec + tv.tv_usec * 1e-6;
 }
-/*
-// from faiss
-struct RandomGenerator {
-    std::mt19937 mt;
-
-    /// random positive integer
-    int rand_int() { return mt() & 0x7fffffff; }
-
-    /// random int64_t
-    int64_t rand_int64() { return int64_t(rand_int()) | int64_t(rand_int()) << 31; }
-
-    /// generate random integer between 0 and max-1
-    int rand_int(int max) { return mt() % max; }
-
-    /// between 0 and 1
-    float rand_float() { return mt() / float(mt.max()); }
-
-    double rand_double() { return mt() / double(mt.max()); }
-
-    explicit RandomGenerator(int64_t seed = 1234) : mt((unsigned int)seed) {}
-};
-
-// from faiss
-void rand_perm(int *perm, size_t n, int64_t seed) {
-    for (size_t i = 0; i < n; i++)
-        perm[i] = i;
-
-    RandomGenerator rng;
-
-    for (size_t i = 0; i + 1 < n; i++) {
-        int i2 = i + rng.rand_int(n - i);
-        std::swap(perm[i], perm[i2]);
-    }
-}
-
-template <typename DiffType, typename ElemType, typename CentroidType>
-Pair<i32, DiffType> l2_find_nearest_centroid(i32 dimension, const ElemType *vector_ptr, i32 partition_num, const CentroidType *centroids_ptr) {
-    i32 nearest_centroid_id = -1;
-    DiffType nearest_distance = std::numeric_limits<DiffType>::max();
-    for (i32 i = 0; i < partition_num; ++i) {
-        DiffType distance = L2Distance<DiffType>(vector_ptr, centroids_ptr + i * dimension, dimension);
-        if (distance < nearest_distance) {
-            nearest_distance = distance;
-            nearest_centroid_id = i;
-        }
-    }
-    return {nearest_centroid_id, nearest_distance};
-}
-*/
 
 Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0) {
     if (random_num == 0 || random_num > vector_count) {
@@ -208,30 +150,6 @@ void k_means_partition_only_centroids_l2(u32 dimension,
                            dimension * sizeof(ElemType));
                 }
             }
-            /*
-            {
-                Vector<i32> random_ids(vector_count);
-                rand_perm(random_ids.data(), vector_count, 1234);
-                // output content of random_ids
-                std::cout << "random_ids nums: " << training_data_num << std::endl;
-                for (int i = 0; i < 20; i++) {
-                    std::cout << random_ids[i] << " ";
-                }
-                std::cout << std::endl;
-                // output dimension, training_data_num, dimension * training_data_num
-                std::cout << "dimension: " << dimension << std::endl;
-                std::cout << "training_data_num: " << training_data_num << std::endl;
-                std::cout << "dimension * training_data_num: " << dimension * training_data_num << std::endl;
-                random_training_data_destructor = MakeUnique<ElemType[]>(dimension * training_data_num);
-                for (i32 i = 0; i < training_data_num; ++i) {
-                    memcpy(random_training_data_destructor.get() + i * dimension,
-                           vectors_ptr + random_ids[i] * dimension,
-                           dimension * sizeof(ElemType));
-                }
-                training_data = random_training_data_destructor.get();
-                std::cout << "random training vectors generated." << std::endl;
-            }
-            */
         }
 #ifdef rectime
         std::cout << "\n[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
@@ -371,37 +289,9 @@ void k_means_partition_only_centroids_l2(u32 dimension,
 #endif
         }
 
-        // output centroids
-        {
-#ifdef rectime
-//            // output content of centroids, 128 per line
-//            std::cout << "######################################################" << std::endl;
-//            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-//                      << "first 3 centroids:\n";
-//            for (u32 i = 0; i < 3; ++i) {
-//                std::cout << "partition " << i << ": ";
-//                for (u32 j = 0; j < dimension; ++j) {
-//                    std::cout << centroids[i * dimension + j] << " ";
-//                }
-//                std::cout << std::endl;
-//            }
-//            std::cout << "######################################################" << std::endl;
-//            std::cout << std::endl;
-#endif
-        }
-
         // output imbalance factor
         {
 #ifdef rectime
-            // // output content of partition_element_count, 70 per line
-            // std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-            //           << "partition_element_count:\n";
-            // for (u32 i = 0; i < partition_num; ++i) {
-            //     std::cout << partition_element_count[i] << " ";
-            //     if (i % 70 == 69)
-            //         std::cout << std::endl;
-            // }
-            //
             // output min, max of partition_element_count
             if constexpr (false) {
                 u32 min = std::numeric_limits<u32>::max();
@@ -489,91 +379,4 @@ void k_means_partition_only_centroids_l2(u32 dimension,
         }
     }
 }
-
-export template <typename ElemType, typename CentroidsDataType, typename VectorDataType>
-void add_data_to_partition_l2(u32 dimension,
-                              u32 vector_count,
-                              const ElemType *vectors_ptr,
-                              u32 segment_id,
-                              IVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data) {
-    if (vector_count <= 0 || index_data == nullptr) {
-        std::cout << "\nwarning : vector_count <= 0 || index_data == nullptr" << std::endl;
-        return;
-    }
-    if (index_data->dimension_ != dimension) {
-        std::cerr << "\nError : index_data->dimension_ != dimension" << std::endl;
-        return;
-    }
-    u32 partition_num = index_data->partition_num_;
-    const auto &centroids = index_data->centroids_;
-    auto &vectors = index_data->vectors_;
-    auto &ids = index_data->ids_;
-    Vector<u32> assigned_partition_id(vector_count);
-    // record time
-#ifdef rectime
-    f64 t0;
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << ((t0 = elapsed()), 0.0) << " s] "
-              << "input vectors classification begin.\n"
-              << "##################################################" << std::endl;
-#endif
-    // Classify vectors
-    // search_top_1
-
-#ifdef usefaiss
-    Vector<f32> distances(vector_count);
-    // float_maxheap_array_t<i32> res1 = {size_t(vector_count), size_t(1), assigned_partition_id.data(), distances.data()};
-    FaissSingleBestResultHandler<FaissCMax<float, i32>> res(vector_count, distances.data(), assigned_partition_id.data());
-    // knn_L2sqr_select(vectors_ptr, index_data->centroids_.data(), dimension, vector_count, index_data->partition_num_, res, y_norm2, sel);
-    // exhaustive_L2sqr_blas(vectors_ptr, index_data->centroids_.data(), dimension, vector_count, index_data->partition_num_, res, nullptr);
-    exhaustive_L2sqr_blas_cmax_avx2(vectors_ptr, index_data->centroids_.data(), dimension, vector_count, index_data->partition_num_, res, nullptr);
-    // output assigned_partition_id
-    // check coarse_idx of 567736
-    std::cout << "#####################################################"
-              << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-              << "\nassigned_partition_id of 567736:\t";
-    std::cout << assigned_partition_id[567736] << std::endl;
-    std::cout << "#####################################################\n" << std::endl;
-#else
-    search_top_1_without_dis<f32>(dimension, vector_count, vectors_ptr, partition_num, centroids.data(), assigned_partition_id.data());
-#endif
-
-#ifdef rectime
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-              << "input vectors classification finished.\n"
-              << "##################################################" << std::endl;
-#endif
-
-    Vector<u32> partition_element_count(partition_num);
-    // calculate partition_element_count
-    for (auto i : assigned_partition_id)
-        ++partition_element_count[i];
-    // Reserve space
-    for (u32 i = 0; i < partition_num; ++i) {
-        vectors[i].reserve(vectors[i].size() + partition_element_count[i] * dimension);
-        ids[i].reserve(ids[i].size() + partition_element_count[i]);
-    }
-
-    // insert vectors to partition
-    for (u32 i = 0; i < vector_count; ++i) {
-        auto vector_pos_i = vectors_ptr + i * dimension;
-        auto partition_of_i = assigned_partition_id[i];
-        vectors[partition_of_i].insert(vectors[partition_of_i].end(), vector_pos_i, vector_pos_i + dimension);
-        ids[partition_of_i].emplace_back(segment_id, i);
-    }
-    // update data_num_
-    index_data->data_num_ += vector_count;
-
-#ifdef rectime
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-              << "input vectors insertion finished.\n"
-              << "##################################################" << std::endl;
-#endif
-}
-
 } // namespace infinity

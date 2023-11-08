@@ -61,10 +61,10 @@ TEST_F(AnnIVFFlatL2Test, test1) {
 
     AnnIVFFlatL2<f32> ann_distance(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
 
-    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 1, 0);
+    auto ann_ivf_l2_index = AnnIVFFlatL2<f32>::CreateIndex(dimension, base_embedding_count, base_embedding.get(), 1);
 
     ann_distance.Begin();
-    ann_distance.Search(ann_ivf_l2_index.get(), 1);
+    ann_distance.Search(ann_ivf_l2_index.get(), 0, 1);
     ann_distance.End();
 
     f32 *distance_array = ann_distance.GetDistanceByIdx(0);

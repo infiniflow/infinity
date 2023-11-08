@@ -27,6 +27,7 @@ import data_block;
 import txn;
 import data_access_state;
 import index_def;
+import index_data;
 import table_collection_entry;
 import base_entry;
 
@@ -35,6 +36,8 @@ import defer_op;
 import ivfflat_index_def;
 import buffer_handle;
 import faiss_index_file_worker;
+import ann_ivf_index_file_worker;
+import ann_ivf_flat;
 import logger;
 import local_file_system;
 import random;
@@ -167,6 +170,40 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
     Vector<SharedPtr<IndexEntry>> index_entries;
     switch (index_def.method_type_) {
         case IndexMethod::kIVFFlat: {
+            auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
+            auto metric = ivfflat_index_def.metric_type_;
+            switch (metric) {
+                case MetricType::kMerticL2:
+                    // case MetricType::kMerticInnerProduct:
+                    break;
+                case MetricType::kInvalid:
+                    Error<StorageException>("Metric type is invalid");
+                default:
+                    Error<NotImplementException>("Not implemented");
+            }
+            // TODO: assume that this index is created on float column?
+            Vector<f32> all_data;
+            all_data.reserve((segment_entry->row_count_) * dimension);
+            for (const auto &block_entry : segment_entry->block_entries_) {
+                auto block_column_entry = block_entry->columns_[column_id].get();
+                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+                auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
+                SizeT block_row_cnt = block_entry->row_count_;
+                all_data.insert(all_data.end(), block_data_ptr, block_data_ptr + block_row_cnt * dimension);
+            }
+            auto ann_index_data =
+                AnnIVFFlatL2<f32>::CreateIndex(dimension, segment_entry->row_count_, all_data.data(), ivfflat_index_def.centroids_count_);
+
+            auto index_entry = IndexEntry::NewAnnIVFFlatIndexEntry(segment_entry,
+                                                                   index_def.index_name_,
+                                                                   create_ts,
+                                                                   buffer_mgr,
+                                                                   new AnnIVFFlatIndexPtr(ann_index_data.release()));
+
+            txn_store->CreateIndexFile(segment_entry->segment_id_, Move(index_entry));
+            return index_entry;
+        }
+        case IndexMethod::kIVFFlatFaiss: {
             auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
             faiss::IndexFlat *quantizer = nullptr;
             faiss::MetricType metric = faiss::MetricType::METRIC_L2;

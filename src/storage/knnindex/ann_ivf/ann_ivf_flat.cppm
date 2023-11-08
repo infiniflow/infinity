@@ -3,14 +3,13 @@ module;
 #include <algorithm>
 #include <iostream>
 import stl;
-// import knn_heap;
 import knn_result_handler;
 import knn_distance;
-// import knn_partition;
 import faiss;
 import parser;
 import third_party;
 import infinity_exception;
+import index_def;
 import index_data;
 import kmeans_partition;
 import vector_distance;
@@ -37,19 +36,18 @@ public:
         single_heap_result_handler_ = MakeUnique<HeapSingleHandler>(*heap_result_handler_, query_count);
     }
 
-    static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num, u32 segment_id) {
-        auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
+    static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
+        auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticL2, dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, vector_count, vectors_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, segment_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, index_data.get());
         return index_data;
     }
 
-    static SharedPtr<IVFFlatIndexData<DistType>>
-    CreateIndex(u32 dimension, u32 train_count, DistType *train_ptr, u32 vector_count, DistType *vectors_ptr, u32 partition_num, u32 segment_id) {
-        auto index_data = MakeShared<IVFFlatIndexData<DistType>>(dimension, partition_num);
+    static UniquePtr<AnnIVFFlatIndexData<DistType>>
+    CreateIndex(u32 dimension, u32 train_count, DistType *train_ptr, u32 vector_count, DistType *vectors_ptr, u32 partition_num) {
+        auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticL2, dimension, partition_num);
         k_means_partition_only_centroids_l2<f32>(dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, segment_id, index_data.get());
+        add_data_to_partition_l2(dimension, vector_count, vectors_ptr, index_data.get());
         return index_data;
     }
 
@@ -67,7 +65,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {}
 
-    void Search(const IVFFlatIndexData<DistType> *base_ivf, i32 n_probes) {
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, i32 n_probes) {
         constexpr bool b_debug_info = false;
         if (base_ivf->partition_num_ < n_probes) {
             Error<ExecutorException>("n_probes > partition_num_", __FILE_NAME__, __LINE__);
@@ -80,8 +78,6 @@ public:
             return;
         }
         this->total_base_count_ += base_ivf->data_num_;
-        // TODO:remove this counter
-        i32 counter_1 = 0, counter_10 = 0, counter_100 = 0;
         if (n_probes == 1) {
             Vector<u32> assign_centroid_ids(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
@@ -91,45 +87,13 @@ public:
                                                base_ivf->centroids_.data(),
                                                assign_centroid_ids.data());
             for (u64 i = 0; i < this->query_count_; i++) {
-                if constexpr (b_debug_info) {
-                    if (i == 1472) {
-                        i32 selected_centroid = assign_centroid_ids[i];
-                        // output i, selected_centroid, with description
-                        std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << std::endl;
-                        // check if base_ivf->ids_[selected_centroid] contain 567736
-                        std::cout << "\ncontain 567736: "
-                                  << (std::find_if(base_ivf->ids_[selected_centroid].begin(),
-                                                   base_ivf->ids_[selected_centroid].end(),
-                                                   [](auto &R) { return R.segment_offset_ == 567736; }) != base_ivf->ids_[selected_centroid].end())
-                                  << std::endl;
-                    }
-                }
                 u32 selected_centroid = assign_centroid_ids[i];
                 u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                if constexpr (b_debug_info) {
-                    if (contain_nums < 100) {
-                        // output i, selected_centroid, contain_nums, with description
-                        std::cout << "\ni: " << i << ", selected_centroid: " << selected_centroid << ", contain_nums: " << contain_nums << std::endl;
-                        if (contain_nums < 100) {
-                            counter_100++;
-                            if (contain_nums < 10) {
-                                counter_10++;
-                                if (contain_nums < 1) {
-                                    counter_1++;
-                                }
-                            }
-                        }
-                    }
-                    // for i = 0, 10, output contain_nums
-                    if (i < 10) {
-                        std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
-                    }
-                }
                 const DistType *x_i = this->queries_ + i * this->dimension_;
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
+                    single_heap_result_handler_->add_result(ip, RowID(segment_id, base_ivf->ids_[selected_centroid][j]), i);
                 }
             }
         } else {
@@ -152,43 +116,15 @@ public:
                     for (u32 k = 0; k < n_probes; k++) {
                         const u32 selected_centroid = centroid_ids[k];
                         const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                        if constexpr (false) {
-                            if (contain_nums < 100) {
-                                // output i, k, selected_centroid, contain_nums, with description
-                                std::cout << "\ni: " << i << ", k: " << k << ", selected_centroid: " << selected_centroid
-                                          << ", contain_nums: " << contain_nums << std::endl;
-                                if (contain_nums < 100) {
-                                    counter_100++;
-                                    if (contain_nums < 10) {
-                                        counter_10++;
-                                        if (contain_nums < 1) {
-                                            counter_1++;
-                                        }
-                                    }
-                                }
-                            }
-                            // for i = 0, 10, output contain_nums
-                            if (i < 10) {
-                                std::cout << "\ni: " << i << " contain_nums: " << contain_nums << std::endl;
-                            }
-                        }
                         const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                         for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                             DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                            single_heap_result_handler_->add_result(ip, base_ivf->ids_[selected_centroid][j], i);
+                            single_heap_result_handler_->add_result(ip, RowID(segment_id, base_ivf->ids_[selected_centroid][j]), i);
                         }
                     }
                 }
             } else {
             }
-        }
-        if constexpr (b_debug_info) {
-            // output counter_1, counter_10, counter_100, with description
-            std::cout << "\ncounter_1: " << counter_1 << ", counter_10: " << counter_10 << ", counter_100: " << counter_100 << std::endl;
-            // output counter_1, counter_10, counter_100, divided by query_count_ (float result), with description
-            std::cout << "\nfloat percentage:\ncounter_1: " << (float)counter_1 / this->query_count_
-                      << ", counter_10: " << (float)counter_10 / this->query_count_ << ", counter_100: " << (float)counter_100 / this->query_count_
-                      << std::endl;
         }
     }
 

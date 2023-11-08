@@ -23,6 +23,7 @@ namespace infinity {
 
 export enum class IndexMethod {
     kIVFFlat,
+    kIVFFlatFaiss,
     kIVFSQ8,
     kHnsw,
     kInvalid,

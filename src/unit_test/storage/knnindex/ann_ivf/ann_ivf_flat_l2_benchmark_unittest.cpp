@@ -38,7 +38,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int global_nb = 100'000;
 int n_lists;
-int n_probes = 3;
+int n_probes = 5;
 size_t k;
 
 faiss::idx_t *I1;
@@ -276,7 +276,7 @@ void benchmark_annivfflatl2() {
 
     size_t partition_num;
 
-    SharedPtr<IVFFlatIndexData<float>> ann_index_data;
+    UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
 
     {
         size_t nt;
@@ -304,7 +304,7 @@ void benchmark_annivfflatl2() {
         printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", elapsed() - t0, nt, partition_num);
 
         // ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
-        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
+        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num);
         // TODO:remove this
         {
             int c1 = 88, c2 = 286;
@@ -312,12 +312,9 @@ void benchmark_annivfflatl2() {
             auto v_ids_286 = ann_index_data->ids_[c2];
             // output i, selected_centroid, with description
             std::cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-                      << c1 << " contain 567736: "
-                      << (std::find_if(v_ids_88.begin(), v_ids_88.end(), [](auto &id) { return id.segment_offset_ == 567736; }) != v_ids_88.end())
-                      << std::endl;
+                      << c1 << " contain 567736: " << (std::find(v_ids_88.begin(), v_ids_88.end(), 567736) != v_ids_88.end()) << std::endl;
             std::cout << "\n"
-                      << c2 << " contain 567736: "
-                      << (std::find_if(v_ids_286.begin(), v_ids_286.end(), [](auto &id) { return id.segment_offset_ == 567736; }) != v_ids_286.end())
+                      << c2 << " contain 567736: " << (std::find(v_ids_286.begin(), v_ids_286.end(), 567736) != v_ids_286.end())
                       << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
                       << std::endl;
         }
@@ -391,7 +388,7 @@ void benchmark_annivfflatl2() {
 
         AnnIVFFlatL2<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
         test_ivf.Begin();
-        test_ivf.Search(ann_index_data.get(), n_probes);
+        test_ivf.Search(ann_index_data.get(), 0, n_probes);
         test_ivf.End();
 
         I2 = test_ivf.GetIDs();
@@ -447,8 +444,8 @@ void benchmark_annivfflatl2() {
             {
                 std::cout << "############################" << std::endl;
                 std::cout << "D1 and D2 difference:\n";
-                for (int id1 = 0, id2 = 0, diffc1 = 0; diffc1 < 50 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
-                    if (D1[id1] == D2[id2]) {
+                for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 500 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
+                    if (abs(D1[id1] - D2[id2]) < 0.01f) {
                         ++id1;
                         ++id2;
                     } else {
@@ -466,6 +463,11 @@ void benchmark_annivfflatl2() {
                                       << "]: " << D2[id2] << " difference: " << D1[id1] - D2[id2] << std::endl;
                             ++id2;
                         }
+                    }
+                    if (((id1 % k) == 0) || ((id2 % k) == 0)) {
+                        ++q;
+                        id1 = q * k;
+                        id2 = q * k;
                     }
                 }
                 std::cout << "############################" << std::endl;

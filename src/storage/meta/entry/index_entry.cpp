@@ -27,6 +27,7 @@ import third_party;
 import infinity_exception;
 import base_entry;
 import faiss_index_file_worker;
+import ann_ivf_index_file_worker;
 
 module index_entry;
 
@@ -50,6 +51,24 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(SegmentEntry *segment_entry,
     auto buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_manager);
     auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
     *dest = *index;
+    return index_entry;
+}
+
+SharedPtr<IndexEntry> IndexEntry::NewAnnIVFFlatIndexEntry(SegmentEntry *segment_entry,
+                                                          SharedPtr<String> index_name,
+                                                          TxnTimeStamp create_ts,
+                                                          BufferManager *buffer_manager,
+                                                          AnnIVFFlatIndexPtr *index_ptr) {
+    // FIXME shenyushi: estimate index size.
+    auto file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_name, 0);
+    auto buffer = buffer_manager->Allocate(std::move(file_worker));
+    // FIXME shenyushi: Should use make_shared instead. One heap allocate
+    auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, std::move(index_name), buffer));
+    index_entry->min_ts_ = create_ts;
+    index_entry->max_ts_ = create_ts;
+    auto buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_manager);
+    auto dest = static_cast<AnnIVFFlatIndexPtr *>(buffer_handle.GetDataMut());
+    *dest = *index_ptr;
     return index_entry;
 }
 
