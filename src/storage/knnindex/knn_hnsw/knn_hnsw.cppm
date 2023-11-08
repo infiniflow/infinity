@@ -15,9 +15,9 @@
 module;
 
 #include "storage/knnindex/header.h"
+#include <algorithm>
 #include <cassert>
 #include <random>
-#include <algorithm>
 
 import cmp;
 import stl;
@@ -131,9 +131,7 @@ private:
     LabelType *GetLabelMut(VertexType vertex_idx) { return reinterpret_cast<LabelType *>(graph_ + vertex_idx * level0_size_ + label_offset_); }
 
 public:
-    template <typename SpaceType>
-        requires SpaceConcept<DataType, SpaceType>
-    KnnHnsw(SizeT max_vertex, SizeT dim, SpaceType space, SizeT M, SizeT ef_construction, SizeT random_seed = 100)
+    KnnHnsw(SizeT max_vertex, SizeT dim, const SpaceBase<DataType> &space, SizeT M, SizeT ef_construction, SizeT ef = 0, SizeT random_seed = 100)
         : max_vertex_(max_vertex), dim_(dim),                                                            //
           M_(M), Mmax_(M_), Mmax0_(2 * Mmax_), ef_construction_(Max(M_, ef_construction)),               //
           dist_func_(space.DistFuncPtr()),                                                               //
@@ -150,7 +148,10 @@ public:
           layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax_, sizeof(VertexListSize))), //
           loaded_vertex_n_(0), loaded_layers_(nullptr)                                                   //
     {
-        ef_ = 10;
+        if (ef == 0) {
+            ef = ef_construction_;
+        }
+        ef_ = ef;
         cur_vertex_n_ = 0;
         max_layer_ = -1;
         enterpoint_ = -1;
@@ -403,81 +404,93 @@ public:
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
-    void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
-        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
-        fs->Write(*file_handler, &max_vertex_, sizeof(max_vertex_));
-        fs->Write(*file_handler, &dim_, sizeof(dim_));
-        fs->Write(*file_handler, &M_, sizeof(M_));
-        fs->Write(*file_handler, &ef_construction_, sizeof(ef_construction_));
-        fs->Write(*file_handler, &cur_vertex_n_, sizeof(cur_vertex_n_));
-        fs->Write(*file_handler, &max_layer_, sizeof(max_layer_));
-        fs->Write(*file_handler, &enterpoint_, sizeof(enterpoint_));
+    void SaveIndexInner(FileHandler &file_handler) {
+        file_handler.Write(&max_vertex_, sizeof(max_vertex_));
+        file_handler.Write(&dim_, sizeof(dim_));
+        file_handler.Write(&M_, sizeof(M_));
+        file_handler.Write(&ef_construction_, sizeof(ef_construction_));
+        file_handler.Write(&cur_vertex_n_, sizeof(cur_vertex_n_));
+        file_handler.Write(&max_layer_, sizeof(max_layer_));
+        file_handler.Write(&enterpoint_, sizeof(enterpoint_));
 
-        fs->Write(*file_handler, graph_, cur_vertex_n_ * level0_size_);
+        file_handler.Write(graph_, cur_vertex_n_ * level0_size_);
 
         SizeT layer_sum = 0;
         for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
             layer_sum += GetLayerN(vertex_idx);
         }
-        fs->Write(*file_handler, &layer_sum, sizeof(layer_sum));
+        file_handler.Write(&layer_sum, sizeof(layer_sum));
 
         for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
             LayerSize layer_n = GetLayerN(vertex_idx);
             if (layer_n) {
                 const char *layer_p = GetLayers(vertex_idx);
-                fs->Write(*file_handler, layer_p, layer_size_ * layer_n);
+                file_handler.Write(layer_p, layer_size_ * layer_n);
             }
         }
+    }
+
+    void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
+        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        SaveIndexInner(*file_handler);
         file_handler->Close();
     }
 
-    template <typename SpaceType>
-        requires SpaceConcept<DataType, SpaceType>
     static UniquePtr<KnnHnsw<DataType>>
-    LoadIndex(const String &file_path, UniquePtr<FileSystem> fs, SpaceType space, SizeT max_vertex_new = 0, SizeT random_seed = 100) {
-        u8 file_flags = FileFlags::READ_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+    LoadIndexInner(FileHandler &file_handler, const SpaceBase<DataType> &space, SizeT max_vertex_new = 0, SizeT random_seed = 100) {
         SizeT max_vertex;
-        fs->Read(*file_handler, &max_vertex, sizeof(max_vertex));
+        file_handler.Read(&max_vertex, sizeof(max_vertex));
         if (max_vertex_new > max_vertex) {
             max_vertex = max_vertex_new;
         }
         SizeT dim;
-        fs->Read(*file_handler, &dim, sizeof(dim));
+        file_handler.Read(&dim, sizeof(dim));
         SizeT M;
-        fs->Read(*file_handler, &M, sizeof(M));
+        file_handler.Read(&M, sizeof(M));
         SizeT ef_construction;
-        fs->Read(*file_handler, &ef_construction, sizeof(ef_construction));
+        file_handler.Read(&ef_construction, sizeof(ef_construction));
         SizeT cur_vertex_n;
-        fs->Read(*file_handler, &cur_vertex_n, sizeof(cur_vertex_n));
+        file_handler.Read(&cur_vertex_n, sizeof(cur_vertex_n));
         i32 max_layer;
-        fs->Read(*file_handler, &max_layer, sizeof(max_layer));
+        file_handler.Read(&max_layer, sizeof(max_layer));
         VertexType enterpoint;
-        fs->Read(*file_handler, &enterpoint, sizeof(enterpoint));
+        file_handler.Read(&enterpoint, sizeof(enterpoint));
 
         auto index = MakeUnique<KnnHnsw<DataType>>(max_vertex, dim, space, M, ef_construction, random_seed);
         index->cur_vertex_n_ = cur_vertex_n;
         index->max_layer_ = max_layer;
         index->enterpoint_ = enterpoint;
 
-        fs->Read(*file_handler, index->graph_, cur_vertex_n * index->level0_size_);
+        file_handler.Read(index->graph_, cur_vertex_n * index->level0_size_);
         // check invariant of grap
 
         SizeT layer_sum;
-        fs->Read(*file_handler, &layer_sum, sizeof(layer_sum));
+        file_handler.Read(&layer_sum, sizeof(layer_sum));
 
         char *const loaded_layers = new char[layer_sum * index->layer_size_];
         char *loaded_layers_p = loaded_layers;
         for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
             LayerSize layer_n = index->GetLayerN(vertex_idx);
             if (layer_n) {
-                fs->Read(*file_handler, loaded_layers_p, layer_n * index->layer_size_);
+                file_handler.Read(loaded_layers_p, layer_n * index->layer_size_);
                 *index->GetLayersMut(vertex_idx) = loaded_layers_p;
                 loaded_layers_p += layer_n * index->layer_size_;
             }
         }
         index->SetLoadLayer(cur_vertex_n, loaded_layers);
+        return index;
+    }
+
+    static UniquePtr<KnnHnsw<DataType>> LoadIndex(const String &file_path,
+                                                  UniquePtr<FileSystem> fs,
+                                                  const SpaceBase<DataType> &space,
+                                                  SizeT max_vertex_new = 0,
+                                                  SizeT random_seed = 100) {
+        u8 file_flags = FileFlags::READ_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        auto index = LoadIndexInner(*file_handler, space, max_vertex_new, random_seed);
+        file_handler->Close();
         return index;
     }
 

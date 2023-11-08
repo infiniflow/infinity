@@ -18,9 +18,10 @@ concept L2DataType = requires(T data) {
 export template <typename DataType>
 using DistFunc = DataType(*)(const DataType *, const DataType *, size_t);
 
-export template <typename DataType, typename SpaceType>
-concept SpaceConcept = requires(SpaceType space) {
-    { space.DistFuncPtr() } -> std::same_as<DistFunc<DataType>>;
+export template <typename DataType>
+class SpaceBase {
+public:
+    virtual DistFunc<DataType> DistFuncPtr() const = 0;
 };
 
 template <typename T>
@@ -201,7 +202,7 @@ static float FloatL2SqrSIMD4ExtResiduals(const float *pVect1v, const float *pVec
 
 export template <typename T>
     requires L2DataType<T>
-class DistFuncL2 {
+class DistFuncL2 : public SpaceBase<T> {
     DistFunc<T> fstdistfunc_;
 
 public:
@@ -229,7 +230,7 @@ public:
 #endif
     }
 
-    DistFunc<T> DistFuncPtr() { return fstdistfunc_; }
+    virtual DistFunc<T> DistFuncPtr() const override { return fstdistfunc_; }
 };
 
 } // namespace infinity
