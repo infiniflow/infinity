@@ -10,17 +10,17 @@ module specific_concurrent_queue;
 namespace infinity {
 
 template <>
-void SpecificConcurrentQueue<FloatHeap>::Enqueue(const FloatHeap &item) {
+void SpecificConcurrentQueue<FloatDistHeap>::Enqueue(const FloatDistHeap &item) {
     queue_.enqueue(item);
 }
 
 template <>
-void SpecificConcurrentQueue<FloatHeap>::Enqueue(FloatHeap &&item) {
+void SpecificConcurrentQueue<FloatDistHeap>::Enqueue(FloatDistHeap &&item) {
     queue_.enqueue(Move(item));
 }
 
 template <>
-bool SpecificConcurrentQueue<FloatHeap>::TryDequeue(FloatHeap &item) {
+bool SpecificConcurrentQueue<FloatDistHeap>::TryDequeue(FloatDistHeap &item) {
     return queue_.try_dequeue(item);
 }
 

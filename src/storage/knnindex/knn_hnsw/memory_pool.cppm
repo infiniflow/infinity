@@ -60,9 +60,9 @@ template <typename F, typename... Args>
 class MemPool {
     SpecificConcurrentQueue<typename F::DataT> pool_;
 
+public:
     using PooledT = PooledType<F, Args...>;
 
-public:
     PooledT Get(Args... args) {
         PooledT result(this, args...);
         if (!pool_.TryDequeue(result.data_)) [[unlikely]] {
@@ -92,13 +92,13 @@ struct PooledVectorBoolFunctor {
     }
 };
 
-template <typename T>
+template <typename T, typename C>
 struct PooledMaxHeapFunctor {
-    using DataT = MaxHeap<T>;
+    using DataT = Heap<T, C>;
 
     PooledMaxHeapFunctor() = default;
 
-    DataT Alloc() { return MaxHeap<T>(); }
+    DataT Alloc() { return Heap<T, C>(); }
 
     void Release(DataT &data) {
         while (!data.empty()) {
@@ -109,7 +109,7 @@ struct PooledMaxHeapFunctor {
 
 export using VisitedMemPool = MemPool<PooledVectorBoolFunctor, SizeT, SizeT>;
 
-export template <typename DataType, typename VertexType>
-using MaxHeapMemPool = MemPool<PooledMaxHeapFunctor<Pair<DataType, VertexType>>>;
+export template <typename T, typename C>
+using MaxHeapMemPool = MemPool<PooledMaxHeapFunctor<T, C>>;
 
 } // namespace infinity

@@ -4,6 +4,7 @@ import stl;
 import std;
 import buffer_obj;
 import third_party;
+import cmp;
 
 export module specific_concurrent_queue;
 
@@ -21,8 +22,10 @@ public:
     bool TryDequeue(T &item);
 };
 
-using FloatHeap = MaxHeap<Pair<float, i32>>;
-template class SpecificConcurrentQueue<MaxHeap<Pair<float, i32>>>;
+using PFV = Pair<float, i32>;
+using CMP = CompareByFirst<float, i32>;
+using FloatDistHeap = Heap<PFV, CMP>;
+template class SpecificConcurrentQueue<FloatDistHeap>;
 
 template class SpecificConcurrentQueue<BufferObj *>;
 

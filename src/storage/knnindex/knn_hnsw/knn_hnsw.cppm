@@ -81,7 +81,7 @@ private:
     const SizeT loaded_vertex_n_;
     const char *loaded_layers_;
 
-    VisitedMemPool visited_pool_;
+    // VisitedMemPool visited_pool_;
 
 private:
     const DataType *GetData(VertexType vertex_idx) const {
@@ -249,8 +249,6 @@ public:
                 }
             }
         }
-        // std::fill(visited.begin(), visited.begin() + cur_vertex_n_, false);
-        // mem_pool_.ReleaseVisited(std::move(visited), cur_vertex_n_);
         return result;
     }
 
