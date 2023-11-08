@@ -74,8 +74,9 @@ void PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         txn->Append(*db_name, *table_name, output_data_block);
         txn->Delete(*db_name, *table_name, row_ids);
 
-        operator_state->count_++;
-        operator_state->sum_ += row_ids.size();
+        UpdateOperatorState* update_operator_state = static_cast<UpdateOperatorState*>(operator_state);
+        ++ update_operator_state->count_;
+        update_operator_state->sum_ += row_ids.size();
     }
     if (prev_op_state->Complete())
         operator_state->SetComplete();

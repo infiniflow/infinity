@@ -36,8 +36,10 @@ void PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_
 
 void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
-        case SinkStateType::kInvalid:
+        case SinkStateType::kInvalid: {
+            Error<ExecutorException>("Invalid sinker type");
             break;
+        }
         case SinkStateType::kMaterialize: {
             // Output general output
             auto *materialize_sink_state = static_cast<MaterializeSinkState *>(sink_state);
@@ -115,14 +117,24 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_sink_state, OperatorState *task_operator_state) {
     switch (task_operator_state->operator_type_) {
-        case PhysicalOperatorType::kDelete:
+        case PhysicalOperatorType::kInvalid: {
+            Error<ExecutorException>("Invalid operator");
+            break;
+        }
+        case PhysicalOperatorType::kDelete: {
+            DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(task_operator_state);
+            summary_sink_state->count_ = delete_operator_state->count_;
+            summary_sink_state->sum_ = delete_operator_state->sum_;
+            break;
+        }
         case PhysicalOperatorType::kUpdate: {
-            summary_sink_state->count_ = task_operator_state->count_;
-            summary_sink_state->sum_ = task_operator_state->sum_;
+            UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(task_operator_state);
+            summary_sink_state->count_ = update_operator_state->count_;
+            summary_sink_state->sum_ = update_operator_state->sum_;
             break;
         }
         default: {
-            Error<ExecutorException>("Invalid operator");
+            Error<ExecutorException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }
@@ -132,44 +144,6 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
 
         case PhysicalOperatorType::kInvalid: {
             Error<ExecutorException>("Invalid operator");
-        }
-        case PhysicalOperatorType::kAggregate:
-        case PhysicalOperatorType::kParallelAggregate:
-        case PhysicalOperatorType::kMergeParallelAggregate:
-        case PhysicalOperatorType::kUnionAll:
-        case PhysicalOperatorType::kIntersect:
-        case PhysicalOperatorType::kExcept:
-        case PhysicalOperatorType::kTableScan:
-        case PhysicalOperatorType::kKnnScan:
-        case PhysicalOperatorType::kFilter:
-        case PhysicalOperatorType::kIndexScan:
-        case PhysicalOperatorType::kDummyScan:
-        case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kMergeHash:
-        case PhysicalOperatorType::kJoinHash:
-        case PhysicalOperatorType::kJoinNestedLoop:
-        case PhysicalOperatorType::kJoinMerge:
-        case PhysicalOperatorType::kJoinIndex:
-        case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kLimit:
-        case PhysicalOperatorType::kMergeLimit:
-        case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kMergeTop:
-        case PhysicalOperatorType::kProjection:
-        case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kInsert:
-        case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kAlter:
-        case PhysicalOperatorType::kFlush:
-        case PhysicalOperatorType::kSink:
-        case PhysicalOperatorType::kSource:
-        case PhysicalOperatorType::kExplain:
-        case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kShow: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
@@ -282,6 +256,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
             }
             break;
+        }
+        default: {
+            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }

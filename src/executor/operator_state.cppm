@@ -46,8 +46,6 @@ export struct OperatorState {
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     SharedPtr<DataBlock> data_block_{};
     UniquePtr<String> error_message_{};
-    u64 count_{0};
-    u64 sum_{0};
 
     bool complete_{false};
 
@@ -181,10 +179,16 @@ export struct MergeSortOperatorState : public OperatorState {
 // Delete
 export struct DeleteOperatorState : public OperatorState {
     inline explicit DeleteOperatorState() : OperatorState(PhysicalOperatorType::kDelete) {}
+
+    u64 count_{0};
+    u64 sum_{0};
 };
 // Update
 export struct UpdateOperatorState : public OperatorState {
     inline explicit UpdateOperatorState() : OperatorState(PhysicalOperatorType::kUpdate) {}
+
+    u64 count_{0};
+    u64 sum_{0};
 };
 
 // Insert
