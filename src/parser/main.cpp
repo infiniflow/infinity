@@ -50,7 +50,7 @@ auto main(int argc, char *argv[]) -> int {
     std::shared_ptr<ParserResult> result = std::make_shared<ParserResult>();
 
     for (const std::string &input : inputs) {
-        parser->Parse(input, result);
+        parser->Parse(input, result.get());
         std::cout << result->ToString() << std::endl;
         result->Reset();
     }

@@ -62,7 +62,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
-    parser->Parse(sql_text, parsed_result);
+    parser->Parse(sql_text, parsed_result.get());
 
     if (parsed_result->IsError()) {
         Error<PlannerException>(parsed_result->error_message_);

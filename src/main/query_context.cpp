@@ -68,8 +68,8 @@ void QueryContext::Init(const Config *global_config_ptr,
 }
 
 QueryResult QueryContext::Query(const String &query) {
-    SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
-    parser_->Parse(query, parsed_result);
+    UniquePtr<ParserResult> parsed_result = MakeUnique<ParserResult>();
+    parser_->Parse(query, parsed_result.get());
 
     if (parsed_result->IsError()) {
         Error<PlannerException>(parsed_result->error_message_);
