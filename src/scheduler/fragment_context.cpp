@@ -942,6 +942,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         }
     }
     Error<SchedulerException>("Unreachable");
+    return nullptr;
 }
 
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {

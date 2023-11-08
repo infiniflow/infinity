@@ -26,6 +26,8 @@ import txn;
 import data_table;
 import parser;
 import optimizer;
+import status;
+import query_result;
 
 export module query_context;
 
@@ -35,14 +37,6 @@ class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
 class FragmentScheduler;
-
-export struct QueryResponse {
-    SharedPtr<DataTable> result_{};
-    LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
-    SharedPtr<String> result_msg_{};
-
-    String ToString() const;
-};
 
 export class QueryContext {
 
@@ -65,9 +59,9 @@ public:
         resource_manager_ = nullptr;
     }
 
-    QueryResponse Query(const String &query);
+    QueryResult Query(const String &query);
 
-    QueryResponse QueryStatement(const BaseStatement *statement);
+    QueryResult QueryStatement(const BaseStatement *statement);
 
     inline void set_current_schema(const String &current_schema) { session_ptr_->set_current_schema(current_schema); }
 

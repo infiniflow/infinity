@@ -37,6 +37,8 @@ import logical_node;
 import physical_operator;
 import third_party;
 import logger;
+import query_result;
+import status;
 
 module query_context;
 
@@ -45,48 +47,6 @@ namespace infinity {
 QueryContext::QueryContext(SessionBase *session) : session_ptr_(session){};
 
 QueryContext::~QueryContext() { UnInit(); }
-
-String QueryResponse::ToString() const {
-    std::stringstream ss;
-
-    switch (root_operator_type_) {
-        case LogicalNodeType::kInsert: {
-            return "INSERT 0 1";
-        }
-        case LogicalNodeType::kUpdate: {
-            return "UPDATE 0 1";
-        }
-        case LogicalNodeType::kDelete: {
-            return "DELETE 0 1";
-        }
-        default: {
-            ss <<std::endl;;
-        }
-    }
-
-    SizeT column_count = result_->ColumnCount();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        String end;
-        if (idx != column_count - 1) {
-            end = " ";
-        }
-        ss << result_->GetColumnNameById(idx) << end;
-    }
-    ss <<std::endl;;
-
-    // Get Block count
-    SizeT block_count = result_->DataBlockCount();
-
-    // Iterate all blocks
-    for (SizeT idx = 0; idx < block_count; ++idx) {
-        // Get current block
-        SharedPtr<DataBlock> current_block = result_->GetDataBlockById(idx);
-
-        ss << current_block->ToString();
-    }
-
-    return ss.str();
-}
 
 void QueryContext::Init(const Config *global_config_ptr,
                         FragmentScheduler *scheduler_ptr,
@@ -107,7 +67,7 @@ void QueryContext::Init(const Config *global_config_ptr,
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
 }
 
-QueryResponse QueryContext::Query(const String &query) {
+QueryResult QueryContext::Query(const String &query) {
     SharedPtr<ParserResult> parsed_result = MakeShared<ParserResult>();
     parser_->Parse(query, parsed_result);
 
@@ -117,15 +77,15 @@ QueryResponse QueryContext::Query(const String &query) {
 
     Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
-        QueryResponse query_response = QueryStatement(statement);
-        return query_response;
+        QueryResult query_result = QueryStatement(statement);
+        return query_result;
     }
 
     Error<NetworkException>("Not reachable");
 }
 
-QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
-    QueryResponse query_response;
+QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
+    QueryResult query_result;
     try {
         this->CreateTxn();
         this->BeginTxn();
@@ -152,16 +112,16 @@ QueryResponse QueryContext::QueryStatement(const BaseStatement *statement) {
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
 
         scheduler_->Schedule(this, plan_fragment.get());
-        query_response.result_ = plan_fragment->GetResult();
-        query_response.root_operator_type_ = unoptimized_plan->operator_type();
+        query_result.result_table_ = plan_fragment->GetResult();
+        query_result.root_operator_type_ = unoptimized_plan->operator_type();
 
         this->CommitTxn();
     } catch (const Exception &e) {
         this->RollbackTxn();
-        query_response.result_ = nullptr;
-        query_response.result_msg_ = MakeShared<String>(e.what());
+        query_result.result_table_ = nullptr;
+        query_result.status_.Init(ErrorCode::kError, e.what());
     }
-    return query_response;
+    return query_result;
 }
 
 void QueryContext::CreateTxn() {
