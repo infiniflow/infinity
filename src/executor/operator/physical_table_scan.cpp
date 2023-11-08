@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import txn;
 import query_context;
@@ -40,40 +40,10 @@ namespace infinity {
 
 void PhysicalTableScan::Init() {}
 
-void PhysicalTableScan::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {
-    auto *table_scan_input_state = static_cast<TableScanInputState *>(input_state);
-    auto *table_scan_output_state = static_cast<TableScanOutputState *>(output_state);
+void PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto *table_scan_operator_state = static_cast<TableScanOperatorState *>(operator_state);
 
-    ExecuteInternal(query_context, table_scan_input_state, table_scan_output_state);
-}
-
-void PhysicalTableScan::Execute(QueryContext *query_context) {
-    // Generate the result table definition
-    Vector<SharedPtr<ColumnDef>> column_defs;
-    SizeT column_count = base_table_ref_->column_names_->size();
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        // Use the column id to fetch column name and type
-        String &col_name_ref = base_table_ref_->column_names_->at(idx);
-        SharedPtr<DataType> col_type_ref = base_table_ref_->column_types_->at(idx);
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type_ref, col_name_ref, HashSet<ConstraintType>());
-        column_defs.emplace_back(col_def);
-    }
-
-    SharedPtr<TableDef> table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>(base_table_ref_->alias_), column_defs);
-
-    output_ = MakeShared<DataTable>(table_def_ptr, TableType::kResult);
-
-    while (true) {
-        SharedPtr<DataBlock> output_block = MakeShared<DataBlock>();
-        output_block->Init(*base_table_ref_->column_types_);
-        base_table_ref_->table_func_->main_function_(query_context, nullptr, *output_block);
-        if (output_block->row_count() > 0) {
-            output_->Append(output_block);
-        } else {
-            break;
-        }
-    }
+    ExecuteInternal(query_context, table_scan_operator_state);
 }
 
 SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
@@ -140,19 +110,18 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
 }
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
-                                        TableScanInputState *table_scan_input_state,
-                                        TableScanOutputState *table_scan_output_state) {
-    DataBlock *output_ptr = table_scan_output_state->data_block_.get();
+                                        TableScanOperatorState *table_scan_operator_state) {
+    DataBlock *output_ptr = table_scan_operator_state->data_block_.get();
     output_ptr->Reset();
 
-    TableScanFunctionData *table_scan_function_data_ptr = table_scan_input_state->table_scan_function_data_.get();
+    TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
     i64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
     if (block_ids_idx >= block_ids->size()) {
         // No data or all data is read
-        table_scan_output_state->SetComplete();
+        table_scan_operator_state->SetComplete();
         return;
     }
 
@@ -193,7 +162,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
         }
     }
     if (block_ids_idx >= block_ids->size()) {
-        table_scan_output_state->SetComplete();
+        table_scan_operator_state->SetComplete();
     }
 
     output_ptr->Finalize();

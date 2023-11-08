@@ -14,7 +14,8 @@
 
 module;
 
-import std;
+#include <sstream>
+
 import stl;
 import session;
 import config;
@@ -59,7 +60,7 @@ String QueryResponse::ToString() const {
             return "DELETE 0 1";
         }
         default: {
-            ss << std::endl;
+            ss <<std::endl;;
         }
     }
 
@@ -71,7 +72,7 @@ String QueryResponse::ToString() const {
         }
         ss << result_->GetColumnNameById(idx) << end;
     }
-    ss << std::endl;
+    ss <<std::endl;;
 
     // Get Block count
     SizeT block_count = result_->DataBlockCount();

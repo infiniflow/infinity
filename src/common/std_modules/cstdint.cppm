@@ -2,8 +2,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 # 4 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:cstdint;
-export namespace std {
+export module std_lib:cstdint;
+export namespace std_lib {
     using std::int8_t;
     using std::int16_t;
     using std::int32_t;

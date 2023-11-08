@@ -1,8 +1,8 @@
 module;
 #include <mutex>
 # 3 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:mutex;
-export namespace std {
+export module std_lib:mutex;
+export namespace std_lib {
     using std::mutex;
     using std::lock;
     using std::lock_guard;

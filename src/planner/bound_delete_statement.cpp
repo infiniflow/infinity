@@ -14,6 +14,8 @@
 
 module;
 
+#include <memory>
+
 import bound_statement;
 import table_ref;
 import base_expression;
@@ -21,7 +23,6 @@ import bind_context;
 import logical_node;
 import query_context;
 import stl;
-import std;
 import infinity_exception;
 
 import base_table_ref;

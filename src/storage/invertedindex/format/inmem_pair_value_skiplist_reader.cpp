@@ -1,7 +1,6 @@
 module;
 
 import stl;
-import std;
 import memory_pool;
 import buffered_byte_slice;
 import buffered_byte_slice_reader;
@@ -44,18 +43,18 @@ Pair<int, bool> InMemPairValueSkipListReader::LoadBuffer() {
     SizeT flush_count = skiplist_buffer_->GetTotalCount();
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
     if (!skiplist_reader_.Decode(key_buffer_, decode_count, key_num)) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
     SizeT value_num = 0;
     if (!skiplist_reader_.Decode(value_buffer_, decode_count, value_num)) {
-        return std::make_pair(0, false);
+        return MakePair(0, false);
     }
     if (key_num != value_num) {
         // LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} offset_num = {}", key_num, value_num));
-        return std::make_pair(-1, false);
+        return MakePair(-1, false);
     }
     num_in_buffer_ = key_num;
     current_cursor_ = 0;
-    return std::make_pair(0, true);
+    return MakePair(0, true);
 }
 } // namespace infinity

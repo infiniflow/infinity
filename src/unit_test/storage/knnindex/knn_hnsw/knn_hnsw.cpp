@@ -14,8 +14,6 @@
 
 #include "unit_test/base_test.h"
 
-import std;
-// import stl;
 import knn_knsw;
 import dist_func;
 

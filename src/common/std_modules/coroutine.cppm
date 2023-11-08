@@ -14,12 +14,12 @@ module;
 #include <coroutine>
 #endif
 # 16 __FILE__ 1 3 // Enter "faked" system files since std is reserved module name
-export module std:coroutine;
+export module std_lib:coroutine;
 
 /**
     coroutine synopsis
 
-namespace std {
+namespace std_lib {
 // [coroutine.traits]
 template <class R, class... ArgTypes>
   struct coroutine_traits;
@@ -40,11 +40,11 @@ noop_coroutine_handle noop_coroutine() noexcept;
 // [coroutine.trivial.awaitables]
 struct suspend_never;
 struct suspend_always;
-} // namespace std
+} // namespace std_lib
 
  */
 
-export namespace std {
+export namespace std_lib {
     using std::coroutine_traits;
     using std::coroutine_handle;
     using std::noop_coroutine;

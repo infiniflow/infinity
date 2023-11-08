@@ -15,9 +15,10 @@
 module;
 
 #include <string>
+#include <algorithm>
+#include <memory>
 
 import stl;
-import std;
 
 import infinity_exception;
 import parser;

@@ -47,9 +47,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context) final;
-
-    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -59,7 +57,7 @@ public:
 
 private:
     template <typename T, template <typename, typename> typename C>
-    void ExecuteInner(QueryContext *query_context, MergeKnnInputState *input_state, MergeKnnOutputState *output_state);
+    void ExecuteInner(QueryContext *query_context, MergeKnnOperatorState *operator_state);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

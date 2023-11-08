@@ -14,7 +14,9 @@
 
 module;
 
-import std;
+#include <string>
+#include <algorithm>
+
 import stl;
 import txn;
 import query_context;
@@ -192,10 +194,7 @@ private:
 
 void PhysicalSort::Init() {}
 
-void PhysicalSort::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
-
-void PhysicalSort::Execute(QueryContext *query_context) {
-
+void PhysicalSort::Execute(QueryContext *query_context, OperatorState *operator_state) {
 #if 0
     executor_.Init(this->expressions_);
 

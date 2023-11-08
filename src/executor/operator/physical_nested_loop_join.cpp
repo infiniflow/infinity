@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import parser;
 import query_context;
@@ -26,9 +26,7 @@ namespace infinity {
 
 void PhysicalNestedLoopJoin::Init() {}
 
-void PhysicalNestedLoopJoin::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
-
-void PhysicalNestedLoopJoin::Execute(QueryContext *query_context) {}
+void PhysicalNestedLoopJoin::Execute(QueryContext *query_context, OperatorState *operator_state) {}
 
 SharedPtr<Vector<String>> PhysicalNestedLoopJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();

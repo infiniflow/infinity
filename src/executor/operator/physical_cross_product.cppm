@@ -35,9 +35,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context) final;
-
-    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SharedPtr<Vector<String>> GetOutputNames() const final;
 

@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 import bitmask_buffer;
 import global_resource_usage;
 

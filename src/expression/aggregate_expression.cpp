@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 import stl;
 import expression_type;
 import aggregate_function;

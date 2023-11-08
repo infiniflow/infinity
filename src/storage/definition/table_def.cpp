@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 import stl;
 import parser;
 import serialize;
@@ -26,7 +26,7 @@ module table_def;
 namespace infinity {
 
 String TableDef::ToString() const {
-    StringStream ss;
+    std::stringstream ss;
     ss << *table_name_ << '[';
     for (SizeT i = 0; auto &column_ptr : this->columns_) {
         ss << column_ptr->ToString();

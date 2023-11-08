@@ -179,7 +179,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
                 function_arguments.emplace_back(left_column_expr);
                 function_arguments.emplace_back(right_column_expr);
 
-                auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+                auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
                 ScalarFunction equi_function = scalar_function_set_ptr->GetMostMatchFunction(function_arguments);
 
                 SharedPtr<FunctionExpression> function_expr_ptr = MakeShared<FunctionExpression>(equi_function, function_arguments);
