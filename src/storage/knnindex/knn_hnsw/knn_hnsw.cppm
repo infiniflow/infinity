@@ -19,7 +19,6 @@ module;
 #include <random>
 #include <algorithm>
 
-import std;
 import cmp;
 import stl;
 import dist_func;

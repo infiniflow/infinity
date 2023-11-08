@@ -1,7 +1,6 @@
 module;
 
 import stl;
-import std;
 import buffer_obj;
 import third_party;
 import cmp;

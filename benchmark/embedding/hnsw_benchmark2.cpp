@@ -1,8 +1,10 @@
 #include "base_profiler.h"
 #include "helper.h"
+#include <fstream>
+#include <iostream>
+#include <thread>
 
 import stl;
-import std;
 import knn_hnsw;
 import dist_func;
 import local_file_system;

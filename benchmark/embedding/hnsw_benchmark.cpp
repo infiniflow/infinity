@@ -9,6 +9,8 @@
 #include "helper.h"
 #include <thread>
 #include <atomic>
+#include <iostream>
+#include <fstream>
 
 static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
 static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";

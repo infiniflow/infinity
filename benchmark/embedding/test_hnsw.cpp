@@ -1,5 +1,8 @@
-import stl;
-import std;
+#include <random>
+#include <memory>
+#include <iostream>
+#include <queue>
+
 import local_file_system;
 import knn_hnsw;
 import dist_func;
@@ -14,7 +17,7 @@ int main() {
     int dim = 16;
     int element_size = 300;
 
-    auto data = MakeUnique<float[]>(dim * element_size);
+    auto data = std::make_unique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
         data[i] = distrib_real(rng);
     }
@@ -23,7 +26,7 @@ int main() {
     int ef_construction = 200;
     DistFuncL2<float> space(dim);
     {
-        auto hnsw_index = MakeUnique<KnnHnsw<float>>(element_size, dim, space, M, ef_construction);
+        auto hnsw_index = std::make_unique<KnnHnsw<float>>(element_size, dim, space, M, ef_construction);
 
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
@@ -31,17 +34,17 @@ int main() {
             hnsw_index->CheckGraph();
         }
 
-        hnsw_index->SaveIndex("./tmp/test.index", MakeUnique<LocalFileSystem>());
+        hnsw_index->SaveIndex("./tmp/test.index", std::make_unique<LocalFileSystem>());
     }
 
     {
-        auto hnsw_index = KnnHnsw<float>::LoadIndex("./tmp/test.index", MakeUnique<LocalFileSystem>(), space);
+        auto hnsw_index = KnnHnsw<float>::LoadIndex("./tmp/test.index", std::make_unique<LocalFileSystem>(), space);
         hnsw_index->CheckGraph();
         hnsw_index->SetEf(ef_construction);
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            MaxHeap<Pair<float, u32>> result = hnsw_index->KnnSearch(query, 1);
+            std::priority_queue<std::pair<float, unsigned int>> result = hnsw_index->KnnSearch(query, 1);
             if (result.top().second == i) {
                 ++correct;
             }

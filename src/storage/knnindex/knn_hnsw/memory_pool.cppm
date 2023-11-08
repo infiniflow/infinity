@@ -1,9 +1,9 @@
 module;
 
 #include <concepts>
+#include <algorithm>
 
 import stl;
-import std;
 import specific_concurrent_queue;
 
 export module hnsw_mem_pool;
