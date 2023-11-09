@@ -96,7 +96,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
                         session_ptr_->txn()->TxnID(),
                         session_ptr_->txn()->BeginTS(),
                         statement->ToString()));
-        TryMarkProfiler();
+        TryMarkProfiler(statement->type_);
 
         // Build unoptimized logical plan for each SQL statement.
         query_metrics_->StartPhase(QueryPhase::kLogicalPlan);

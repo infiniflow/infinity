@@ -14,10 +14,12 @@
 
 module;
 
+#include <fstream>
 import stl;
 import query_context;
 import operator_state;
 import parser;
+import profiler;
 import table_def;
 import data_table;
 import options;
@@ -58,6 +60,16 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
+            auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
+            if (!profiler_record) {
+                Error<ExecutorException>(Format("The record does not exist: {}", export_command->file_no()));
+            }
+            std::ofstream export_file(export_command->file_name());
+            if (export_file.is_open()) {
+                export_file << QueryProfiler::Serialize(profiler_record);
+            } else {
+                Error<ExecutorException>(Format("Failed to open the file: {}", export_command->file_name()));
+            }
             break;
         }
         case CommandType::kCheckTable: {

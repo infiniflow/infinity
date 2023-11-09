@@ -75,6 +75,12 @@ public:
         records_.push_back(Move(profiler));
     }
 
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        if (index >= records_.size()) {
+            return nullptr;
+        }
+        return records_[index].get();
+    }
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};

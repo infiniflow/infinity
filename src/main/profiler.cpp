@@ -101,7 +101,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
 
     auto output_block = operator_state->data_block_;
     auto input_rows = operator_state->prev_op_state_ ? operator_state->prev_op_state_->data_block_->row_count() : 0;
-    auto output_data_size = output_block ? output_block->GetSizeInBytes() : 0;
+    auto output_data_size = output_block && output_block->Finalized() ? output_block->GetSizeInBytes() : 0;
     auto output_rows = output_block ? output_block->row_count() : 0;
 
     OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);

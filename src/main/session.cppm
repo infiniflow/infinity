@@ -46,6 +46,13 @@ public:
             txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
         }
     }
+
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        if (txn_->GetCatalog()) {
+            return txn_->GetCatalog()->GetProfilerRecord(index);
+        }
+        return nullptr;
+    }
 protected:
     // Current schema
     String current_database_{};

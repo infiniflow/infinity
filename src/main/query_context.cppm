@@ -93,8 +93,8 @@ public:
 
     void RollbackTxn();
 
-    void TryMarkProfiler() const {
-        if (is_enable_profiler()) {
+    void TryMarkProfiler(const StatementType &type) const {
+        if (is_enable_profiler() && type != StatementType::kCommand) {
             session_ptr_->AppendProfilerRecord(query_metrics_);
         }
     }
