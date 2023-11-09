@@ -30,6 +30,37 @@ export module new_catalog;
 
 namespace infinity {
 
+template<typename T>
+class LimitedVector {
+public:
+    explicit LimitedVector(SizeT max_size) : max_size_(max_size) {
+        vector_.reserve(max_size);
+    }
+
+    void PushBack(const T& value) {
+        if (vector_.size() >= max_size_) {
+            vector_.erase(vector_.begin());
+        }
+        vector_.push_back(value);
+    }
+
+    const T& operator[](SizeT index) const {
+        return vector_[index];
+    }
+
+    T& operator[](SizeT index) {
+        return vector_[index];
+    }
+
+    [[nodiscard]] SizeT Size() const {
+        return vector_.size();
+    }
+
+private:
+    Vector<T> vector_;
+    SizeT max_size_;
+};
+
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
@@ -72,11 +103,11 @@ public:
     void MergeFrom(NewCatalog &other);
 
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
-        records_.push_back(Move(profiler));
+        records_.PushBack(Move(profiler));
     }
 
     const QueryProfiler *GetProfilerRecord(SizeT index) {
-        if (index >= records_.size()) {
+        if (index >= records_.Size()) {
             return nullptr;
         }
         return records_[index].get();
@@ -91,8 +122,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    // TOOD:
-    Vector<SharedPtr<QueryProfiler>> records_;
+    LimitedVector<SharedPtr<QueryProfiler>> records_{ 100 };
 };
 
 } // namespace infinity
