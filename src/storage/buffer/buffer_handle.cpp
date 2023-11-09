@@ -57,7 +57,7 @@ BufferHandle::~BufferHandle() {
     }
 }
 
-const void *BufferHandle::GetData() { return data_; }
+const void *BufferHandle::GetData() const { return data_; }
 
 void *BufferHandle::GetDataMut() {
     buffer_obj_->GetMutPointer();

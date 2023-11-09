@@ -19,17 +19,18 @@ import index_def;
 import parser;
 import third_party;
 
-export module ivfflat_index_def;
+export module hnsw_index_def;
 
 namespace infinity {
-export class IVFFlatIndexDef : public IndexDef {
+export class HnswIndexDef : public IndexDef {
 public:
     static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
 
-    IVFFlatIndexDef(SharedPtr<String> index_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexDef(Move(index_name), IndexMethod::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+    HnswIndexDef(SharedPtr<String> index_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
+        : IndexDef(Move(index_name), IndexMethod::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction),
+          ef_(ef) {}
 
-    ~IVFFlatIndexDef() = default;
+    ~HnswIndexDef() = default;
 
     virtual bool operator==(const IndexDef &other) const override;
 
@@ -45,9 +46,11 @@ public:
     virtual Json Serialize() const override;
 
 public:
-    const SizeT centroids_count_{};
-
     const MetricType metric_type_{MetricType::kInvalid};
+
+    const SizeT M_{};
+    const SizeT ef_construction_{};
+    const SizeT ef_{};
 };
 
 } // namespace infinity

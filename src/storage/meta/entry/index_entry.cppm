@@ -19,7 +19,8 @@ import base_entry;
 import buffer_handle;
 import third_party;
 import buffer_obj;
-import index_data;
+import file_worker;
+import parser;
 
 export module index_entry;
 
@@ -29,6 +30,7 @@ class SegmentEntry;
 class FaissIndexPtr;
 class AnnIVFFlatIndexPtr;
 class BufferManager;
+class IndexDef;
 
 export class IndexEntry : public BaseEntry {
 private:
@@ -39,16 +41,16 @@ public:
                                                SharedPtr<String> index_name,
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
-                                               FaissIndexPtr *index);
-    static SharedPtr<IndexEntry> NewAnnIVFFlatIndexEntry(SegmentEntry *segment_entry,
-                                                         SharedPtr<String> index_name,
-                                                         TxnTimeStamp create_ts,
-                                                         BufferManager *buffer_manager,
-                                                         AnnIVFFlatIndexPtr *index_ptr);
+                                               SharedPtr<IndexDef> index_def,
+                                               SharedPtr<ColumnDef> column_def);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.
-    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager);
+    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry,
+                                                BufferManager *buffer_manager,
+                                                SharedPtr<String> file_name,
+                                                SharedPtr<IndexDef> index_def,
+                                                SharedPtr<ColumnDef> column_def);
 
 public:
     [[nodiscard]] static BufferHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
@@ -59,7 +61,11 @@ public:
 
     static Json Serialize(const IndexEntry *index_entry);
 
-    static SharedPtr<IndexEntry> Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
+    static SharedPtr<IndexEntry> Deserialize(const Json &index_entry_json,
+                                             SegmentEntry *segment_entry,
+                                             BufferManager *buffer_mgr,
+                                             SharedPtr<IndexDef> index_def,
+                                             SharedPtr<ColumnDef> column_def);
 
     void MergeFrom(BaseEntry &other);
 

@@ -34,6 +34,7 @@ import base_entry;
 import infinity_exception;
 import defer_op;
 import ivfflat_index_def;
+import hnsw_index_def;
 import buffer_handle;
 import faiss_index_file_worker;
 import ann_ivf_index_file_worker;
@@ -44,6 +45,9 @@ import random;
 import parser;
 import index_entry;
 import txn_store;
+
+import knn_hnsw;
+import dist_func;
 
 module segment_entry;
 
@@ -151,81 +155,20 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry,
-                                     Txn *txn_ptr,
-                                     const IndexDef &index_def,
-                                     u64 column_id,
-                                     BufferManager *buffer_mgr,
-                                     TxnTableStore *txn_store) {
-    Error<NotImplementException>("Not implemented");
-}
-
-SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
-                                                         const IndexDef &index_def,
-                                                         u64 column_id,
-                                                         int dimension,
-                                                         TxnTimeStamp create_ts,
-                                                         BufferManager *buffer_mgr,
-                                                         TxnTableStore *txn_store) {
-    Vector<SharedPtr<IndexEntry>> index_entries;
-    switch (index_def.method_type_) {
+SharedPtr<IndexEntry> SegmentEntry::CreateIndex(SegmentEntry *segment_entry,
+                                                SharedPtr<IndexDef> index_def,
+                                                SharedPtr<ColumnDef> column_def,
+                                                TxnTimeStamp create_ts,
+                                                BufferManager *buffer_mgr,
+                                                TxnTableStore *txn_store) {
+    u64 column_id = column_def->id();
+    SharedPtr<IndexEntry> index_entry =
+        IndexEntry::NewIndexEntry(segment_entry, index_def->index_name_, create_ts, buffer_mgr, index_def, Move(column_def));
+    switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
-            auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
-            auto metric = ivfflat_index_def.metric_type_;
-            switch (metric) {
-                case MetricType::kMerticL2:
-                    // case MetricType::kMerticInnerProduct:
-                    break;
-                case MetricType::kInvalid:
-                    Error<StorageException>("Metric type is invalid");
-                default:
-                    Error<NotImplementException>("Not implemented");
-            }
-            // TODO: assume that this index is created on float column?
-            Vector<f32> all_data;
-            all_data.reserve((segment_entry->row_count_) * dimension);
-            for (const auto &block_entry : segment_entry->block_entries_) {
-                auto block_column_entry = block_entry->columns_[column_id].get();
-                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-                auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
-                SizeT block_row_cnt = block_entry->row_count_;
-                all_data.insert(all_data.end(), block_data_ptr, block_data_ptr + block_row_cnt * dimension);
-            }
-            auto ann_index_data =
-                AnnIVFFlatL2<f32>::CreateIndex(dimension, segment_entry->row_count_, all_data.data(), ivfflat_index_def.centroids_count_);
-
-            auto index_entry = IndexEntry::NewAnnIVFFlatIndexEntry(segment_entry,
-                                                                   index_def.index_name_,
-                                                                   create_ts,
-                                                                   buffer_mgr,
-                                                                   new AnnIVFFlatIndexPtr(ann_index_data.release()));
-
-            txn_store->CreateIndexFile(segment_entry->segment_id_, Move(index_entry));
-            return index_entry;
-        }
-        case IndexMethod::kIVFFlatFaiss: {
-            auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
-            faiss::IndexFlat *quantizer = nullptr;
-            faiss::MetricType metric = faiss::MetricType::METRIC_L2;
-            switch (ivfflat_index_def.metric_type_) {
-                case MetricType::kMerticL2: {
-                    quantizer = new faiss::IndexFlatL2(dimension);
-                    metric = faiss::MetricType::METRIC_L2;
-                    break;
-                }
-                case MetricType::kMerticInnerProduct: {
-                    quantizer = new faiss::IndexFlatIP(dimension);
-                    metric = faiss::MetricType::METRIC_INNER_PRODUCT;
-                    break;
-                }
-                case MetricType::kInvalid: {
-                    Error<StorageException>("Metric type is invalid");
-                }
-                default: {
-                    Error<NotImplementException>("Not implemented");
-                }
-            }
-            auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
+            BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
+            auto faiss_index_ptr = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
+            faiss::Index *index = faiss_index_ptr->index_;
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 BufferHandle buffer_handle = block_column_entry->buffer_->Load();
@@ -233,20 +176,20 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                 SizeT block_row_cnt = block_entry->row_count_;
                 index->train(block_row_cnt, block_data_ptr);
             }
-
-            auto index_entry =
-                IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, create_ts, buffer_mgr, new FaissIndexPtr(index, quantizer));
-
-            txn_store->CreateIndexFile(segment_entry->segment_id_, Move(index_entry));
-            return index_entry;
+            break;
+        }
+        case IndexMethod::kHnsw: {
+            break;
         }
         case IndexMethod::kInvalid: {
-            Error<StorageException>("Index method type is invalid");
+            StorageException("Invalid index method type.");
         }
         default: {
-            Error<NotImplementException>("Not implemented");
+            NotImplementException("Not implemented.");
         }
     }
+    txn_store->CreateIndexFile(segment_entry->segment_id_, index_entry);
+    return index_entry;
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count) {
@@ -338,7 +281,11 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json,
+                                                  TableCollectionEntry *table_entry,
+                                                  BufferManager *buffer_mgr,
+                                                  const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
+                                                  const HashMap<String, SharedPtr<ColumnDef>> &column_def_map) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -364,7 +311,9 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
 
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
-            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
+            SharedPtr<IndexDef> index_def = index_def_map.at(index_json["index_name"].get<String>());
+            SharedPtr<ColumnDef> column_def = column_def_map.at(index_def->column_names_[0]);
+            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr, index_def, column_def);
             segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
         }
     }
