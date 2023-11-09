@@ -37,26 +37,26 @@ public:
         vector_.reserve(max_size);
     }
 
-    void PushBack(const T& value) {
+    void PushBack(T&& value) {
+        UniqueLock<Mutex> lk(lock_);
         if (vector_.size() >= max_size_) {
             vector_.erase(vector_.begin());
         }
         vector_.push_back(value);
     }
 
-    const T& operator[](SizeT index) const {
+    T operator[](SizeT index) {
+        UniqueLock<Mutex> lk(lock_);
         return vector_[index];
     }
 
-    T& operator[](SizeT index) {
-        return vector_[index];
-    }
-
-    [[nodiscard]] SizeT Size() const {
+    SizeT Size() const {
+        LockGuard<Mutex> lock(lock_);
         return vector_.size();
     }
 
 private:
+    mutable Mutex lock_{};
     Vector<T> vector_;
     SizeT max_size_;
 };
