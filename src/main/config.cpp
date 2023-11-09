@@ -137,7 +137,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
         // Profiler
         {
-            option_.enable = default_enable_profiler;
+            system_option_.enable_profiler = default_enable_profiler;
         }
 
         // Network
@@ -236,7 +236,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Profiler
         {
             auto profiler_config = config["profiler"];
-            option_.enable = profiler_config["enable"].value_or(default_enable_profiler);
+            system_option_.enable_profiler = profiler_config["enable"].value_or(default_enable_profiler);
         }
 
         // Network
