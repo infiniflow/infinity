@@ -77,7 +77,7 @@ struct AnnIVFFlatIndexData {
             }
             return;
         }
-        add_data_to_partition<metric_>(dimension, vector_count, vectors_ptr, this, id_begin);
+        add_data_to_partition(dimension, vector_count, vectors_ptr, this, id_begin);
     }
 };
 
