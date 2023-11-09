@@ -41,11 +41,17 @@ static UniquePtr<IndexFileWorker> CreateFileWorker(SegmentEntry *segment_entry, 
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
             auto create_annivfflat_para = static_cast<CreateAnnIVFFlatPara *>(para.get());
-            file_worker = MakeUnique<AnnIVFFlatIndexFileWorker>(segment_entry->segment_dir_,
-                                                                index_def->index_name_,
-                                                                index_def,
-                                                                column_def,
-                                                                create_annivfflat_para->row_count_);
+            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
+            switch (elem_type) {
+                case kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(segment_entry->segment_dir_,
+                                                                             index_def->index_name_,
+                                                                             index_def,
+                                                                             column_def,
+                                                                             create_annivfflat_para->row_count_);
+                    break;
+                }
+            }
             break;
         }
         case IndexMethod::kHnsw: {

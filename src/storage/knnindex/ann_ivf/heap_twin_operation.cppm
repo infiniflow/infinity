@@ -73,6 +73,11 @@ public:
         u32 &size = sizes[q_id];
         DistType *distance = distance_ptr + q_id * top_k - 1;
         ID *id = id_ptr + q_id * top_k - 1;
+        if (size < top_k && size > 1) {
+            for (u32 index = size / 2; index > 0; --index) {
+                down(distance, id, size, index);
+            }
+        }
         while (size > 1) {
             std::swap(distance[size], distance[1]);
             std::swap(id[size], id[1]);
@@ -151,6 +156,9 @@ public:
         }
     }
     void sort() {
+        if (size < capacity && size > 1) {
+            construct_heap();
+        }
         while (size > 1) {
             pop();
         }
@@ -225,6 +233,9 @@ public:
         }
     }
     void sort() {
+        if (size < capacity && size > 1) {
+            construct_heap();
+        }
         while (size > 1) {
             pop();
         }

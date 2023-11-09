@@ -66,15 +66,15 @@ struct AnnIVFFlatIndexData {
             }
             return;
         }
-        k_means_partition_only_centroids(metric_,
-                                         dimension,
-                                         vector_count,
-                                         vectors_ptr,
-                                         centroids_.data(),
-                                         partition_num_,
-                                         iteration_max,
-                                         min_points_per_centroid,
-                                         max_points_per_centroid);
+        k_means_partition_only_centroids<f32>(metric_,
+                                              dimension,
+                                              vector_count,
+                                              vectors_ptr,
+                                              centroids_.data(),
+                                              partition_num_,
+                                              iteration_max,
+                                              min_points_per_centroid,
+                                              max_points_per_centroid);
     }
 
     void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
