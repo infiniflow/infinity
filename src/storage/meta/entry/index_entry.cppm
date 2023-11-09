@@ -19,8 +19,8 @@ import base_entry;
 import buffer_handle;
 import third_party;
 import buffer_obj;
-import file_worker;
 import parser;
+import index_file_worker;
 
 export module index_entry;
 
@@ -40,16 +40,14 @@ public:
                                                SharedPtr<String> index_name,
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
-                                               SharedPtr<IndexDef> index_def,
-                                               SharedPtr<ColumnDef> column_def);
+                                               UniquePtr<CreateIndexPara> create_index_para);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.
     static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry,
                                                 BufferManager *buffer_manager,
                                                 SharedPtr<String> file_name,
-                                                SharedPtr<IndexDef> index_def,
-                                                SharedPtr<ColumnDef> column_def);
+                                                UniquePtr<CreateIndexPara> create_index_para);
 
 public:
     [[nodiscard]] static BufferHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
@@ -60,11 +58,8 @@ public:
 
     static Json Serialize(const IndexEntry *index_entry);
 
-    static SharedPtr<IndexEntry> Deserialize(const Json &index_entry_json,
-                                             SegmentEntry *segment_entry,
-                                             BufferManager *buffer_mgr,
-                                             SharedPtr<IndexDef> index_def,
-                                             SharedPtr<ColumnDef> column_def);
+    static SharedPtr<IndexEntry>
+    Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr, UniquePtr<CreateIndexPara> create_index_para);
 
     void MergeFrom(BaseEntry &other);
 

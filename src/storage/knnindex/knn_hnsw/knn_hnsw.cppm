@@ -25,17 +25,16 @@ import dist_func;
 import file_system;
 import file_system_type;
 import hnsw_mem_pool;
+import infinity_exception;
 
 export module knn_hnsw;
 
 namespace infinity {
 
-export template <typename DataType>
+export template <typename DataType, typename LabelType>
 class KnnHnsw {
 public:
     static SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
-
-    using LabelType = u32;
 
     using VertexType = i32;
 
@@ -182,7 +181,13 @@ private:
         return static_cast<i32>(r);
     }
 
-    VertexType GenerateNewVertexIdx() { return cur_vertex_n_++; }
+    VertexType GenerateNewVertexIdx() {
+        VertexType res = cur_vertex_n_++;
+        if (res >= max_vertex_) {
+            Error<StorageException>("KnnHnsw::GenerateNewVertexIdx: max_vertex_ is not enough.");
+        }
+        return res;
+    }
 
     void InitVertex(VertexType vertex_idx, i32 layer_n, const DataType *data, LabelType label) {
         DataType *vertex_data = GetDataMut(vertex_idx);
@@ -437,7 +442,7 @@ public:
         file_handler->Close();
     }
 
-    static UniquePtr<KnnHnsw<DataType>>
+    static UniquePtr<KnnHnsw<DataType, LabelType>>
     LoadIndexInner(FileHandler &file_handler, const SpaceBase<DataType> &space, SizeT max_vertex_new = 0, SizeT random_seed = 100) {
         SizeT max_vertex;
         file_handler.Read(&max_vertex, sizeof(max_vertex));
@@ -457,7 +462,7 @@ public:
         VertexType enterpoint;
         file_handler.Read(&enterpoint, sizeof(enterpoint));
 
-        auto index = MakeUnique<KnnHnsw<DataType>>(max_vertex, dim, space, M, ef_construction, random_seed);
+        auto index = MakeUnique<KnnHnsw<DataType, LabelType>>(max_vertex, dim, space, M, ef_construction, random_seed);
         index->cur_vertex_n_ = cur_vertex_n;
         index->max_layer_ = max_layer;
         index->enterpoint_ = enterpoint;
@@ -482,11 +487,11 @@ public:
         return index;
     }
 
-    static UniquePtr<KnnHnsw<DataType>> LoadIndex(const String &file_path,
-                                                  UniquePtr<FileSystem> fs,
-                                                  const SpaceBase<DataType> &space,
-                                                  SizeT max_vertex_new = 0,
-                                                  SizeT random_seed = 100) {
+    static UniquePtr<KnnHnsw<DataType, LabelType>> LoadIndex(const String &file_path,
+                                                             UniquePtr<FileSystem> fs,
+                                                             const SpaceBase<DataType> &space,
+                                                             SizeT max_vertex_new = 0,
+                                                             SizeT random_seed = 100) {
         u8 file_flags = FileFlags::READ_FLAG;
         UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
         auto index = LoadIndexInner(*file_handler, space, max_vertex_new, random_seed);
