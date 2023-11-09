@@ -436,7 +436,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         method_type = IndexMethod::kIVFFlat;
     } else if (IsEqual(create_index_info->method_type_, "IVFSQ8")) {
         method_type = IndexMethod::kIVFSQ8;
-    } else if (IsEqual(create_index_info->method_type_, "HNSW")) {
+    } else if (IsEqual(create_index_info->method_type_, "Hnsw")) {
         method_type = IndexMethod::kHnsw;
     } else {
         PlannerException("Invalid index method type.");

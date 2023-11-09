@@ -25,12 +25,38 @@ import index_def;
 import parser;
 import infinity_exception;
 import base_entry;
-import file_worker;
+import index_file_worker;
 import faiss_index_file_worker;
+import hnsw_file_worker;
 
 module index_entry;
 
 namespace infinity {
+
+static UniquePtr<IndexFileWorker> CreateFileWorker(SegmentEntry *segment_entry, UniquePtr<CreateIndexPara> para) {
+    UniquePtr<IndexFileWorker> file_worker = nullptr;
+    auto index_def = para->index_def_;
+    auto column_def = para->column_def_;
+    switch (index_def->method_type_) {
+        case IndexMethod::kIVFFlat: {
+            file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_def->index_name_, index_def, column_def);
+            break;
+        }
+        case IndexMethod::kHnsw: {
+            auto create_hnsw_para = static_cast<CreateHnswPara *>(para.get());
+            file_worker = MakeUnique<HnswFileWorker>(segment_entry->segment_dir_,
+                                                     index_def->index_name_,
+                                                     index_def,
+                                                     column_def,
+                                                     create_hnsw_para->max_element_);
+            break;
+        }
+        default: {
+            NotImplementException("Not implemented.");
+        }
+    }
+    return file_worker;
+}
 
 IndexEntry::IndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferObj *buffer)
     : BaseEntry(EntryType::kIndex), segment_entry_(segment_entry), index_name_(Move(index_name)), buffer_(buffer){};
@@ -39,26 +65,9 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(SegmentEntry *segment_entry,
                                                 SharedPtr<String> index_name,
                                                 TxnTimeStamp create_ts,
                                                 BufferManager *buffer_manager,
-                                                SharedPtr<IndexDef> index_def,
-                                                SharedPtr<ColumnDef> column_def) {
+                                                UniquePtr<CreateIndexPara> para) {
     // FIXME: estimate index size.
-    UniquePtr<FileWorker> file_worker = nullptr;
-    switch (index_def->method_type_) {
-        case IndexMethod::kIVFFlat: {
-            SharedPtr<String> index_name = index_def->index_name_;
-            file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_def->index_name_, index_def, column_def);
-            break;
-        }
-        case IndexMethod::kIVFSQ8: {
-            break;
-        }
-        case IndexMethod::kInvalid: {
-            StorageException("Invalid index method type.");
-        }
-        default: {
-            NotImplementException("Not implemented.");
-        }
-    }
+    UniquePtr<IndexFileWorker> file_worker = CreateFileWorker(segment_entry, Move(para));
     auto buffer = buffer_manager->Allocate(Move(file_worker));
     auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, Move(index_name), buffer));
     index_entry->min_ts_ = create_ts;
@@ -67,13 +76,9 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(SegmentEntry *segment_entry,
     return index_entry;
 }
 
-SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry,
-                                                 BufferManager *buffer_manager,
-                                                 SharedPtr<String> file_name,
-                                                 SharedPtr<IndexDef> index_def,
-                                                 SharedPtr<ColumnDef> column_def) {
-    // Load from file, so index def and column def is not needed
-    auto file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, file_name, index_def, column_def);
+SharedPtr<IndexEntry>
+IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, BufferManager *buffer_manager, SharedPtr<String> file_name, UniquePtr<CreateIndexPara> para) {
+    UniquePtr<IndexFileWorker> file_worker = CreateFileWorker(segment_entry, Move(para));
     auto buffer = buffer_manager->Get(Move(file_worker));
     auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, Move(file_name), buffer));
 
@@ -117,13 +122,10 @@ Json IndexEntry::Serialize(const IndexEntry *index_entry) {
     return index_entry_json;
 }
 
-SharedPtr<IndexEntry> IndexEntry::Deserialize(const Json &index_entry_json,
-                                              SegmentEntry *segment_entry,
-                                              BufferManager *buffer_mgr,
-                                              SharedPtr<IndexDef> index_def,
-                                              SharedPtr<ColumnDef> column_def) {
+SharedPtr<IndexEntry>
+IndexEntry::Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr, UniquePtr<CreateIndexPara> para) {
     auto file_name = MakeShared<String>(index_entry_json["index_name"].get<String>());
-    auto index_entry = LoadIndexEntry(segment_entry, buffer_mgr, file_name, index_def, column_def);
+    auto index_entry = LoadIndexEntry(segment_entry, buffer_mgr, file_name, Move(para));
     Assert<StorageException>(index_entry.get() != nullptr, "Failed to load index entry");
     index_entry->min_ts_ = index_entry_json["min_ts"];
     index_entry->max_ts_ = index_entry_json["max_ts"];
