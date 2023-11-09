@@ -203,7 +203,7 @@ private:
 public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n) {
+    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n) const {
         DistHeap result;    // TODO:: use faiss heap
         DistHeap candidate; // TODO:: use pool
         // TODO:: reserve heap size
@@ -384,7 +384,7 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k) {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k) const {
         VertexType ep = enterpoint_;
         for (i32 cur_layer = max_layer_; cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);

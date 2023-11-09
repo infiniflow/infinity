@@ -19,6 +19,7 @@ import base_entry;
 import buffer_handle;
 import third_party;
 import buffer_obj;
+import file_worker;
 
 export module index_entry;
 
@@ -27,6 +28,7 @@ namespace infinity {
 class SegmentEntry;
 class FaissIndexPtr;
 class BufferManager;
+class IndexDef;
 
 export class IndexEntry : public BaseEntry {
 private:
@@ -37,11 +39,11 @@ public:
                                                SharedPtr<String> index_name,
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
-                                               FaissIndexPtr *index);
+                                               UniquePtr<FileWorker> file_worker);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.
-    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager);
+    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry, BufferManager *buffer_manager, SharedPtr<String> file_name);
 
 public:
     [[nodiscard]] static BufferHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);

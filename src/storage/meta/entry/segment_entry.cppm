@@ -74,20 +74,12 @@ public:
 
     static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
-    static void CreateIndexScalar(SegmentEntry *segment_entry,
-                                  Txn *txn_ptr,
-                                  const IndexDef &index_def,
-                                  u64 column_id,
-                                  BufferManager *buffer_mgr,
-                                  TxnTableStore *txn_store);
-
-    static SharedPtr<IndexEntry> CreateIndexEmbedding(SegmentEntry *segment_entry,
-                                                      const IndexDef &index_def,
-                                                      u64 column_id,
-                                                      int dimension,
-                                                      TxnTimeStamp create_ts,
-                                                      BufferManager *buffer_mgr,
-                                                      TxnTableStore *txn_store);
+    static SharedPtr<IndexEntry> CreateIndex(SegmentEntry *segment_entry,
+                                             SharedPtr<IndexDef> index_def,
+                                             SharedPtr<ColumnDef> column_def,
+                                             TxnTimeStamp create_ts,
+                                             BufferManager *buffer_mgr,
+                                             TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
