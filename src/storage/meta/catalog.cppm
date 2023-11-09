@@ -50,13 +50,13 @@ public:
         return vector_[index];
     }
 
-    SizeT Size() const {
+    SizeT Size() {
         LockGuard<Mutex> lock(lock_);
         return vector_.size();
     }
 
 private:
-    mutable Mutex lock_{};
+    Mutex lock_{};
     Vector<T> vector_;
     SizeT max_size_;
 };

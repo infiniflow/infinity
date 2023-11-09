@@ -139,6 +139,14 @@ public:
         timings_.reserve(operators_len);
     }
 
+    void Begin() {
+        task_profiler_.Begin();
+    }
+
+    void End() {
+        task_profiler_.End();
+    }
+
     void StartOperator(const PhysicalOperator *op);
 
     void StopOperator(const OperatorState *output_state);
@@ -146,6 +154,7 @@ public:
 
     TaskBinding binding_;
     Vector<OperatorInformation> timings_{};
+    BaseProfiler task_profiler_;
 private:
     bool enable_ = false;
 

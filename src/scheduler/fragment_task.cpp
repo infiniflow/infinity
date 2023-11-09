@@ -53,6 +53,7 @@ void FragmentTask::OnExecute(i64 worker_id) {
 
     bool enable_profiler = fragment_context->query_context()->is_enable_profiler();
     TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+    profiler.Begin();
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
@@ -64,7 +65,7 @@ void FragmentTask::OnExecute(i64 worker_id) {
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
     }
-
+    profiler.End();
     if (sink_state_->error_message_.get() == nullptr and err_msg.get() != nullptr) {
         sink_state_->error_message_ = Move(err_msg);
     } else {
