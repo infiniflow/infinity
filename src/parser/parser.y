@@ -352,7 +352,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE
 %token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
@@ -1495,7 +1495,75 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
     free($2);
 }
-
+| EXPORT PROFILE LONG_VALUE file_path {
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::ExportCmd>($4, infinity::ExportType::kProfileRecord, $3);
+    free($4);
+}
+| SET SESSION IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET SESSION IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET SESSION IDENTIFIER STRING {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET SESSION IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET SESSION IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+};
+| SET GLOBAL IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER STRING {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET GLOBAL IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+};
 
 /*
  * EXPRESSION

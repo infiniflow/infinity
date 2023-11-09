@@ -143,6 +143,8 @@ export using DropViewInfo = DropViewInfo;
 export using CommandInfo = CommandInfo;
 export using UseCmd = UseCmd;
 export using CheckTable = CheckTable;
+export using SetCmd = SetCmd;
+export using ExportCmd = ExportCmd;
 
 export using InitParameter = InitParameter;
 
@@ -179,6 +181,9 @@ export using SubqueryType = SubqueryType;
 export using JoinType = JoinType;
 export using KnnDistanceType = KnnDistanceType;
 export using CommandType = CommandType;
+export using SetVarType = SetVarType;
+export using ExportType = ExportType;
+export using SetScope = SetScope;
 
 export using ParsedExpr = ParsedExpr;
 export using ColumnExpr = ColumnExpr;

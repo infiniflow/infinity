@@ -359,7 +359,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     table_store = txn_tables_store_[table_name].get();
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store, *index_def, begin_ts, GetBufferMgr());
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store, index_def, begin_ts, GetBufferMgr());
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;

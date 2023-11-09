@@ -63,6 +63,7 @@ import parser;
 import index_def;
 import ivfflat_index_def;
 import status;
+import hnsw_index_def;
 
 module logical_planner;
 
@@ -448,6 +449,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             index_def_ptr = IVFFlatIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
             break;
         }
+        case IndexMethod::kHnsw: {
+            index_def_ptr = HnswIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
+            break;
+        }
         case IndexMethod::kInvalid: {
             Error<PlannerException>("Invalid index method type.");
             break;
@@ -675,6 +680,20 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             } else {
                 Error<PlannerException>("Invalid command type.");
             }
+            break;
+        }
+        case CommandType::kSet: {
+            SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+            this->logical_plan_ = logical_command;
+            break;
+        }
+        case CommandType::kExport: {
+            SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+            this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kCheckTable: {

@@ -16,7 +16,7 @@ module;
 
 import stl;
 import file_worker;
-import third_party;
+import specific_concurrent_queue;
 
 export module buffer_manager;
 
@@ -58,6 +58,6 @@ private:
     const u64 memory_limit_{};
     au64 current_memory_size_{}; // TODO: need to be atomic
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
-    ConcurrentQueue<BufferObj *> gc_queue_{};
+    SpecificConcurrentQueue<BufferObj *> gc_queue_{};
 };
 } // namespace infinity
