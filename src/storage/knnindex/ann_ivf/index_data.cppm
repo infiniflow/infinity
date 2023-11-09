@@ -9,6 +9,7 @@ module;
 import stl;
 import index_def;
 import search_top_k;
+import kmeans_partition;
 import infinity_exception;
 
 export module index_data;
@@ -34,29 +35,56 @@ struct AnnIVFFlatIndexData {
     AnnIVFFlatIndexData(MetricType metric, u32 dimension, u32 partition_num)
         : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), vectors_(partition_num_),
           ids_(partition_num_) {}
+
+    template <typename ElemType>
+    void train_centroids(u32 dimension,
+                         u32 vector_count,
+                         const ElemType *vectors_ptr,
+                         u32 iteration_max = 0,
+                         u32 min_points_per_centroid = 32,
+                         u32 max_points_per_centroid = 256) {
+        if (dimension != dimension_) {
+            Error<StorageException>("Dimension not match");
+        }
+        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+            if (metric_ != MetricType::kInvalid) {
+                Error<StorageException>("Metric type not implemented");
+            } else {
+                Error<StorageException>("Metric type not supported");
+            }
+            return;
+        }
+        k_means_partition_only_centroids<metric_>(dimension,
+                                                  vector_count,
+                                                  vectors_ptr,
+                                                  centroids_.data(),
+                                                  partition_num_,
+                                                  iteration_max,
+                                                  min_points_per_centroid,
+                                                  max_points_per_centroid);
+    }
     void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
         if (dimension != dimension_) {
             Error<StorageException>("Dimension not match");
         }
-        switch (metric_) {
-            case MetricType::kMerticL2: {
-                add_data_to_partition_l2(dimension, vector_count, vectors_ptr, this, id_begin);
-                break;
+        if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
+            if (metric_ != MetricType::kInvalid) {
+                Error<StorageException>("Metric type not implemented");
+            } else {
+                Error<StorageException>("Metric type not supported");
             }
-            case MetricType::kInvalid:
-                Error<StorageException>("Metric type is invalid");
-            default:
-                Error<NotImplementException>("Not implemented");
+            return;
         }
+        add_data_to_partition<metric_>(dimension, vector_count, vectors_ptr, this, id_begin);
     }
 };
 
-export template <typename ElemType, typename CentroidsDataType, typename VectorDataType>
-void add_data_to_partition_l2(u32 dimension,
-                              u32 vector_count,
-                              const ElemType *vectors_ptr,
-                              AnnIVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data,
-                              u32 id_begin = 0) {
+export template <MetricType metric, typename ElemType, typename CentroidsDataType, typename VectorDataType>
+void add_data_to_partition(u32 dimension,
+                           u32 vector_count,
+                           const ElemType *vectors_ptr,
+                           AnnIVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data,
+                           u32 id_begin = 0) {
     if (vector_count <= 0 || index_data == nullptr) {
         std::cout << "\nwarning : vector_count <= 0 || index_data == nullptr" << std::endl;
         return;
