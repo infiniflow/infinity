@@ -63,6 +63,7 @@ import parser;
 import index_def;
 import ivfflat_index_def;
 import status;
+import default_values;
 import hnsw_index_def;
 
 module logical_planner;
@@ -671,14 +672,21 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            EntryResult result = txn->GetDatabase(use_command_info->db_name());
-            if (result.Success()) {
+            if(use_command_info->db_name() == SYSTEM_DB_NAME) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                        MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
-                Error<PlannerException>("Invalid command type.");
+                EntryResult result = txn->GetDatabase(use_command_info->db_name());
+                if (result.Success() or use_command_info->db_name() == SYSTEM_DB_NAME) {
+                    SharedPtr<LogicalNode> logical_command =
+                            MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+                    this->logical_plan_ = logical_command;
+                } else {
+                    Error<PlannerException>(Format("Unknown database name:{}.", use_command_info->db_name()));
+                }
             }
             break;
         }
@@ -734,12 +742,39 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
         case ShowStmtType::kIndexes: {
             return BuildShowIndexes(statement, bind_context_ptr);
         }
+        case ShowStmtType::kConfigs: {
+            return BuildShowConfigs(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kProfiles: {
+            return BuildShowProfiles(statement, bind_context_ptr);
+        }
         default: {
             Error<PlannerException>("Unexpected show statement type.");
         }
     }
     return Status();
 }
+
+Status LogicalPlanner::BuildShowConfigs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowConfigs,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
+Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowProfiles,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
 
 Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -754,7 +789,7 @@ Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPt
 Status LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowColumn,
-                                                                  statement->schema_name_,
+                                                                  query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
 

@@ -40,6 +40,18 @@ std::string ShowStatement::ToString() const {
             ss << "Describe index of table: " << schema_name_ << ", table: " << table_name_;
             break;
         }
+        case ShowStmtType::kDatabases: {
+            ss << "Show databases";
+            break;
+        }
+        case ShowStmtType::kConfigs: {
+            ss << "Show configs";
+            break;
+        }
+        case ShowStmtType::kProfiles: {
+            ss << "Show profiles";
+            break;
+        }
     }
     return ss.str();
 }

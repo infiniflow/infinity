@@ -46,7 +46,6 @@ import substring;
 import substract;
 
 import table_scan;
-import seq_scan;
 import knn_scan;
 
 module builtin_functions;
@@ -110,7 +109,6 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
 void BuiltinFunctions::RegisterTableFunction() {
 
-    RegisterSeqScanFunction(catalog_ptr_);
     RegisterTableScanFunction(catalog_ptr_);
     RegisterKnnScanFunction(catalog_ptr_);
 }

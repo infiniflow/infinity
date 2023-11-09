@@ -49,6 +49,7 @@ CAST            { return CAST; }
 CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+CONFIGS         { return CONFIGS; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }
 CROSS           { return CROSS; }
@@ -134,6 +135,7 @@ POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
 PROFILE         { return PROFILE; }
+PROFILES        { return PROFILES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
