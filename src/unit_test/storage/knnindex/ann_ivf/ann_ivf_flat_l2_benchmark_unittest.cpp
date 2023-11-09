@@ -117,8 +117,11 @@ void benchmark_faiss_ivfflatl2() {
 
         // printf("[%.3f s] Preparing index \"%s\" d=%ld\n", elapsed() - t0, index_key, d);
         quantizer = new faiss::IndexFlatL2(d);
+        quantizer->verbose = true;
+
         n_lists = (size_t)sqrt(nt);
         index = new faiss::IndexIVFFlat(quantizer, d, n_lists, faiss::METRIC_L2);
+        index->verbose = true;
 
         printf("[%.3f s] Training on %ld vectors\n, with %d centroids", elapsed() - t0, nt, n_lists);
 

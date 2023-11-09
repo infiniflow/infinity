@@ -24,8 +24,6 @@
 #include <faiss/utils/distances.h>
 #include <faiss/utils/random.h>
 #include <faiss/utils/utils.h>
-#include <iomanip>
-#include <iostream>
 
 namespace faiss {
 
@@ -505,43 +503,6 @@ void Clustering::train_encoded(
                     imbalance_factor(nx, k, assign.get()),
                     nsplit};
             iteration_stats.push_back(stats);
-
-            // output centroids
-            if (false) {
-                // output content of centroids, 128 per line
-                std::cout << "######################################################" << std::endl;
-                std::cout << "first 10 centroids:\n";
-                for (int i = 0; i < 10; ++i) {
-                    std::cout << "partition " << i << ": ";
-                    for (int j = 0; j < d; ++j) {
-                        std::cout << centroids[i * d + j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
-                std::cout << "######################################################" << std::endl;
-                std::cout << std::endl;
-                // output content of partition_element_count, 10 per line
-                std::cout << "partition_element_count:\n";
-                for (int i = 0; i < k; ++i) {
-                    std::cout << hassign[i] << " ";
-                    if (i % 70 == 69)
-                        std::cout << std::endl;
-                }
-                // output the max and min of inthassign
-                int max = 0, min = std::numeric_limits<int>::max();
-                for (int i = 0; i < k; ++i) {
-                    if (hassign[i] > max)
-                        max = hassign[i];
-                    if (hassign[i] < min)
-                        min = hassign[i];
-                }
-                std::cout << "\nmax: " << max << " min: " << min << std::endl;
-            }
-            if (true) {
-                std::cout << "\nIteration " << i << " (" << stats.time << " s, search " << stats.time_search << " s): "
-                          << "objective=" << stats.obj << "\nimbalance=" << std::fixed << std::setprecision(10) << stats.imbalance_factor
-                          << " nsplit=" << nsplit << std::endl;
-            }
 
             if (verbose) {
                 printf("  Iteration %d (%.2f s, search %.2f s): "
