@@ -46,8 +46,6 @@ RowID *I2;
 RowID *I3;
 float *D1, *D2, *D3;
 
-float *c1, *c2, *c3;
-
 float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out);
 /*
 float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out) {
@@ -101,7 +99,7 @@ void benchmark_faiss_ivfflatl2() {
     // TODO: limit omp to 1.
     omp_set_num_threads(1);
     // output max omp threads
-    std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
+    // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
     double t0 = elapsed();
 
     faiss::IndexFlatL2 *quantizer;
@@ -128,10 +126,6 @@ void benchmark_faiss_ivfflatl2() {
 
         index->train(nt, xt);
         delete[] xt;
-        {
-            // copy content of quantizer->codes to c1, use memcpy
-            memcpy(c1, quantizer->codes.data(), n_lists * d * sizeof(float));
-        }
     }
 
     {
@@ -150,28 +144,6 @@ void benchmark_faiss_ivfflatl2() {
 
         delete[] xb;
     }
-#ifdef bucketcontent
-    {
-        // output 100th bucket content
-        std::cout << "######################################################" << std::endl;
-        std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                  << "the 100th bucket content of IndexIVFFlat:\n";
-        auto v_vectors = (const float *)(((faiss::ArrayInvertedLists *)index->invlists)->codes[100].data());
-        auto v_ids = ((faiss::ArrayInvertedLists *)index->invlists)->ids[100];
-        for (i32 i = 0; i < v_ids.size(); ++i) {
-            auto vectors = v_vectors + i * d;
-            auto ids = v_ids.data() + i;
-            std::cout << "id: " << *ids << std::endl;
-            std::cout << "######################################################" << std::endl;
-            std::cout << std::endl;
-            std::cout << "vector: " << i << "\n";
-            for (i32 i = 0; i < d; ++i) {
-                std::cout << vectors[i] << " ";
-            }
-            std::cout << std::endl;
-        }
-    }
-#endif
 
     size_t nq;
     float *xq;
@@ -309,45 +281,6 @@ void benchmark_annivfflatl2() {
 
         // ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
         ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num);
-        // TODO:remove this
-        {
-            int c1 = 88, c2 = 286;
-            auto v_ids_88 = ann_index_data->ids_[c1];
-            auto v_ids_286 = ann_index_data->ids_[c2];
-            // output i, selected_centroid, with description
-            std::cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-                      << c1 << " contain 567736: " << (std::find(v_ids_88.begin(), v_ids_88.end(), 567736) != v_ids_88.end()) << std::endl;
-            std::cout << "\n"
-                      << c2 << " contain 567736: " << (std::find(v_ids_286.begin(), v_ids_286.end(), 567736) != v_ids_286.end())
-                      << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-                      << std::endl;
-        }
-        // copy content of ann_index_data->centroids_ to c2, use memcpy
-        memcpy(c2, ann_index_data->centroids_.data(), partition_num * d * sizeof(float));
-
-#ifdef bucketcontent
-        // output the 100th vector content of ann_index_data->vectors_ and ann_index_data->ids_
-        {
-            std::cout << "######################################################" << std::endl;
-            std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
-                      << "the 100th bucket content of ann_index_data:\n";
-            auto v_vectors = ann_index_data->vectors_[100];
-            auto v_ids = ann_index_data->ids_[100];
-            for (i32 i = 0; i < v_ids.size(); ++i) {
-                auto vectors = v_vectors.data() + i * d;
-                auto ids = v_ids.data() + i;
-                std::cout << "id: " << ids->block_offset_ << std::endl;
-                std::cout << "######################################################" << std::endl;
-                std::cout << std::endl;
-                std::cout << "vector: " << i << "\n";
-                for (i32 i = 0; i < d; ++i) {
-                    std::cout << vectors[i] << " ";
-                }
-                std::cout << std::endl;
-            }
-        }
-#endif
-
         delete[] xt;
         delete[] xb;
     }
@@ -520,21 +453,6 @@ void benchmark_annivfflatip() {
 
         // ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, partition_num, 0);
         ann_index_data = AnnIVFFlatIP<float>::CreateIndex(d, nt, xt, nb, xb, partition_num);
-        // TODO:remove this
-        {
-            int c1 = 88, c2 = 286;
-            auto v_ids_88 = ann_index_data->ids_[c1];
-            auto v_ids_286 = ann_index_data->ids_[c2];
-            // output i, selected_centroid, with description
-            std::cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-                      << c1 << " contain 567736: " << (std::find(v_ids_88.begin(), v_ids_88.end(), 567736) != v_ids_88.end()) << std::endl;
-            std::cout << "\n"
-                      << c2 << " contain 567736: " << (std::find(v_ids_286.begin(), v_ids_286.end(), 567736) != v_ids_286.end())
-                      << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-                      << std::endl;
-        }
-        // copy content of ann_index_data->centroids_ to c2, use memcpy
-        memcpy(c3, ann_index_data->centroids_.data(), partition_num * d * sizeof(float));
 
         delete[] xt;
         delete[] xb;
@@ -631,7 +549,7 @@ void benchmark_annivfflatip() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (true) {
+        if (false) {
             // compare I1,I3, D1,D3
             {
                 std::cout << "############################" << std::endl;
@@ -644,7 +562,7 @@ void benchmark_annivfflatip() {
                         ++diffc1;
                         if (D1[id1] < D3[id2]) {
                             // warn: D1 found result which is not in D3
-                            std::cout << "D1 found result which is not in D2: "
+                            std::cout << "D1 found result which is not in D3: "
                                       << "D1[" << (id1 / k) << " : " << (id1 % k) << "]: " << D1[id1] << " D3[" << (id2 / k) << " : " << (id2 % k)
                                       << "]: " << D3[id2] << " difference: " << D1[id1] - D3[id2] << std::endl;
                             ++id1;
@@ -675,12 +593,9 @@ void benchmark_annivfflatip() {
 class AnnIVFFlatL2Benchmark : public BaseTest {};
 
 TEST_F(AnnIVFFlatL2Benchmark, test1) {
-    c1 = new float[316 * 128];
-    c2 = new float[316 * 128];
-    c3 = new float[316 * 128];
     omp_set_num_threads(1);
     // output max omp threads
-    std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
+    // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
     benchmark_faiss_ivfflatl2();
     std::cout << "##########################################################" << std::endl;
     std::cout << "Hello ?" << std::endl;
@@ -692,7 +607,4 @@ TEST_F(AnnIVFFlatL2Benchmark, test1) {
     benchmark_annivfflatip();
     delete[] I1;
     delete[] D1;
-    delete[] c1;
-    delete[] c2;
-    delete[] c3;
 }

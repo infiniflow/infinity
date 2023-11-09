@@ -7,21 +7,22 @@ import stl;
 export module heap_twin_operation;
 namespace infinity {
 
-// assume that distances have been initialized to std::numeric_limits<DistType>::max()
-// the 1st element may not be the largest when heap is not full
-export template <typename DistType, typename ID>
-class heap_twin_max_multiple {
-    u64 nq;
-    u32 top_k;
-    DistType *distance_ptr;
-    ID *id_ptr;
+// assume that distances have been initialized
+// the 1st element may not be the largest/smallest when heap is not full
+export template <typename Compare, typename DistType, typename ID>
+class heap_twin_multiple {
+    u64 nq{};
+    u32 top_k{};
+    DistType *distance_ptr = nullptr;
+    ID *id_ptr = nullptr;
     Vector<u32> sizes;
+    Compare comp{};
     void down(DistType *distance, ID *id, u32 size, u32 index) {
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-            if (sub + 1 <= size && distance[sub + 1] > distance[sub]) {
+            if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
                 ++sub;
             }
-            if (distance[sub] <= distance[index]) {
+            if (!comp(distance[sub], distance[index])) {
                 break;
             }
             std::swap(distance[sub], distance[index]);
@@ -30,76 +31,18 @@ class heap_twin_max_multiple {
     }
 
 public:
-    heap_twin_max_multiple(u64 nq, u32 top_k, DistType *distance_ptr, ID *id_ptr)
+    explicit heap_twin_multiple(u64 nq, u32 top_k, DistType *distance_ptr, ID *id_ptr)
         : nq{nq}, top_k{top_k}, distance_ptr{distance_ptr}, id_ptr{id_ptr}, sizes(nq) {}
-    void initialize() { std::fill_n(distance_ptr, nq * top_k, std::numeric_limits<DistType>::max()); }
+    ~heap_twin_multiple() = default;
+    void initialize() {
+        std::fill_n(distance_ptr, nq * top_k, comp(1, 0) ? std::numeric_limits<DistType>::max() : std::numeric_limits<DistType>::lowest());
+    }
     void add(u64 q_id, DistType d, ID i) {
         u32 &size = sizes[q_id];
         DistType *distance = distance_ptr + q_id * top_k - 1;
         ID *id = id_ptr + q_id * top_k - 1;
         if (size == top_k) {
-            if (d < distance[1]) {
-                distance[1] = d;
-                id[1] = i;
-                down(distance, id, size, 1);
-            }
-        } else {
-            ++size;
-            distance[size] = d;
-            id[size] = i;
-            if (size == top_k) {
-                for (u32 index = size / 2; index > 0; --index) {
-                    down(distance, id, size, index);
-                }
-            }
-        }
-    }
-    void sort(u64 q_id) {
-        u32 &size = sizes[q_id];
-        DistType *distance = distance_ptr + q_id * top_k - 1;
-        ID *id = id_ptr + q_id * top_k - 1;
-        while (size > 1) {
-            std::swap(distance[size], distance[1]);
-            std::swap(id[size], id[1]);
-            --size;
-            down(distance, id, size, 1);
-        }
-        size = 0;
-    }
-};
-
-// assume that distances have been initialized to std::numeric_limits<DistType>::lowest()
-// the 1st element may not be the smallest when heap is not full
-export template <typename DistType, typename ID>
-class heap_twin_min_multiple {
-    u64 nq;
-    u32 top_k;
-    DistType *distance_ptr;
-    ID *id_ptr;
-    Vector<u32> sizes;
-    void down(DistType *distance, ID *id, u32 size, u32 index) {
-        for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-            if (sub + 1 <= size && distance[sub + 1] < distance[sub]) {
-                ++sub;
-            }
-            if (distance[sub] >= distance[index]) {
-                break;
-            }
-            std::swap(distance[sub], distance[index]);
-            std::swap(id[sub], id[index]);
-        }
-    }
-
-public:
-    heap_twin_min_multiple(u64 nq, u32 top_k, DistType *distance_ptr, ID *id_ptr)
-        : nq{nq}, top_k{top_k}, distance_ptr{distance_ptr}, id_ptr{id_ptr}, sizes(nq) {}
-    void initialize() { std::fill_n(distance_ptr, nq * top_k, std::numeric_limits<DistType>::lowest()); }
-    void add(u64 q_id, DistType d, ID i) {
-        u32 &size = sizes[q_id];
-        DistType *distance = distance_ptr + q_id * top_k - 1;
-        ID *id = id_ptr + q_id * top_k - 1;
-        if (size == top_k) {
-            if (d > distance[1]) {
+            if (comp(distance[1], d)) {
                 distance[1] = d;
                 id[1] = i;
                 down(distance, id, size, 1);

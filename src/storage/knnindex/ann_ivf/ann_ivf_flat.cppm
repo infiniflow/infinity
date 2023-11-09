@@ -1,6 +1,7 @@
 
 module;
 #include <algorithm>
+#include <functional>
 #include <iostream>
 import stl;
 // import knn_result_handler;
@@ -29,7 +30,8 @@ public:
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
         distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, std::numeric_limits<DistType>::max());
-        heap_twin_max_multiple_ = MakeUnique<heap_twin_max_multiple<DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
+        heap_twin_max_multiple_ =
+            MakeUnique<heap_twin_multiple<std::greater<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
@@ -152,7 +154,7 @@ private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
 
-    UniquePtr<heap_twin_max_multiple<DistType, RowID>> heap_twin_max_multiple_{};
+    UniquePtr<heap_twin_multiple<std::greater<DistType>, DistType, RowID>> heap_twin_max_multiple_{};
 
     const DistType *queries_{};
     bool begin_{false};
@@ -166,7 +168,8 @@ public:
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
         distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, std::numeric_limits<DistType>::lowest());
-        heap_twin_min_multiple_ = MakeUnique<heap_twin_min_multiple<DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
+        heap_twin_min_multiple_ =
+            MakeUnique<heap_twin_multiple<std::less<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
@@ -294,7 +297,7 @@ private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
 
-    UniquePtr<heap_twin_min_multiple<DistType, RowID>> heap_twin_min_multiple_{};
+    UniquePtr<heap_twin_multiple<std::less<DistType>, DistType, RowID>> heap_twin_min_multiple_{};
 
     const DistType *queries_{};
     bool begin_{false};
