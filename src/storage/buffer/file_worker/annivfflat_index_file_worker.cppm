@@ -59,7 +59,13 @@ protected:
     void WriteToFileImpl(bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
+
+private:
+    EmbeddingDataType GetType() const;
+
+    SizeT GetDimension() const;
 };
+
 template <typename DataType>
 AnnIVFFlatIndexFileWorker<DataType>::~AnnIVFFlatIndexFileWorker() {
     if (data_ != nullptr) {
@@ -73,20 +79,25 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
         Error<StorageException>("Data is already allocated.");
     }
+    if (index_def_->method_type_ != IndexMethod::kIVFFlat) {
+        Error<StorageException>("Bug.");
+    }
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
         StorageException("Index should be created on embedding column now.");
     }
-    auto type_info = data_type->type_info().get();
-    auto embedding_info = (EmbeddingInfo *)type_info;
-    SizeT dimension = embedding_info->Dimension();
+    SizeT dimension = GetDimension();
 
-    if (index_def_->method_type_ == IndexMethod::kIVFFlat) {
-        auto ivfflat_index_def = dynamic_cast<IVFFlatIndexDef *>(index_def_.get());
-        auto index = new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, ivfflat_index_def->centroids_count_);
-        data_ = static_cast<void *>(index);
-    } else {
-        Error<StorageException>("Not implemented.");
+    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
+    switch (GetType()) {
+        case kElemFloat: {
+            data_ = static_cast<void *>(
+                new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, ivfflat_index_def->centroids_count_));
+            break;
+        }
+        default: {
+            Error<StorageException>("Index should be created on float embedding column now.");
+        }
     }
 }
 
@@ -113,4 +124,19 @@ void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl() {
     index->ReadIndexInner(*file_handler_);
 }
 
+template <typename DataType>
+EmbeddingDataType AnnIVFFlatIndexFileWorker<DataType>::GetType() const {
+    auto data_type = column_def_->type();
+    auto type_info = data_type->type_info().get();
+    auto embedding_info = (EmbeddingInfo *)type_info;
+    return embedding_info->Type();
+}
+
+template <typename DataType>
+SizeT AnnIVFFlatIndexFileWorker<DataType>::GetDimension() const {
+    auto data_type = column_def_->type();
+    auto type_info = data_type->type_info().get();
+    auto embedding_info = (EmbeddingInfo *)type_info;
+    return embedding_info->Dimension();
+}
 } // namespace infinity
