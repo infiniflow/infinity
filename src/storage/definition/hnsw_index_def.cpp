@@ -23,16 +23,16 @@ import index_def;
 import third_party;
 import infinity_exception;
 import serialize;
+import default_values;
 
 module hnsw_index_def;
 
 namespace infinity {
 
 SharedPtr<IndexDef> HnswIndexDef::Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list) {
-    //
-    SizeT M = 16;
-    SizeT ef_construction = 200;
-    SizeT ef = 200;
+    SizeT M = HNSW_M;
+    SizeT ef_construction = HNSW_EF_CONSTRUCTION;
+    SizeT ef = HNSW_EF;
     MetricType metric_type = MetricType::kInvalid;
     for (auto para : index_para_list) {
         if (para->para_name_ == "M") {

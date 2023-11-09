@@ -370,6 +370,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
+    HashMap<String, SharedPtr<ColumnDef>> column_def_map;
 
     if (table_entry_json.contains("column_definition")) {
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
@@ -387,6 +388,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 
             SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
             columns.emplace_back(column_def);
+            column_def_map.emplace(column_name, column_def);
         }
     }
 
@@ -398,10 +400,23 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
     table_entry->table_entry_dir_ = table_entry_dir;
+
+    HashMap<String, SharedPtr<IndexDef>> index_def_map;
+    if (table_entry_json.contains("indexes")) {
+        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
+            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
+            auto res = IndexDefMeta::GetEntry(index_def_meta.get(), 0, 0); // get the last entry from entry list, so set the begin_ts = 0
+            Assert<StorageException>(res.entry_ != nullptr, "index_def_meta should have at least one entry");
+            index_def_map.emplace(*index_def_meta->index_name_, static_cast<IndexDefEntry *>(res.entry_)->index_def_);
+            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
+        }
+    }
+
     if (table_entry_json.contains("segments")) {
         u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
-            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
+            SharedPtr<SegmentEntry> segment_entry =
+                SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr, index_def_map, column_def_map);
             table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
             max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
@@ -410,13 +425,6 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
-
-    if (table_entry_json.contains("indexes")) {
-        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
-            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
-        }
-    }
 
     if (table_entry->deleted_)
         Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");

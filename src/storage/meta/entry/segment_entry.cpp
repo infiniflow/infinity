@@ -159,13 +159,10 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndex(SegmentEntry *segment_entry,
                                                 BufferManager *buffer_mgr,
                                                 TxnTableStore *txn_store) {
     u64 column_id = column_def->id();
-    SharedPtr<IndexEntry> index_entry = nullptr;
+    SharedPtr<IndexEntry> index_entry =
+        IndexEntry::NewIndexEntry(segment_entry, index_def->index_name_, create_ts, buffer_mgr, index_def, Move(column_def));
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
-            SharedPtr<String> index_name = index_def->index_name_;
-            auto file_worker =
-                MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_def->index_name_, Move(index_def), Move(column_def));
-            index_entry = IndexEntry::NewIndexEntry(segment_entry, Move(index_name), create_ts, buffer_mgr, Move(file_worker));
             BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
             auto faiss_index_ptr = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
             faiss::Index *index = faiss_index_ptr->index_;
@@ -281,7 +278,11 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json,
+                                                  TableCollectionEntry *table_entry,
+                                                  BufferManager *buffer_mgr,
+                                                  const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
+                                                  const HashMap<String, SharedPtr<ColumnDef>> &column_def_map) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -307,7 +308,9 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
 
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
-            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
+            SharedPtr<IndexDef> index_def = index_def_map.at(index_json["index_name"].get<String>());
+            SharedPtr<ColumnDef> column_def = column_def_map.at(index_def->column_names_[0]);
+            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr, index_def, column_def);
             segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
         }
     }

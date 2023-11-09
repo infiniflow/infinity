@@ -93,7 +93,11 @@ public:
 
     static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json,
+                                               TableCollectionEntry *table_entry,
+                                               BufferManager *buffer_mgr,
+                                               const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
+                                               const HashMap<String, SharedPtr<ColumnDef>> &column_def_map);
 
     static int Room(SegmentEntry *segment_entry);
 
