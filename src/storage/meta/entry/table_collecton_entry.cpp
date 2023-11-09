@@ -14,8 +14,9 @@
 
 module;
 
+#include <string>
+
 import stl;
-import std;
 import parser;
 import base_entry;
 import table_collection_meta;
@@ -446,7 +447,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     if (table_entry->deleted_)
         Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");
     else
-        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0] != nullptr, "table segment 0 should be valid");
+        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0].get() != nullptr, "table segment 0 should be valid");
     return table_entry;
 }
 

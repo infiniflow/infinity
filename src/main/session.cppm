@@ -16,6 +16,8 @@ module;
 
 import stl;
 import txn;
+import config;
+import options;
 
 export module session;
 
@@ -33,6 +35,7 @@ public:
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
+    SessionOptions* options() { return &session_options; }
 
     inline Txn*& txn() { return txn_; }
 protected:
@@ -43,6 +46,8 @@ protected:
     Txn *txn_{};
 
     SessionType session_type_{SessionType::kRemote};
+
+    SessionOptions session_options;
 };
 
 export class EmbeddedSession : public SessionBase {

@@ -44,9 +44,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context) final;
-
-    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
@@ -71,7 +69,7 @@ public:
     bool IsExchange() const override { return true; }
 
 private:
-    void ExecuteInternal(QueryContext *query_context, TableScanInputState *table_scan_input_state, TableScanOutputState *table_scan_output_state);
+    void ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state);
 
 private:
     SharedPtr<BaseTableRef> base_table_ref_{};

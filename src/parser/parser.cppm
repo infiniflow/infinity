@@ -14,10 +14,8 @@
 module;
 
 #include "type/info/array_info.h"
-#include "type/logical_type.h"
-#include "type/number/float16.h"
-#include "definition/column_def.h"
 #include "sql_parser.h"
+#include "type/number/float16.h"
 
 export module parser;
 
@@ -145,6 +143,8 @@ export using DropViewInfo = DropViewInfo;
 export using CommandInfo = CommandInfo;
 export using UseCmd = UseCmd;
 export using CheckTable = CheckTable;
+export using SetCmd = SetCmd;
+export using ExportCmd = ExportCmd;
 
 export using InitParameter = InitParameter;
 
@@ -181,12 +181,19 @@ export using SubqueryType = SubqueryType;
 export using JoinType = JoinType;
 export using KnnDistanceType = KnnDistanceType;
 export using CommandType = CommandType;
+export using SetVarType = SetVarType;
+export using ExportType = ExportType;
+export using SetScope = SetScope;
 
 export using ParsedExpr = ParsedExpr;
 export using ColumnExpr = ColumnExpr;
 export using ConstantExpr = ConstantExpr;
 export using FunctionExpr = FunctionExpr;
 export using KnnExpr = KnnExpr;
+export using MatchExpr = MatchExpr;
+export using QueryExpr = QueryExpr;
+export using FusionExpr = FusionExpr;
+export using SearchExpr = SearchExpr;
 export using BetweenExpr = BetweenExpr;
 export using SubqueryExpr = SubqueryExpr;
 export using CaseExpr = CaseExpr;

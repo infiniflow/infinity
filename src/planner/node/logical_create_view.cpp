@@ -15,7 +15,7 @@
 module;
 
 #include <memory>
-import std;
+#include <sstream>
 
 import stl;
 import column_binding;

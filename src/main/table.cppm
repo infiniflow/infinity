@@ -15,19 +15,18 @@
 export module table;
 
 import stl;
-import query_result;
 import query_options;
 import value;
 import parser;
-import std;
 import session;
+import query_result;
 
 namespace infinity {
 
 export class Table {
 public:
     Table(String table_name, SharedPtr<EmbeddedSession> session)
-        : table_name_(std::move(table_name)), session_(std::move(session)) {}
+        : table_name_(Move(table_name)), session_(Move(session)) {}
 
     QueryResult CreateIndex(const String &index_name, Vector<String> *column_names, CreateIndexOptions create_index_options);
 

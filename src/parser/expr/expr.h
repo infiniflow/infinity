@@ -30,6 +30,10 @@ enum class ParsedExprType {
     kCast,
     kIn,
     kKnn,
+    kMatch,
+    kQuery,
+    kFusion,
+    kSearch
 };
 
 class ParsedExpr {

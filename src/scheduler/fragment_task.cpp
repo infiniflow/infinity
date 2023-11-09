@@ -32,8 +32,7 @@ namespace infinity {
 void FragmentTask::Init() {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     // Init each operator input / output
-    operator_input_state_.resize(operator_count_);
-    operator_output_state_.resize(operator_count_);
+    operator_states_.resize(operator_count_);
 }
 
 void FragmentTask::OnExecute(i64 worker_id) {
@@ -57,12 +56,10 @@ void FragmentTask::OnExecute(i64 worker_id) {
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
-            auto op = operator_refs[op_idx];
             profiler.StartOperator(op);
-            op->Execute(fragment_context->query_context(),
-                                           operator_input_state_[op_idx].get(),
-                                           operator_output_state_[op_idx].get());
-            profiler.StopOperator(operator_input_state_[op_idx].get(), operator_output_state_[op_idx].get());
+            operator_refs[op_idx]->Execute(fragment_context->query_context(),
+                                           operator_states_[op_idx].get());
+            profiler.StopOperator(operator_output_state_[op_idx].get());
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
@@ -87,7 +84,7 @@ bool FragmentTask::Ready() const {
 bool FragmentTask::IsComplete() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-    return sink_state_->prev_output_state_->Complete();
+    return sink_state_->prev_op_state_->Complete();
 }
 
 TaskBinding FragmentTask::TaskBinding() const {

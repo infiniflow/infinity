@@ -14,6 +14,8 @@
 
 module;
 
+#include <iostream>
+
 module infinity;
 
 import stl;
@@ -23,7 +25,6 @@ import resource_manager;
 import fragment_scheduler;
 import storage;
 import local_file_system;
-import std;
 import third_party;
 import query_options;
 import query_result;
@@ -36,7 +37,7 @@ import parser;
 
 namespace infinity {
 
-Infinity::Infinity() : DatabaseObject(ObjectType::kDatabase), session_(std::move(MakeShared<EmbeddedSession>())) {}
+Infinity::Infinity() : session_(Move(MakeShared<EmbeddedSession>())) {}
 
 Infinity::~Infinity() { Disconnect(); }
 
@@ -73,13 +74,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
     create_schema_info->schema_name_ = db_name;
     create_statement->create_info_ = create_schema_info;
-    QueryResponse response = query_context_ptr->QueryStatement(create_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
 }
 
@@ -93,13 +88,7 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
     SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
     drop_schema_info->schema_name_ = db_name;
     drop_statement->drop_info_ = drop_schema_info;
-    QueryResponse response = query_context_ptr->QueryStatement(drop_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;
 }
 
@@ -111,13 +100,7 @@ QueryResult Infinity::ListDatabases() {
                             InfinityContext::instance().resource_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabases;
-    QueryResponse response = query_context_ptr->QueryStatement(show_statement.get());
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
 
@@ -129,8 +112,8 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
                             InfinityContext::instance().resource_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
-    QueryResponse response = query_context_ptr->QueryStatement(command_statement.get());
-    if (response.result_msg_.get() == nullptr) {
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    if (result.status_.ok()) {
         return MakeShared<Database>(db_name, session_);
     } else {
         return nullptr;
@@ -143,13 +126,7 @@ QueryResult Infinity::Query(const String &query_text) {
                             InfinityContext::instance().fragment_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
-    QueryResponse response = query_context_ptr->Query(query_text);
-    QueryResult result;
-    result.result_table_ = response.result_;
-    if (response.result_msg_.get() != nullptr) {
-        result.error_message_ = response.result_msg_;
-        result.error_code_ = -1;
-    }
+    QueryResult result = query_context_ptr->Query(query_text);
     return result;
 }
 

@@ -75,6 +75,7 @@ EXTRACT         { return EXTRACT; }
 EXECUTE         { return EXECUTE; }
 EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
+EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
@@ -82,6 +83,8 @@ FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
 FULL            { return FULL; }
+FUSION          { return FUSION; }
+GLOBAL          { return GLOBAL; }
 GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
@@ -109,6 +112,7 @@ LINE            { return LINE; }
 LOG             { return LOG; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
+MATCH           { return MATCH; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
@@ -116,6 +120,7 @@ MONTHS          { return MONTHS; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+OFF             { return OFF; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
 OR              { return OR; }
@@ -128,12 +133,16 @@ POINT           { return POINT; }
 POLYGON         { return POLYGON; }
 PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
+PROFILE         { return PROFILE; }
+QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
+SEARCH          { return SEARCH; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }
+SESSION         { return SESSION; }
 SET             { return SET; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }

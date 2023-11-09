@@ -352,7 +352,8 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE
+%token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
 
@@ -396,9 +397,10 @@ struct SQL_LTYPE {
 %type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr knn_expr
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
+%type <expr_t>                  match_expr query_expr fusion_expr search_clause
 %type <const_expr_t>            constant_expr interval_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
-%type <expr_array_t>            expr_array group_by_clause
+%type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
@@ -1157,14 +1159,15 @@ select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
 };
 
 select_clause_without_modifier:
-SELECT distinct expr_array from_clause where_clause group_by_clause having_clause {
+SELECT distinct expr_array from_clause search_clause where_clause group_by_clause having_clause {
     $$ = new infinity::SelectStatement();
     $$->select_list_ = $3;
     $$->select_distinct_ = $2;
     $$->table_ref_ = $4;
-    $$->where_expr_ = $5;
-    $$->group_by_list_ = $6;
-    $$->having_expr_ = $7;
+    $$->search_expr_ = $5;
+    $$->where_expr_ = $6;
+    $$->group_by_list_ = $7;
+    $$->having_expr_ = $8;
 
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
@@ -1227,6 +1230,15 @@ from_clause: FROM table_reference {
     $$ = $2;
 }
 | /* no from clause */ {
+    $$ = nullptr;
+}
+
+search_clause: SEARCH sub_search_array {
+    infinity::SearchExpr* search_expr = new infinity::SearchExpr();
+    search_expr->SetExprs($2);
+    $$ = search_expr;
+}
+| /* no search clause */ {
     $$ = nullptr;
 }
 
@@ -1483,7 +1495,75 @@ command_statement: USE IDENTIFIER {
     $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
     free($2);
 }
-
+| EXPORT PROFILE LONG_VALUE file_path {
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::ExportCmd>($4, infinity::ExportType::kProfileRecord, $3);
+    free($4);
+}
+| SET SESSION IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET SESSION IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET SESSION IDENTIFIER STRING {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET SESSION IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET SESSION IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+};
+| SET GLOBAL IDENTIFIER ON {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, true);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER OFF {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER STRING {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kString, $3, $4);
+    free($3);
+    free($4);
+}
+| SET GLOBAL IDENTIFIER LONG_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    free($3);
+}
+| SET GLOBAL IDENTIFIER DOUBLE_VALUE {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    free($3);
+};
 
 /*
  * EXPRESSION
@@ -1562,6 +1642,9 @@ operand: '(' expr ')' {
 | case_expr
 | cast_expr
 | knn_expr
+| match_expr
+| query_expr
+| fusion_expr
 
 knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
@@ -1671,6 +1754,73 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
 
     $$ = knn_expr;
 }
+
+match_expr : MATCH '(' STRING ',' STRING ')' {
+    infinity::MatchExpr* match_expr = new infinity::MatchExpr();
+    match_expr->SetFields($3);
+    match_expr->matching_text_ = std::string($5);
+    $$ = match_expr;
+}
+| MATCH '(' STRING ',' STRING ',' STRING ')' {
+    infinity::MatchExpr* match_expr = new infinity::MatchExpr();
+    match_expr->SetFields($3);
+    match_expr->matching_text_ = std::move(std::string($5));
+    match_expr->SetOptions($7);
+    $$ = match_expr;
+}
+
+query_expr : QUERY '(' STRING ')' {
+    infinity::QueryExpr* query_expr = new infinity::QueryExpr();
+    query_expr->query_text_ = std::move(std::string($3));
+    $$ = query_expr;
+}
+| QUERY '(' STRING ',' STRING ')' {
+    infinity::QueryExpr* query_expr = new infinity::QueryExpr();
+    query_expr->query_text_ = std::move(std::string($3));
+    query_expr->SetOptions($5);
+    $$ = query_expr;
+}
+
+fusion_expr : FUSION '(' STRING ',' STRING ')' {
+    infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
+    fusion_expr->method_ = std::move(std::string($3));
+    fusion_expr->SetOptions($5);
+    $$ = fusion_expr;
+}
+
+
+sub_search_array : knn_expr {
+    $$ = new std::vector<infinity::ParsedExpr*>();
+    $$->emplace_back($1);
+}
+| match_expr {
+    $$ = new std::vector<infinity::ParsedExpr*>();
+    $$->emplace_back($1);
+}
+| query_expr {
+    $$ = new std::vector<infinity::ParsedExpr*>();
+    $$->emplace_back($1);
+}
+| fusion_expr {
+    $$ = new std::vector<infinity::ParsedExpr*>();
+    $$->emplace_back($1);
+}
+| sub_search_array ',' knn_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+| sub_search_array ',' match_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+| sub_search_array ',' query_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+}
+| sub_search_array ',' fusion_expr {
+    $1->emplace_back($3);
+    $$ = $1;
+};
 
 function_expr : IDENTIFIER '(' ')' {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();

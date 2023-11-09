@@ -61,10 +61,6 @@ public:
 
     [[nodiscard]] inline bool IsTerminator() const { return is_terminator_; }
 
-    InputState *GetInputStateByOperatorID(i64 operator_id) { return operator_input_state_[operator_id].get(); }
-
-    OutputState *GetOutputStateByOperatorID(i64 operator_id) { return operator_output_state_[operator_id].get(); }
-
     // Set source
     // Scan source
     //    void
@@ -92,12 +88,11 @@ public:
 public:
     Atomic<FragmentTaskState> state_{FragmentTaskState::kReady};
 
-    UniquePtr<SourceState> source_state_;
+    UniquePtr<SourceState> source_state_{};
 
-    Vector<UniquePtr<InputState>> operator_input_state_;
-    Vector<UniquePtr<OutputState>> operator_output_state_;
+    Vector<UniquePtr<OperatorState>> operator_states_{};
 
-    UniquePtr<SinkState> sink_state_;
+    UniquePtr<SinkState> sink_state_{};
 
 private:
     void *fragment_context_{};

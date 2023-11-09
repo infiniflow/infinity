@@ -13,9 +13,9 @@
 // limitations under the License.
 module;
 
+#include <iostream>
 #include "magic_enum.hpp"
 
-import std;
 import stl;
 import third_party;
 import physical_operator;

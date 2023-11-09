@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 
 import stl;
 import base_table_ref;

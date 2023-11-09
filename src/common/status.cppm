@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
-extern unsigned long strlen (const char *str);
+export module status;
 
-enum class ErrorCode : long {
+namespace infinity {
+
+export enum class ErrorCode : long {
 
     kOk = 0,
+    kError,
     kNotFound,
     kNotImplemented,
     kReachQueryMemoryLimit,
@@ -29,53 +32,52 @@ enum class ErrorCode : long {
 
 };
 
-class Status {
+export class Status {
 public:
     Status() = default;
 
-    Status(ErrorCode code, const char *msg) : code_(code) {
-        unsigned long len = strlen(msg);
-        msg_ = new char[len]();
-    }
+    inline explicit Status(ErrorCode code) : code_(code) {}
 
-    explicit Status(ErrorCode code) : code_(code) {}
+    Status(ErrorCode code, const char *msg);
 
-    ~Status() {
+    inline ~Status() {
         if(msg_ != nullptr) {
             delete[] msg_;
             msg_ = nullptr;
         }
     }
 
-    Status(const Status &s);
+    Status(Status &s);
 
     Status(Status &&s) noexcept;
 
-    Status &operator=(Status &s);
-
-    const Status &operator=(const Status &s);
+    Status &operator=(Status &s) noexcept;
 
     Status &operator=(Status &&s) noexcept;
 
-    const Status &operator=(const Status &&s) noexcept;
+    const Status &operator=(const Status &s) noexcept = delete;
 
-    static Status OK() { return Status(); }
+    const Status &operator=(const Status &&s) noexcept = delete;
 
-    bool ok() const { return code_ == ErrorCode::kOk && msg_ == nullptr; }
+    static Status OK() { return {}; }
 
-    ErrorCode code() const { return code_; }
+    [[nodiscard]] bool ok() const { return code_ == ErrorCode::kOk && msg_ == nullptr; }
 
-    const char* message() const {
+    [[nodiscard]] ErrorCode code() const { return code_; }
+
+    void Init(ErrorCode code, const char* msg);
+
+    [[nodiscard]] const char* message() const {
         return msg_;
     }
 
 private:
-    inline void CopyFrom(const Status &s);
-
-    inline void MoveFrom(Status &s);
+    void Move(Status &s);
+    void Move(Status &&s);
 
 private:
     ErrorCode code_{ErrorCode::kOk};
     char* msg_{nullptr};
 };
 
+}

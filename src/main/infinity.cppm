@@ -29,7 +29,7 @@ import database_object;
 
 namespace infinity {
 
-export class Infinity : public DatabaseObject {
+export class Infinity {
 public:
     Infinity();
 

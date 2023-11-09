@@ -44,7 +44,7 @@ TEST_F(SQLFileParsingTest, tpch) {
         }
         std::ifstream t(filename);
         String input_sql((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         result->Reset();
     }
 }
@@ -85,14 +85,14 @@ TEST_F(SQLFileParsingTest, hyrise) {
     ReadSQLs(good_sql_path, sqls);
     for (auto &input_sql : sqls) {
         //        std::cout << input_sql << std::endl;
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         result->Reset();
     }
 
     ReadSQLs(bad_sql_path, sqls);
     for (auto &input_sql : sqls) {
         //        std::cout << input_sql << std::endl;
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         result->Reset();
     }
 }
@@ -111,7 +111,7 @@ TEST_F(SQLFileParsingTest, infinity) {
     ReadSQLs(good_sql_path, sqls);
     for (auto &input_sql : sqls) {
         //        std::cout << input_sql << std::endl;
-        parser->Parse(input_sql, result);
+        parser->Parse(input_sql, result.get());
         result->Reset();
     }
 }

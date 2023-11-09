@@ -37,9 +37,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context) final;
-
-    virtual void Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) final;
+    void Execute(QueryContext *query_context, OperatorState *output_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -64,15 +62,15 @@ private:
                                const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
                                const SharedPtr<Vector<String>> &column_names);
 
-    void ExecuteShowDatabases(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState* operator_state);
 
     /// Execute push based show table
-    void ExecuteShowTable(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+    void ExecuteShowTable(QueryContext *query_context, ShowOperatorState* operator_state);
 
     /// Execute push based describe table
-    void ExecuteShowColumns(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+    void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState* operator_state);
 
-    void ExecuteShowIndexes(QueryContext *query_context, ShowInputState *input_state, ShowOutputState *output_state);
+    void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState* operator_state);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};

@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <sstream>
 
 import stl;
 import column_binding;
@@ -53,6 +53,45 @@ String LogicalCommand::ToString(i64 &space) const {
         case CommandType::kUse: {
             UseCmd *use_cmd_info = (UseCmd *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Use table: " << use_cmd_info->db_name();
+            break;
+        }
+        case CommandType::kExport: {
+            ExportCmd *export_cmd_info = (ExportCmd *)(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Export ";
+            switch(export_cmd_info->export_type()) {
+                case ExportType::kProfileRecord: {
+                    ss << "Profile Record: " << export_cmd_info->file_no();
+                }
+            }
+            break;
+        }
+        case CommandType::kSet: {
+            SetCmd* set_cmd_info = (SetCmd*)(command_info_.get());
+            ss << String(space, ' ') << arrow_str;
+            if(set_cmd_info->scope() == SetScope::kSession) {
+                ss << "Set session variable: ";
+            } else {
+                ss << "Set global variable: ";
+            }
+            switch(set_cmd_info->value_type()) {
+                case SetVarType::kBool: {
+                    ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_bool();
+                    break;
+                }
+                case SetVarType::kInteger: {
+                    ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_int();
+                    break;
+                }
+                case SetVarType::kDouble: {
+                    ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_double();
+                    break;
+                }
+                case SetVarType::kString: {
+                    ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_str();
+                    break;
+                }
+            }
+            break;
         }
         case CommandType::kInvalid: {
             Error<PlannerException>("Invalid command type.");

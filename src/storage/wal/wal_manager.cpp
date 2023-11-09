@@ -691,11 +691,11 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
                                                   commit_ts,
                                                   commit_ts);
 
-        segment_entry->block_entries_.emplace_back(std::move(block_entry));
+        segment_entry->block_entries_.emplace_back(Move(block_entry));
         segment_entry->row_count_ += cmd.row_counts_[id];
     }
 
-    table_entry->segments_.emplace(cmd.segment_id, std::move(segment_entry));
+    table_entry->segments_.emplace(cmd.segment_id, Move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }

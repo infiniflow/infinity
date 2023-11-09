@@ -21,7 +21,6 @@ import bind_context;
 import logical_node;
 import query_context;
 import stl;
-import std;
 
 export module bound_delete_statement;
 
@@ -34,11 +33,11 @@ namespace infinity {
 export struct BoundDeleteStatement final : public BoundStatement {
 public:
     static inline SharedPtr<BoundDeleteStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeShared<BoundDeleteStatement>(std::move(bind_context));
+        return MakeShared<BoundDeleteStatement>(Move(bind_context));
     }
 
 public:
-    inline explicit BoundDeleteStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
+    inline explicit BoundDeleteStatement(SharedPtr<BindContext> bind_context) : bind_context_(Move(bind_context)) {}
 
     SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 

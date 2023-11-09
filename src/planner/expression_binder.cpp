@@ -129,7 +129,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
         arguments.emplace_back(lower_ptr);
         SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
-        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
         left_function_expr = MakeShared<FunctionExpression>(scalar_function, arguments);
     }
@@ -142,7 +142,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
         arguments.emplace_back(upper_ptr);
         SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, left_func);
         CheckFuncType(function_set_ptr->type_);
-        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
         ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
         right_function_expr = MakeShared<FunctionExpression>(scalar_function, arguments);
     }
@@ -155,7 +155,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
 
     SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, and_func);
     CheckFuncType(function_set_ptr->type_);
-    auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+    auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
     ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
     return MakeShared<FunctionExpression>(scalar_function, arguments);
 }
@@ -176,7 +176,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDate: {
-            SizeT date_str_len = std::strlen(expr.date_value_);
+            SizeT date_str_len = strlen(expr.date_value_);
             DateT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
             Value value = Value::MakeDate(date_value);
@@ -253,7 +253,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
     switch (function_set_ptr->type_) {
         case FunctionType::kScalar: {
             // SharedPtr<ScalarFunctionSet> scalar_function_set_ptr
-            auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+            auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
             ScalarFunction scalar_function = scalar_function_set_ptr->GetMostMatchFunction(arguments);
 
             for (SizeT idx = 0; idx < arguments.size(); ++idx) {
@@ -273,7 +273,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         }
         case FunctionType::kAggregate: {
             // SharedPtr<AggregateFunctionSet> aggregate_function_set_ptr
-            auto aggregate_function_set_ptr = std::static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
+            auto aggregate_function_set_ptr = static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
             AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments[0]);
             auto aggregate_function_ptr = MakeShared<AggregateExpression>(aggregate_function, arguments);
             return aggregate_function_ptr;
@@ -307,7 +307,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, 
         String function_name = "=";
         NewCatalog *catalog = query_context_->storage()->catalog();
         SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, function_name);
-        auto scalar_function_set_ptr = std::static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
+        auto scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(function_set_ptr);
 
         for (const WhenThen *when_then_expr : *expr.case_check_array_) {
             // Construct when expression: left_expr = value_expr

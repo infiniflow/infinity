@@ -161,12 +161,10 @@ constexpr inline basic_string_view<ElemDst> ViewCast(basic_string_view<ElemSrc> 
 namespace hash_utils {
 
 inline size_t Hash(std::string_view value) noexcept {
-    std::cout << "hash3 " << value << std::endl;
     return std::hash<std::string_view>()(value);
 }
 inline size_t Hash(bytes_view value) noexcept {
     static_assert(sizeof(byte_type) == sizeof(char));
-    std::cout << "hash2 " << std::endl;
     return Hash(ViewCast<char>(value));
 }
 

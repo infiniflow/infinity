@@ -14,7 +14,7 @@
 
 module;
 
-import std;
+#include <string>
 import stl;
 import query_context;
 import operator_state;
@@ -26,9 +26,7 @@ namespace infinity {
 
 void PhysicalIndexJoin::Init() {}
 
-void PhysicalIndexJoin::Execute(QueryContext *query_context, InputState *input_state, OutputState *output_state) {}
-
-void PhysicalIndexJoin::Execute(QueryContext *query_context) {}
+void PhysicalIndexJoin::Execute(QueryContext *query_context, OperatorState *operator_state) {}
 
 SharedPtr<Vector<String>> PhysicalIndexJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
