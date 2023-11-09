@@ -13,7 +13,7 @@
 // limitations under the License.
 module;
 
-import std;
+#include <sstream>
 import stl;
 import third_party;
 
@@ -73,16 +73,18 @@ struct OperatorInformation {
     OperatorInformation() = default;
 
     OperatorInformation(const OperatorInformation& other)
-        : name_(other.name_), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+        : name_(other.name_), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
+          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {
 
     }
 
     OperatorInformation(OperatorInformation&& other)
-        : name_(Move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_), input_data_size_(other.input_data_size_), output_rows_(other.output_rows_) {
+        : name_(Move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
+          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {
     }
 
-    OperatorInformation(String name, i64 start, i64 end, i64 elapsed, u16 input_rows, i32 input_data_size, u16 output_rows)
-        : name_(Move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), input_data_size_(input_data_size), output_rows_(output_rows) {
+    OperatorInformation(String name, i64 start, i64 end, i64 elapsed, u16 input_rows, i32 output_data_size, u16 output_rows)
+        : name_(Move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), output_data_size_(output_data_size), output_rows_(output_rows) {
     }
 
     OperatorInformation& operator=(OperatorInformation&& other) {
@@ -93,7 +95,7 @@ struct OperatorInformation {
             elapsed_ = other.elapsed_;
             input_rows_ = other.input_rows_;
             output_rows_ = other.output_rows_;
-            input_data_size_ = other.input_data_size_;
+            output_data_size_ = other.output_data_size_;
         }
         return *this;
     }
@@ -103,7 +105,7 @@ struct OperatorInformation {
     i64 elapsed_ = 0;
     u16 input_rows_ = 0;
     u16 output_rows_ = 0;
-    i32 input_data_size_ = 0;
+    i32 output_data_size_ = 0;
 
     String name_;
 };
@@ -127,8 +129,7 @@ private:
 
 class PhysicalOperator;
 class PlanFragment;
-class InputState;
-class OutputState;
+class OperatorState;
 
 export class TaskProfiler {
 public:
@@ -140,7 +141,7 @@ public:
 
     void StartOperator(const PhysicalOperator *op);
 
-    void StopOperator(const InputState *input_state, const OutputState *output_state);
+    void StopOperator(const OperatorState *output_state);
 
 
     TaskBinding binding_;

@@ -90,7 +90,7 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
     active_operator_ = op;
     profiler_.Begin();
 }
-void TaskProfiler::StopOperator(const InputState *input_state, const OutputState *output_state) {
+void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     if (!enable_) {
         return;
     }
@@ -98,13 +98,13 @@ void TaskProfiler::StopOperator(const InputState *input_state, const OutputState
         Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
     }
     profiler_.End();
-    auto input_block = input_state->input_data_block_;
-    auto output_block = output_state->data_block_;
-    auto input_rows = input_block ? input_block->row_count() : 0;
-    auto input_data_size = input_block ? input_block->GetSizeInBytes() : 0;
+
+    auto output_block = operator_state->data_block_;
+    auto input_rows = operator_state->prev_op_state_ ? operator_state->prev_op_state_->data_block_->row_count() : 0;
+    auto output_data_size = output_block ? output_block->GetSizeInBytes() : 0;
     auto output_rows = output_block ? output_block->row_count() : 0;
 
-    OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, input_data_size, output_rows);
+    OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
 
     timings_.push_back(Move(info));
     active_operator_ = nullptr;
@@ -191,7 +191,7 @@ void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
                        << ": ElapsedTime: " << op.elapsed_
                        << ", InputRows: " << op.input_rows_
                        << ", OutputRows: " << op.output_rows_
-                       << ", InputDataSize: " << op.input_data_size_
+                       << ", OutputDataSize: " << op.output_data_size_
                        << std::endl;
                 }
                 times ++;
@@ -248,7 +248,7 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
                     json_info["elapsed(ns)"] = op.elapsed_;
                     json_info["input_rows"] = op.input_rows_;
                     json_info["output_rows"] = op.output_rows_;
-                    json_info["input_data_size"] = op.input_data_size_;
+                    json_info["output_data_size"] = op.output_data_size_;
                     json_operators["infos"].push_back(json_info);
                 }
                 times ++;

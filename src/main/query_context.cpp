@@ -65,10 +65,11 @@ void QueryContext::Init(const Config *global_config_ptr,
     optimizer_ = MakeUnique<Optimizer>(this);
     physical_planner_ = MakeUnique<PhysicalPlanner>(this);
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
-    query_metrics_ = MakeShared<QueryProfiler>(global_config_ptr->enable_profiler());
+    query_metrics_ = MakeShared<QueryProfiler>(is_enable_profiler());
 }
 
 QueryResult QueryContext::Query(const String &query) {
+    query_metrics_->StartPhase(QueryPhase::kParser);
     UniquePtr<ParserResult> parsed_result = MakeUnique<ParserResult>();
     parser_->Parse(query, parsed_result.get());
 
@@ -95,6 +96,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
                         session_ptr_->txn()->TxnID(),
                         session_ptr_->txn()->BeginTS(),
                         statement->ToString()));
+        TryMarkProfiler();
 
         // Build unoptimized logical plan for each SQL statement.
         query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
@@ -124,7 +126,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
         query_metrics_->StopPhase(QueryPhase::kExecution);
 
-        MarkProfiler();
         this->CommitTxn();
     } catch (const Exception &e) {
         this->RollbackTxn();
