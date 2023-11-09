@@ -27,7 +27,6 @@ import data_block;
 import txn;
 import data_access_state;
 import index_def;
-import index_data;
 import table_collection_entry;
 import base_entry;
 
@@ -37,8 +36,6 @@ import ivfflat_index_def;
 import hnsw_index_def;
 import buffer_handle;
 import faiss_index_file_worker;
-import ann_ivf_index_file_worker;
-import ann_ivf_flat;
 import logger;
 import local_file_system;
 import random;

@@ -28,7 +28,6 @@ namespace infinity {
 
 class SegmentEntry;
 class FaissIndexPtr;
-class AnnIVFFlatIndexPtr;
 class BufferManager;
 class IndexDef;
 

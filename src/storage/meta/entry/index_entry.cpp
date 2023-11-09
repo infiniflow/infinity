@@ -27,7 +27,6 @@ import infinity_exception;
 import base_entry;
 import file_worker;
 import faiss_index_file_worker;
-import ann_ivf_index_file_worker;
 
 module index_entry;
 
