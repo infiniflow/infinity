@@ -1,5 +1,5 @@
 import stl;
-import index_data;
+import annivfflat_index_data;
 import ann_ivf_flat;
 
 #include <cassert>

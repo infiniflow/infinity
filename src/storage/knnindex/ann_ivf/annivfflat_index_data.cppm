@@ -12,7 +12,7 @@ import search_top_k;
 import kmeans_partition;
 import infinity_exception;
 
-export module index_data;
+export module annivfflat_index_data;
 
 namespace infinity {
 
@@ -25,9 +25,9 @@ double elapsed_334() {
 
 export template <typename CentroidsDataType, typename VectorDataType = CentroidsDataType>
 struct AnnIVFFlatIndexData {
-    MetricType metric_;
-    u32 dimension_;
-    u32 partition_num_;
+    MetricType metric_{MetricType::kInvalid};
+    u32 dimension_{};
+    u32 partition_num_{};
     u32 data_num_{};
     Vector<CentroidsDataType> centroids_;
     Vector<Vector<VectorDataType>> vectors_;
@@ -54,15 +54,17 @@ struct AnnIVFFlatIndexData {
             }
             return;
         }
-        k_means_partition_only_centroids<metric_>(dimension,
-                                                  vector_count,
-                                                  vectors_ptr,
-                                                  centroids_.data(),
-                                                  partition_num_,
-                                                  iteration_max,
-                                                  min_points_per_centroid,
-                                                  max_points_per_centroid);
+        k_means_partition_only_centroids(metric_,
+                                         dimension,
+                                         vector_count,
+                                         vectors_ptr,
+                                         centroids_.data(),
+                                         partition_num_,
+                                         iteration_max,
+                                         min_points_per_centroid,
+                                         max_points_per_centroid);
     }
+
     void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
         if (dimension != dimension_) {
             Error<StorageException>("Dimension not match");
@@ -79,7 +81,7 @@ struct AnnIVFFlatIndexData {
     }
 };
 
-export template <MetricType metric, typename ElemType, typename CentroidsDataType, typename VectorDataType>
+export template <typename ElemType, typename CentroidsDataType, typename VectorDataType>
 void add_data_to_partition(u32 dimension,
                            u32 vector_count,
                            const ElemType *vectors_ptr,

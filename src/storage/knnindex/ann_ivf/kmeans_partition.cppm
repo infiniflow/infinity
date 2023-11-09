@@ -402,8 +402,9 @@ inline void normalize_centroids(u32 dimension, u32 partition_num, CentroidType *
 // CentroidsType: the type to calculate centroids
 // partition_num: the number of partitions, default to sqrt(vector_count)
 // iteration_max: the max iteration count, default to 10
-export template <MetricType metric, typename CentroidsType, typename ElemType, typename CentroidsOutputType>
-void k_means_partition_only_centroids(u32 dimension,
+export template <typename CentroidsType, typename ElemType, typename CentroidsOutputType>
+void k_means_partition_only_centroids(MetricType metric,
+                                      u32 dimension,
                                       u32 vector_count,
                                       const ElemType *vectors_ptr,
                                       CentroidsOutputType *centroids_output,
@@ -413,7 +414,7 @@ void k_means_partition_only_centroids(u32 dimension,
                                       u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
     constexpr bool b_debug_info = false;
-    if constexpr (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
+    if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
         std::cout << "metric type not implemented" << std::endl;
         return;
     }
@@ -423,10 +424,10 @@ void k_means_partition_only_centroids(u32 dimension,
     std::cout << "\n[" << std::fixed << std::setprecision(3) << ((t0 = elapsed()), 0.f) << " s] "
               << "k-means training begin." << std::endl;
     // output metric type
-    if constexpr (metric == MetricType::kMerticL2) {
+    if (metric == MetricType::kMerticL2) {
         std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                   << "metric type: kMerticL2" << std::endl;
-    } else if constexpr (metric == MetricType::kMerticInnerProduct) {
+    } else if (metric == MetricType::kMerticInnerProduct) {
         std::cout << "[" << std::fixed << std::setprecision(3) << elapsed() - t0 << " s] "
                   << "metric type: kMerticInnerProduct" << std::endl;
     } else {
@@ -540,7 +541,7 @@ void k_means_partition_only_centroids(u32 dimension,
             }
         }
         // normalize centroids if inner product metric is used
-        if constexpr (metric == MetricType::kMerticInnerProduct) {
+        if (metric == MetricType::kMerticInnerProduct) {
             normalize_centroids(dimension, partition_num, centroids);
         }
 #ifdef rectime
@@ -630,7 +631,7 @@ void k_means_partition_only_centroids(u32 dimension,
             // For L2 metric, divide the count.
             // For IP metric, normalize centroids.
             // If there is no vector in a partition, the centroid of this partition will not be updated.
-            if constexpr (metric == MetricType::kMerticL2) {
+            if (metric == MetricType::kMerticL2) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     if (auto cnt = partition_element_count[i]; cnt > 0) {
                         f32 inv = 1.0f / (f32)cnt;
@@ -639,7 +640,7 @@ void k_means_partition_only_centroids(u32 dimension,
                         }
                     }
                 }
-            } else if constexpr (metric == MetricType::kMerticInnerProduct) {
+            } else if (metric == MetricType::kMerticInnerProduct) {
                 normalize_centroids(dimension, partition_num, centroids);
             }
 #ifdef rectime

@@ -35,6 +35,8 @@ import defer_op;
 import ivfflat_index_def;
 import hnsw_index_def;
 import buffer_handle;
+import annivfflat_index_data;
+import annivfflat_index_file_worker;
 import faiss_index_file_worker;
 import logger;
 import local_file_system;
@@ -163,15 +165,26 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndex(SegmentEntry *segment_entry,
         IndexEntry::NewIndexEntry(segment_entry, index_def->index_name_, create_ts, buffer_mgr, index_def, Move(column_def));
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
+            auto ivfflat_index_def = dynamic_cast<IVFFlatIndexDef *>(index_def.get());
+            auto data_type = column_def->type();
+            if (data_type->type() != LogicalType::kEmbedding) {
+                StorageException("Index should be created on embedding column now.");
+            }
+            auto type_info = data_type->type_info().get();
+            auto embedding_info = (EmbeddingInfo *)type_info;
+            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+                Error<StorageException>("Index should be created on float embedding column now.");
+            }
             BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
-            auto faiss_index_ptr = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
-            faiss::Index *index = faiss_index_ptr->index_;
+            auto index_ptr = static_cast<AnnIVFFlatIndexPtr *>(buffer_handle.GetDataMut());
+            SizeT dimension = embedding_info->Dimension();
+            AnnIVFFlatIndexData<f32> *index = index_ptr->index_;
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 BufferHandle buffer_handle = block_column_entry->buffer_->Load();
                 auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                 SizeT block_row_cnt = block_entry->row_count_;
-                index->train(block_row_cnt, block_data_ptr);
+                index->insert_data(dimension, block_row_cnt, block_data_ptr);
             }
             break;
         }

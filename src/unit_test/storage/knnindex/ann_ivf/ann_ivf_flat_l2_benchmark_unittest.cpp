@@ -21,7 +21,7 @@ import logger;
 import parser;
 import knn_flat_ip;
 import infinity;
-import index_data;
+import annivfflat_index_data;
 import ann_ivf_flat;
 import search_top_k;
 import knn_result_handler;

@@ -10,7 +10,7 @@ import parser;
 // import third_party;
 import infinity_exception;
 import index_def;
-import index_data;
+import annivfflat_index_data;
 import kmeans_partition;
 // import kmeans_partition_with_triangle;
 import vector_distance;
@@ -39,8 +39,8 @@ public:
     static UniquePtr<AnnIVFFlatIndexData<DistType>>
     CreateIndex(u32 dimension, u32 train_count, const DistType *train_ptr, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
         auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticL2, dimension, partition_num);
-        k_means_partition_only_centroids<MetricType::kMerticL2, f32>(dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition<MetricType::kMerticL2>(dimension, vector_count, vectors_ptr, index_data.get());
+        k_means_partition_only_centroids<f32>(MetricType::kMerticL2, dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
+        add_data_to_partition(dimension, vector_count, vectors_ptr, index_data.get());
         return index_data;
     }
 
@@ -176,12 +176,13 @@ public:
     static UniquePtr<AnnIVFFlatIndexData<DistType>>
     CreateIndex(u32 dimension, u32 train_count, const DistType *train_ptr, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
         auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticInnerProduct, dimension, partition_num);
-        k_means_partition_only_centroids<MetricType::kMerticInnerProduct, f32>(dimension,
-                                                                               train_count,
-                                                                               train_ptr,
-                                                                               index_data->centroids_.data(),
-                                                                               partition_num);
-        add_data_to_partition<MetricType::kMerticInnerProduct>(dimension, vector_count, vectors_ptr, index_data.get());
+        k_means_partition_only_centroids<f32>(MetricType::kMerticInnerProduct,
+                                              dimension,
+                                              train_count,
+                                              train_ptr,
+                                              index_data->centroids_.data(),
+                                              partition_num);
+        add_data_to_partition(dimension, vector_count, vectors_ptr, index_data.get());
         return index_data;
     }
 
