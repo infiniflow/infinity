@@ -180,7 +180,7 @@ inline void heap_heapify(SizeT k,
 
     for (SizeT i = k0; i < k; i++) {
         bh_val[i] = C::neutral();
-        // bh_ids[i] = -1;
+        bh_ids[i] = -1;
     }
 }
 

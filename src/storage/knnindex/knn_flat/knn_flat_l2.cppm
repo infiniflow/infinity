@@ -41,7 +41,7 @@ public:
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, topk), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(this->top_k_ * this->query_count_);
+        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->top_k_ * this->query_count_);
 
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), this->top_k_);
         single_result_handler_ = MakeUnique<SingleResultHandler>(*heap_result_handler_, query_count);
