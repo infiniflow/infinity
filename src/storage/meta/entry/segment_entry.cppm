@@ -74,20 +74,12 @@ public:
 
     static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
-    static void CreateIndexScalar(SegmentEntry *segment_entry,
-                                  Txn *txn_ptr,
-                                  const IndexDef &index_def,
-                                  u64 column_id,
-                                  BufferManager *buffer_mgr,
-                                  TxnTableStore *txn_store);
-
-    static SharedPtr<IndexEntry> CreateIndexEmbedding(SegmentEntry *segment_entry,
-                                                      const IndexDef &index_def,
-                                                      u64 column_id,
-                                                      int dimension,
-                                                      TxnTimeStamp create_ts,
-                                                      BufferManager *buffer_mgr,
-                                                      TxnTableStore *txn_store);
+    static SharedPtr<IndexEntry> CreateIndex(SegmentEntry *segment_entry,
+                                             SharedPtr<IndexDef> index_def,
+                                             SharedPtr<ColumnDef> column_def,
+                                             TxnTimeStamp create_ts,
+                                             BufferManager *buffer_mgr,
+                                             TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
@@ -101,7 +93,11 @@ public:
 
     static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json,
+                                               TableCollectionEntry *table_entry,
+                                               BufferManager *buffer_mgr,
+                                               const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
+                                               const HashMap<String, SharedPtr<ColumnDef>> &column_def_map);
 
     static int Room(SegmentEntry *segment_entry);
 

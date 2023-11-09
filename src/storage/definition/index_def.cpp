@@ -21,6 +21,7 @@ module;
 import stl;
 import serialize;
 import ivfflat_index_def;
+import hnsw_index_def;
 import third_party;
 
 import infinity_exception;
@@ -127,7 +128,16 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
         case IndexMethod::kIVFFlat: {
             size_t centroids_count = ReadBufAdv<size_t>(ptr);
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
-            auto res1 = MakeShared<IVFFlatIndexDef>(index_name, method_type, column_names, centroids_count, metric_type);
+            auto res1 = MakeShared<IVFFlatIndexDef>(index_name, column_names, centroids_count, metric_type);
+            res = std::static_pointer_cast<IndexDef>(res1);
+            break;
+        }
+        case IndexMethod::kHnsw: {
+            MetricType metric_type = ReadBufAdv<MetricType>(ptr);
+            SizeT M = ReadBufAdv<SizeT>(ptr);
+            SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
+            SizeT ef = ReadBufAdv<SizeT>(ptr);
+            auto res1 = MakeShared<HnswIndexDef>(index_name, column_names, metric_type, M, ef_construction, ef);
             res = std::static_pointer_cast<IndexDef>(res1);
             break;
         }
@@ -172,8 +182,16 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
         case IndexMethod::kIVFFlat: {
             size_t centroids_count = index_def_json["centroids_count"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IVFFlatIndexDef>(Move(index_name), method_type, Move(column_names), centroids_count, metric_type);
+            auto ptr = MakeShared<IVFFlatIndexDef>(Move(index_name), Move(column_names), centroids_count, metric_type);
             res = std::static_pointer_cast<IndexDef>(ptr);
+            break;
+        }
+        case IndexMethod::kHnsw: {
+            SizeT M = index_def_json["M"];
+            SizeT ef_construction = index_def_json["ef_construction"];
+            SizeT ef = index_def_json["ef"];
+            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
+            auto ptr = MakeShared<HnswIndexDef>(Move(index_name), Move(column_names), metric_type, M, ef_construction, ef);
             break;
         }
         case IndexMethod::kInvalid: {
