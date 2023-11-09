@@ -14,7 +14,10 @@
 
 module;
 
+#include <cmath>
+
 import stl;
+import index_file_worker;
 import file_worker;
 import parser;
 import index_def;
@@ -26,17 +29,24 @@ export module annivfflat_index_file_worker;
 
 namespace infinity {
 
+export struct CreateAnnIVFFlatPara : public CreateIndexPara {
+    const SizeT row_count_;
+
+    CreateAnnIVFFlatPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def, SizeT row_count)
+        : CreateIndexPara(index_def, column_def), row_count_(row_count) {}
+};
+
 export template <typename DataType>
-class AnnIVFFlatIndexFileWorker : public FileWorker {
-    SharedPtr<ColumnDef> column_def_;
-    SharedPtr<IndexDef> index_def_;
+class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
+    u32 centroid_num_;
 
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
                                        SharedPtr<IndexDef> index_def,
-                                       SharedPtr<ColumnDef> column_def)
-        : FileWorker(Move(file_dir), Move(file_name), 0), index_def_(Move(index_def)), column_def_(Move(column_def)) {}
+                                       SharedPtr<ColumnDef> column_def,
+                                       SizeT row_count)
+        : IndexFileWorker(file_dir, file_name, index_def, column_def), centroid_num_((u32)sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 

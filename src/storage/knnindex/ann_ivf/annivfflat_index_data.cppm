@@ -49,10 +49,9 @@ struct AnnIVFFlatIndexData {
         : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), ids_(partition_num_),
           vectors_(partition_num_) {}
 
-    template <typename ElemType>
     void train_centroids(u32 dimension,
                          u32 vector_count,
-                         const ElemType *vectors_ptr,
+                         const VectorDataType *vectors_ptr,
                          u32 iteration_max = 0,
                          u32 min_points_per_centroid = 32,
                          u32 max_points_per_centroid = 256) {
