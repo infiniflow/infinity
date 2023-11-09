@@ -25,6 +25,8 @@ enum class ShowStmtType {
     kCollections,
     kViews,
     kIndexes,
+    kConfigs,
+    kProfiles,
 };
 
 class ShowStatement : public BaseStatement {
