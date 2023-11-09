@@ -14,7 +14,7 @@ import infinity_exception;
 import vector_distance;
 import search_top_k;
 
-export module kmeans_partition_with_triangle;
+export module kmeans_partition_with_triangle_unfinished;
 
 namespace infinity {
 

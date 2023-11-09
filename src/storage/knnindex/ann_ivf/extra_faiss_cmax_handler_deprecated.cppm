@@ -4,7 +4,7 @@
 module;
 #include <cmath>
 #include <limits>
-export module extra_faiss_cmax_handler;
+export module extra_faiss_cmax_handler_deprecated;
 
 namespace infinity {
 // traits of minheaps = heaps where the minimum value is stored on top

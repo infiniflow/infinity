@@ -8,13 +8,13 @@ module;
 #include <limits>
 import stl;
 import use_mlas;
-import some_simd_functions;
+import vector_distance;
 
 export module search_top_1_sgemm;
 
 namespace infinity {
 
-float vector_norm_l2(const float *x, u32 d) { return IPDistance_simd(x, x, d); }
+float vector_norm_l2(const float *x, u32 d) { return IPDistance<f32>(x, x, d); }
 
 export template <typename ID>
 void search_top_1_with_sgemm(u32 dimension,
