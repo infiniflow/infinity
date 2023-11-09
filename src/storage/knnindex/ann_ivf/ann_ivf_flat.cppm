@@ -105,7 +105,7 @@ public:
             if constexpr (true) {
                 Vector<DistType> centroid_dists(n_probes);
                 Vector<u32> centroid_ids(n_probes);
-                heap_twin_max<DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
+                heap_twin<std::greater<DistType>, DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
                 for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
                     centroids_n_probes.initialize();
@@ -248,7 +248,7 @@ public:
             if constexpr (true) {
                 Vector<DistType> centroid_dists(n_probes);
                 Vector<u32> centroid_ids(n_probes);
-                heap_twin_min<DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
+                heap_twin<std::less<DistType>, DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
                 for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
                     centroids_n_probes.initialize();
