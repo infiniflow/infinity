@@ -58,6 +58,11 @@ export {
     constexpr String WAL_FILE_TEMP_FILE = "wal.log";
     constexpr String WAL_FILE_PREFIX = "wal.log.";
     constexpr String CATALOG_FILE_DIR = "catalog";
+
+    // default hnsw parameter
+    constexpr SizeT HNSW_M = 16;
+    constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
+    constexpr SizeT HNSW_EF = 200;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

@@ -14,22 +14,25 @@
 
 module;
 
-#include "../header.h"
+#include "storage/knnindex/header.h"
+#include <algorithm>
 #include <cassert>
 #include <random>
-#include <algorithm>
 
+import cmp;
 import stl;
-import parser;
-import knn_distance;
 import dist_func;
+import file_system;
+import file_system_type;
+import hnsw_mem_pool;
 
-export module knn_knsw;
+export module knn_hnsw;
 
 namespace infinity {
 
 export template <typename DataType>
 class KnnHnsw {
+public:
     static SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
 
     using LabelType = u32;
@@ -37,14 +40,8 @@ class KnnHnsw {
     using VertexType = i32;
 
     using PDV = Pair<DataType, VertexType>;
-
-    struct CompareByFirst {
-        constexpr bool operator()(const PDV &lhs, const PDV &rhs) const { return lhs.first < rhs.first; }
-    };
-
-    using DistHeap = Heap<PDV, CompareByFirst>;
-
-    using DistTypeLabel = MaxHeap<Pair<DataType, LabelType>>;
+    using CMP = CompareByFirst<DataType, VertexType>;
+    using DistHeap = Heap<PDV, CMP>;
 
     using VertexListSize = i32;
     using LayerSize = i32;
@@ -81,7 +78,14 @@ private:
     const SizeT layer_size_;
     char *graph_{};
 
-    Vector<bool> visited_{};
+    const SizeT loaded_vertex_n_;
+    const char *loaded_layers_;
+
+    // VisitedMemPool visited_pool_;
+
+    // using DistHeapPool = MaxHeapMemPool<PDV, CMP>;
+    // using PooledDistHeap = DistHeapPool::PooledT;
+    // DistHeapPool dist_heap_pool_;
 
 private:
     const DataType *GetData(VertexType vertex_idx) const {
@@ -126,17 +130,11 @@ private:
     }
     LabelType *GetLabelMut(VertexType vertex_idx) { return reinterpret_cast<LabelType *>(graph_ + vertex_idx * level0_size_ + label_offset_); }
 
-    void ReleaseVisited() { std::fill(visited_.begin(), visited_.begin() + cur_vertex_n_, false); }
-
 public:
-    template <typename SpaceType>
-        requires SpaceConcept<DataType, SpaceType>
-    KnnHnsw(SizeT max_vertex, SizeT dim, SpaceType space, SizeT M = 16, SizeT ef_construction = 200, SizeT random_seed = 100)
+    KnnHnsw(SizeT max_vertex, SizeT dim, const SpaceBase<DataType> &space, SizeT M, SizeT ef_construction, SizeT ef = 0, SizeT random_seed = 100)
         : max_vertex_(max_vertex), dim_(dim),                                                            //
-          M_(M), Mmax_(M_), Mmax0_(2 * Mmax_),                                                           //
-          ef_(10), ef_construction_(Max(M_, ef_construction)),                                           //
+          M_(M), Mmax_(M_), Mmax0_(2 * Mmax_), ef_construction_(Max(M_, ef_construction)),               //
           dist_func_(space.DistFuncPtr()),                                                               //
-          cur_vertex_n_(0), max_layer_(-1), enterpoint_(-1),                                             //
           mult_(1 / std::log(1.0 * M_)),                                                                 //
           data_offset_(0),                                                                               //
           neighbor_n0_offset_(AlignTo(sizeof(DataType) * dim_, sizeof(VertexListSize))),                 //
@@ -148,19 +146,35 @@ public:
           neighbor_n1_offset_(0),                                                                        //
           neighbors1_offset_(AlignTo(sizeof(VertexListSize), sizeof(VertexType))),                       //
           layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax_, sizeof(VertexListSize))), //
-          visited_(max_vertex_, false) {
+          loaded_vertex_n_(0), loaded_layers_(nullptr)                                                   //
+    {
+        if (ef == 0) {
+            ef = ef_construction_;
+        }
+        ef_ = ef;
+        cur_vertex_n_ = 0;
+        max_layer_ = -1;
+        enterpoint_ = -1;
         level_rng_.seed(random_seed);
         graph_ = new char[max_vertex_ * level0_size_];
     }
 
     ~KnnHnsw() {
-        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
+        for (VertexType vertex_idx = loaded_vertex_n_; vertex_idx < cur_vertex_n_; ++vertex_idx) {
             delete[] GetLayers(vertex_idx);
         }
         delete[] graph_;
+        if (loaded_layers_) {
+            delete[] loaded_layers_;
+        }
     }
 
 private:
+    void SetLoadLayer(SizeT loaded_vertex_n, char *loaded_layers) {
+        const_cast<SizeT &>(loaded_vertex_n_) = loaded_vertex_n;
+        const_cast<char *&>(loaded_layers_) = loaded_layers;
+    }
+
     // >= 0
     i32 GenerateRandomLayer() {
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
@@ -172,7 +186,7 @@ private:
 
     void InitVertex(VertexType vertex_idx, i32 layer_n, const DataType *data, LabelType label) {
         DataType *vertex_data = GetDataMut(vertex_idx);
-        std::copy(data, data + dim_, vertex_data);
+        std::copy(data, data + dim_, vertex_data); // TODO:: memcpy
         *GetNeighborsMut(vertex_idx, 0).second = 0;
         *GetLabelMut(vertex_idx) = label;
         *GetLayerNMut(vertex_idx) = layer_n;
@@ -181,20 +195,28 @@ private:
             for (i32 layer_idx = 1; layer_idx <= layer_n; ++layer_idx) {
                 *GetNeighborsMut(vertex_idx, layer_idx).second = 0;
             }
+        } else [[likely]] {
+            *GetLayersMut(vertex_idx) = nullptr;
         }
     }
 
+public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n) {
-        DistHeap result;
-        DistHeap candidate;
+    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n) const {
+        DistHeap result;    // TODO:: use faiss heap
+        DistHeap candidate; // TODO:: use pool
+        // TODO:: reserve heap size
 
         DataType dist = dist_func_(query, GetData(enter_point), dim_);
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
-        visited_[enter_point] = true;
+        // auto pooled_visited = visited_pool_.Get(max_vertex_, cur_vertex_n_);
+        // Vector<bool> &visited = *pooled_visited;
+
+        Vector<bool> visited(cur_vertex_n_, false);
+        visited[enter_point] = true;
 
         while (!candidate.empty()) {
             const auto [minus_c_dist, c_idx] = candidate.top();
@@ -203,25 +225,25 @@ private:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = GetNeighbors(c_idx, layer_idx);
+            // TODO:: prefetch visited
 #ifdef USE_SSE
-            _mm_prefetch(GetData(neighbors_p[0]), _MM_HINT_T0);
-            _mm_prefetch(GetData(neighbors_p[1]), _MM_HINT_T0);
+            if (neighbor_size) [[likely]]
+                _mm_prefetch(GetData(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
-            for (int i = 0; i < neighbor_size; ++i) {
+            for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
 #ifdef USE_SSE
-                _mm_prefetch(GetData(neighbors_p[i + 1]), _MM_HINT_T0);
+                if (i - 1 >= 0) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
-                if (visited_[n_idx]) {
+                if (visited[n_idx]) {
                     continue;
                 }
-                visited_[n_idx] = true;
+                visited[n_idx] = true;
+                // TODO:: store result.top(), result.size() in variable
                 dist = dist_func_(query, GetData(n_idx), dim_);
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
-#ifdef USE_SSE
-                    _mm_prefetch(GetData(result.top().second), _MM_HINT_T0);
-#endif
                     result.emplace(dist, n_idx);
                     if (result.size() > candidate_n) {
                         result.pop();
@@ -229,7 +251,6 @@ private:
                 }
             }
         }
-        ReleaseVisited();
         return result;
     }
 
@@ -240,7 +261,15 @@ private:
         while (check) {
             check = false;
             const auto [neighbors_p, neighbor_size] = GetNeighbors(cur_p, layer_idx);
-            for (int i = 0; i < neighbor_size; ++i) {
+#ifdef USE_SSE
+            if (neighbor_size) [[likely]]
+                _mm_prefetch(GetData(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
+#endif
+            for (int i = neighbor_size - 1; i >= 0; --i) {
+#ifdef USE_SSE
+                if (i - 1 >= 0) [[likely]]
+                    _mm_prefetch(GetData(neighbors_p[i - 1]), _MM_HINT_T0);
+#endif
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func_(query, GetData(n_idx), dim_);
                 if (n_dist < cur_dist) {
@@ -255,40 +284,46 @@ private:
 
     // DistHeap is the min heap whose key is the minus distance to query
     // result distance is increasing
-    Vector<VertexType> SelectNeighborsHeuristic(DistHeap &candidates, SizeT M, bool extend_candidates = false, bool keey_pruned_candidates = false) {
-        Vector<VertexType> result;
+    // TODO:: write directly into query's neighbors
+
+    void SelectNeighborsHeuristic(DistHeap &candidates, SizeT M, VertexType *result_p, VertexListSize *result_size_p) const {
+        VertexListSize result_size = 0;
         if (SizeT c_size = candidates.size(); c_size < M) {
-            result.reserve(c_size);
             while (!candidates.empty()) {
-                result.emplace_back(candidates.top().second);
+                result_p[result_size++] = candidates.top().second;
                 candidates.pop();
             }
-            return result;
-        }
-        while (!candidates.empty() && result.size() < M) {
-            const auto [minus_c_dist, c_idx] = candidates.top();
-            candidates.pop();
-            const DataType *c_data = GetData(c_idx);
-            bool check = true;
-            for (VertexType r_idx : result) {
-                DataType cr_dist = dist_func_(c_data, GetData(r_idx), dim_);
-                if (cr_dist < -minus_c_dist) {
-                    check = false;
-                    break;
+        } else {
+            while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
+                const auto &[minus_c_dist, c_idx] = candidates.top();
+                const DataType *c_data = GetData(c_idx);
+                bool check = true;
+#ifdef USE_SSE
+                if (!result_size) [[likely]]
+                    _mm_prefetch(GetData(result_p[0]), _MM_HINT_T0);
+#endif
+                for (SizeT i = 0; i < result_size; ++i) {
+#ifdef USE_SSE
+                    if (i + 1 < result_size) [[likely]]
+                        _mm_prefetch(GetData(result_p[i + 1]), _MM_HINT_T0);
+#endif
+                    VertexType r_idx = result_p[i];
+                    DataType cr_dist = dist_func_(c_data, GetData(r_idx), dim_);
+                    if (cr_dist < -minus_c_dist) {
+                        check = false;
+                        break;
+                    }
                 }
-            }
-            if (check) {
-                result.emplace_back(c_idx);
+                if (check) {
+                    result_p[result_size++] = c_idx;
+                }
+                candidates.pop();
             }
         }
-        return result;
+        *result_size_p = result_size;
     }
 
-    void ConnectNeighbors(VertexType vertex_idx, const Vector<VertexType> &neighbors, i32 layer_idx) {
-        const auto [q_neighbors_p, q_neighbor_size_p] = GetNeighborsMut(vertex_idx, layer_idx);
-        VertexListSize q_neighbor_size = neighbors.size();
-        *q_neighbor_size_p = q_neighbor_size;
-        std::reverse_copy(neighbors.begin(), neighbors.end(), q_neighbors_p);
+    void ConnectNeighbors(VertexType vertex_idx, const VertexType *q_neighbors_p, VertexListSize q_neighbor_size, i32 layer_idx) {
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
             auto [n_neighbors_p, n_neighbor_size_p] = GetNeighborsMut(n_idx, layer_idx);
@@ -299,43 +334,49 @@ private:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            DistHeap candidates;
             const DataType *n_data = GetData(n_idx);
             DataType n_dist = dist_func_(n_data, GetData(vertex_idx), dim_);
-            candidates.emplace(-n_dist, vertex_idx);
+
+            Vector<PDV> tmp;
+            tmp.reserve(n_neighbor_size + 1);
+            tmp.emplace_back(-n_dist, vertex_idx);
+#ifdef USE_SSE
+            if (n_neighbor_size) [[likely]]
+                _mm_prefetch(GetData(n_neighbors_p[0]), _MM_HINT_T0);
+#endif
             for (int i = 0; i < n_neighbor_size; ++i) {
-                VertexType nn_idx = n_neighbors_p[i];
-                DataType nn_dist = dist_func_(GetData(nn_idx), n_data, dim_);
-                candidates.emplace(-nn_dist, nn_idx);
+#ifdef USE_SSE
+                if (i + 1 < n_neighbor_size) [[likely]]
+                    _mm_prefetch(GetData(n_neighbors_p[i + 1]), _MM_HINT_T0);
+#endif
+                tmp.emplace_back(-dist_func_(n_data, GetData(n_neighbors_p[i]), dim_), n_neighbors_p[i]);
             }
-            Vector<VertexType> shrink_neighbors = SelectNeighborsHeuristic(candidates, Mmax);
-            *n_neighbor_size_p = shrink_neighbors.size();
-            std::reverse_copy(shrink_neighbors.begin(), shrink_neighbors.end(), n_neighbors_p);
+
+            DistHeap candidates(tmp.begin(), tmp.end());
+            SelectNeighborsHeuristic(candidates, Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
         }
     }
 
-public:
     void Insert(const DataType *query, LabelType label) {
         VertexType q_vertex = GenerateNewVertexIdx();
         i32 q_layer = GenerateRandomLayer();
         InitVertex(q_vertex, q_layer, query, label);
         VertexType ep = enterpoint_;
-        if (max_layer_ != -1) {
-            for (i32 cur_layer = max_layer_; cur_layer > q_layer; --cur_layer) {
-                ep = SearchLayerNearest(ep, query, cur_layer);
+        for (i32 cur_layer = max_layer_; cur_layer > q_layer; --cur_layer) {
+            ep = SearchLayerNearest(ep, query, cur_layer);
+        }
+        for (i32 cur_layer = Min(q_layer, max_layer_); cur_layer >= 0; --cur_layer) {
+            DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_); // TODO:: use pool
+            DistHeap candidates;
+            while (!search_result.empty()) {
+                const auto &[dist, idx] = search_result.top();
+                candidates.emplace(-dist, idx);
+                search_result.pop();
             }
-            for (i32 cur_layer = Min(q_layer, max_layer_); cur_layer >= 0; --cur_layer) {
-                DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_);
-                DistHeap candidates;
-                while (!search_result.empty()) {
-                    const auto &[dist, idx] = search_result.top();
-                    candidates.emplace(-dist, idx);
-                    search_result.pop();
-                }
-                Vector<VertexType> neighbors = SelectNeighborsHeuristic(candidates, M_);
-                ep = neighbors.front();
-                ConnectNeighbors(q_vertex, neighbors, cur_layer);
-            }
+            const auto [q_neighbors_p, q_neighbor_size_p] = GetNeighborsMut(q_vertex, cur_layer);
+            SelectNeighborsHeuristic(candidates, M_, q_neighbors_p, q_neighbor_size_p);
+            ep = q_neighbors_p[0];
+            ConnectNeighbors(q_vertex, q_neighbors_p, *q_neighbor_size_p, cur_layer);
         }
         if (q_layer > max_layer_) {
             max_layer_ = q_layer;
@@ -343,7 +384,7 @@ public:
         }
     }
 
-    DistTypeLabel KnnSearch(const DataType *query, SizeT k) {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k) const {
         VertexType ep = enterpoint_;
         for (i32 cur_layer = max_layer_; cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
@@ -352,7 +393,7 @@ public:
         while (search_result.size() > k) {
             search_result.pop();
         }
-        DistTypeLabel result;
+        MaxHeap<Pair<DataType, LabelType>> result; // TODO:: reserve
         while (!search_result.empty()) {
             const auto &[dist, idx] = search_result.top();
             result.emplace(dist, GetLabel(idx));
@@ -363,9 +404,101 @@ public:
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
+    void SaveIndexInner(FileHandler &file_handler) {
+        file_handler.Write(&max_vertex_, sizeof(max_vertex_));
+        file_handler.Write(&dim_, sizeof(dim_));
+        file_handler.Write(&M_, sizeof(M_));
+        file_handler.Write(&ef_construction_, sizeof(ef_construction_));
+        file_handler.Write(&cur_vertex_n_, sizeof(cur_vertex_n_));
+        file_handler.Write(&max_layer_, sizeof(max_layer_));
+        file_handler.Write(&enterpoint_, sizeof(enterpoint_));
+
+        file_handler.Write(graph_, cur_vertex_n_ * level0_size_);
+
+        SizeT layer_sum = 0;
+        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
+            layer_sum += GetLayerN(vertex_idx);
+        }
+        file_handler.Write(&layer_sum, sizeof(layer_sum));
+
+        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
+            LayerSize layer_n = GetLayerN(vertex_idx);
+            if (layer_n) {
+                const char *layer_p = GetLayers(vertex_idx);
+                file_handler.Write(layer_p, layer_size_ * layer_n);
+            }
+        }
+    }
+
+    void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
+        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        SaveIndexInner(*file_handler);
+        file_handler->Close();
+    }
+
+    static UniquePtr<KnnHnsw<DataType>>
+    LoadIndexInner(FileHandler &file_handler, const SpaceBase<DataType> &space, SizeT max_vertex_new = 0, SizeT random_seed = 100) {
+        SizeT max_vertex;
+        file_handler.Read(&max_vertex, sizeof(max_vertex));
+        if (max_vertex_new > max_vertex) {
+            max_vertex = max_vertex_new;
+        }
+        SizeT dim;
+        file_handler.Read(&dim, sizeof(dim));
+        SizeT M;
+        file_handler.Read(&M, sizeof(M));
+        SizeT ef_construction;
+        file_handler.Read(&ef_construction, sizeof(ef_construction));
+        SizeT cur_vertex_n;
+        file_handler.Read(&cur_vertex_n, sizeof(cur_vertex_n));
+        i32 max_layer;
+        file_handler.Read(&max_layer, sizeof(max_layer));
+        VertexType enterpoint;
+        file_handler.Read(&enterpoint, sizeof(enterpoint));
+
+        auto index = MakeUnique<KnnHnsw<DataType>>(max_vertex, dim, space, M, ef_construction, random_seed);
+        index->cur_vertex_n_ = cur_vertex_n;
+        index->max_layer_ = max_layer;
+        index->enterpoint_ = enterpoint;
+
+        file_handler.Read(index->graph_, cur_vertex_n * index->level0_size_);
+        // check invariant of grap
+
+        SizeT layer_sum;
+        file_handler.Read(&layer_sum, sizeof(layer_sum));
+
+        char *const loaded_layers = new char[layer_sum * index->layer_size_];
+        char *loaded_layers_p = loaded_layers;
+        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
+            LayerSize layer_n = index->GetLayerN(vertex_idx);
+            if (layer_n) {
+                file_handler.Read(loaded_layers_p, layer_n * index->layer_size_);
+                *index->GetLayersMut(vertex_idx) = loaded_layers_p;
+                loaded_layers_p += layer_n * index->layer_size_;
+            }
+        }
+        index->SetLoadLayer(cur_vertex_n, loaded_layers);
+        return index;
+    }
+
+    static UniquePtr<KnnHnsw<DataType>> LoadIndex(const String &file_path,
+                                                  UniquePtr<FileSystem> fs,
+                                                  const SpaceBase<DataType> &space,
+                                                  SizeT max_vertex_new = 0,
+                                                  SizeT random_seed = 100) {
+        u8 file_flags = FileFlags::READ_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        auto index = LoadIndexInner(*file_handler, space, max_vertex_new, random_seed);
+        file_handler->Close();
+        return index;
+    }
+
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
-    void CheckGraph() {
+    // check invariant of graph
+
+    void CheckGraph() const {
         assert(cur_vertex_n_ <= max_vertex_);
         int max_layer = -1;
         for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n_; ++vertex_idx) {
@@ -373,13 +506,12 @@ public:
             max_layer = Max(cur_max_layer, max_layer);
             assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
             for (int layer_idx = 0; layer_idx <= cur_max_layer; ++layer_idx) {
-                char *p = graph_ + vertex_idx * level0_size_;
                 auto [neighbors, neighbor_n] = GetNeighbors(vertex_idx, layer_idx);
                 VertexType Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
                 assert(neighbor_n <= Mmax);
                 for (int i = 0; i < neighbor_n; ++i) {
                     VertexType neighbor_idx = neighbors[i];
-                    assert(neighbor_idx < cur_vertex_n_);
+                    assert(neighbor_idx < cur_vertex_n_ && neighbor_idx >= 0);
                     assert(neighbor_idx != vertex_idx);
                     auto [n_neighbors, n_neighbor_n] = GetNeighbors(neighbor_idx, layer_idx);
                     assert(n_neighbor_n <= Mmax);
@@ -423,60 +555,6 @@ public:
     //         }
     //     }
     //     fo << "---------------------------------------------" << std::endl;
-    // }
-
-    // void TmpSave(const String &file_name) {
-    //     std::fstream fo(file_name, std::ios::out);
-    //     fo << max_layer_ << std::endl;
-    //     fo << enterpoint_ << std::endl;
-    //     fo << graph_.size() << std::endl;
-    //     for (const auto &vertex : graph_) {
-    //         fo << vertex.label_ << std::endl;
-    //         for (const auto &data : vertex.data_) {
-    //             fo << data << " ";
-    //         }
-    //         fo << vertex.neighbor_layers_.size() << std::endl;
-    //         for (const auto &layer : vertex.neighbor_layers_) {
-    //             fo << layer.size() << std::endl;
-    //             for (const auto &neighbor : layer) {
-    //                 fo << neighbor << " ";
-    //             }
-    //             fo << std::endl;
-    //         }
-    //         fo << std::endl;
-    //     }
-    // }
-
-    // template <typename SpaceType>
-    //     requires SpaceConcept<DataType, SpaceType>
-    // KnnHnsw(SpaceType space, const String &file_name)
-    //     : M_(16), Mmax_(M_), Mmax0_(2 * Mmax_), ef_(10), ef_construction_(200), dim_(space.Dimension()),
-    //       dist_func_(space.template DistFuncPtr<DataType>()), mult_(1 / std::log(1.0 * M_)) {
-    //     level_rng_.seed(100);
-    //     std::fstream fo(file_name, std::ios::in);
-    //     fo >> max_layer_;
-    //     fo >> enterpoint_;
-    //     int vertex_num = -1;
-    //     fo >> vertex_num;
-    //     graph_.resize(vertex_num);
-    //     for (int i = 0; i < vertex_num; i++) {
-    //         fo >> graph_[i].label_;
-    //         graph_[i].data_.resize(dim_);
-    //         for (int j = 0; j < dim_; j++) {
-    //             fo >> graph_[i].data_[j];
-    //         }
-    //         int layer_num = -1;
-    //         fo >> layer_num;
-    //         graph_[i].neighbor_layers_.resize(layer_num);
-    //         for (int j = 0; j < layer_num; j++) {
-    //             int neighbor_num = -1;
-    //             fo >> neighbor_num;
-    //             graph_[i].neighbor_layers_[j].resize(neighbor_num);
-    //             for (int k = 0; k < neighbor_num; k++) {
-    //                 fo >> graph_[i].neighbor_layers_[j][k];
-    //             }
-    //         }
-    //     }
     // }
 };
 } // namespace infinity

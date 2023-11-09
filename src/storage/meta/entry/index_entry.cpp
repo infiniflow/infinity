@@ -14,8 +14,6 @@
 
 module;
 
-#include <string>
-
 import stl;
 import segment_entry;
 import buffer_manager;
@@ -23,9 +21,11 @@ import buffer_handle;
 import buffer_obj;
 import logger;
 import third_party;
-
+import index_def;
+import parser;
 import infinity_exception;
 import base_entry;
+import file_worker;
 import faiss_index_file_worker;
 
 module index_entry;
@@ -39,25 +39,43 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(SegmentEntry *segment_entry,
                                                 SharedPtr<String> index_name,
                                                 TxnTimeStamp create_ts,
                                                 BufferManager *buffer_manager,
-                                                FaissIndexPtr *index) {
-    // FIXME shenyushi: estimate index size.
-    auto file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_name, 0);
-    auto buffer = buffer_manager->Allocate(std::move(file_worker));
-    // FIXME shenyushi: Should use make_shared instead. One heap allocate
-    auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, std::move(index_name), buffer));
+                                                SharedPtr<IndexDef> index_def,
+                                                SharedPtr<ColumnDef> column_def) {
+    // FIXME: estimate index size.
+    UniquePtr<FileWorker> file_worker = nullptr;
+    switch (index_def->method_type_) {
+        case IndexMethod::kIVFFlat: {
+            SharedPtr<String> index_name = index_def->index_name_;
+            file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_def->index_name_, index_def, column_def);
+            break;
+        }
+        case IndexMethod::kIVFSQ8: {
+            break;
+        }
+        case IndexMethod::kInvalid: {
+            StorageException("Invalid index method type.");
+        }
+        default: {
+            NotImplementException("Not implemented.");
+        }
+    }
+    auto buffer = buffer_manager->Allocate(Move(file_worker));
+    auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, Move(index_name), buffer));
     index_entry->min_ts_ = create_ts;
     index_entry->max_ts_ = create_ts;
     auto buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_manager);
-    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
-    *dest = *index;
     return index_entry;
 }
 
-SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager) {
-    auto file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_name, 0);
-    auto buffer = buffer_manager->Get(std::move(file_worker));
-    // FIXME shenyushi: Should use make_shared instead. One heap allocate
-    auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, std::move(index_name), buffer));
+SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry,
+                                                 BufferManager *buffer_manager,
+                                                 SharedPtr<String> file_name,
+                                                 SharedPtr<IndexDef> index_def,
+                                                 SharedPtr<ColumnDef> column_def) {
+    // Load from file, so index def and column def is not needed
+    auto file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, file_name, index_def, column_def);
+    auto buffer = buffer_manager->Get(Move(file_worker));
+    auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(segment_entry, Move(file_name), buffer));
 
     return index_entry;
 }
@@ -65,12 +83,7 @@ SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(SegmentEntry *segment_entry, Sh
 BufferHandle IndexEntry::GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr) { return index_entry->buffer_->Load(); }
 
 void IndexEntry::UpdateIndex(IndexEntry *index_entry, TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr) {
-    Error<NotImplementException>("Not tested. TODO shenyushi0");
-
-    index_entry->max_ts_ = commit_ts;
-    auto buffer_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
-    auto dest = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
-    *dest = *index;
+    Error<NotImplementException>("Not implemented");
 }
 
 bool IndexEntry::Flush(IndexEntry *index_entry, TxnTimeStamp checkpoint_ts) {
@@ -104,10 +117,13 @@ Json IndexEntry::Serialize(const IndexEntry *index_entry) {
     return index_entry_json;
 }
 
-SharedPtr<IndexEntry> IndexEntry::Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
-    auto index_name = MakeShared<String>(index_entry_json["index_name"].get<String>());
-
-    auto index_entry = LoadIndexEntry(segment_entry, Move(index_name), buffer_mgr);
+SharedPtr<IndexEntry> IndexEntry::Deserialize(const Json &index_entry_json,
+                                              SegmentEntry *segment_entry,
+                                              BufferManager *buffer_mgr,
+                                              SharedPtr<IndexDef> index_def,
+                                              SharedPtr<ColumnDef> column_def) {
+    auto file_name = MakeShared<String>(index_entry_json["index_name"].get<String>());
+    auto index_entry = LoadIndexEntry(segment_entry, buffer_mgr, file_name, index_def, column_def);
     Assert<StorageException>(index_entry.get() != nullptr, "Failed to load index entry");
     index_entry->min_ts_ = index_entry_json["min_ts"];
     index_entry->max_ts_ = index_entry_json["max_ts"];
@@ -128,8 +144,8 @@ void IndexEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-String IndexEntry::IndexFileName(const String &index_name) { return index_name + ".idx"; }
+String IndexEntry::IndexFileName(const String &index_name) { return Format("{}.idx", index_name); }
 
-String IndexEntry::IndexDirName(const String &segment_entry_dir) { return segment_entry_dir + "/index"; }
+String IndexEntry::IndexDirName(const String &segment_entry_dir) { return Format("{}/index", segment_entry_dir); }
 
 } // namespace infinity

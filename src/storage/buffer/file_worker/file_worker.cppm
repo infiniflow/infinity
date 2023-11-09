@@ -66,15 +66,14 @@ private:
 
 public:
     const SizeT buffer_size_{};
+    const SharedPtr<String> file_name_{};
+    const SharedPtr<String> file_dir_{};
 
 protected:
     void *data_{nullptr};
     UniquePtr<FileHandler> file_handler_{nullptr};
 
 private:
-    SharedPtr<String> file_name_{};
-    SharedPtr<String> file_dir_{};
-
     // following members are not init in constructor
     SharedPtr<String> base_dir_{};
     SharedPtr<String> temp_dir_{};

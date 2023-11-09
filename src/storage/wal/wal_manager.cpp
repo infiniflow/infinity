@@ -644,7 +644,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), *cmd.index_def_, commit_ts, storage_->buffer_manager());
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), cmd.index_def_, commit_ts, storage_->buffer_manager());
     TableCollectionEntry::CommitCreateIndex(table_entry, table_store->uncommitted_indexes_);
 }
 

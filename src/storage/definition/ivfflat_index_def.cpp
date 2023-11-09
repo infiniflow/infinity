@@ -41,8 +41,7 @@ SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name, Vector<S
     if (centroids_count == 0 || metric_type == MetricType::kInvalid) {
         Error<StorageException>("Lack index parameters");
     }
-    auto ptr = MakeShared<IVFFlatIndexDef>(Move(index_name), IndexMethod::kIVFFlat, Move(column_names), centroids_count, metric_type);
-    return std::static_pointer_cast<IndexDef>(ptr);
+    return MakeShared<IVFFlatIndexDef>(Move(index_name), Move(column_names), centroids_count, metric_type);
 }
 
 bool IVFFlatIndexDef::operator==(const IndexDef &other) const {
