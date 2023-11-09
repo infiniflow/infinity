@@ -16,11 +16,7 @@
 
 import infinity_exception;
 import stl;
-import global_resource_usage;
-// import third_party;
-import logger;
 import parser;
-import infinity;
 import ann_ivf_flat;
 
 class AnnIVFFlatL2Test : public BaseTest {};
