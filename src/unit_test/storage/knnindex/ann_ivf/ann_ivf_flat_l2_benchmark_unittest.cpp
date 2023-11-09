@@ -685,7 +685,7 @@ TEST_F(AnnIVFFlatL2Benchmark, test1) {
     std::cout << "##########################################################" << std::endl;
     std::cout << "Hello ?" << std::endl;
     std::cout << "##########################################################" << std::endl;
-    // benchmark_annivfflatl2();
+    benchmark_annivfflatl2();
     std::cout << "##########################################################" << std::endl;
     std::cout << "Hello ?" << std::endl;
     std::cout << "##########################################################" << std::endl;
