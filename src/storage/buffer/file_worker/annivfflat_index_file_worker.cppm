@@ -19,21 +19,15 @@ import file_worker;
 import parser;
 import index_def;
 import annivfflat_index_data;
+import infinity_exception;
+import ivfflat_index_def;
 
 export module annivfflat_index_file_worker;
 
 namespace infinity {
 
-export struct AnnIVFFlatIndexPtr {
-    AnnIVFFlatIndexData<f32> *index_{};
-
-    AnnIVFFlatIndexPtr(AnnIVFFlatIndexData<f32> *index) : index_(index) {}
-
-    // Not destruct here
-    ~AnnIVFFlatIndexPtr() = default;
-};
-
-export class AnnIVFFlatIndexFileWorker : public FileWorker {
+export template <typename DataType>
+class AnnIVFFlatIndexFileWorker : public FileWorker {
     SharedPtr<ColumnDef> column_def_;
     SharedPtr<IndexDef> index_def_;
 
@@ -56,5 +50,57 @@ protected:
 
     void ReadFromFileImpl() override;
 };
+template <typename DataType>
+AnnIVFFlatIndexFileWorker<DataType>::~AnnIVFFlatIndexFileWorker() {
+    if (data_ != nullptr) {
+        FreeInMemory();
+        data_ = nullptr;
+    }
+}
+
+template <typename DataType>
+void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
+    if (data_) {
+        Error<StorageException>("Data is already allocated.");
+    }
+    auto data_type = column_def_->type();
+    if (data_type->type() != LogicalType::kEmbedding) {
+        StorageException("Index should be created on embedding column now.");
+    }
+    auto type_info = data_type->type_info().get();
+    auto embedding_info = (EmbeddingInfo *)type_info;
+    SizeT dimension = embedding_info->Dimension();
+
+    if (index_def_->method_type_ == IndexMethod::kIVFFlat) {
+        auto ivfflat_index_def = dynamic_cast<IVFFlatIndexDef *>(index_def_.get());
+        auto index = new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, ivfflat_index_def->centroids_count_);
+        data_ = static_cast<void *>(index);
+    } else {
+        Error<StorageException>("Not implemented.");
+    }
+}
+
+template <typename DataType>
+void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
+    if (!data_) {
+        Error<StorageException>("Data is not allocated.");
+    }
+    auto index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
+    delete index;
+    data_ = nullptr;
+}
+
+template <typename DataType>
+void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool &prepare_success) {
+    auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
+    index->SaveIndexInner(*file_handler_);
+    prepare_success = true;
+}
+
+template <typename DataType>
+void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl() {
+    auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
+    index->ReadIndexInner(*file_handler_);
+}
 
 } // namespace infinity

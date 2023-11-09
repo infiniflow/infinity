@@ -20,6 +20,7 @@ module;
 
 import stl;
 import index_def;
+import file_system;
 import search_top_k;
 import kmeans_partition;
 import infinity_exception;
@@ -42,11 +43,11 @@ struct AnnIVFFlatIndexData {
     u32 partition_num_{};
     u32 data_num_{};
     Vector<CentroidsDataType> centroids_;
-    Vector<Vector<VectorDataType>> vectors_;
     Vector<Vector<u32>> ids_;
+    Vector<Vector<VectorDataType>> vectors_;
     AnnIVFFlatIndexData(MetricType metric, u32 dimension, u32 partition_num)
-        : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), vectors_(partition_num_),
-          ids_(partition_num_) {}
+        : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), ids_(partition_num_),
+          vectors_(partition_num_) {}
 
     template <typename ElemType>
     void train_centroids(u32 dimension,
@@ -90,6 +91,38 @@ struct AnnIVFFlatIndexData {
             return;
         }
         add_data_to_partition(dimension, vector_count, vectors_ptr, this, id_begin);
+    }
+
+    void SaveIndexInner(FileHandler &file_handler) {
+        file_handler.Write(&metric_, sizeof(metric_));
+        file_handler.Write(&dimension_, sizeof(dimension_));
+        file_handler.Write(&partition_num_, sizeof(partition_num_));
+        file_handler.Write(&data_num_, sizeof(data_num_));
+        file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+        u32 vector_element_num;
+        for (u32 i = 0; i < partition_num_; ++i) {
+            vector_element_num = ids_[i].size();
+            file_handler.Write(&vector_element_num, sizeof(vector_element_num));
+            file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
+            file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+        }
+    }
+
+    void ReadIndexInner(FileHandler &file_handler) {
+        file_handler.Read(&metric_, sizeof(metric_));
+        file_handler.Read(&dimension_, sizeof(dimension_));
+        file_handler.Read(&partition_num_, sizeof(partition_num_));
+        file_handler.Read(&data_num_, sizeof(data_num_));
+        centroids_.resize(dimension_ * partition_num_);
+        file_handler.Read(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+        u32 vector_element_num;
+        for (u32 i = 0; i < partition_num_; ++i) {
+            file_handler.Read(&vector_element_num, sizeof(vector_element_num));
+            ids_[i].resize(vector_element_num);
+            file_handler.Read(ids_[i].data(), sizeof(u32) * vector_element_num);
+            vectors_[i].resize(dimension_ * vector_element_num);
+            file_handler.Read(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+        }
     }
 };
 
