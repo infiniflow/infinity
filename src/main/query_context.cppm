@@ -93,6 +93,12 @@ public:
 
     void RollbackTxn();
 
+    void MarkProfiler() const {
+        if (global_config_->enable_profiler()) {
+            session_ptr_->AppendProfilerRecord(query_metrics_);
+        }
+    }
+
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->txn(); }
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }

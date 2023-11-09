@@ -24,6 +24,7 @@ import function_set;
 import table_function;
 import third_party;
 import buffer_manager;
+import profiler;
 
 export module new_catalog;
 
@@ -70,6 +71,10 @@ public:
 
     void MergeFrom(NewCatalog &other);
 
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        records_.push_back(Move(profiler));
+    }
+
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
@@ -80,6 +85,8 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
+    // TOOD:
+    Vector<SharedPtr<QueryProfiler>> records_;
 };
 
 } // namespace infinity

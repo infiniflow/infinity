@@ -96,22 +96,21 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
                         session_ptr_->txn()->BeginTS(),
                         statement->ToString()));
 
-        query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
         // Build unoptimized logical plan for each SQL statement.
+        query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
         logical_planner_->Build(statement, bind_context);
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
+        SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
         query_metrics_->StopPhase(QueryPhase::kLogicalPlan);
 
-        SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
-
-        query_metrics_->StartPhase(QueryPhase::kOptimizer);
         // Apply optimized rule to the logical plan
+        query_metrics_->StartPhase(QueryPhase::kOptimizer);
         SharedPtr<LogicalNode> optimized_plan = optimizer_->optimize(unoptimized_plan);
         query_metrics_->StopPhase(QueryPhase::kOptimizer);
 
-        query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
         // Build physical plan
+        query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
         SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
         query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
 
@@ -125,6 +124,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
         query_metrics_->StopPhase(QueryPhase::kExecution);
 
+        MarkProfiler();
         this->CommitTxn();
     } catch (const Exception &e) {
         this->RollbackTxn();

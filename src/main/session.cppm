@@ -18,6 +18,8 @@ import stl;
 import txn;
 import config;
 import options;
+import profiler;
+import new_catalog;
 
 export module session;
 
@@ -38,6 +40,12 @@ public:
     SessionOptions* options() { return &session_options; }
 
     inline Txn*& txn() { return txn_; }
+
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        if (txn_->GetCatalog()) {
+            txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
+        }
+    }
 protected:
     // Current schema
     String current_database_{};

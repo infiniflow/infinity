@@ -243,9 +243,9 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
                 for (const auto &op : operators.timings_) {
                     Json json_info;
                     json_info["name"] = op.name_;
-                    json_info["start"] = op.start_;
-                    json_info["end"] = op.end_;
-                    json_info["elapsed"] = op.elapsed_;
+                    json_info["start(ns)"] = op.start_;
+                    json_info["end(ns)"] = op.end_;
+                    json_info["elapsed(ns)"] = op.elapsed_;
                     json_info["input_rows"] = op.input_rows_;
                     json_info["output_rows"] = op.output_rows_;
                     json_info["input_data_size"] = op.input_data_size_;
