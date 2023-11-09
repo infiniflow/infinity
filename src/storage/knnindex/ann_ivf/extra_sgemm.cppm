@@ -6,7 +6,7 @@ module;
 #ifndef FINTEGER
 #define FINTEGER long
 #endif
-export module extra_sgemm;
+export module extra_sgemm_deprecated;
 namespace infinity{
 export int sgemm_(
     const char* transa,

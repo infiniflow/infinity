@@ -9,7 +9,7 @@ module;
 #ifndef FINTEGER
 #define FINTEGER long
 #endif
-import extra_sgemm;
+import extra_sgemm_deprecated;
 import extra_faiss_cmax_handler;
 
 export module extra_faiss_rewrite_deprecated;
