@@ -29,6 +29,9 @@ class heap_twin_multiple {
     Vector<u32> sizes;
     Compare comp{};
     void down(DistType *distance, ID *id, u32 size, u32 index) {
+        if (index == 0 || index > size || size <= 1) {
+            return;
+        }
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
             if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
                 ++sub;
@@ -46,6 +49,7 @@ public:
         : nq{nq}, top_k{top_k}, distance_ptr{distance_ptr}, id_ptr{id_ptr}, sizes(nq) {}
     ~heap_twin_multiple() = default;
     void initialize() {
+        std::fill(sizes.begin(), sizes.end(), 0);
         std::fill_n(distance_ptr, nq * top_k, comp(1, 0) ? std::numeric_limits<DistType>::max() : std::numeric_limits<DistType>::lowest());
     }
     void add(u64 q_id, DistType d, ID i) {
@@ -110,6 +114,9 @@ class heap_twin {
         }
     }
     void down(u32 index) {
+        if (index == 0 || index > size || size <= 1) {
+            return;
+        }
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
             if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
                 ++sub;
@@ -132,12 +139,15 @@ class heap_twin {
             std::swap(id[size], id[1]);
             --size;
             down(1);
+        } else if (size == 1) {
+            size = 0;
         }
     }
 
 public:
     heap_twin(u32 capacity, DistType *distance_ptr, ID *id_ptr) : capacity{capacity}, size{0}, distance{distance_ptr - 1}, id{id_ptr - 1} {}
     void initialize() {
+        size = 0;
         std::fill_n(distance + 1, capacity, comp(1, 0) ? std::numeric_limits<DistType>::max() : std::numeric_limits<DistType>::lowest());
     }
     void add(DistType d, ID i) {
@@ -161,8 +171,12 @@ public:
             construct_heap();
         }
         while (size > 1) {
-            pop();
+            std::swap(distance[size], distance[1]);
+            std::swap(id[size], id[1]);
+            --size;
+            down(1);
         }
+        size = 0;
     }
 };
 

@@ -38,7 +38,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int global_nb = 100'000;
 int n_lists;
-int n_probes = 5;
+int n_probes = 16;
 size_t k;
 
 faiss::idx_t *I1;
@@ -527,7 +527,7 @@ void benchmark_annivfflatl2() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (true) {
+        if (false) {
             // compare I1,I2, D1,D2
             {
                 std::cout << "############################" << std::endl;
@@ -700,7 +700,7 @@ void benchmark_annivfflatip() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (true) {
+        if (false) {
             // compare I11,I3, D11,D3
             {
                 std::cout << "############################" << std::endl;
