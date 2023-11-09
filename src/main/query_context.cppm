@@ -103,6 +103,7 @@ public:
     [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
 
+    [[nodiscard]] SessionBase* current_session() const { return session_ptr_; }
 private:
     // Parser
     UniquePtr<SQLParser> parser_{};

@@ -677,6 +677,20 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             }
             break;
         }
+        case CommandType::kSet: {
+            SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+            this->logical_plan_ = logical_command;
+            break;
+        }
+        case CommandType::kExport: {
+            SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+
+            this->logical_plan_ = logical_command;
+            break;
+        }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
             EntryResult result = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());

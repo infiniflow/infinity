@@ -20,6 +20,8 @@ import operator_state;
 import parser;
 import table_def;
 import data_table;
+import options;
+import third_party;
 
 import infinity_exception;
 
@@ -30,20 +32,42 @@ namespace infinity {
 void PhysicalCommand::Init() {}
 
 void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    operator_state->SetComplete();
     switch (command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command = (UseCmd *)(command_info_.get());
             query_context->set_current_schema(use_command->db_name());
-            operator_state->SetComplete();
+            break;
+        }
+        case CommandType::kSet: {
+            SetCmd *set_command = (SetCmd *)(command_info_.get());
+            if(IsEqual(set_command->var_name(), enable_profiling_name)) {
+                if(set_command->value_type() != SetVarType::kBool) {
+                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                }
+                query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
+            } else if(IsEqual(set_command->var_name(), profile_history_capacity_name)) {
+                if(set_command->value_type() != SetVarType::kInteger) {
+                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                }
+                query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
+            } else {
+                Error<ExecutorException>(Format("Unknown command: {}", set_command->var_name()));
+            }
+            break;
+        }
+        case CommandType::kExport: {
+            ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             break;
         }
         case CommandType::kCheckTable: {
-            operator_state->SetComplete();
+
             break;
         }
         case CommandType::kInvalid: {
             Error<ExecutorException>("Invalid command type.");
         }
     }
+
 }
 } // namespace infinity
