@@ -10,7 +10,6 @@ module;
 
 import stl;
 import infinity_exception;
-// import index_data;
 import vector_distance;
 import search_top_k;
 

@@ -42,9 +42,10 @@ int n_probes = 5;
 size_t k;
 
 faiss::idx_t *I1;
+faiss::idx_t *I11;
 RowID *I2;
 RowID *I3;
-float *D1, *D2, *D3;
+float *D1, *D2, *D3, *D11;
 
 float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out);
 /*
@@ -217,6 +218,156 @@ void benchmark_faiss_ivfflatl2() {
                 }
                 for (int j = 0; j < k; j++) {
                     int32_t result_id = I1[i * k + j];
+                    if (j < 1 && gt1.contains(result_id)) {
+                        ++n_1;
+                    }
+                    if (j < 10 && gt10.contains(result_id)) {
+                        ++n_10;
+                    }
+                    if (j < 100 && gt100.contains(result_id)) {
+                        ++n_100;
+                    }
+                }
+            }
+            // output n_1, n_10, n_100
+            std::cout << "############################" << std::endl;
+            std::cout << "n_1: " << n_1 << std::endl;
+            std::cout << "n_10: " << n_10 << std::endl;
+            std::cout << "n_100: " << n_100 << std::endl;
+            std::cout << "############################" << std::endl;
+            printf("R@1 = %.4f\n", n_1 / float(nq));
+            printf("R@10 = %.4f\n", n_10 / float(nq * 10));
+            printf("R@100 = %.4f\n", n_100 / float(nq * 100));
+        }
+    }
+
+    delete[] xq;
+    delete[] gt;
+    delete index;
+}
+
+void benchmark_faiss_ivfflatip() {
+    // TODO: limit omp to 1.
+    omp_set_num_threads(1);
+    // output max omp threads
+    // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
+    double t0 = elapsed();
+
+    faiss::IndexFlatL2 *quantizer;
+    // faiss::Index *index;
+    faiss::IndexIVFFlat *index;
+
+    size_t d;
+
+    {
+        printf("[%.3f s] Loading train set\n", elapsed() - t0);
+
+        size_t nt;
+        float *xt = fvecs_read(sift1m_train, &d, &nt);
+
+        // printf("[%.3f s] Preparing index \"%s\" d=%ld\n", elapsed() - t0, index_key, d);
+        quantizer = new faiss::IndexFlatL2(d);
+        quantizer->verbose = true;
+
+        n_lists = (size_t)sqrt(nt);
+        index = new faiss::IndexIVFFlat(quantizer, d, n_lists, faiss::METRIC_INNER_PRODUCT);
+        index->verbose = true;
+
+        printf("[%.3f s] Training on %ld vectors\n, with %d centroids", elapsed() - t0, nt, n_lists);
+
+        index->train(nt, xt);
+        delete[] xt;
+    }
+
+    {
+        printf("[%.3f s] Loading database\n", elapsed() - t0);
+
+        size_t nb, d2;
+        float *xb = fvecs_read(sift1m_base, &d2, &nb);
+
+        //// TODO: change nb to do tests
+        // nb = global_nb;
+        assert(d == d2 || !"dataset does not have same dimension as train set");
+
+        printf("[%.3f s] Indexing database, size %ld*%ld\n", elapsed() - t0, nb, d);
+
+        index->add(nb, xb);
+
+        delete[] xb;
+    }
+
+    size_t nq;
+    float *xq;
+
+    {
+        printf("[%.3f s] Loading queries\n", elapsed() - t0);
+
+        size_t d2;
+        xq = fvecs_read(sift1m_query, &d2, &nq);
+        // TODO
+        // nq = 100;
+        assert(d == d2 || !"query does not have same dimension as train set");
+    }
+
+    // size_t k;         // nb of results per query in the GT
+    faiss::idx_t *gt; // nq * k matrix of ground-truth nearest-neighbors
+
+    {
+        printf("[%.3f s] Loading ground truth for %ld queries\n", elapsed() - t0, nq);
+
+        // load ground-truth and convert int to long
+        size_t nq2;
+        int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
+        // TODO
+        // nq2 = 100;
+        // assert(nq2 == nq || !"incorrect nb of ground truth entries");
+
+        gt = new faiss::idx_t[k * nq];
+        for (int i = 0; i < k * nq; i++) {
+            gt[i] = gt_int[i];
+        }
+        delete[] gt_int;
+    }
+
+    { // Perform a search
+
+        printf("[%.3f s] Perform a search on %ld queries\n", elapsed() - t0, nq);
+        {
+            // TODO: ksearch = 1?
+            int ksearch = k;
+            // output buffers
+            I11 = new faiss::idx_t[nq * ksearch];
+            D11 = new float[nq * ksearch];
+            // memset I1 and D1 to 0
+            memset(I11, 0, nq * ksearch * sizeof(faiss::idx_t));
+            memset(D11, 0, nq * ksearch * sizeof(float));
+
+            faiss::IVFSearchParameters p;
+            p.nprobe = n_probes;
+            index->search(nq, xq, ksearch, D11, I11, &p);
+
+            std::cout << "############################" << std::endl;
+            printf("[%.3f s] Compute recalls\n", elapsed() - t0);
+            std::cout << "############################" << std::endl;
+
+            int n_1 = 0, n_10 = 0, n_100 = 0;
+            // std::unordered_set<int32_t> gt1, gt10, gt100;
+            for (int i = 0; i < nq; i++) {
+                std::unordered_set<int32_t> gt1, gt10, gt100;
+                for (int j = 0; j < k; ++j) {
+                    int32_t gt_id = gt[i * k + j];
+                    if (j < 1) {
+                        gt1.insert(gt_id);
+                    }
+                    if (j < 10) {
+                        gt10.insert(gt_id);
+                    }
+                    if (j < 100) {
+                        gt100.insert(gt_id);
+                    }
+                }
+                for (int j = 0; j < k; j++) {
+                    int32_t result_id = I11[i * k + j];
                     if (j < 1 && gt1.contains(result_id)) {
                         ++n_1;
                     }
@@ -549,28 +700,28 @@ void benchmark_annivfflatip() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (false) {
-            // compare I1,I3, D1,D3
+        if (true) {
+            // compare I11,I3, D11,D3
             {
                 std::cout << "############################" << std::endl;
-                std::cout << "D1 and D3 difference:\n";
+                std::cout << "D11 and D3 difference:\n";
                 for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 500 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
-                    if (abs(D1[id1] - D3[id2]) < 0.01f) {
+                    if (abs(D11[id1] - D3[id2]) < 0.01f) {
                         ++id1;
                         ++id2;
                     } else {
                         ++diffc1;
-                        if (D1[id1] < D3[id2]) {
+                        if (D11[id1] > D3[id2]) {
                             // warn: D1 found result which is not in D3
-                            std::cout << "D1 found result which is not in D3: "
-                                      << "D1[" << (id1 / k) << " : " << (id1 % k) << "]: " << D1[id1] << " D3[" << (id2 / k) << " : " << (id2 % k)
-                                      << "]: " << D3[id2] << " difference: " << D1[id1] - D3[id2] << std::endl;
+                            std::cout << "D11 found result which is not in D3: "
+                                      << "D11[" << (id1 / k) << " : " << (id1 % k) << "]: " << D11[id1] << " D3[" << (id2 / k) << " : " << (id2 % k)
+                                      << "]: " << D3[id2] << " difference: " << D11[id1] - D3[id2] << std::endl;
                             ++id1;
                         } else {
                             // warn: D3 found result which is not in D1
                             std::cout << "D3 found result which is not in D1: "
-                                      << "D1[" << (id1 / k) << " : " << (id1 % k) << "]: " << D1[id1] << " D3[" << (id2 / k) << " : " << (id2 % k)
-                                      << "]: " << D3[id2] << " difference: " << D1[id1] - D3[id2] << std::endl;
+                                      << "D11[" << (id1 / k) << " : " << (id1 % k) << "]: " << D11[id1] << " D3[" << (id2 / k) << " : " << (id2 % k)
+                                      << "]: " << D3[id2] << " difference: " << D11[id1] - D3[id2] << std::endl;
                             ++id2;
                         }
                     }
@@ -596,15 +747,21 @@ TEST_F(AnnIVFFlatL2Benchmark, test1) {
     omp_set_num_threads(1);
     // output max omp threads
     // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
+    benchmark_faiss_ivfflatip();
+    std::cout << "##########################################################" << std::endl;
+    std::cout << "Hello ?" << std::endl;
+    std::cout << "##########################################################" << std::endl;
+    benchmark_annivfflatip();
+    std::cout << "##########################################################" << std::endl;
+    std::cout << "Hello ?" << std::endl;
+    std::cout << "##########################################################" << std::endl;
     benchmark_faiss_ivfflatl2();
     std::cout << "##########################################################" << std::endl;
     std::cout << "Hello ?" << std::endl;
     std::cout << "##########################################################" << std::endl;
     benchmark_annivfflatl2();
-    std::cout << "##########################################################" << std::endl;
-    std::cout << "Hello ?" << std::endl;
-    std::cout << "##########################################################" << std::endl;
-    benchmark_annivfflatip();
     delete[] I1;
+    delete[] I11;
     delete[] D1;
+    delete[] D11;
 }

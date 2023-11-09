@@ -4,16 +4,12 @@ module;
 #include <functional>
 #include <iostream>
 import stl;
-// import knn_result_handler;
 import knn_distance;
-// import faiss;
 import parser;
-// import third_party;
 import infinity_exception;
 import index_def;
 import annivfflat_index_data;
 import kmeans_partition;
-// import kmeans_partition_with_triangle;
 import vector_distance;
 import search_top_k;
 import heap_twin_operation;
@@ -239,17 +235,17 @@ public:
             if constexpr (true) {
                 Vector<DistType> centroid_dists(n_probes);
                 Vector<u32> centroid_ids(n_probes);
-                heap_twin_max<DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
+                heap_twin_min<DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
                 for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
                     centroids_n_probes.initialize();
                     for (u32 j = 0; j < base_ivf->partition_num_; j++) {
                         const DistType *y_j = base_ivf->centroids_.data() + j * this->dimension_;
-                        DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                        DistType distance = IPDistance<DistType>(x_i, y_j, this->dimension_);
                         centroids_n_probes.add(distance, j);
                     }
                     centroids_n_probes.sort();
-                    for (u32 k = 0; k < n_probes && centroid_dists[k] != std::numeric_limits<DistType>::max(); ++k) {
+                    for (u32 k = 0; k < n_probes && centroid_dists[k] != std::numeric_limits<DistType>::lowest(); ++k) {
                         const u32 selected_centroid = centroid_ids[k];
                         const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                         const DistType *y_j = base_ivf->vectors_[selected_centroid].data();

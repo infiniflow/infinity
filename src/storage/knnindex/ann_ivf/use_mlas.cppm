@@ -3,9 +3,6 @@
 //
 module;
 #include "/home/yzq/GitHub/infinity/third_party/mlas/inc/mlas.h"
-#ifndef FINTEGER
-#define FINTEGER long
-#endif
 
 export module use_mlas;
 

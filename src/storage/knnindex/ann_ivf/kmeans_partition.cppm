@@ -10,8 +10,6 @@ module;
 
 import stl;
 import infinity_exception;
-// import index_data;
-// import vector_distance;
 import search_top_k;
 import index_def;
 import vector_distance;
@@ -310,9 +308,8 @@ void k_means_partition_only_centroids(MetricType metric,
                     centroid_pos_i[j] += vector_pos_i[j];
                 }
             }
-            // For L2 metric, divide the count.
+            // For L2 metric, divide the count. If there is no vector in a partition, the centroid of this partition will not be updated.
             // For IP metric, normalize centroids.
-            // If there is no vector in a partition, the centroid of this partition will not be updated.
             if (metric == MetricType::kMerticL2) {
                 for (u32 i = 0; i < partition_num; ++i) {
                     if (auto cnt = partition_element_count[i]; cnt > 0) {
