@@ -58,6 +58,9 @@ export {
     constexpr String WAL_FILE_TEMP_FILE = "wal.log";
     constexpr String WAL_FILE_PREFIX = "wal.log.";
     constexpr String CATALOG_FILE_DIR = "catalog";
+
+    constexpr String SYSTEM_DB_NAME = "system";
+    constexpr String SYSTEM_CONFIG_TABLE_NAME = "config";
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

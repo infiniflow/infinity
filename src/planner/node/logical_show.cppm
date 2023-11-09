@@ -30,6 +30,8 @@ export enum class ShowType {
     kShowTables,
     kShowViews,
     kShowColumn,
+    kShowConfigs,
+    kShowProfiles,
     kShowIndexes,
     kIntermediate,
 };

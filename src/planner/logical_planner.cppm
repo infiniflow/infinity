@@ -104,6 +104,10 @@ public:
 
     Status BuildShowDatabases(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowConfigs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

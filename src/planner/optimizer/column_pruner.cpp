@@ -180,6 +180,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kFlush:
             break;
+        case LogicalNodeType::kCommand:
+            break;
     }
     LogicalNodeVisitor::VisitNodeExpression(op);
     LogicalNodeVisitor::VisitNodeChildren(op);
