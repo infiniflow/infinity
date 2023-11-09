@@ -72,6 +72,10 @@ private:
 
     void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState* operator_state);
 
+    void ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState* operator_state);
+
+    void ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState* operator_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};

@@ -40,6 +40,9 @@ import index_def;
 import index_entry;
 import ivfflat_index_def;
 import database_detail;
+import default_values;
+import defer_op;
+import config;
 
 module physical_show;
 
@@ -114,6 +117,42 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowConfigs: {
+
+            output_names_->reserve(3);
+            output_types_->reserve(3);
+
+            output_names_->emplace_back("config_name");
+            output_names_->emplace_back("value");
+            output_names_->emplace_back("description");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowProfiles: {
+
+            output_names_->reserve(7);
+            output_types_->reserve(7);
+
+            output_names_->emplace_back("total_cost");
+            output_names_->emplace_back("parser");
+            output_names_->emplace_back("logical planner");
+            output_names_->emplace_back("optimizer");
+            output_names_->emplace_back("physical planner");
+            output_names_->emplace_back("pipeline builder");
+            output_names_->emplace_back("executor");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Error<NotImplementException>("Not implemented show type");
         }
@@ -121,8 +160,8 @@ void PhysicalShow::Init() {
 }
 
 void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
-
     auto show_operator_state = (ShowOperatorState *)(operator_state);
+    DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
     switch (scan_type_) {
         case ShowType::kShowDatabases: {
@@ -141,12 +180,18 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowIndexes(query_context, show_operator_state);
             break;
         }
+        case ShowType::kShowConfigs: {
+            ExecuteShowConfigs(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowProfiles: {
+            ExecuteShowProfiles(query_context, show_operator_state);
+            break;
+        }
         default: {
             Error<ExecutorException>("Invalid chunk scan type");
         }
     }
-
-    show_operator_state->SetComplete();
 }
 
 /**
@@ -342,6 +387,90 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     show_operator_state->output_.emplace_back(output_block_ptr);
 }
 
+void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState* show_operator_state) {
+    Error<ExecutorException>("Not implemented");
+//    // Define output table schema
+//    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+//    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+//
+//    // Get tables from catalog
+//    Txn *txn = query_context->GetTxn();
+//
+//    // Prepare the output data block
+//    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+//    Vector<SharedPtr<DataType>>
+//            column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
+//
+//    output_block_ptr->Init(column_types);
+//
+//    SizeT column_id = 0;
+//    {
+//        // Append schema name to the 0 column
+//        Value value = Value::MakeVarchar("system");
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Append table name to the 1 column
+//        Value value = Value::MakeVarchar("config");
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Append base table type to the 2 column
+//        Value value = Value::MakeVarchar("Table");
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Column count
+//        Value value = Value::MakeBigInt(static_cast<i64>(3));
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Row count
+//        Value value = Value::MakeBigInt(static_cast<i64>(14));
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Block count
+//        Value value = Value::MakeBigInt(static_cast<i64>(1));
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Block count
+//        Value value = Value::MakeBigInt(static_cast<i64>(1));
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    ++column_id;
+//    {
+//        // Append block limit the 6 column
+//        Value value = Value::MakeBigInt(8192);
+//        ValueExpression value_expr(value);
+//        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//    }
+//
+//    output_block_ptr->Finalize();
+//    show_operator_state->output_.emplace_back(output_block_ptr);
+}
+
 /**
  * @brief Execute Show table details statement (i.e. describe t1)
  * @param query_context
@@ -349,7 +478,6 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
  * @param output_state
  */
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState* show_operator_state) {
-
     auto txn = query_context->GetTxn();
     auto result = txn->GetTableByName(db_name_, object_name_);
     show_operator_state->error_message_ = Move(result.err_);
@@ -418,7 +546,85 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         }
 
         show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    } else {
+        Error<ExecutorException>(Format("{} isn't found", object_name_));
     }
+}
+
+// Execute describe system table
+void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState* show_operator_state) {
+
+    auto txn = query_context->GetTxn();
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+            MakeShared<ColumnDef>(0, varchar_type, "config_name", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
+            MakeShared<ColumnDef>(2, varchar_type, "description", HashSet<ConstraintType>()),
+    };
+
+    const Config *global_config = query_context->global_config();
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("configs"), column_defs);
+
+    // create data block for output state
+    auto output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types{
+            varchar_type,
+            varchar_type,
+            varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    // Config
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("version");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option value
+
+            Value value = Value::MakeVarchar(global_config->version());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option description
+            Value value = Value::MakeVarchar("Infinity version.");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("time_zone");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(Format("{}-{}", global_config->time_zone(), global_config->time_zone_bias()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Timezone");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+
 }
 
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState* show_operator_state) {

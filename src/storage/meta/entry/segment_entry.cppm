@@ -26,6 +26,7 @@ import data_access_state;
 import parser;
 import index_entry;
 import txn_store;
+import index_file_worker;
 
 export module segment_entry;
 
@@ -74,12 +75,14 @@ public:
 
     static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
-    static SharedPtr<IndexEntry> CreateIndex(SegmentEntry *segment_entry,
-                                             SharedPtr<IndexDef> index_def,
-                                             SharedPtr<ColumnDef> column_def,
-                                             TxnTimeStamp create_ts,
-                                             BufferManager *buffer_mgr,
-                                             TxnTableStore *txn_store);
+    static SharedPtr<IndexEntry> CreateIndexFile(SegmentEntry *segment_entry,
+                                                 SharedPtr<IndexDef> index_def,
+                                                 SharedPtr<ColumnDef> column_def,
+                                                 TxnTimeStamp create_ts,
+                                                 BufferManager *buffer_mgr,
+                                                 TxnTableStore *txn_store);
+
+    
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
@@ -105,6 +108,9 @@ public:
 
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u32 seg_id);
+
+    static UniquePtr<CreateIndexPara>
+    GetCreateIndexPara(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def);
 };
 
 } // namespace infinity

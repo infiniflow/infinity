@@ -20,7 +20,9 @@ int main() {
     size_t M = 16;
     size_t ef_construction = 200;
 
-    std::unique_ptr<KnnHnsw<float>> knn_hnsw = nullptr;
+    using LabelT = uint64_t;
+
+    std::unique_ptr<KnnHnsw<float, LabelT>> knn_hnsw = nullptr;
     std::string save_place = "./tmp/my.hnsw";
     std::ifstream f(save_place);
     if (!f.good()) {
@@ -31,7 +33,7 @@ int main() {
         assert(embedding_count == 1000000 || !"embedding size isn't 1000000");
 
         DistFuncL2<float> space(dimension);
-        knn_hnsw = std::make_unique<KnnHnsw<float>>(embedding_count, dimension, space, M, ef_construction);
+        knn_hnsw = std::make_unique<KnnHnsw<float, LabelT>>(embedding_count, dimension, space, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -52,7 +54,7 @@ int main() {
     } else {
         std::cout << "Load index from " << save_place << std::endl;
         DistFuncL2<float> space(dimension);
-        knn_hnsw = KnnHnsw<float>::LoadIndex(save_place, MakeUnique<LocalFileSystem>(), space);
+        knn_hnsw = KnnHnsw<float, LabelT>::LoadIndex(save_place, MakeUnique<LocalFileSystem>(), space);
     }
 
     size_t number_of_queries;
@@ -104,7 +106,7 @@ int main() {
                     }
 
                     const float *query = queries + (idx % number_of_queries) * dimension;
-                    MaxHeap<Pair<float, unsigned int>> result = knn_hnsw->KnnSearch(query, top_k);
+                    MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, top_k);
                     int correct = 0;
                     while (!result.empty()) {
                         if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {

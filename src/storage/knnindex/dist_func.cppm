@@ -22,6 +22,8 @@ export template <typename DataType>
 class SpaceBase {
 public:
     virtual DistFunc<DataType> DistFuncPtr() const = 0;
+
+    virtual ~SpaceBase() = default;
 };
 
 template <typename T>

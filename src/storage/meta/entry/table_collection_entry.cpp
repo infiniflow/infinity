@@ -138,10 +138,11 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
             }
         }
         Error<StorageException>("Should not reach here.");
-    } else {
-        LOG_TRACE(Format("Drop index entry {}", index_name));
-        return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
     }
+    LOG_TRACE(Format("Drop index entry {}", index_name));
+    auto res = IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
+    
+    return res;
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
@@ -201,7 +202,7 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     u64 column_id = table_entry->GetColumnIdByName(column_name);
     SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
     for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-        SegmentEntry::CreateIndex(segment_entry.get(), Move(index_def), column_def, begin_ts, buffer_mgr, txn_store_ptr);
+        SegmentEntry::CreateIndexFile(segment_entry.get(), Move(index_def), column_def, begin_ts, buffer_mgr, txn_store_ptr);
     }
 }
 

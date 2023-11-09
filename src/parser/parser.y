@@ -352,7 +352,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER
-%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE
+%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES
 %token SEARCH MATCH QUERY FUSION
 
 %token NUMBER
@@ -1448,6 +1448,14 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kViews;
 }
+| SHOW CONFIGS {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kConfigs;
+}
+| SHOW PROFILES {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kProfiles;
+}
 | DESCRIBE table_name {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kColumns;
@@ -1492,6 +1500,7 @@ flush_statement: FLUSH DATA {
  */
 command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
+    ParserHelper::ToLower($2);
     $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
     free($2);
 }
