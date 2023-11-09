@@ -54,10 +54,3 @@ target_link_libraries(
     infinity_core
     benchmark_profiler
 )
-
-add_executable(test_hnsw test_hnsw.cpp)
-target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-    test_hnsw
-    infinity_core
-)
