@@ -3,11 +3,11 @@ module;
 #include <algorithm>
 #include <iostream>
 import stl;
-import knn_result_handler;
+// import knn_result_handler;
 import knn_distance;
-import faiss;
+// import faiss;
 import parser;
-import third_party;
+// import third_party;
 import infinity_exception;
 import index_def;
 import index_data;
@@ -15,6 +15,7 @@ import kmeans_partition;
 // import kmeans_partition_with_triangle;
 import vector_distance;
 import search_top_k;
+import heap_twin_operation;
 
 export module ann_ivf_flat;
 
@@ -22,19 +23,13 @@ namespace infinity {
 
 export template <typename DistType>
 class AnnIVFFlatL2 final : public KnnDistance<DistType> {
-
-    using HeapResultHandler = NewHeapResultHandler<FaissCMax<DistType, RowID>>;
-    using HeapSingleHandler = HeapResultHandler::HeapSingleResultHandler;
-
 public:
     explicit AnnIVFFlatL2(const DistType *queries, i64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, top_k), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(this->top_k_ * this->query_count_);
-
-        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), top_k);
-        single_heap_result_handler_ = MakeUnique<HeapSingleHandler>(*heap_result_handler_, query_count);
+        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, std::numeric_limits<DistType>::max());
+        heap_twin_max_multiple_ = MakeUnique<heap_twin_max_multiple<DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
@@ -56,10 +51,7 @@ public:
         if (begin_ || this->query_count_ == 0) {
             return;
         }
-
-        for (u64 i = 0; i < this->query_count_; ++i) {
-            single_heap_result_handler_->begin(i);
-        }
+        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, std::numeric_limits<DistType>::max());
 
         begin_ = true;
     }
@@ -93,34 +85,31 @@ public:
                 const DistType *x_i = this->queries_ + i * this->dimension_;
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                    DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    single_heap_result_handler_->add_result(ip, RowID(segment_id, base_ivf->ids_[selected_centroid][j]), i);
+                    DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                    heap_twin_max_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
                 }
             }
         } else {
             if constexpr (true) {
-                using HeapResultHandler_INT = NewHeapResultHandler<FaissCMax<DistType, u32>>;
-                using HeapSingleHandler_INT = HeapResultHandler_INT::HeapSingleResultHandler;
                 Vector<DistType> centroid_dists(n_probes);
                 Vector<u32> centroid_ids(n_probes);
+                heap_twin_max<DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
                 for (u64 i = 0; i < this->query_count_; i++) {
                     const DistType *x_i = queries_ + i * this->dimension_;
-                    HeapResultHandler_INT centroid_heap_result(1, centroid_dists.data(), centroid_ids.data(), n_probes);
-                    HeapSingleHandler_INT centroid_single_heap_result(centroid_heap_result, 1);
-                    centroid_single_heap_result.begin(0);
+                    centroids_n_probes.initialize();
                     for (u32 j = 0; j < base_ivf->partition_num_; j++) {
                         const DistType *y_j = base_ivf->centroids_.data() + j * this->dimension_;
-                        DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                        centroid_single_heap_result.add_result(ip, j, 0);
+                        DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                        centroids_n_probes.add(distance, j);
                     }
-                    centroid_single_heap_result.end(0);
-                    for (u32 k = 0; k < n_probes; k++) {
+                    centroids_n_probes.sort();
+                    for (u32 k = 0; k < n_probes && centroid_dists[k] != std::numeric_limits<DistType>::max(); ++k) {
                         const u32 selected_centroid = centroid_ids[k];
                         const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                         const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                         for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                            DistType ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                            single_heap_result_handler_->add_result(ip, RowID(segment_id, base_ivf->ids_[selected_centroid][j]), i);
+                            DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                            heap_twin_max_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
                         }
                     }
                 }
@@ -134,36 +123,36 @@ public:
             return;
 
         for (u64 i = 0; i < this->query_count_; ++i) {
-            single_heap_result_handler_->end(i);
+            heap_twin_max_multiple_->sort(i);
         }
 
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return heap_result_handler_->heap_dis_tab; }
+    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_->data(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return heap_result_handler_->heap_ids_tab; }
+    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }
-        return heap_result_handler_->heap_dis_tab + idx * this->top_k_;
+        return distance_array_->data() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }
-        return heap_result_handler_->heap_ids_tab + idx * this->top_k_;
+        return id_array_->data() + idx * this->top_k_;
     }
 
 private:
     UniquePtr<Vector<RowID>> id_array_{};
-    UniquePtr<DistType[]> distance_array_{};
+    UniquePtr<Vector<DistType>> distance_array_{};
 
-    UniquePtr<HeapResultHandler> heap_result_handler_{};
-    UniquePtr<HeapSingleHandler> single_heap_result_handler_{};
+    UniquePtr<heap_twin_max_multiple<DistType, RowID>> heap_twin_max_multiple_{};
+
     const DistType *queries_{};
     bool begin_{false};
 };
