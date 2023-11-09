@@ -19,6 +19,8 @@ import base_entry;
 import buffer_handle;
 import third_party;
 import buffer_obj;
+import parser;
+import index_file_worker;
 
 export module index_entry;
 
@@ -27,6 +29,7 @@ namespace infinity {
 class SegmentEntry;
 class FaissIndexPtr;
 class BufferManager;
+class IndexDef;
 
 export class IndexEntry : public BaseEntry {
 private:
@@ -37,11 +40,14 @@ public:
                                                SharedPtr<String> index_name,
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
-                                               FaissIndexPtr *index);
+                                               UniquePtr<CreateIndexPara> create_index_para);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.
-    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferManager *buffer_manager);
+    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry,
+                                                BufferManager *buffer_manager,
+                                                SharedPtr<String> file_name,
+                                                UniquePtr<CreateIndexPara> create_index_para);
 
 public:
     [[nodiscard]] static BufferHandle GetIndex(IndexEntry *index_entry, BufferManager *buffer_mgr);
@@ -52,7 +58,8 @@ public:
 
     static Json Serialize(const IndexEntry *index_entry);
 
-    static SharedPtr<IndexEntry> Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
+    static SharedPtr<IndexEntry>
+    Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr, UniquePtr<CreateIndexPara> create_index_para);
 
     void MergeFrom(BaseEntry &other);
 

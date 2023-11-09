@@ -34,7 +34,6 @@ void PhysicalCommand::Init() {}
 
 void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
     DeferFn defer_fn([&]() { operator_state->SetComplete(); });
-
     switch (command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command = (UseCmd *)(command_info_.get());

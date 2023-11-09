@@ -64,6 +64,7 @@ import index_def;
 import ivfflat_index_def;
 import status;
 import default_values;
+import hnsw_index_def;
 
 module logical_planner;
 
@@ -436,7 +437,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         method_type = IndexMethod::kIVFFlat;
     } else if (IsEqual(create_index_info->method_type_, "IVFSQ8")) {
         method_type = IndexMethod::kIVFSQ8;
-    } else if (IsEqual(create_index_info->method_type_, "HNSW")) {
+    } else if (IsEqual(create_index_info->method_type_, "Hnsw")) {
         method_type = IndexMethod::kHnsw;
     } else {
         PlannerException("Invalid index method type.");
@@ -447,6 +448,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     switch (method_type) {
         case IndexMethod::kIVFFlat: {
             index_def_ptr = IVFFlatIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
+            break;
+        }
+        case IndexMethod::kHnsw: {
+            index_def_ptr = HnswIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
             break;
         }
         case IndexMethod::kInvalid: {

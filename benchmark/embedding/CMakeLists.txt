@@ -48,7 +48,7 @@ add_executable(hnsw_benchmark2
     helper.cpp
     helper.h
 )
-target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(hnsw_benchmark2 PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
     hnsw_benchmark2
     infinity_core

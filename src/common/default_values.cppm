@@ -61,6 +61,11 @@ export {
 
     constexpr String SYSTEM_DB_NAME = "system";
     constexpr String SYSTEM_CONFIG_TABLE_NAME = "config";
+
+    // default hnsw parameter
+    constexpr SizeT HNSW_M = 16;
+    constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
+    constexpr SizeT HNSW_EF = 200;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

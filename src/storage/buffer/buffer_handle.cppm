@@ -41,7 +41,7 @@ public:
     ~BufferHandle();
 
 public:
-    [[nodiscard]] const void *GetData();
+    [[nodiscard]] const void *GetData() const;
 
     [[nodiscard]] void *GetDataMut();
 

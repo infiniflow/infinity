@@ -13,10 +13,8 @@
 // limitations under the License.
 
 module;
-
-#include "faiss/IndexFlat.h"
-#include "faiss/IndexIVFFlat.h"
 #include "faiss/index_io.h"
+#include <time.h>
 
 import stl;
 import third_party;
@@ -33,7 +31,10 @@ import base_entry;
 import infinity_exception;
 import defer_op;
 import ivfflat_index_def;
+import hnsw_index_def;
 import buffer_handle;
+import index_file_worker;
+import hnsw_file_worker;
 import faiss_index_file_worker;
 import logger;
 import local_file_system;
@@ -41,6 +42,9 @@ import random;
 import parser;
 import index_entry;
 import txn_store;
+
+import knn_hnsw;
+import dist_func;
 
 module segment_entry;
 
@@ -148,47 +152,31 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-void SegmentEntry::CreateIndexScalar(SegmentEntry *segment_entry,
-                                     Txn *txn_ptr,
-                                     const IndexDef &index_def,
-                                     u64 column_id,
-                                     BufferManager *buffer_mgr,
-                                     TxnTableStore *txn_store) {
-    Error<NotImplementException>("Not implemented");
-}
-
-SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_entry,
-                                                         const IndexDef &index_def,
-                                                         u64 column_id,
-                                                         int dimension,
-                                                         TxnTimeStamp create_ts,
-                                                         BufferManager *buffer_mgr,
-                                                         TxnTableStore *txn_store) {
-    Vector<SharedPtr<IndexEntry>> index_entries;
-    switch (index_def.method_type_) {
+SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
+                                                    SharedPtr<IndexDef> index_def,
+                                                    SharedPtr<ColumnDef> column_def,
+                                                    TxnTimeStamp create_ts,
+                                                    BufferManager *buffer_mgr,
+                                                    TxnTableStore *txn_store) {
+    u64 column_id = column_def->id();
+    SharedPtr<IndexEntry> index_entry = IndexEntry::NewIndexEntry(segment_entry,
+                                                                  index_def->index_name_,
+                                                                  create_ts,
+                                                                  buffer_mgr,
+                                                                  GetCreateIndexPara(segment_entry, index_def, column_def));
+    switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
-            auto ivfflat_index_def = static_cast<const IVFFlatIndexDef &>(index_def);
-            faiss::IndexFlat *quantizer = nullptr;
-            faiss::MetricType metric = faiss::MetricType::METRIC_L2;
-            switch (ivfflat_index_def.metric_type_) {
-                case MetricType::kMerticL2: {
-                    quantizer = new faiss::IndexFlatL2(dimension);
-                    metric = faiss::MetricType::METRIC_L2;
-                    break;
-                }
-                case MetricType::kMerticInnerProduct: {
-                    quantizer = new faiss::IndexFlatIP(dimension);
-                    metric = faiss::MetricType::METRIC_INNER_PRODUCT;
-                    break;
-                }
-                case MetricType::kInvalid: {
-                    Error<StorageException>("Metric type is invalid");
-                }
-                default: {
-                    Error<NotImplementException>("Not implemented");
-                }
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                Error<StorageException>("IVFFlat supports embedding type.");
             }
-            auto index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def.centroids_count_, metric);
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+                Error<StorageException>("Only supports float32 type now.");
+            }
+            BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
+            auto faiss_index_ptr = static_cast<FaissIndexPtr *>(buffer_handle.GetDataMut());
+            faiss::Index *index = faiss_index_ptr->index_;
             for (const auto &block_entry : segment_entry->block_entries_) {
                 auto block_column_entry = block_entry->columns_[column_id].get();
                 BufferHandle buffer_handle = block_column_entry->buffer_->Load();
@@ -196,20 +184,45 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexEmbedding(SegmentEntry *segment_e
                 SizeT block_row_cnt = block_entry->row_count_;
                 index->train(block_row_cnt, block_data_ptr);
             }
-
-            auto index_entry =
-                IndexEntry::NewIndexEntry(segment_entry, index_def.index_name_, create_ts, buffer_mgr, new FaissIndexPtr(index, quantizer));
-
-            txn_store->CreateIndexFile(segment_entry->segment_id_, Move(index_entry));
-            return index_entry;
+            break;
         }
-        case IndexMethod::kInvalid: {
-            Error<StorageException>("Index method type is invalid");
+        case IndexMethod::kHnsw: {
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                Error<StorageException>("HNSW supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+            SizeT dimension = embedding_info->Dimension();
+            BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    auto hnsw_index = static_cast<KnnHnsw<float, u64> *>(buffer_handle.GetDataMut());
+                    u32 segment_offset = 0;
+                    for (const auto &block_entry : segment_entry->block_entries_) {
+                        auto block_column_entry = block_entry->columns_[column_id].get();
+                        BufferHandle buffer_handle = block_column_entry->buffer_->Load();
+                        auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
+                        SizeT block_row_cnt = block_entry->row_count_;
+                        for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
+                            RowID row_id(segment_entry->segment_id_, segment_offset);
+                            hnsw_index->Insert(block_data_ptr + block_offset * dimension, row_id.ToUint64());
+                        }
+                        segment_offset += block_row_cnt;
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Not implemented");
+                }
+            }
+            break;
         }
         default: {
-            Error<NotImplementException>("Not implemented");
+            throw NotImplementException("Not implemented.");
         }
     }
+    txn_store->CreateIndexFile(segment_entry->segment_id_, index_entry);
+    return index_entry;
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count) {
@@ -301,7 +314,11 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json,
+                                                  TableCollectionEntry *table_entry,
+                                                  BufferManager *buffer_mgr,
+                                                  const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
+                                                  const HashMap<String, SharedPtr<ColumnDef>> &column_def_map) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -327,7 +344,12 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
 
     if (segment_entry_json.contains("index_entries")) {
         for (const auto &index_json : segment_entry_json["index_entries"]) {
-            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json, segment_entry.get(), buffer_mgr);
+            SharedPtr<IndexDef> index_def = index_def_map.at(index_json["index_name"].get<String>());
+            SharedPtr<ColumnDef> column_def = column_def_map.at(index_def->column_names_[0]);
+            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json,
+                                                                        segment_entry.get(),
+                                                                        buffer_mgr,
+                                                                        SegmentEntry::GetCreateIndexPara(segment_entry.get(), index_def, column_def));
             segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
         }
     }
@@ -363,9 +385,9 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     for (int i = 0; i < block_count; i++) {
         auto &block_entry1 = this->block_entries_[i];
         auto &block_entry2 = this->block_entries_[i];
-        if (block_entry1 == nullptr)
+        if (block_entry1.get() == nullptr)
             block_entry1 = block_entry2;
-        else if (block_entry2 != nullptr)
+        else if (block_entry2.get() != nullptr)
             block_entry1->MergeFrom(*block_entry2);
     }
 
@@ -374,6 +396,22 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
             this->index_entry_map_.emplace(index_name, index_entry);
         } else {
             this->index_entry_map_[index_name]->MergeFrom(*index_entry);
+        }
+    }
+}
+
+UniquePtr<CreateIndexPara>
+SegmentEntry::GetCreateIndexPara(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def) {
+    switch (index_def->method_type_) {
+        case IndexMethod::kIVFFlat: {
+            return MakeUnique<CreateIndexPara>(index_def, column_def);
+        }
+        case IndexMethod::kHnsw: {
+            SizeT max_element = segment_entry->row_capacity_;
+            return MakeUnique<CreateHnswPara>(index_def, column_def, max_element);
+        }
+        default: {
+            throw NotImplementException("Not implemented.");
         }
     }
 }

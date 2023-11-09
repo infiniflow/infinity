@@ -14,8 +14,6 @@
 
 module;
 
-#include "concurrentqueue.h"
-
 import stl;
 import file_worker;
 import third_party;
@@ -42,14 +40,10 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
     auto buffer_obj = MakeUnique<BufferObj>(this, true, Move(file_worker));
 
-    rw_locker_.lock();
-    auto [iter, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
-    rw_locker_.unlock();
-
-    if (!insert_ok) {
-        Error<StorageException>("Buffer handle already exists. Use GET instead.");
-    }
-    return iter->second.get();
+    auto res = buffer_obj.get();
+    UniqueLock<RWMutex> w_lock(rw_locker_);
+    buffer_map_[file_path] = Move(buffer_obj);
+    return res;
 }
 
 BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
@@ -77,7 +71,7 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
     while (current_memory_size_ + need_size > memory_limit_) {
         BufferObj *buffer_obj1 = nullptr;
-        if (gc_queue_.try_dequeue(buffer_obj1)) {
+        if (gc_queue_.TryDequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
                 Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.");
                 // prevent dead lock
@@ -95,7 +89,7 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
     // gc_queue_ is lock-free. No lock is needed.
-    gc_queue_.enqueue(buffer_obj);
+    gc_queue_.Enqueue(buffer_obj);
 }
 
 } // namespace infinity

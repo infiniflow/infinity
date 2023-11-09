@@ -37,6 +37,7 @@ import ivfflat_index_def;
 import index_def_meta;
 import txn_manager;
 import index_entry;
+import index_def_entry;
 
 module table_collection_entry;
 
@@ -137,10 +138,11 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
             }
         }
         Error<StorageException>("Should not reach here.");
-    } else {
-        LOG_TRACE(Format("Drop index entry {}", index_name));
-        return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
     }
+    LOG_TRACE(Format("Drop index entry {}", index_name));
+    auto res = IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
+    
+    return res;
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
@@ -189,45 +191,18 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
 
 void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            void *txn_store,
-                                           const IndexDef &index_def,
+                                           SharedPtr<IndexDef> index_def,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-    switch (index_def.method_type_) {
-        case IndexMethod::kIVFFlat: {
-            // check whether the column def is valid
-            if (index_def.column_names_.size() != 1) {
-                StorageException("IVFFlat index should created on one column");
-            }
-            const String &column_name = index_def.column_names_[0];
-            u64 column_id = table_entry->GetColumnIdByName(column_name);
-            ColumnDef &column_def = *table_entry->columns_[column_id];
-            if (column_def.type()->type() != LogicalType::kEmbedding) {
-                StorageException("IVFFlat index should created on Embedding type column");
-            }
-            auto type_info = column_def.type()->type_info().get();
-            auto embedding_info = (EmbeddingInfo *)type_info;
-            if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-                StorageException("IVFFlat index should created on float embedding type column");
-            }
-
-            for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-                SegmentEntry::CreateIndexEmbedding(segment_entry.get(),
-                                                   index_def,
-                                                   column_id,
-                                                   embedding_info->Dimension(),
-                                                   begin_ts,
-                                                   buffer_mgr,
-                                                   txn_store_ptr);
-            }
-            break;
-        }
-        case IndexMethod::kInvalid: {
-            StorageException("Invalid index method type.");
-        }
-        default: {
-            NotImplementException("Not implemented.");
-        }
+    if (index_def->column_names_.size() != 1) {
+        StorageException("Not implemented");
+    }
+    const String &column_name = index_def->column_names_[0];
+    u64 column_id = table_entry->GetColumnIdByName(column_name);
+    SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
+    for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+        SegmentEntry::CreateIndexFile(segment_entry.get(), Move(index_def), column_def, begin_ts, buffer_mgr, txn_store_ptr);
     }
 }
 
@@ -396,6 +371,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
+    HashMap<String, SharedPtr<ColumnDef>> column_def_map;
 
     if (table_entry_json.contains("column_definition")) {
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
@@ -413,6 +389,7 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 
             SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
             columns.emplace_back(column_def);
+            column_def_map.emplace(column_name, column_def);
         }
     }
 
@@ -424,10 +401,23 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
     table_entry->table_entry_dir_ = table_entry_dir;
+
+    HashMap<String, SharedPtr<IndexDef>> index_def_map;
+    if (table_entry_json.contains("indexes")) {
+        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
+            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
+            auto res = IndexDefMeta::GetEntry(index_def_meta.get(), 0, 0); // get the last entry from entry list, so set the begin_ts = 0
+            Assert<StorageException>(res.entry_ != nullptr, "index_def_meta should have at least one entry");
+            index_def_map.emplace(*index_def_meta->index_name_, static_cast<IndexDefEntry *>(res.entry_)->index_def_);
+            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
+        }
+    }
+
     if (table_entry_json.contains("segments")) {
         u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
-            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
+            SharedPtr<SegmentEntry> segment_entry =
+                SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr, index_def_map, column_def_map);
             table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
             max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
@@ -436,13 +426,6 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
-
-    if (table_entry_json.contains("indexes")) {
-        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
-            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
-        }
-    }
 
     if (table_entry->deleted_)
         Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");

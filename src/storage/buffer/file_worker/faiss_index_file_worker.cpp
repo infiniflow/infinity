@@ -13,14 +13,17 @@
 // limitations under the License.
 
 module;
-
+#include "faiss/IndexFlat.h"
+#include "faiss/IndexIVFFlat.h"
 #include "faiss/impl/FaissException.h"
 #include "faiss/impl/io.h"
 #include "faiss/index_io.h"
 
 import stl;
 import infinity_exception;
-
+import parser;
+import ivfflat_index_def;
+import index_def;
 import file_system;
 import third_party;
 
@@ -57,7 +60,44 @@ void FaissIndexFileWorker::AllocateInMemory() {
     if (data_) {
         Error<StorageException>("Data is already allocated.");
     }
-    auto faiss_index_ptr = new FaissIndexPtr(nullptr, nullptr);
+    auto data_type = column_def_->type();
+    if (data_type->type() != LogicalType::kEmbedding) {
+        StorageException("Index should be created on embedding column now.");
+    }
+    auto type_info = data_type->type_info().get();
+    auto embedding_info = (EmbeddingInfo *)type_info;
+    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
+        Error<StorageException>("Index should be created on float embedding column now.");
+    }
+    SizeT dimension = embedding_info->Dimension();
+
+    if (index_def_->method_type_ != IndexMethod::kIVFFlat) {
+        Error<StorageException>("Not implemented.");
+    }
+    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
+    faiss::IndexFlat *quantizer = nullptr;
+    faiss::MetricType metric = faiss::MetricType::METRIC_L2;
+
+    switch (ivfflat_index_def->metric_type_) {
+        case MetricType::kMerticL2: {
+            quantizer = new faiss::IndexFlatL2(dimension);
+            metric = faiss::MetricType::METRIC_L2;
+            break;
+        }
+        case MetricType::kMerticInnerProduct: {
+            quantizer = new faiss::IndexFlatIP(dimension);
+            metric = faiss::MetricType::METRIC_INNER_PRODUCT;
+            break;
+        }
+        case MetricType::kInvalid: {
+            Error<StorageException>("Metric type is invalid");
+        }
+        default: {
+            Error<NotImplementException>("Not implemented");
+        }
+    }
+    faiss::Index *index = new faiss::IndexIVFFlat(quantizer, dimension, ivfflat_index_def->centroids_count_, metric);
+    auto faiss_index_ptr = new FaissIndexPtr(index, quantizer);
     data_ = static_cast<void *>(faiss_index_ptr);
 }
 
