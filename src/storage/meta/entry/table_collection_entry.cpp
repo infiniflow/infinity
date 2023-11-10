@@ -146,7 +146,10 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    Error<StorageException>("Not implemented.");
+    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
+        return IndexDefMeta::GetEntry(iter->second.get(), txn_id, begin_ts);
+    }
+    return {.entry_ = nullptr, .err_ = MakeUnique<String>("Cannot find index def")};
 }
 
 void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -202,7 +205,7 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     u64 column_id = table_entry->GetColumnIdByName(column_name);
     SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
     for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-        SegmentEntry::CreateIndexFile(segment_entry.get(), Move(index_def), column_def, begin_ts, buffer_mgr, txn_store_ptr);
+        SegmentEntry::CreateIndexFile(segment_entry.get(), index_def, column_def, begin_ts, buffer_mgr, txn_store_ptr);
     }
 }
 

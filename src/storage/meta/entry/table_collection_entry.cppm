@@ -82,8 +82,6 @@ public:
 
     static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u32, SharedPtr<IndexEntry>> &uncommitted_indexes);
 
-    // static void CommitDropIndex(TableCollectionEntry *table_entry);
-
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 
     static void CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &append_state);

@@ -16,6 +16,7 @@ module;
 
 import stl;
 import default_values;
+import third_party;
 
 export module base_entry;
 
@@ -65,6 +66,15 @@ public:
     bool deleted_{false};
 
     EntryType entry_type_{EntryType::kDummy};
+
+    static Json Serialize(const BaseEntry *entry) {
+        Json json;
+        json["begin_ts"] = entry->begin_ts_;
+        json["commit_ts"] = entry->commit_ts_.load();
+        json["txn_id"] = entry->txn_id_.load();
+        json["deleted"] = entry->deleted_;
+        return json;
+    }
 };
 
 export struct EntryResult {

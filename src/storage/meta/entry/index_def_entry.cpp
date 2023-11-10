@@ -14,11 +14,29 @@
 
 module;
 
+#include "faiss/index_io.h"
+#include <vector>
+
 import stl;
 import base_entry;
 import index_def;
 import third_party;
 import index_def_meta;
+import buffer_manager;
+import txn_store;
+import index_entry;
+import parser;
+import infinity_exception;
+import buffer_handle;
+import txn_store;
+
+import ivfflat_index_def;
+import hnsw_index_def;
+import index_file_worker;
+import faiss_index_file_worker;
+import hnsw_file_worker;
+import knn_hnsw;
+import dist_func;
 
 module index_def_entry;
 
@@ -29,14 +47,16 @@ IndexDefEntry::IndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_
     txn_id_ = txn_id;
 }
 
+void IndexDefEntry::CommitCreatedIndex(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index_entry) {
+    UniqueLock<RWMutex> w_locker(index_def_entry->rw_locker_);
+    index_def_entry->indexes_.emplace(segment_id, index_entry);
+}
+
 Json IndexDefEntry::Serialize(const IndexDefEntry *index_def_entry) {
-    Json json;
-    json["begin_ts"] = index_def_entry->begin_ts_;
-    json["commit_ts"] = index_def_entry->commit_ts_.load();
-    json["txn_id"] = index_def_entry->txn_id_.load();
-    json["delete"] = index_def_entry->deleted_;
-    if (!index_def_entry->deleted_) {
-        json["index_def"] = index_def_entry->index_def_->Serialize();
+    Json json = BaseEntry::Serialize(index_def_entry);
+    index_def_entry->index_def_->Serialize();
+    for (const auto &[segment_id, index_entry] : index_def_entry->indexes_) {
+        json["index_entry_list"].push_back(IndexEntry::Serialize(index_entry.get()));
     }
     return json;
 }

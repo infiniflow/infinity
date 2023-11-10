@@ -20,6 +20,7 @@ import parser;
 import txn_manager;
 import third_party;
 import index_def;
+import base_meta;
 
 export module index_def_meta;
 
@@ -27,7 +28,7 @@ namespace infinity {
 
 class TableCollectionEntry;
 
-export class IndexDefMeta {
+export class IndexDefMeta : public BaseMeta{
 public:
     explicit IndexDefMeta(SharedPtr<String> index_name, TableCollectionEntry *table_collection_entry);
 
@@ -38,12 +39,6 @@ public:
                                       u64 txn_id,
                                       TxnTimeStamp begin_ts,
                                       TxnManager *txn_mgr);
-
-    static EntryResult DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
-
-    static void DeleteNewEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnManager *txn_mgr);
-
-    static EntryResult GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<String> ToString(IndexDefMeta *index_def_meta);
 

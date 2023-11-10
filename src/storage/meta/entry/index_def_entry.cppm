@@ -19,27 +19,35 @@ import parser;
 import index_def;
 import base_entry;
 import third_party;
+import index_entry;
 
 export module index_def_entry;
 
 namespace infinity {
 
 class IndexDefMeta;
+class BufferManager;
+class TxnTableStore;
+class CreateIndexPara;
 
 export struct IndexDefEntry : public BaseEntry {
 public:
     explicit IndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-public:
+    static void CommitCreatedIndex(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index_entry);
+
     static Json Serialize(const IndexDefEntry *index_def_entry);
 
     static UniquePtr<IndexDefEntry> Deserialize(const Json &index_def_entry_json, IndexDefMeta *index_def_meta);
 
+private:
 public:
     RWMutex rw_locker_{};
 
     IndexDefMeta *index_def_meta_{};
 
     SharedPtr<IndexDef> index_def_{};
+
+    HashMap<u32, SharedPtr<IndexEntry>> indexes_;
 };
 } // namespace infinity
