@@ -24,6 +24,14 @@ CreateIndexInfo::~CreateIndexInfo() {
         delete column_names_;
         column_names_ = nullptr;
     }
+    if (index_para_list_ != nullptr) {
+        for (auto &index_para : *index_para_list_) {
+            delete index_para;
+            index_para = nullptr;
+        }
+        delete index_para_list_;
+        index_para_list_ = nullptr;
+    }
 }
 
 std::string CreateIndexInfo::ToString() const {
@@ -48,7 +56,7 @@ std::string CreateIndexInfo::ToString() const {
     } else {
         ss << index_name_;
     }
-    ss << "ON " << table_name_ << "(";
+    ss << " ON " << table_name_ << "(";
     size_t column_count = column_names_->size();
     if (column_count == 0) {
         ParserError("No column name specified.");
@@ -57,9 +65,9 @@ std::string CreateIndexInfo::ToString() const {
         ss << (*column_names_)[idx] << ", ";
     }
     ss << (*column_names_)[column_count - 1] << ")";
-    ss << "USING " << method_type_;
+    ss << " USING " << method_type_;
     if (index_para_list_ != nullptr && !index_para_list_->empty()) {
-        ss << "WITH(";
+        ss << " WITH(";
         size_t para_count = index_para_list_->size();
         for (size_t idx = 0; idx < para_count; ++idx) {
             ss << (*index_para_list_)[idx]->para_name_ << " " << (*index_para_list_)[idx]->para_value_;

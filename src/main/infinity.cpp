@@ -49,6 +49,10 @@ void Infinity::RemoteDisconnect() {
     session_.reset();
 }
 
+u64 Infinity::GetSessionId() {
+    return session_->session_id();
+}
+
 SharedPtr<Infinity> Infinity::LocalConnect(const String &path) {
     LocalFileSystem fs;
     if (!fs.Exists(path)) {
