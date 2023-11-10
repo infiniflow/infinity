@@ -38,7 +38,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int global_nb = 100'000;
 int n_lists;
-int n_probes = 2;
+int n_probes = 5;
 size_t k;
 
 faiss::idx_t *I1;
@@ -253,7 +253,7 @@ void benchmark_faiss_ivfflatip() {
     // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
     double t0 = elapsed();
 
-    faiss::IndexFlatL2 *quantizer;
+    faiss::IndexFlatIP *quantizer;
     // faiss::Index *index;
     faiss::IndexIVFFlat *index;
 
@@ -266,7 +266,7 @@ void benchmark_faiss_ivfflatip() {
         float *xt = fvecs_read(sift1m_train, &d, &nt);
 
         // printf("[%.3f s] Preparing index \"%s\" d=%ld\n", elapsed() - t0, index_key, d);
-        quantizer = new faiss::IndexFlatL2(d);
+        quantizer = new faiss::IndexFlatIP(d);
         quantizer->verbose = true;
 
         n_lists = (size_t)sqrt(nt);
@@ -340,7 +340,7 @@ void benchmark_faiss_ivfflatip() {
             D11 = new float[nq * ksearch];
             // memset I1 and D1 to 0
             memset(I11, 0, nq * ksearch * sizeof(faiss::idx_t));
-            memset(D11, 0, nq * ksearch * sizeof(float));
+            memset(D11, -1, nq * ksearch * sizeof(float));
 
             faiss::IVFSearchParameters p;
             p.nprobe = n_probes;
@@ -532,7 +532,7 @@ void benchmark_annivfflatl2() {
             {
                 std::cout << "############################" << std::endl;
                 std::cout << "D1 and D2 difference:\n";
-                for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 500 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
+                for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 300 && id1 < ((nq / 2) * k) && id2 > ((nq / 2) * k);) {
                     if (abs(D1[id1] - D2[id2]) < 0.01f) {
                         ++id1;
                         ++id2;
@@ -700,12 +700,12 @@ void benchmark_annivfflatip() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (false) {
+        if (true) {
             // compare I11,I3, D11,D3
             {
                 std::cout << "############################" << std::endl;
                 std::cout << "D11 and D3 difference:\n";
-                for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 500 || id1 > ((nq / 2) * k) || id2 > ((nq / 2) * k);) {
+                for (int id1 = 0, id2 = 0, diffc1 = 0, q = 0; diffc1 < 300 && id1 < ((nq / 2) * k) && id2 < ((nq / 2) * k);) {
                     if (abs(D11[id1] - D3[id2]) < 0.01f) {
                         ++id1;
                         ++id2;
