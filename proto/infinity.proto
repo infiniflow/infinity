@@ -1,0 +1,398 @@
+syntax = "proto3";
+
+package infinity_proto;
+
+
+enum LogicType {
+  Boolean = 0;
+  TinyInt = 1;
+  SmallInt = 2;
+  Integer = 3;
+  BigInt = 4;
+  HugeInt = 5;
+  Decimal = 6;
+  Float = 7;
+  Double = 8;
+  Varchar = 9;
+  Embedding = 10;
+  Invalid = 11;
+}
+
+message Options {}
+
+// For database
+message CreateDatabaseRequest {
+  string db_name = 1;
+  Options options = 2;
+  uint64 session_id = 3;
+}
+
+message DropDatabaseRequest {
+  string db_name = 1;
+  Options options = 2;
+  uint64 session_id = 3;
+}
+
+// For table
+message CreateTableRequest {
+  string db_name = 1;
+  string table_name = 2;
+  repeated ColumnDef column_defs = 3;
+  // repeated ColumnConstraint column_constraints = 4;
+  Options options = 5;
+  uint64 session_id = 6;
+}
+
+message ColumnConstraint {
+  string column_name = 1;
+  repeated Constraint constraint = 2;
+}
+
+enum Constraint {
+  kNull = 0;
+  kNotNull = 1;
+  kPrimaryKey = 2;
+  kUnique = 3;
+}
+
+message ColumnDef {
+  int32 id = 1;
+  string  name = 2;
+  DataType column_type = 3;
+  repeated Constraint constraints = 4;
+}
+
+message DataType {
+  LogicType logic_type = 1;
+  oneof PhysicalType {
+    NumberType number_type = 2;
+    VarcharType varchar_type = 3;
+    EmbeddingType embedding_type = 4;
+  }
+}
+
+enum ElementType {
+  kElemBit = 0;
+  kElemInt8 = 2;
+  kElemInt16 = 3;
+  kElemInt32 = 4;
+  kElemInt64 = 7;
+  kElemFloat = 8;
+  kElemDouble = 9;
+}
+
+message EmbeddingType {
+  ElementType embedding_data_type = 1;
+  int32 dimension = 2;
+}
+
+message VarcharType {
+  int32 width = 1;
+}
+message NumberType {}
+
+message DropTableRequest {
+  string db_name = 1;
+  string table_name = 2;
+  Options options = 3;
+  uint64 session_id = 4;
+}
+
+// For Insert
+message InsertRequest {
+  string db_name = 1;
+  string table_name = 2;
+  repeated string column_names = 3;
+  repeated Field fields = 4;
+  uint64 session_id = 5;
+}
+message Field {
+  repeated ParsedExpr parse_exprs = 1;
+}
+
+// For Import
+message ImportRequest {
+  string db_name = 1;
+  string table_name = 2;
+  string file_path = 3;
+  ImportOptions import_options = 4;
+  uint64 session_id = 5;
+
+  message ImportOptions{
+    string delimiter = 1;
+    string file_type = 2;
+    string table_name = 3;
+    string schema_name = 4;
+    bool  copy_from = 5;
+    bool  has_header = 6;
+
+    enum CopyFileType {
+      kCSV = 0;
+      kJSON = 1;
+      kFVECS = 2;
+    }
+  }
+}
+
+// For Select
+message ParsedExpr {
+  oneof ParsedExprType {
+    ConstantExpr constant_expr = 2;
+    ColumnExpr column_expr = 4;
+    FunctionExpr function_expr = 5;
+    //BetweenExpr between_expr = 6;
+    //SubqueryExpr subquery_expr = 8;
+    //CaseExpr case_expr = 9;
+    //CastExpr cast_expr = 10;
+    //InExpr in_expr = 11;
+    KnnExpr knn_expr = 12;
+  }
+  string alias = 1;
+}
+
+
+
+
+message ConstantExpr {
+  enum LiteralType {
+    kBoolean = 0;
+    kDouble = 1;
+    kString = 2;
+    kInt64 = 3;
+    kNull = 4;
+    kIntegerArray = 5;
+    kDoubleArray = 6;
+  }
+  LiteralType literal_type = 1;
+
+  bool bool_value = 2;
+  int64 i64_value = 3;
+  double f64_value = 4;
+  string str_value = 5;
+  string date_value = 6;
+  repeated int64 long_array = 7;
+  repeated double double_array = 8;
+}
+
+message FunctionExpr {
+  string function_name = 1;   // > <  =
+  repeated ParsedExpr arguments = 2;
+}
+
+message ColumnExpr {
+  repeated string column_name = 1;
+  bool star = 2;
+}
+
+message BetweenExpr {
+  ParsedExpr value = 1;
+  ParsedExpr upper_bound = 2;
+  ParsedExpr lower_bound = 3;
+}
+
+message InExpr {
+  ParsedExpr left = 1;
+  repeated ParsedExpr arguments = 2;
+  bool not_in = 3;
+}
+
+
+
+message KnnExpr {
+  ParsedExpr column_expr = 1;
+  repeated string embedding_data = 2; // ? int or float
+  int64 dimension = 3;
+  EmbeddingDataType embedding_data_type = 4;
+  KnnDistanceType distance_type = 5;
+
+  enum KnnDistanceType {
+    L2 = 0;
+    Cosine = 1;
+    InnerProduct = 2;
+    Hamming = 3;
+  }
+  enum EmbeddingDataType {
+    ElemBool = 0;
+    ElemTinyInt = 1;
+    ElemSmallInt = 2;
+    ElemInteger = 3;
+    ElemBigInt = 4;
+    ElemFloat = 7;
+    ElemDouble = 8;
+  }
+}
+
+message SelectStatement {
+  string db_name = 1;
+  string table_name = 2;
+  uint64 session_id = 9;
+  repeated ParsedExpr select_list = 3;
+  ParsedExpr where_expr = 4;
+  repeated ParsedExpr group_by_list = 5;
+  ParsedExpr limit_expr = 6;
+  ParsedExpr offset_expr = 7;
+  ParsedExpr search_expr = 8;
+}
+
+
+// network
+service InfinityService {
+  rpc Connect(Empty) returns (CommonResponse);
+  rpc DisConnect(DisConnectRequest) returns (CommonResponse);
+  rpc CreateDatabase(CreateDatabaseRequest) returns (CommonResponse);
+  rpc DropDatabase(DropDatabaseRequest) returns (CommonResponse);
+  rpc ListDatabase(ListDatabaseRequest) returns (ListDatabaseResponse);
+  rpc DescribeDatabase(DescribeDatabaseRequest) returns (DescribeDatabaseResponse);
+  rpc GetDatabase(GetDatabaseRequest) returns (CommonResponse);
+
+  rpc CreateTable(CreateTableRequest) returns (CommonResponse);
+  rpc DropTable(DropTableRequest) returns (CommonResponse);
+  rpc ListTable(ListTableRequest) returns (ListTableResponse);
+  rpc DescribeTable(DescribeTableRequest) returns (DescribeTableResponse);
+  rpc GetTable(GetTableRequest) returns (CommonResponse);
+
+  rpc Insert(InsertRequest) returns (CommonResponse);
+  rpc Import(ImportRequest) returns (CommonResponse);
+  // rpc Update(Update) returns (Empty);
+  // rpc Delete(Delete) returns (Empty);
+  rpc CreateIndex(CreateIndexRequest) returns (CommonResponse);
+  rpc DropIndex(DropIndexRequest) returns (CommonResponse);
+  rpc Search(SelectStatement) returns (SelectResponse);
+}
+
+message DisConnectRequest{
+  uint64 session_id = 1;
+}
+
+message Empty{}
+
+message CommonResponse{
+  bool success = 1;
+  string error_msg = 2;
+  uint64 session_id = 3;
+}
+
+
+message SelectResponse {
+  bool success = 1;
+  string error_msg = 2;
+
+  repeated ColumnDef column_defs = 3;
+  repeated ColumnField column_fields = 4;
+}
+
+message ColumnField {
+  ColumnType column_type = 1;
+  bytes column_vector = 2;   // all in one column vector
+}
+
+enum ColumnType {
+  kColumnBool = 0;
+  kColumnInt8 = 1;
+  kColumnInt16 = 2;
+  kColumnInt32 = 3;
+  kColumnInt64 = 4;
+  kColumnFloat = 5;
+  kColumnDouble = 6;
+  kColumnVarchar = 10;
+  kColumnEmbedding = 11;
+  kColumnInvalid = 12;
+}
+
+
+message DataBlock {
+  int32 row_count = 1;
+  int32 column_count = 2;
+  int32 capacity = 3;
+  repeated ColumnVector column_vectors = 4;
+  message ColumnVector{
+    repeated ColumnVector column_vectors = 1;
+  }
+}
+
+message ListDatabaseRequest {
+  uint64 session_id = 1;
+}
+
+message ListDatabaseResponse{
+  repeated string db_name = 1;
+  bool success = 2;
+  string error_msg = 3;
+}
+
+message DescribeDatabaseRequest {
+  string db_name = 1;
+  uint64 session_id = 2;
+}
+
+message DescribeDatabaseResponse {
+  string db_name = 1;
+  int32  db_id = 2;
+  int32  num_segments = 3;
+  int32  num_blocks = 4;
+}
+
+
+message ListTableRequest {
+  string db_name = 1;
+  bool success = 2;
+  string error_msg = 3;
+  uint64 session_id = 4;
+}
+
+message ListTableResponse {
+  repeated string table_name = 1;
+  bool success = 2;
+  string error_msg = 3;
+}
+
+
+message DescribeTableRequest {
+  string db_name = 1;
+  uint64 session_id = 2;
+}
+
+message DescribeTableResponse {
+  string table_name = 1;
+  int32  table_id = 2;
+  int32  num_segments = 3;
+  int32  num_blocks = 4;
+}
+
+
+message GetDatabaseRequest {
+  string db_name = 1;
+  uint64 session_id = 2;
+}
+
+message GetTableRequest {
+  string db_name = 1;
+  string table_name = 2;
+  uint64 session_id = 3;
+}
+
+message CreateIndexRequest {
+  string db_name = 1;
+  string table_name = 2;
+  string index_name = 3;
+  string method_type = 4;
+  repeated string column_names = 5;
+  repeated InitParameter index_para_list = 6;
+  Options options = 7;
+  uint64 session_id = 8;
+}
+
+message InitParameter {
+  string para_name = 1;
+  string para_value = 2;
+}
+
+message DropIndexRequest {
+  string db_name = 1;
+  string table_name = 2;
+  string index_name = 3;
+  uint64 session_id = 4;
+}
+
+
+

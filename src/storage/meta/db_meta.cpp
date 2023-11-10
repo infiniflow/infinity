@@ -70,7 +70,7 @@ EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp beg
                     return {res, nullptr};
                 } else {
                     // Duplicated database
-                    LOG_TRACE(Format("Duplicated database name: {}.", *db_meta->db_name_));
+                    LOG_ERROR(Format("Duplicated database name: {}.", *db_meta->db_name_));
                     return {nullptr, MakeUnique<String>("Duplicated database.")};
                 }
             } else {
