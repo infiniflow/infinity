@@ -26,9 +26,8 @@ namespace infinity {
 class EmbeddingInfo : public TypeInfo {
 public:
     inline static std::shared_ptr<EmbeddingInfo> Make(EmbeddingDataType embedding_data_type, size_t dimension) {
-        ParserAssert(dimension <= EMBEDDING_LIMIT_INTERNAL,
-                     "Embedding dimension should less than " +
-                         std::to_string(EMBEDDING_LIMIT_INTERNAL)) return std::make_shared<EmbeddingInfo>(embedding_data_type, dimension);
+        ParserAssert(dimension <= EMBEDDING_LIMIT_INTERNAL, "Embedding dimension should less than " + std::to_string(EMBEDDING_LIMIT_INTERNAL));
+        return std::make_shared<EmbeddingInfo>(embedding_data_type, dimension);
     }
 
     explicit EmbeddingInfo(EmbeddingDataType type, size_t dimension)

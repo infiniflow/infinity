@@ -38,18 +38,21 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
             Error<TypeException>(Format("Can't cast from Time type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct BitmapTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>("Not support to cast from " + DataType::TypeToString<SourceType>() + " to " + DataType::TypeToString<TargetType>());
+        return false;
     }
 };
 
 template <>
 inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<FunctionException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

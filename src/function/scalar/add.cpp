@@ -76,6 +76,7 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 template <>
 inline bool AddFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
     Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT");
+    return false;
 }
 
 // FloatT + FloatT = FloatT, and check overflow
@@ -102,6 +103,7 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool AddFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
     Error<NotImplementException>("Not implemented: Decimal + Decimal");
+    return false;
 }
 
 // Date + Interval
@@ -120,6 +122,7 @@ inline bool AddFunction::Run(IntervalT left, DateT right, DateT &result) {
 template <>
 inline bool AddFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
     Error<NotImplementException>("Not implemented: DateTimeT + IntervalT");
+    return false;
 }
 
 // Interval + DateTime
@@ -132,6 +135,7 @@ inline bool AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT &result)
 template <>
 inline bool AddFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
     Error<NotImplementException>("Not implemented: TimestampT + IntervalT");
+    return false;
 }
 
 // Interval + TimestampT
@@ -144,6 +148,7 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 template <>
 inline bool AddFunction::Run(MixedT left, BigIntT right, MixedT &result) {
     Error<NotImplementException>("Not implemented: MixedT + BigIntT");
+    return false;
 }
 
 // i64 + Mixed Type
@@ -156,6 +161,7 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 template <>
 inline bool AddFunction::Run(MixedT left, DoubleT right, MixedT &result) {
     Error<NotImplementException>("Not implemented: MixedT + DoubleT");
+    return false;
 }
 
 // f64 + Mixed Type
@@ -168,6 +174,7 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 template <>
 inline bool AddFunction::Run(MixedT left, MixedT right, MixedT &result) {
     Error<NotImplementException>("Not implemented: MixedT + MixedT");
+    return false;
 }
 
 void RegisterAddFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

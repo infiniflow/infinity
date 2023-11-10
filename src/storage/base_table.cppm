@@ -41,6 +41,8 @@ inline String ToString(BaseTableType type) {
             Error<ExecutorException>("Invalid base table type");
         }
     }
+
+    return String();
 }
 
 export class BaseTable {

@@ -29,7 +29,10 @@ struct TimestampType {
         time = 0;
     }
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); }
+    [[nodiscard]] inline std::string ToString() const {
+        ParserError("ToString() isn't implemented");
+        return std::string();
+    }
 
     int32_t date{};
     int32_t time{};

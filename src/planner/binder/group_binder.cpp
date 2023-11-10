@@ -151,10 +151,12 @@ void GroupBinder::CheckFuncType(FunctionType func_type) const {
 SharedPtr<SubqueryExpression>
 GroupBinder::BuildSubquery(const SubqueryExpr &select, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool root) {
     Error<PlannerException>("Subquery isn't supported in group by list.");
+    return nullptr;
 }
 
 SharedPtr<BaseExpression> GroupBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     Error<PlannerException>("KNN expression isn't supported in group by list");
+    return nullptr;
 }
 
 } // namespace infinity

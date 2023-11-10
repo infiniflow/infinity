@@ -173,11 +173,13 @@ public:
 template <typename T>
 std::string DataType::TypeToString() {
     ParserError("Unexpected date type.");
+    return std::string();
 }
 
 template <typename T>
 T DataType::StringToValue(const std::string_view &str_view) {
     ParserError("Unexpected data type.");
+    return T();
 }
 
 template <>

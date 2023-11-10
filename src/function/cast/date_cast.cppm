@@ -46,13 +46,15 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
             Error<TypeException>(Format("Can't cast from Date type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct DateTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -60,26 +62,27 @@ struct DateTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
 template <>
 inline bool DateTryCastToFixlen::Run(DateT source, DateTimeT &target) {
-    Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DateTryCastToFixlen::Run(DateT source, TimestampT &target) {
-    Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DateTryCastToVarlen::Run(DateT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

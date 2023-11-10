@@ -134,6 +134,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             Error<ExecutorException>("Invalid query phase in query profiler");
         }
     }
+    return String();
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {

@@ -108,7 +108,10 @@ public:
 
     void Reset(bool in_constructor = false);
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); }
+    [[nodiscard]] inline std::string ToString() const {
+        ParserError("ToString() isn't implemented");
+        return std::string();
+    }
 
 private:
     static void Copy(const MixedType &from, MixedType &to);

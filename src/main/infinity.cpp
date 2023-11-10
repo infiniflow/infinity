@@ -42,6 +42,7 @@ Infinity::Infinity() : session_(Move(MakeShared<LocalSession>())) {}
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     infinity_ptr->session_ = MakeUnique<RemoteSession>();
+    return infinity_ptr;
 }
 
 void Infinity::RemoteDisconnect() {

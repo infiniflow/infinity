@@ -72,6 +72,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 template <>
 inline bool SubFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // FloatT - FloatT = FloatT, and check overflow
@@ -98,6 +99,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool SubFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // DateT - Interval
@@ -110,42 +112,49 @@ inline bool SubFunction::Run(DateT left, IntervalT right, DateT &result) {
 template <>
 inline bool SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // TimestampT - Interval
 template <>
 inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT left, BigIntT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT left, MixedT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT left, DoubleT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT left, MixedT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT left, MixedT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 void RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

@@ -49,6 +49,7 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
     }
 
     Error<PlannerException>("Not support nested correlated subquery in the subquery plan");
+    return nullptr;
 }
 
 } // namespace infinity

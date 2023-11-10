@@ -57,6 +57,7 @@ export inline String ToString(TxnState txn_state) {
         }
     }
     Error<StorageException>("Invalid transaction state.");
+    return String();
 }
 
 } // namespace infinity

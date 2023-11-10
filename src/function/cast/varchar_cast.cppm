@@ -130,6 +130,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             Error<TypeException>("Can't convert varchar");
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct TryCastVarchar {
@@ -138,6 +139,7 @@ struct TryCastVarchar {
         Error<FunctionException>(Format("No implementation to cast from {} to {}",
                                  DataType::TypeToString<SourceType>(),
                                  DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -244,6 +246,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, HugeIntT &target) {
     Error<TypeException>("Cast varchar to hugeint");
+    return false;
 }
 
 // Cast VarcharT to FloatT type

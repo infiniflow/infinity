@@ -33,7 +33,6 @@ export enum class ShowType {
     kShowConfigs,
     kShowProfiles,
     kShowIndexes,
-    kIntermediate,
 };
 
 export String ToString(ShowType type);
