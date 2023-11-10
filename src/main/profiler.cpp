@@ -233,14 +233,14 @@ String QueryProfiler::ToString() const {
 Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
     Json json;
 
-    i64 total = 0;
+    i64 start = std::numeric_limits<i64>::max();
+    i64 end = 0;
     for (const auto &fragment : profiler->records_) {
         Json json_fragments;
         json_fragments["fragment_id"] = fragment.first;
 
         i64 fragment_start = std::numeric_limits<i64>::max();
         i64 fragment_end = 0;
-        i64 fragment_total = 0;
         for (const auto &task : fragment.second) {
             Json json_tasks;
             SizeT times = 0;
@@ -276,19 +276,21 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
 
             fragment_start = Min(fragment_start, task_start);
             fragment_end = Max(fragment_end, task_end);
-            fragment_total += task_total;
 
             json_fragments["tasks"].push_back(json_tasks);
         }
-        total += fragment_total;
+        i64 fragment_total = fragment_end - fragment_start;
 
         json_fragments["fragment_start"] = fragment_start;
         json_fragments["fragment_end"] = fragment_end;
         json_fragments["fragment_total"] = fragment_total;
 
+        start = Min(start, fragment_start);
+        end = Max(end, fragment_end);
+
         json["fragments"].push_back(json_fragments);
     }
-    json["total"] = total;
+    json["total"] = end - start;
     json["time_unit"] = "ns";
 
     return json;
