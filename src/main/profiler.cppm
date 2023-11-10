@@ -35,6 +35,8 @@ public:
 
     [[nodiscard]] String ElapsedToString() const;
 
+    static String ElapsedToString(NanoSeconds duration);
+
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline i64 Elapsed() const { return ElapsedInternal().count(); }
 
@@ -173,6 +175,10 @@ public:
     void StopPhase(QueryPhase phase);
 
     void Flush(TaskProfiler &&profiler);
+
+    i64 ElapsedAt(SizeT index) {
+        return profilers_[index].Elapsed();
+    }
 
     OptimizerProfiler &optimizer() { return optimizer_; }
 

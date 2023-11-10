@@ -118,11 +118,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
         query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
 
-        query_metrics_->StartPhase(QueryPhase::kExecution);
+        query_metrics_->StartPhase(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
+        query_metrics_->StopPhase(QueryPhase::kPipelineBuild);
 
+        query_metrics_->StartPhase(QueryPhase::kExecution);
         scheduler_->Schedule(this, plan_fragment.get());
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
