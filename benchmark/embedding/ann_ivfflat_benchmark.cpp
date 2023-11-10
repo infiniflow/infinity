@@ -1,4 +1,4 @@
-
+// #define ann_verbose 0
 #include "base_profiler.h"
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <memory>
 #include <sys/time.h>
 
 import stl;
@@ -93,38 +94,44 @@ void benchmark_faiss_ivfflatl2(double t0,
                                const int *gt,
                                size_t n_probes,
                                size_t n_centroids) {
-    auto *I_faiss_l2 = new int64_t[nq * k];
-    auto *D_faiss_l2 = new float[nq * k];
-    auto *quantizer = new faiss::IndexFlatL2(d);
-    quantizer->verbose = true;
-    auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_L2);
-    index->verbose = true;
+    auto I_faiss_l2 = std::make_unique<int64_t[]>(nq * k);
+    auto D_faiss_l2 = std::make_unique<float[]>(nq * k);
+    faiss::IndexFlatL2 quantizer(d);
+    quantizer.verbose = true;
+    faiss::IndexIVFFlat index(&quantizer, d, n_centroids, faiss::METRIC_L2);
+    index.verbose = true;
     {
+#ifdef ann_verbose
         printf("[%.3f s] Training on %ld vectors, with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
-        index->train(nt, xt);
+        index.train(nt, xt);
         profiler.End();
         std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
-        index->add(nb, xb);
+        index.add(nb, xb);
         profiler.End();
         std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
         faiss::IVFSearchParameters p;
         p.nprobe = n_probes;
-        index->search(nq, xq, k, D_faiss_l2, I_faiss_l2, &p);
+        index.search(nq, xq, k, D_faiss_l2.get(), I_faiss_l2.get(), &p);
         profiler.End();
         std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
@@ -132,11 +139,9 @@ void benchmark_faiss_ivfflatl2(double t0,
         std::cout << "############################" << std::endl;
         printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
         std::cout << "############################" << std::endl;
-        auto I = [I_faiss_l2](size_t i) { return I_faiss_l2[i]; };
+        auto I = [&I_faiss_l2](size_t i) { return I_faiss_l2[i]; };
         compute_recall(gt, I, nq, k);
     }
-    delete[] I_faiss_l2;
-    delete[] D_faiss_l2;
 }
 
 void benchmark_faiss_ivfflatip(double t0,
@@ -151,38 +156,45 @@ void benchmark_faiss_ivfflatip(double t0,
                                const int *gt,
                                size_t n_probes,
                                size_t n_centroids) {
-    auto *I_faiss_ip = new int64_t[nq * k];
-    auto *D_faiss_ip = new float[nq * k];
-    auto *quantizer = new faiss::IndexFlatL2(d);
-    quantizer->verbose = true;
-    auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_INNER_PRODUCT);
-    index->verbose = true;
+    auto I_faiss_ip = std::make_unique<int64_t[]>(nq * k);
+    auto D_faiss_ip = std::make_unique<float[]>(nq * k);
+
+    faiss::IndexFlatL2 quantizer(d);
+    quantizer.verbose = true;
+    faiss::IndexIVFFlat index(&quantizer, d, n_centroids, faiss::METRIC_INNER_PRODUCT);
+    index.verbose = true;
     {
+#ifdef ann_verbose
         printf("[%.3f s] Training on %ld vectors , with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
-        index->train(nt, xt);
+        index.train(nt, xt);
         profiler.End();
         std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
-        index->add(nb, xb);
+        index.add(nb, xb);
         profiler.End();
         std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         profiler.Begin();
         faiss::IVFSearchParameters p;
         p.nprobe = n_probes;
-        index->search(nq, xq, k, D_faiss_ip, I_faiss_ip, &p);
+        index.search(nq, xq, k, D_faiss_ip.get(), I_faiss_ip.get(), &p);
         profiler.End();
         std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
@@ -190,11 +202,9 @@ void benchmark_faiss_ivfflatip(double t0,
         std::cout << "############################" << std::endl;
         printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
         std::cout << "############################" << std::endl;
-        auto I = [I_faiss_ip](size_t i) { return I_faiss_ip[i]; };
+        auto I = [&I_faiss_ip](size_t i) { return I_faiss_ip[i]; };
         compute_recall(gt, I, nq, k);
     }
-    delete[] I_faiss_ip;
-    delete[] D_faiss_ip;
 }
 
 void benchmark_annivfflatl2(double t0,
@@ -211,7 +221,9 @@ void benchmark_annivfflatl2(double t0,
                             size_t n_centroids) {
     UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
     {
+#ifdef ann_verbose
         printf("[%.3f s] Training and Indexing on %ld vectors, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+#endif
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -222,7 +234,9 @@ void benchmark_annivfflatl2(double t0,
                   << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -257,7 +271,9 @@ void benchmark_annivfflatip(double t0,
                             size_t n_centroids) {
     UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
     {
+#ifdef ann_verbose
         printf("[%.3f s] Training and Indexing on %ld vectors, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+#endif
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -268,7 +284,9 @@ void benchmark_annivfflatip(double t0,
                   << std::endl;
     }
     {
+#ifdef ann_verbose
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -290,37 +308,50 @@ void benchmark_annivfflatip(double t0,
 }
 
 int main() {
-    std::cout << "##########################################################" << std::endl;
     auto t0 = ann_benchmark_elapsed();
-    size_t d, k, n_probes = 10, n_centroids;
+#ifdef ann_verbose
+    std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Loading train set\n", ann_benchmark_elapsed() - t0);
+#endif
+    size_t d, k, n_probes = 10, n_centroids;
     size_t nt;
     float *xt = fvecs_read(sift1m_train, &d, &nt);
+#ifdef ann_verbose
     printf("[%.3f s] Loading database\n", ann_benchmark_elapsed() - t0);
+#endif
     size_t nb, d2;
     float *xb = fvecs_read(sift1m_base, &d2, &nb);
     assert(d == d2 || !"dataset does not have same dimension as train set");
     // n_centroids = (size_t)sqrt(nb);
     n_centroids = (size_t)sqrt(nb);
+#ifdef ann_verbose
     printf("[%.3f s] Loading queries\n", ann_benchmark_elapsed() - t0);
+#endif
     size_t nq, d3;
     float *xq = fvecs_read(sift1m_query, &d3, &nq);
     assert(d == d2 || !"query does not have same dimension as train set");
+#ifdef ann_verbose
     printf("[%.3f s] Loading ground truth for %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
     size_t nq2;
     int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
     assert(nq2 == nq || !"incorrect nb of ground truth entries");
+#ifdef ann_verbose
     printf("[%.3f s] Data loaded\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin faiss ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
+#endif
     benchmark_faiss_ivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+#ifdef ann_verbose
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End faiss ivfflatl2\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin ann ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
+#endif
     benchmark_annivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+#ifdef ann_verbose
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End ann ivfflatl2\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
@@ -328,16 +359,21 @@ int main() {
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin faiss ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
+#endif
     benchmark_faiss_ivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+#ifdef ann_verbose
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End faiss ivfflatip\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin ann ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
+#endif
     benchmark_annivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+#ifdef ann_verbose
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End ann ivfflatip\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
+#endif
     delete[] xt;
     delete[] xb;
     delete[] xq;
