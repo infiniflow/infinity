@@ -136,9 +136,10 @@ void PhysicalShow::Init() {
         }
         case ShowType::kShowProfiles: {
 
-            output_names_->reserve(7);
-            output_types_->reserve(7);
+            output_names_->reserve(8);
+            output_types_->reserve(8);
 
+            output_names_->emplace_back("record_no");
             output_names_->emplace_back("parser");
             output_names_->emplace_back("logical planner");
             output_names_->emplace_back("optimizer");
@@ -147,6 +148,7 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("executor");
             output_names_->emplace_back("total_cost");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -395,13 +397,14 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "parser", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "logical_plan", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "optimizer", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "physical_plan", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(4, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(5, varchar_type, "execution", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "total_cost", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(0, varchar_type, "profile_no", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "parser", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "logical_plan", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "optimizer", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "physical_plan", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(5, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "execution", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "total_cost", HashSet<ConstraintType>()),
     };
 
     auto catalog = txn->GetCatalog();
@@ -416,6 +419,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         varchar_type,
         varchar_type,
         varchar_type,
+        varchar_type,
         varchar_type
     };
     output_block_ptr->Init(column_types);
@@ -423,6 +427,9 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     auto records = catalog->GetProfilerRecords();
     for (int i = 0; i < records.size(); ++i) {
         i64 total_cost = 0;
+        ValueExpression value_expr(Value::MakeVarchar(Format("{}", i)));
+
+        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         for (int j = 0; j < 7; ++j) {
             i64 this_time = total_cost;
             if (j != 6) {
@@ -432,7 +439,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
             NanoSeconds duration(this_time);
             Value value = Value::MakeVarchar(BaseProfiler::ElapsedToString(duration));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[j]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[j + 1]);
         }
         output_block_ptr->Finalize();
     }
