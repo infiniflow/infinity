@@ -45,8 +45,7 @@ NanoSeconds BaseProfiler::ElapsedInternal() const {
     return ElapsedFromStart(now, begin_ts_);
 }
 
-String BaseProfiler::ElapsedToString() const {
-    auto duration = this->ElapsedInternal();
+String BaseProfiler::ElapsedToString(NanoSeconds duration) {
     String result;
     if (duration.count() <= 1000) {
         result.append(Format("{}ns", duration.count()));
@@ -58,6 +57,10 @@ String BaseProfiler::ElapsedToString() const {
         result.append(Format("{}s", ChronoCast<Seconds>(duration).count()));
     }
     return result;
+}
+
+String BaseProfiler::ElapsedToString() const {
+    return ElapsedToString(this->ElapsedInternal());
 }
 
 void OptimizerProfiler::StartRule(const String &rule_name) {

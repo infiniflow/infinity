@@ -19,6 +19,7 @@ import stl;
 import txn;
 import query_context;
 import parser;
+import profiler;
 import operator_state;
 import data_block;
 
@@ -138,13 +139,13 @@ void PhysicalShow::Init() {
             output_names_->reserve(7);
             output_types_->reserve(7);
 
-            output_names_->emplace_back("total_cost");
             output_names_->emplace_back("parser");
             output_names_->emplace_back("logical planner");
             output_names_->emplace_back("optimizer");
             output_names_->emplace_back("physical planner");
             output_names_->emplace_back("pipeline builder");
             output_names_->emplace_back("executor");
+            output_names_->emplace_back("total_cost");
 
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -390,87 +391,52 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    Error<ExecutorException>("Not implemented");
-    //    // Define output table schema
-    //    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-    //
-    //    // Get tables from catalog
-    //    Txn *txn = query_context->GetTxn();
-    //
-    //    // Prepare the output data block
-    //    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    //    Vector<SharedPtr<DataType>>
-    //            column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
-    //
-    //    output_block_ptr->Init(column_types);
-    //
-    //    SizeT column_id = 0;
-    //    {
-    //        // Append schema name to the 0 column
-    //        Value value = Value::MakeVarchar("system");
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Append table name to the 1 column
-    //        Value value = Value::MakeVarchar("config");
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Append base table type to the 2 column
-    //        Value value = Value::MakeVarchar("Table");
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Column count
-    //        Value value = Value::MakeBigInt(static_cast<i64>(3));
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Row count
-    //        Value value = Value::MakeBigInt(static_cast<i64>(14));
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Block count
-    //        Value value = Value::MakeBigInt(static_cast<i64>(1));
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Block count
-    //        Value value = Value::MakeBigInt(static_cast<i64>(1));
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    ++column_id;
-    //    {
-    //        // Append block limit the 6 column
-    //        Value value = Value::MakeBigInt(8192);
-    //        ValueExpression value_expr(value);
-    //        value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //    }
-    //
-    //    output_block_ptr->Finalize();
-    //    show_operator_state->output_.emplace_back(output_block_ptr);
+    auto txn = query_context->GetTxn();
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "parser", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "logical_plan", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "optimizer", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "physical_plan", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(5, varchar_type, "execution", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "total_cost", HashSet<ConstraintType>()),
+    };
+
+    auto catalog = txn->GetCatalog();
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("profiles"), column_defs);
+
+    // create data block for output state
+    auto output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        varchar_type
+    };
+    output_block_ptr->Init(column_types);
+
+    auto records = catalog->GetProfilerRecords();
+    for (int i = 0; i < records.size(); ++i) {
+        i64 total_cost = 0;
+        for (int j = 0; j < 7; ++j) {
+            i64 this_time = total_cost;
+            if (j != 6) {
+                this_time = records[i]->ElapsedAt(j);
+                total_cost += this_time;
+            }
+            NanoSeconds duration(this_time);
+            Value value = Value::MakeVarchar(BaseProfiler::ElapsedToString(duration));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[j]);
+        }
+        output_block_ptr->Finalize();
+    }
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 /**
