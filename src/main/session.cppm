@@ -42,16 +42,11 @@ public:
     inline Txn*& txn() { return txn_; }
 
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
-        if (txn_->GetCatalog()) {
-            txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
-        }
+        txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
     }
 
     const QueryProfiler *GetProfilerRecord(SizeT index) {
-        if (txn_->GetCatalog()) {
-            return txn_->GetCatalog()->GetProfilerRecord(index);
-        }
-        return nullptr;
+        return txn_->GetCatalog()->GetProfilerRecord(index);
     }
 protected:
     // Current schema

@@ -84,6 +84,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     // Default profiler config
     bool default_enable_profiler = false;
+    bool default_profile_record_capacity = 100;
 
     // Default network config
     String default_listen_address = "0.0.0.0";
@@ -138,6 +139,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Profiler
         {
             system_option_.enable_profiler = default_enable_profiler;
+            system_option_.profile_record_capacity = default_profile_record_capacity;
         }
 
         // Network
@@ -237,6 +239,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             auto profiler_config = config["profiler"];
             system_option_.enable_profiler = profiler_config["enable"].value_or(default_enable_profiler);
+            system_option_.profile_record_capacity = profiler_config["profile_record_capacity"].value_or(default_profile_record_capacity);
         }
 
         // Network

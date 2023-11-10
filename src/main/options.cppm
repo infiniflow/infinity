@@ -43,6 +43,7 @@ export struct SystemOptions {
 
     // profiler
     bool enable_profiler{};
+    u64 profile_record_capacity{};
 
     // Network
     String listen_address{};

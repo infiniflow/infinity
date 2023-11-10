@@ -51,7 +51,7 @@ public:
     [[nodiscard]] inline u32 sdk_port() const { return system_option_.sdk_port; }
 
     // Profiler
-    [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler || default_session_options_.enable_profiling_; }
+    [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler; }
 
     // Log
     [[nodiscard]] inline SharedPtr<String> log_filename() const { return system_option_.log_filename; }

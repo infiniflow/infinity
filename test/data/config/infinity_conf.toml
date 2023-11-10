@@ -16,6 +16,7 @@ sdk_port                = 24817
 
 [profiler]
 enable                  = false
+profile_record_capacity = 100
 
 [log]
 log_filename            = "info.log"

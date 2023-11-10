@@ -84,7 +84,7 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
     if (!enable_) {
         return;
     }
-    if (active_operator_) {
+    if (active_operator_ != nullptr) {
         Error<ProfilerException>("Attempting to call StartOperator while another operator is active.", __FILE_NAME__, __LINE__);
     }
     active_operator_ = op;
@@ -94,7 +94,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     if (!enable_) {
         return;
     }
-    if (!active_operator_) {
+    if (active_operator_ == nullptr) {
         Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
     }
     profiler_.End();
@@ -221,7 +221,6 @@ String QueryProfiler::ToString() const {
             ss << optimizer_.ToString(4) << std::endl;
         }
         if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kExecution) {
-            ss << "--------------------------------" << std::endl;
             ExecuteRender(ss);
         }
     }
@@ -231,6 +230,7 @@ String QueryProfiler::ToString() const {
 Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
     Json json;
 
+    i64 total = 0;
     for (const auto &fragment : profiler->records_) {
         Json json_fragments;
         json_fragments["fragment_id"] = fragment.first;
@@ -277,12 +277,15 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
 
             json_fragments["tasks"].push_back(json_tasks);
         }
+        total += fragment_total;
+
         json_fragments["fragment_start"] = fragment_start;
         json_fragments["fragment_end"] = fragment_end;
         json_fragments["fragment_total"] = fragment_total;
 
         json["fragments"].push_back(json_fragments);
     }
+    json["total"] = total;
     json["time_unit"] = "ns";
 
     return json;

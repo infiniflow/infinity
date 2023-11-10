@@ -100,14 +100,14 @@ struct OperatorInformation {
         return *this;
     }
 
-    i64 start_ = 0;
-    i64 end_ = 0;
-    i64 elapsed_ = 0;
-    u16 input_rows_ = 0;
-    u16 output_rows_ = 0;
-    i32 output_data_size_ = 0;
+    i64 start_ {};
+    i64 end_ {};
+    i64 elapsed_{};
+    u16 input_rows_ {};
+    u16 output_rows_ {};
+    i32 output_data_size_ {};
 
-    String name_;
+    String name_ {};
 };
 
 export struct TaskBinding {
@@ -156,7 +156,7 @@ public:
     Vector<OperatorInformation> timings_{};
     BaseProfiler task_profiler_;
 private:
-    bool enable_ = false;
+    bool enable_ {};
 
     BaseProfiler profiler_;
     const PhysicalOperator *active_operator_ = nullptr;
@@ -164,9 +164,9 @@ private:
 
 export class QueryProfiler {
 public:
-    QueryProfiler() {};
+    QueryProfiler() = default;
 
-    QueryProfiler(bool enable) : enable_(enable) {};
+    explicit QueryProfiler(bool enable) : enable_(enable) {};
 
     void StartPhase(QueryPhase phase);
 
@@ -183,7 +183,7 @@ public:
     static Json Serialize(const QueryProfiler *profiler);
 
 private:
-    bool enable_ = false;
+    bool enable_ {};
 
     Mutex flush_lock_{};
     HashMap<u64, HashMap<i64, Vector<TaskProfiler>>> records_{};
