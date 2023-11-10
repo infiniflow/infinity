@@ -30,6 +30,7 @@ export module annivfflat_index_file_worker;
 namespace infinity {
 
 export struct CreateAnnIVFFlatPara : public CreateIndexPara {
+    // used when ivfflat_index_def->centroids_count_ == 0
     const SizeT row_count_;
 
     CreateAnnIVFFlatPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def, SizeT row_count)
@@ -38,7 +39,7 @@ export struct CreateAnnIVFFlatPara : public CreateIndexPara {
 
 export template <typename DataType>
 class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
-    u32 centroid_num_;
+    u32 default_centroid_num_;
 
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
@@ -46,7 +47,7 @@ public:
                                        SharedPtr<IndexDef> index_def,
                                        SharedPtr<ColumnDef> column_def,
                                        SizeT row_count)
-        : IndexFileWorker(file_dir, file_name, index_def, column_def), centroid_num_((u32)sqrt(row_count)) {}
+        : IndexFileWorker(file_dir, file_name, index_def, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -88,13 +89,14 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    // TODO: now use ivfflat_index_def->metric_type_.
-    //  CreateAnnIVFFlatPara maybe unnecessary.
     auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
+    auto centroids_count = ivfflat_index_def->centroids_count_;
+    if (centroids_count == 0) {
+        centroids_count = default_centroid_num_;
+    }
     switch (GetType()) {
         case kElemFloat: {
-            data_ = static_cast<void *>(
-                new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, ivfflat_index_def->centroids_count_));
+            data_ = static_cast<void *>(new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, centroids_count));
             break;
         }
         default: {

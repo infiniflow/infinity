@@ -38,7 +38,7 @@ static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivec
 
 int global_nb = 100'000;
 int n_lists;
-int n_probes = 16;
+int n_probes = 2;
 size_t k;
 
 faiss::idx_t *I1;
