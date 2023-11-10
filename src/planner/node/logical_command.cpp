@@ -93,6 +93,11 @@ String LogicalCommand::ToString(i64 &space) const {
             }
             break;
         }
+        case CommandType::kCheckTable: {
+            CheckTable *check_table_info = (CheckTable *)(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
+            break;
+        }
         case CommandType::kInvalid: {
             Error<PlannerException>("Invalid command type.");
         }

@@ -35,6 +35,7 @@ const_ptr_t ColumnBuffer::GetAll() {
         return static_cast<const_ptr_t>(inline_col_.GetData());
     }
     Error<NotImplementException>("Cannot get all data of an outline column");
+    return nullptr;
 }
 
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
@@ -97,6 +98,7 @@ ptr_t ColumnBuffer::GetAllMut() {
         return static_cast<ptr_t>(inline_col_.GetDataMut());
     }
     Error<NotImplementException>("Cannot get all data of an outline column");
+    return nullptr;
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {

@@ -66,6 +66,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             Error<ExecutorException>("Unknown expression type: " + expression->Name());
         }
     }
+    return nullptr;
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr) {

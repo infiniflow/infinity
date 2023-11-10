@@ -94,9 +94,11 @@ std::string KnnExpr::KnnDistanceType2Str(KnnDistanceType knn_distance_type) {
             return "Hamming";
         }
         case KnnDistanceType::kInvalid: {
-            ParserError("Invalid knn distance type") break;
+            ParserError("Invalid knn distance type");
+            break;
         }
     }
+    return std::string();
 }
 
 } // namespace infinity

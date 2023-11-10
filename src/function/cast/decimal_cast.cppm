@@ -89,41 +89,49 @@ struct DecimalTryCastToVarlen {
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, TinyIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, SmallIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, IntegerT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, BigIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, HugeIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, FloatT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT source, DoubleT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DecimalTryCastToVarlen::Run(DecimalT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

@@ -506,7 +506,10 @@ EntryResult Txn::DropViewByName(const String &db_name, const String &view_name, 
 
 EntryResult Txn::GetViewByName(const String &db_name, const String &view_name) { Error<TransactionException>("Not Implemented"); }
 
-Vector<BaseEntry *> Txn::GetViews(const String &db_name) { Error<TransactionException>("Not Implemented"); }
+Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
+    Error<TransactionException>("Not Implemented");
+    return Vector<BaseEntry *>();
+}
 
 void Txn::BeginTxn() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
 

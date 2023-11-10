@@ -179,6 +179,7 @@ bool LocalFileSystem::Exists(const String &path) {
     } else {
         Error<StorageException>(Format("{} exists exception: {}", path, strerror(errno)));
     }
+    return false;
 }
 
 bool LocalFileSystem::CreateDirectoryNoExp(const String &path) {

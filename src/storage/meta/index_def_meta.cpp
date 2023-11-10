@@ -254,7 +254,10 @@ EntryResult IndexDefMeta::GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, Txn
     return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid index def entry")};
 }
 
-SharedPtr<String> IndexDefMeta::ToString(IndexDefMeta *index_def_meta) { Error<StorageException>("Not implemented"); }
+SharedPtr<String> IndexDefMeta::ToString(IndexDefMeta *index_def_meta) {
+    Error<StorageException>("Not implemented");
+    return nullptr;
+}
 
 Json IndexDefMeta::Serialize(const IndexDefMeta *index_def_meta) {
     Json json;

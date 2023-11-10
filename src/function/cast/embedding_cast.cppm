@@ -40,6 +40,7 @@ export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
             Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct EmbeddingTryCastToVarlen {
@@ -50,7 +51,8 @@ struct EmbeddingTryCastToVarlen {
                            const DataType &target_type,
                            const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 

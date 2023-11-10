@@ -40,6 +40,7 @@ struct PowFunction {
 template <>
 inline bool PowFunction::Run(MixedT base, DoubleT exponent, DoubleT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 void RegisterPowFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

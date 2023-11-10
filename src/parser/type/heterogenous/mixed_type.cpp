@@ -425,8 +425,11 @@ bool MixedType::operator==(const MixedType &other) const {
     if (this->type != other.type)
         return false;
     switch (this->type) {
-        case MixedValueType::kInvalid:
-        ParserError("Invalid heterogeneous type") case MixedValueType::kInteger: {
+        case MixedValueType::kInvalid: {
+            ParserError("Invalid heterogeneous type");
+            break;
+        }
+        case MixedValueType::kInteger: {
             auto *this_integer = (IntegerMixedType *)(this);
             auto *other_integer = (IntegerMixedType *)(&other);
             return this_integer->value == other_integer->value;
@@ -482,11 +485,14 @@ bool MixedType::operator==(const MixedType &other) const {
         case MixedValueType::kNull:
         case MixedValueType::kMissing:
             return true;
-        case MixedValueType::kDummy:
-            ParserError("Dummy heterogeneous type")
+        case MixedValueType::kDummy: {
+            ParserError("Dummy heterogeneous type");
+            return false;
+        }
     }
 
     ParserError("Unknown heterogeneous type.");
+    return false;
 }
 
 void MixedType::Move(MixedType &&from, MixedType &to) {

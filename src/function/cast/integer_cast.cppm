@@ -67,13 +67,15 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
             Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -81,7 +83,8 @@ struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -127,6 +130,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DecimalT &target) {
     Error<NotImplementException>(Format("Not implemented"));
+    return false;
 }
 
 // Cast TinyIntT to VarcharT type
@@ -191,6 +195,7 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast SmallIntT to VarcharT type
@@ -258,6 +263,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast IntegerT to VarcharT type
@@ -329,6 +335,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast integer to varlen type
@@ -363,43 +370,51 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, TinyIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, SmallIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, IntegerT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, BigIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, FloatT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, DoubleT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(HugeIntT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

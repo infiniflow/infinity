@@ -36,10 +36,17 @@ String ToString(ShowType type) {
             return "Show column";
         case ShowType::kShowIndexes:
             return "Show indexes";
+        case ShowType::kShowDatabases:
+            return "Show databases";
+        case ShowType::kShowConfigs:
+            return "Show configs";
+        case ShowType::kShowProfiles:
+            return "Show profiles";
         default: {
             Error<PlannerException>("Invalid chunk scan type");
         }
     }
+    return String();
 }
 
 Vector<ColumnBinding> LogicalShow::GetColumnBindings() const { return {}; }

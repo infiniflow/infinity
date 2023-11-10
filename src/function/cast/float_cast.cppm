@@ -35,8 +35,7 @@ export struct FloatTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() != target.type(),
-                          Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    Assert<TypeException>(source.type() != target.type(), Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, TinyIntT, FloatTryCastToFixlen>);
@@ -69,13 +68,15 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-            Format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -83,7 +84,8 @@ struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -131,6 +133,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
@@ -143,6 +146,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast FloatT to varlen type
@@ -156,8 +160,7 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const Sha
         Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer. ");
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
 
         ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         Memcpy(ptr, tmp_str.c_str(), target.length);
@@ -211,6 +214,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT source, HugeIntT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
@@ -223,6 +227,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT source, DecimalT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 // Cast double to varlen type
@@ -236,8 +241,7 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const Sh
         Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
         Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer. ");
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
 
         ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
         Memcpy(ptr, tmp_str.c_str(), target.length);

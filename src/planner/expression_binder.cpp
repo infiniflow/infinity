@@ -284,6 +284,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             Error<PlannerException>(Format("Unknown function type: {}", function_set_ptr->name()));
         }
     }
+    return nullptr;
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
@@ -438,6 +439,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
     }
 
     Error<PlannerException>("Unreachable");
+    return nullptr;
 }
 //
 //// Bind window function.

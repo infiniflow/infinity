@@ -33,6 +33,7 @@ struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA left, TB right, TC &result) {
         Error<NotImplementException>("Not implement");
+        return false;
     }
 };
 
@@ -96,12 +97,14 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool MulFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // Mixed Type * i64
 template <>
 inline bool MulFunction::Run(MixedT left, BigIntT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // i64 * Mixed Type
@@ -114,6 +117,7 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT left, DoubleT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 // f64 * Mixed Type
@@ -126,6 +130,7 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT left, MixedT right, MixedT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 void RegisterMulFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

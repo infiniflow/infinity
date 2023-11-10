@@ -31,7 +31,7 @@ public:
 public:
     static inline size_t EmbeddingDataWidth(EmbeddingDataType type_index) { return embedding_type_width[type_index]; }
 
-    static inline size_t EmbeddingSize(EmbeddingDataType type, size_t dimension) {
+    [[nodiscard]] static inline size_t EmbeddingSize(EmbeddingDataType type, size_t dimension) {
         ParserAssert(type != EmbeddingDataType::kElemInvalid, "Invalid embedding data type");
         if (type == EmbeddingDataType::kElemBit) {
             size_t byte_count = (dimension + 7) >> 3;
@@ -41,7 +41,7 @@ public:
         return dimension * EmbeddingDataWidth(type);
     }
 
-    static inline std::string EmbeddingDataType2String(EmbeddingDataType type) {
+    [[nodiscard]] static inline std::string EmbeddingDataType2String(EmbeddingDataType type) {
         switch (type) {
             case kElemBit:
                 return "BIT";
@@ -61,9 +61,10 @@ public:
                 ParserError("Unexpected embedding type");
             }
         }
+        return std::string();
     }
 
-    static inline std::string Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {
+    [[nodiscard]] static inline std::string Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {
         switch (type) {
             case kElemBit:
                 return BitmapEmbedding2StringInternal(embedding, dimension);
@@ -83,6 +84,7 @@ public:
                 ParserError("Unexpected embedding type");
             }
         }
+        return std::string();
     }
 
 private:
@@ -97,7 +99,7 @@ private:
         return ss.str();
     }
 
-    static inline std::string BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
+    [[nodiscard]] static inline std::string BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
         std::stringstream ss;
         ParserAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.");
@@ -169,7 +171,7 @@ public:
 
     inline void SetNull() { ptr = nullptr; }
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); }
+    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); return std::string(); }
 };
 
 } // namespace infinity

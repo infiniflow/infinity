@@ -46,7 +46,7 @@ std::string TableConstraint::ToString() const {
         }
         ss << names_ptr_->back();
     } else {
-        ParserError("Table constraint without any columns involved.")
+        ParserError("Table constraint without any columns involved.");
     }
     ss << ")";
     return ss.str();
