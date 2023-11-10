@@ -1,0 +1,2 @@
+sqlglot==11.7.1
+grpcio-tools==1.42.0

@@ -37,6 +37,8 @@ public:
 
     static SharedPtr<Infinity> RemoteConnect();
 
+    u64 GetSessionId();
+
     void RemoteDisconnect();
 
     static SharedPtr<Infinity> LocalConnect(const String &path);

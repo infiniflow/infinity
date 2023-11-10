@@ -29,6 +29,9 @@ class RemoteInfinityConnection(InfinityConnection, ABC):
         from python.infinity.remote.db import RemoteDatabase
         return RemoteDatabase(self, name=db_name)
 
+    def disconnect(self):
+        return self._client.disconnect()
+
     @property
     def client(self):
         return self._client

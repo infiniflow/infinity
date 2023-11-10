@@ -4,12 +4,12 @@
 //
 
 
-#include "infinity.grpc.pb.h"
-#include "infinity.pb.h"
 #include <grpc/grpc.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
+#include "infinity.grpc.pb.h"
+#include "infinity.pb.h"
 
 import stl;
 import singleton;
@@ -25,6 +25,7 @@ class GrpcServiceImpl : public infinity_proto::InfinityService::Service {
 public:
     GrpcServiceImpl() = default;
     grpc::Status Connect(grpc::ServerContext *context, const infinity_proto::Empty *request, infinity_proto::CommonResponse *response) override;
+    grpc::Status DisConnect(grpc::ServerContext *context, const infinity_proto::DisConnectRequest *request, infinity_proto::CommonResponse *response) override;
     grpc::Status CreateDatabase(grpc::ServerContext *context,
                                 const infinity_proto::CreateDatabaseRequest *request,
                                 infinity_proto::CommonResponse *response) override;
@@ -73,7 +74,11 @@ private:
 
     static infinity_proto::DataType *DataTypeToProtoDataType(const SharedPtr<DataType> &data_type);
     static infinity_proto::ColumnType DataTypeToProtoColumnType (const SharedPtr<DataType>& data_type);
+
+    SharedPtr<Infinity> GetInfinityBySessionID(u64 session_id);
+
 private:
-    SharedPtr<Infinity> infinity_{};
+    Mutex infinity_session_map_mutex_{};
+    HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 };
 } // end namespace infinity

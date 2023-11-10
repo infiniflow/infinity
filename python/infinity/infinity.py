@@ -29,3 +29,7 @@ class InfinityConnection(ABC):
     @abstractmethod
     def get_database(self, db_name):
         pass
+
+    @abstractmethod
+    def disconnect(self):
+        pass

@@ -64,13 +64,15 @@ class RemoteTable(Table, ABC):
                 elif isinstance(value, float):
                     constant_expression.literal_type = infinity_pb2.ConstantExpr.LiteralType.kDouble
                     constant_expression.f64_value = value
+                else:
+                    raise Exception("Invalid constant expression")
                 paser_expr = infinity_pb2.ParsedExpr()
                 paser_expr.constant_expr.CopyFrom(constant_expression)
                 field.parse_exprs.append(paser_expr)
 
             fields.append(field)
 
-        print(db_name, table_name, column_names, fields)
+        # print(db_name, table_name, column_names, fields)
         self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names, fields=fields)
 
     def import_data(self, file_path: str, options=None):
@@ -116,7 +118,7 @@ class RemoteTable(Table, ABC):
         # process where_expr
 
         # str to ParsedExpr
-        from sqlglot import select, condition
+        from sqlglot import condition
         if query.filter is not None:
             where_expr = traverse_conditions(condition(query.filter))
 
@@ -160,6 +162,8 @@ class RemoteTable(Table, ABC):
             elif column_type == infinity_pb2.ColumnType.kColumnDouble:
                 value_list = struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
                 results[column_name] = value_list
+            else:
+                raise Exception(f"unknown column type: {column_type}")
 
         return results
         # todo: how to convert bytes to string?
@@ -197,6 +201,8 @@ def traverse_conditions(cons) -> infinity_pb2.ParsedExpr:
         elif cons.is_number:
             constant_expr.literal_type = infinity_pb2.ConstantExpr.LiteralType.kDouble
             constant_expr.f64_value = float(cons.output_name)
+        else:
+            raise Exception(f"unknown literal type: {cons}")
 
         parsed_expr.constant_expr.CopyFrom(constant_expr)
         return parsed_expr
@@ -204,7 +210,8 @@ def traverse_conditions(cons) -> infinity_pb2.ParsedExpr:
     elif isinstance(cons, exp.Paren):
         for value in cons.hashable_args:
             traverse_conditions(value)
-
+    else:
+        raise Exception(f"unknown condition: {cons}")
 
 def binary_exp_to_paser_exp(binary_expr_key) -> str:
     if binary_expr_key == "eq":
@@ -223,3 +230,5 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "and"
     elif binary_expr_key == "or":
         return "or"
+    else:
+        raise Exception(f"unknown binary expression: {binary_expr_key}")

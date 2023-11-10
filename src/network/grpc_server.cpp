@@ -16,20 +16,42 @@ import column_vector;
 namespace infinity {
 
 grpc::Status GrpcServiceImpl::Connect(grpc::ServerContext *context, const infinity_proto::Empty *request, infinity_proto::CommonResponse *response) {
-    infinity_ = Infinity::Connect("/tmp/infinity");
-    if (infinity_ != nullptr) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
+    auto infinity = Infinity::RemoteConnect();
+    if (infinity == nullptr) {
         response->set_success(false);
         response->set_error_msg("Connect failed");
         return grpc::Status::CANCELLED;
+    } else {
+        infinity_session_map_mutex_.lock();
+        infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
+        infinity_session_map_mutex_.unlock();
+        response->set_session_id(infinity->GetSessionId());
+        response->set_success(true);
+        return grpc::Status::OK;
+    }
+}
+grpc::Status GrpcServiceImpl::DisConnect(grpc::ServerContext *context,
+                                         const infinity_proto::DisConnectRequest *request,
+                                         infinity_proto::CommonResponse *response) {
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    if (infinity == nullptr) {
+        response->set_success(false);
+        response->set_error_msg("Disconnect failed");
+        return grpc::Status::CANCELLED;
+    } else {
+        auto session_id = infinity->GetSessionId();
+        infinity->RemoteDisconnect();
+        infinity_session_map_mutex_.lock();
+        infinity_session_map_.erase(session_id);
+        infinity_session_map_mutex_.unlock();
+        response->set_success(true);
+        return grpc::Status::OK;
     }
 }
 
 grpc::Status GrpcServiceImpl::CreateDatabase(grpc::ServerContext *context, const infinity_proto::CreateDatabaseRequest *request, infinity_proto::CommonResponse *response) {
-    auto result = infinity_->CreateDatabase(request->db_name(), (const CreateDatabaseOptions &)request->options());
-
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->CreateDatabase(request->db_name(), (const CreateDatabaseOptions &)request->options());
     if (result.IsOk()) {
         response->set_success(true);
         return grpc::Status::OK;
@@ -41,7 +63,8 @@ grpc::Status GrpcServiceImpl::CreateDatabase(grpc::ServerContext *context, const
 }
 
 grpc::Status GrpcServiceImpl::DropDatabase(grpc::ServerContext *context, const infinity_proto::DropDatabaseRequest *request, infinity_proto::CommonResponse *response) {
-    auto result = infinity_->DropDatabase(request->db_name(), (const DropDatabaseOptions &)request->options());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->DropDatabase(request->db_name(), (const DropDatabaseOptions &)request->options());
 
     if (result.IsOk()) {
         response->set_success(true);
@@ -54,7 +77,8 @@ grpc::Status GrpcServiceImpl::DropDatabase(grpc::ServerContext *context, const i
 }
 
 grpc::Status GrpcServiceImpl::ListDatabase(grpc::ServerContext *context, const infinity_proto::ListDatabaseRequest *request, infinity_proto::ListDatabaseResponse *response) {
-    auto result = infinity_->ListDatabases();
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->ListDatabases();
 
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -84,7 +108,8 @@ grpc::Status GrpcServiceImpl::DescribeDatabase(grpc::ServerContext *context, con
 }
 
 grpc::Status GrpcServiceImpl::GetDatabase(grpc::ServerContext *context, const infinity_proto::GetDatabaseRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     if (database != nullptr) {
         response->set_success(true);
         return grpc::Status::OK;
@@ -102,7 +127,8 @@ grpc::Status GrpcServiceImpl::CreateTable(grpc::ServerContext *context, const in
         column_defs.emplace_back(column_def);
     }
 
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     CreateTableOptions create_table_opts;
     Assert<NetworkException>(database != nullptr, "Database is null", __FILE_NAME__, __LINE__);
     auto result = database->CreateTable(request->table_name(), column_defs, Vector<TableConstraint *>(), create_table_opts);
@@ -118,7 +144,8 @@ grpc::Status GrpcServiceImpl::CreateTable(grpc::ServerContext *context, const in
 }
 
 grpc::Status GrpcServiceImpl::DropTable(grpc::ServerContext *context, const infinity_proto::DropTableRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto result = database->DropTable(request->table_name(), (const DropTableOptions &)request->options());
 
     if (result.IsOk()) {
@@ -132,7 +159,8 @@ grpc::Status GrpcServiceImpl::DropTable(grpc::ServerContext *context, const infi
 }
 
 grpc::Status GrpcServiceImpl::ListTable(grpc::ServerContext *context, const infinity_proto::ListTableRequest *request, infinity_proto::ListTableResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto result = database->ListTables();
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -160,7 +188,8 @@ grpc::Status GrpcServiceImpl::ListTable(grpc::ServerContext *context, const infi
 
 grpc::Status
 GrpcServiceImpl::GetTable(grpc::ServerContext *context, const infinity_proto::GetTableRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
 
     if (table != nullptr) {
@@ -176,7 +205,9 @@ GrpcServiceImpl::GetTable(grpc::ServerContext *context, const infinity_proto::Ge
 grpc::Status GrpcServiceImpl::CreateIndex(grpc::ServerContext *context,
                                           const infinity_proto::CreateIndexRequest *request,
                                           infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
     auto column_names = new Vector<String>();
 
@@ -208,7 +239,8 @@ grpc::Status GrpcServiceImpl::CreateIndex(grpc::ServerContext *context,
 
 grpc::Status
 GrpcServiceImpl::DropIndex(grpc::ServerContext *context, const infinity_proto::DropIndexRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
     auto result = table->DropIndex(request->index_name());
 
@@ -224,7 +256,8 @@ GrpcServiceImpl::DropIndex(grpc::ServerContext *context, const infinity_proto::D
 
 grpc::Status
 GrpcServiceImpl::Search(grpc::ServerContext *context, const infinity_proto::SelectStatement *request, infinity_proto::SelectResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
     Vector<ParsedExpr *> *output_columns;
     output_columns = new Vector<ParsedExpr *>();
@@ -306,7 +339,8 @@ GrpcServiceImpl::Search(grpc::ServerContext *context, const infinity_proto::Sele
 
 grpc::Status
 GrpcServiceImpl::Import(grpc::ServerContext *context, const infinity_proto::ImportRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
     auto result = table->Import(request->file_path(), (const ImportOptions &)request->import_options());
 
@@ -322,7 +356,8 @@ GrpcServiceImpl::Import(grpc::ServerContext *context, const infinity_proto::Impo
 
 grpc::Status
 GrpcServiceImpl::Insert(grpc::ServerContext *context, const infinity_proto::InsertRequest *request, infinity_proto::CommonResponse *response) {
-    auto database = infinity_->GetDatabase(request->db_name());
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
     auto table = database->GetTable(request->table_name());
     auto columns = new Vector<String>();
     columns->reserve(request->column_names().size());
@@ -364,7 +399,7 @@ void GrpcServiceImpl::Run() {
     builder.RegisterService(&service);
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
-    std::cout << "Server listening on " << server_address << std::endl;
+    std::cout << "GRPC server listening on " << server_address << std::endl;
     server->Wait();
 }
 
@@ -622,6 +657,14 @@ ParsedExpr *GrpcServiceImpl::GetParsedExprFromProto(const infinity_proto::Parsed
         auto parsed_expr = GetFunctionExprFromProto(expr.function_expr());
         return parsed_expr;
     }
+}
+
+SharedPtr<Infinity> GrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
+    auto it = infinity_session_map_.find(session_id);
+    if (it == infinity_session_map_.end()) {
+        Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
+    }
+    return it->second;
 }
 
 } // namespace infinity

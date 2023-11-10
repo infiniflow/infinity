@@ -47,6 +47,8 @@ class RemoteDatabase(Database, ABC):
                     embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt32
                 elif element_type == "int64":
                     embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt64
+                else:
+                    raise Exception(f"unknown element type: {element_type}")
 
                 embedding_type.dimension = int(length)
                 column_type.embedding_type.CopyFrom(embedding_type)
@@ -83,24 +85,24 @@ class RemoteDatabase(Database, ABC):
                     proto_column_type.VarcharType.width = 1024
                 elif datatype == "bool":
                     proto_column_type.logic_type = infinity_pb2.LogicType.Bool
+                else:
+                    raise Exception(f"unknown datatype: {datatype}")
 
                 proto_column_def.column_type.CopyFrom(proto_column_type)
                 # process constraints
                 for constraint in constraints:
                     if constraint == "null":
                         proto_column_def.constraints.append(infinity_pb2.Constraint.kNull)
-                        continue
                     elif constraint == "not null":
                         proto_column_def.constraints.append(infinity_pb2.Constraint.kNotNull)
-                        continue
                     elif constraint == "primary key":
                         proto_column_def.constraints.append(infinity_pb2.Constraint.kPrimaryKey)
-                        continue
                     elif constraint == "unique":
                         proto_column_def.constraints.append(infinity_pb2.Constraint.kUnique)
-                        continue
+                    else:
+                        raise Exception(f"unknown constraint: {constraint}")
                 column_defs.append(proto_column_def)
-        print(column_defs)
+        # print(column_defs)
         return self._conn.client.create_table(db_name=self._conn.db_name, table_name=table_name,
                                               column_defs=column_defs,
                                               options=options)

@@ -24,11 +24,13 @@ message Options {}
 message CreateDatabaseRequest {
   string db_name = 1;
   Options options = 2;
+  uint64 session_id = 3;
 }
 
 message DropDatabaseRequest {
   string db_name = 1;
   Options options = 2;
+  uint64 session_id = 3;
 }
 
 // For table
@@ -38,6 +40,7 @@ message CreateTableRequest {
   repeated ColumnDef column_defs = 3;
   // repeated ColumnConstraint column_constraints = 4;
   Options options = 5;
+  uint64 session_id = 6;
 }
 
 message ColumnConstraint {
@@ -92,6 +95,7 @@ message DropTableRequest {
   string db_name = 1;
   string table_name = 2;
   Options options = 3;
+  uint64 session_id = 4;
 }
 
 // For Insert
@@ -100,6 +104,7 @@ message InsertRequest {
   string table_name = 2;
   repeated string column_names = 3;
   repeated Field fields = 4;
+  uint64 session_id = 5;
 }
 message Field {
   repeated ParsedExpr parse_exprs = 1;
@@ -111,6 +116,7 @@ message ImportRequest {
   string table_name = 2;
   string file_path = 3;
   ImportOptions import_options = 4;
+  uint64 session_id = 5;
 
   message ImportOptions{
     string delimiter = 1;
@@ -219,18 +225,20 @@ message KnnExpr {
 message SelectStatement {
   string db_name = 1;
   string table_name = 2;
+  uint64 session_id = 9;
   repeated ParsedExpr select_list = 3;
   ParsedExpr where_expr = 4;
   repeated ParsedExpr group_by_list = 5;
   ParsedExpr limit_expr = 6;
   ParsedExpr offset_expr = 7;
-  ParsedExpr search_expr = 8;// ?? [xxx, .. , ...]
+  ParsedExpr search_expr = 8;
 }
 
 
 // network
 service InfinityService {
   rpc Connect(Empty) returns (CommonResponse);
+  rpc DisConnect(DisConnectRequest) returns (CommonResponse);
   rpc CreateDatabase(CreateDatabaseRequest) returns (CommonResponse);
   rpc DropDatabase(DropDatabaseRequest) returns (CommonResponse);
   rpc ListDatabase(ListDatabaseRequest) returns (ListDatabaseResponse);
@@ -252,12 +260,16 @@ service InfinityService {
   rpc Search(SelectStatement) returns (SelectResponse);
 }
 
+message DisConnectRequest{
+  uint64 session_id = 1;
+}
 
 message Empty{}
 
 message CommonResponse{
   bool success = 1;
   string error_msg = 2;
+  uint64 session_id = 3;
 }
 
 
@@ -298,7 +310,9 @@ message DataBlock {
   }
 }
 
-message ListDatabaseRequest {}
+message ListDatabaseRequest {
+  uint64 session_id = 1;
+}
 
 message ListDatabaseResponse{
   repeated string db_name = 1;
@@ -308,6 +322,7 @@ message ListDatabaseResponse{
 
 message DescribeDatabaseRequest {
   string db_name = 1;
+  uint64 session_id = 2;
 }
 
 message DescribeDatabaseResponse {
@@ -322,6 +337,7 @@ message ListTableRequest {
   string db_name = 1;
   bool success = 2;
   string error_msg = 3;
+  uint64 session_id = 4;
 }
 
 message ListTableResponse {
@@ -333,6 +349,7 @@ message ListTableResponse {
 
 message DescribeTableRequest {
   string db_name = 1;
+  uint64 session_id = 2;
 }
 
 message DescribeTableResponse {
@@ -345,11 +362,13 @@ message DescribeTableResponse {
 
 message GetDatabaseRequest {
   string db_name = 1;
+  uint64 session_id = 2;
 }
 
 message GetTableRequest {
   string db_name = 1;
   string table_name = 2;
+  uint64 session_id = 3;
 }
 
 message CreateIndexRequest {
@@ -360,6 +379,7 @@ message CreateIndexRequest {
   repeated string column_names = 5;
   repeated InitParameter index_para_list = 6;
   Options options = 7;
+  uint64 session_id = 8;
 }
 
 message InitParameter {
@@ -371,6 +391,7 @@ message DropIndexRequest {
   string db_name = 1;
   string table_name = 2;
   string index_name = 3;
+  uint64 session_id = 4;
 }
 
 
