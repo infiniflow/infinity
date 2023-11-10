@@ -1,4 +1,14 @@
-// #define ann_verbose 0
+
+
+/*
+ * This benchmark includes:
+ * 1. faiss IndexIVFFlatL2 (train, add, search)
+ * 2. faiss IndexIVFFlatIP (train, add, search)
+ * 3. ann_ivfflatl2 (train, add, search, save to / load from file)
+ * 4. ann_ivfflatip (train, add, search, save to / load from file)
+ */
+
+#define ann_verbose 0
 #include "base_profiler.h"
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
@@ -255,6 +265,38 @@ void benchmark_annivfflatl2(double t0,
         auto I = [ID](size_t i) { return ID[i].segment_offset_; };
         compute_recall(gt, I, nq, k);
     }
+    {
+        // test read/write file
+#ifdef ann_verbose
+        printf("[%.3f s] Save index to file\n", ann_benchmark_elapsed() - t0);
+#endif
+        const String save_file_tmp = "/tmp/benchmark_annivfflatl2_tmp";
+        ann_index_data->SaveIndex(save_file_tmp, MakeUnique<LocalFileSystem>());
+        ann_index_data.reset();
+#ifdef ann_verbose
+        printf("[%.3f s] Old index deleted. Loading index from file\n", ann_benchmark_elapsed() - t0);
+#endif
+        auto ann_index_data2 = AnnIVFFlatIndexData<f32>::LoadIndex(save_file_tmp, MakeUnique<LocalFileSystem>());
+#ifdef ann_verbose
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
+        AnnIVFFlatL2<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
+        test_ivf.Begin();
+        test_ivf.Search(ann_index_data2.get(), 0, n_probes);
+        test_ivf.End();
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        auto ID = test_ivf.GetIDs();
+        auto D = test_ivf.GetDistances();
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [ID](size_t i) { return ID[i].segment_offset_; };
+        compute_recall(gt, I, nq, k);
+    }
 }
 
 void benchmark_annivfflatip(double t0,
@@ -294,6 +336,38 @@ void benchmark_annivfflatip(double t0,
         AnnIVFFlatIP<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
         test_ivf.Begin();
         test_ivf.Search(ann_index_data.get(), 0, n_probes);
+        test_ivf.End();
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        auto ID = test_ivf.GetIDs();
+        auto D = test_ivf.GetDistances();
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [ID](size_t i) { return ID[i].segment_offset_; };
+        compute_recall(gt, I, nq, k);
+    }
+    {
+        // test read/write file
+#ifdef ann_verbose
+        printf("[%.3f s] Save index to file\n", ann_benchmark_elapsed() - t0);
+#endif
+        const String save_file_tmp = "/tmp/benchmark_annivfflatip_tmp";
+        ann_index_data->SaveIndex(save_file_tmp, MakeUnique<LocalFileSystem>());
+        ann_index_data.reset();
+#ifdef ann_verbose
+        printf("[%.3f s] Old index deleted. Loading index from file\n", ann_benchmark_elapsed() - t0);
+#endif
+        auto ann_index_data2 = AnnIVFFlatIndexData<f32>::LoadIndex(save_file_tmp, MakeUnique<LocalFileSystem>());
+#ifdef ann_verbose
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+#endif
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
+        AnnIVFFlatIP<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
+        test_ivf.Begin();
+        test_ivf.Search(ann_index_data2.get(), 0, n_probes);
         test_ivf.End();
         profiler.End();
         std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;

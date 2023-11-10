@@ -21,6 +21,7 @@ module;
 import stl;
 import index_def;
 import file_system;
+import file_system_type;
 import search_top_k;
 import kmeans_partition;
 import infinity_exception;
@@ -107,6 +108,13 @@ struct AnnIVFFlatIndexData {
         }
     }
 
+    void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
+        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        SaveIndexInner(*file_handler);
+        file_handler->Close();
+    }
+
     void ReadIndexInner(FileHandler &file_handler) {
         file_handler.Read(&metric_, sizeof(metric_));
         file_handler.Read(&dimension_, sizeof(dimension_));
@@ -124,6 +132,20 @@ struct AnnIVFFlatIndexData {
             vectors_[i].resize(dimension_ * vector_element_num);
             file_handler.Read(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
         }
+    }
+
+    static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndexInner(FileHandler &file_handler) {
+        auto index_data = MakeUnique<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>>(MetricType::kInvalid, 0, 0);
+        index_data->ReadIndexInner(file_handler);
+        return index_data;
+    }
+
+    static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
+        u8 file_flags = FileFlags::READ_FLAG;
+        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        auto index_data = LoadIndexInner(*file_handler);
+        file_handler->Close();
+        return index_data;
     }
 };
 
