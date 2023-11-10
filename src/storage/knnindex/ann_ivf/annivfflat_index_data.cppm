@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#define rectime 0
+// #define rectime 0
 #include <iomanip>
 #include <iostream>
 #include <sys/time.h>
@@ -134,11 +134,11 @@ void add_data_to_partition(u32 dimension,
                            AnnIVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data,
                            u32 id_begin = 0) {
     if (vector_count <= 0 || index_data == nullptr) {
-        std::cout << "\nwarning : vector_count <= 0 || index_data == nullptr" << std::endl;
+        Error<StorageException>("vector_count <= 0 || index_data == nullptr");
         return;
     }
     if (index_data->dimension_ != dimension) {
-        std::cerr << "\nError : index_data->dimension_ != dimension" << std::endl;
+        Error<StorageException>("index_data->dimension_ != dimension");
         return;
     }
     if (id_begin == 0)

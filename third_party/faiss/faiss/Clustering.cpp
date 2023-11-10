@@ -38,7 +38,7 @@ ClusteringParameters::ClusteringParameters()
           min_points_per_centroid(39),
           max_points_per_centroid(256),
           seed(1234),
-          decode_block_size(32768) {}
+          decode_block_size(32768) {verbose=true;}
 // 39 corresponds to 10000 / 256 -> to avoid warnings on PQ tests with randu10k
 
 Clustering::Clustering(int d, int k) : d(d), k(k) {}

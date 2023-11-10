@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#define rectime 0
+// #define rectime 0
 #include <algorithm>
 #include <cstring>
 #include <iomanip>
@@ -108,7 +108,7 @@ void k_means_partition_only_centroids(MetricType metric,
     constexpr int default_iteration_max = 10;
     constexpr bool b_debug_info = false;
     if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
-        std::cout << "metric type not implemented" << std::endl;
+        Error<ExecutorException>("metric type not implemented", __FILE_NAME__, __LINE__);
         return;
     }
 #ifdef rectime
@@ -173,16 +173,20 @@ void k_means_partition_only_centroids(MetricType metric,
         // u32 max_points_per_centroid = 256;
         if (u32 min_num = min_points_per_centroid * partition_num; vector_count < min_num) {
             // warning : too few vectors, less than min_points_per_centroid * partition_num
+#ifdef rectime
             std::cout << "warning : too few vectors, less than min_points_per_centroid (" << min_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << min_num << " vectors to train" << std::endl;
+#endif
         }
         if (u32 max_num = max_points_per_centroid * partition_num; vector_count > max_num) {
             // warning : too many vectors, more than max_points_per_centroid * partition_num
+#ifdef rectime
             std::cout << "warning : too many vectors, more than max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << max_num << " vectors to train" << std::endl;
             // warning : will randomly choose max_points_per_centroid * partition_num vectors to train
             std::cout << "warning : will randomly choose max_points_per_centroid (" << max_points_per_centroid << ") * partition_num ("
                       << partition_num << ") = " << max_num << " vectors to train" << std::endl;
+#endif
             training_data_num = max_num;
             // generate random training data
             {
