@@ -37,11 +37,18 @@ import parser;
 
 namespace infinity {
 
-Infinity::Infinity() : session_(Move(MakeShared<EmbeddedSession>())) {}
+Infinity::Infinity() : session_(Move(MakeShared<LocalSession>())) {}
 
-Infinity::~Infinity() { Disconnect(); }
+SharedPtr<Infinity> Infinity::RemoteConnect() {
+    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
+    infinity_ptr->session_ = MakeUnique<RemoteSession>();
+}
 
-SharedPtr<Infinity> Infinity::Connect(const String &path) {
+void Infinity::RemoteDisconnect() {
+    session_.reset();
+}
+
+SharedPtr<Infinity> Infinity::LocalConnect(const String &path) {
     LocalFileSystem fs;
     if (!fs.Exists(path)) {
         std::cerr << path << " doesn't exist." << std::endl;
@@ -55,11 +62,11 @@ SharedPtr<Infinity> Infinity::Connect(const String &path) {
 
     //    infinity_ptr->Init(config_path);
     Printf("Connect to database at: {}\n", path);
-    infinity_ptr->session_ = MakeUnique<EmbeddedSession>();
+    infinity_ptr->session_ = MakeUnique<LocalSession>();
     return infinity_ptr;
 }
 
-void Infinity::Disconnect() {
+void Infinity::LocalDisconnect() {
     Printf("To disconnect the database.\n");
     InfinityContext::instance().UnInit();
 }

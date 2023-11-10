@@ -33,9 +33,15 @@ export class Infinity {
 public:
     Infinity();
 
-    static SharedPtr<Infinity> Connect(const String &path);
+    ~Infinity() = default;
 
-    void Disconnect();
+    static SharedPtr<Infinity> RemoteConnect();
+
+    void RemoteDisconnect();
+
+    static SharedPtr<Infinity> LocalConnect(const String &path);
+
+    void LocalDisconnect();
 
     QueryResult CreateDatabase(const String &db_name, const CreateDatabaseOptions &options);
 
@@ -48,12 +54,8 @@ public:
     // For embedded sqllogictest
     QueryResult Query(const String& query_text);
 
-    ~Infinity();
-
 private:
-    SharedPtr<EmbeddedSession> session_{};
-
-    bool initialized_{false};
+    SharedPtr<SessionBase> session_{};
 };
 
 } // namespace infinity

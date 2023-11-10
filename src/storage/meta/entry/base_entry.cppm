@@ -58,9 +58,9 @@ public:
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
 public:
-    au64 txn_id_{0};
+    atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
-    au64 commit_ts_{UNCOMMIT_TS};
+    atomic_u64 commit_ts_{UNCOMMIT_TS};
 
     bool deleted_{false};
 
