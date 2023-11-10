@@ -590,10 +590,12 @@ Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<B
 
 Status LogicalPlanner::BuildPrepare(const PrepareStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     Error<PlannerException>("Prepare statement isn't supported.");
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildExecute(const ExecuteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     Error<PlannerException>("Execute statement isn't supported.");
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCopy(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -664,6 +666,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
 Status LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     Error<PlannerException>("Alter statement isn't supported.");
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -672,34 +675,27 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            if(use_command_info->db_name() == SYSTEM_DB_NAME) {
+            EntryResult result = txn->GetDatabase(use_command_info->db_name());
+            if (result.Success()) {
                 SharedPtr<LogicalNode> logical_command =
-                        MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
-                EntryResult result = txn->GetDatabase(use_command_info->db_name());
-                if (result.Success() or use_command_info->db_name() == SYSTEM_DB_NAME) {
-                    SharedPtr<LogicalNode> logical_command =
-                            MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
-
-                    this->logical_plan_ = logical_command;
-                } else {
-                    Error<PlannerException>(Format("Unknown database name:{}.", use_command_info->db_name()));
-                }
+                Error<PlannerException>(Format("Unknown database name:{}.", use_command_info->db_name()));
             }
             break;
         }
         case CommandType::kSet: {
             SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kExport: {
             SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
@@ -774,7 +770,6 @@ Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedP
     this->logical_plan_ = logical_show;
     return Status();
 }
-
 
 Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
