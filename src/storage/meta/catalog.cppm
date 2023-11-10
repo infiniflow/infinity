@@ -30,35 +30,49 @@ export module new_catalog;
 
 namespace infinity {
 
-template<typename T>
-class LimitedVector {
-public:
-    explicit LimitedVector(SizeT max_size) : max_size_(max_size) {
-        vector_.reserve(max_size);
-    }
-
-    void PushBack(T&& value) {
-        UniqueLock<Mutex> lk(lock_);
-        if (vector_.size() >= max_size_) {
-            vector_.erase(vector_.begin());
-        }
-        vector_.push_back(value);
-    }
-
-    T operator[](SizeT index) {
-        UniqueLock<Mutex> lk(lock_);
-        return vector_[index];
-    }
-
-    SizeT Size() {
-        LockGuard<Mutex> lock(lock_);
-        return vector_.size();
-    }
-
+class ProfileHistory {
 private:
     Mutex lock_{};
-    Vector<T> vector_;
-    SizeT max_size_;
+    Vector<SharedPtr<QueryProfiler>> queue;
+    int front;
+    int rear;
+    int maxSize;
+
+public:
+    ProfileHistory(int size) {
+        maxSize = size + 1;
+        queue.resize(maxSize);
+        front = 0;
+        rear = 0;
+    }
+
+    void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
+        UniqueLock<Mutex> lk(lock_);
+        if ((rear + 1) % maxSize == front) {
+            return;
+        }
+        queue[rear] = profiler;
+        rear = (rear + 1) % maxSize;
+    }
+
+    SharedPtr<QueryProfiler> Dequeue() {
+        UniqueLock<Mutex> lk(lock_);
+        if (front == rear) {
+            return nullptr;
+        }
+        SharedPtr<QueryProfiler> value = queue[front];
+        front = (front + 1) % maxSize;
+        return value;
+    }
+
+    QueryProfiler *GetElement(int index) {
+        UniqueLock<Mutex> lk(lock_);
+        if (index < 0 || index >= (rear - front + maxSize) % maxSize) {
+            return nullptr;
+        }
+        int actualIndex = (front + index) % maxSize;
+        return queue[actualIndex].get();
+    }
 };
 
 export struct NewCatalog {
@@ -103,14 +117,11 @@ public:
     void MergeFrom(NewCatalog &other);
 
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
-        records_.PushBack(Move(profiler));
+        history.Enqueue(Move(profiler));
     }
 
     const QueryProfiler *GetProfilerRecord(SizeT index) {
-        if (index >= records_.Size()) {
-            return nullptr;
-        }
-        return records_[index].get();
+        return history.GetElement(index);
     }
 public:
     SharedPtr<String> current_dir_{nullptr};
@@ -122,7 +133,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    LimitedVector<SharedPtr<QueryProfiler>> records_{ 100 };
+    ProfileHistory history{ 100 };
 };
 
 } // namespace infinity
