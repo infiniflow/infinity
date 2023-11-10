@@ -395,6 +395,7 @@ SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &in
     }
     return output_table;
 #endif
+    return nullptr;
 }
 
 } // namespace infinity

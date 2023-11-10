@@ -69,11 +69,17 @@ public:
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
+    [[nodiscard]] inline bool is_enable_profiler() const { return session_ptr_->options()->enable_profiling_; }
+
     [[nodiscard]] inline u64 memory_size_limit() const { return memory_size_limit_; }
 
     [[nodiscard]] inline u64 query_id() const { return query_id_; }
 
     [[nodiscard]] inline u64 max_node_id() const { return current_max_node_id_; }
+
+    void FlushProfiler(TaskProfiler &&profiler) {
+        query_metrics_->Flush(Move(profiler));
+    }
 
     inline void set_max_node_id(u64 node_id) { current_max_node_id_ = node_id; }
 
@@ -86,6 +92,12 @@ public:
     void CommitTxn();
 
     void RollbackTxn();
+
+    void TryMarkProfiler(const StatementType &type) const {
+        if (is_enable_profiler() && type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
+            session_ptr_->AppendProfilerRecord(query_metrics_);
+        }
+    }
 
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->txn(); }
 

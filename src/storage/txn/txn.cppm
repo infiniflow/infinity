@@ -111,6 +111,10 @@ public:
 
     BufferManager *GetBufferMgr() const;
 
+    NewCatalog *GetCatalog() {
+        return catalog_;
+    }
+
     inline u64 TxnID() const { return txn_id_; }
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }

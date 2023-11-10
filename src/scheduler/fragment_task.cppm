@@ -15,6 +15,7 @@
 module;
 
 import stl;
+import profiler;
 import operator_state;
 
 export module fragment_task;
@@ -79,6 +80,8 @@ public:
     [[nodiscard]] bool Ready() const;
 
     [[nodiscard]] bool IsComplete() const;
+
+    [[nodiscard]] TaskBinding TaskBinding() const;
 
     void TryCompleteFragment();
 

@@ -28,9 +28,10 @@ public:
     [[nodiscard]] inline bool IsOk() const { return status_.ok(); }
     [[nodiscard]] inline ErrorCode ErrorCode() const { return status_.code(); }
     [[nodiscard]] inline DataTable* ResultTable() const { return result_table_.get(); }
+    [[nodiscard]] inline const char *ErrorMsg() const { return status_.message(); }
 
-//    template<typename ObjectType>
-//    inline ObjectType* AsInfinity() { return static_cast<ObjectType*>(database_object_.get()); }
+    //    template<typename ObjectType>
+    //    inline ObjectType* AsInfinity() { return static_cast<ObjectType*>(database_object_.get()); }
 
 public:
     Status status_{};

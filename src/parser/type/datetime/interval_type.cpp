@@ -42,6 +42,7 @@ std::string IntervalType::ToString() const {
         }
     }
     ParserError("ToString() isn't implemented");
+    return std::string();
 }
 
 } // namespace infinity

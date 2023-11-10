@@ -181,6 +181,8 @@ BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryC
             Error<PlannerException>("Unexpected table type");
         }
     }
+
+    return nullptr;
 }
 
 SharedPtr<LogicalNode>

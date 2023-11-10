@@ -25,7 +25,11 @@ import parser;
 
 namespace infinity {
 
-QueryResult Table::CreateIndex(const String &index_name, Vector<String> *column_names, CreateIndexOptions create_index_options) {
+QueryResult Table::CreateIndex(const String &index_name,
+                               Vector<String> *column_names,
+                               const String &method_type,
+                               Vector<InitParameter *> *index_para_list,
+                               CreateIndexOptions create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().fragment_scheduler(),
@@ -38,6 +42,11 @@ QueryResult Table::CreateIndex(const String &index_name, Vector<String> *column_
     create_index_info->table_name_ = table_name_;
     create_index_info->index_name_ = index_name;
     create_index_info->column_names_ = column_names;
+    create_index_info->method_type_ = method_type;
+    create_index_info->index_para_list_ = index_para_list;
+
+    create_statement->create_info_ = create_index_info;
+    create_statement->create_info_->conflict_type_ = ConflictType::kIgnore;
 
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
@@ -55,6 +64,7 @@ QueryResult Table::DropIndex(const String &index_name) {
     drop_index_info->schema_name_ = session_->current_database();
     drop_index_info->table_name_ = table_name_;
     drop_index_info->index_name_ = index_name;
+    drop_statement->drop_info_ = drop_index_info;
 
     QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;
@@ -140,7 +150,7 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
                             InfinityContext::instance().resource_manager());
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
 
-    TableReference *table_ref = new TableReference();
+    auto *table_ref = new TableReference();
     table_ref->db_name_ = session_->current_database();
     table_ref->table_name_ = table_name_;
     select_statement->table_ref_ = table_ref;

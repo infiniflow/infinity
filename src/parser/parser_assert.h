@@ -16,6 +16,8 @@
 
 #include <exception>
 #include <string>
+#include <cstdint>
+#include <source_location>
 
 namespace infinity {
 
@@ -29,23 +31,27 @@ private:
 };
 
 #ifdef INFINITY_DEBUG
-#define ParserAssert(is_true, message)                                                                                                               \
-    if (!(is_true)) {                                                                                                                                \
-        const std::string path = __FILE__;                                                                                                           \
-        const auto pos = path.find("/core/");                                                                                                        \
-        if (pos != std::string::npos) {                                                                                                              \
-            path.substr(pos + 1);                                                                                                                    \
-        }                                                                                                                                            \
-                                                                                                                                                     \
-        std::string errmsg = std::string(message) + " @" + path + ":" + std::to_string(__LINE__);                                                    \
-        throw ParserException(errmsg);                                                                                                               \
+inline void ParserAssert(bool is_true,
+            const std::string &message,
+            const char *file_name = std::source_location::current().file_name(),
+            uint32_t line = std::source_location::current().line()) {
+    if (!(is_true)) {
+        std::string path = file_name;
+        const auto pos = path.find("/src/");
+        if (pos != std::string::npos) {
+            path = path.substr(pos + 1);
+        }
+
+        std::string errmsg = std::string(message) + " @" + path + ":" + std::to_string(line);
+        throw ParserException(errmsg);
     }
+}
 #else
-#define ParserAssert(is_true, message)                                                                                                               \
-    if (!(is_true)) {                                                                                                                                \
-        std::string errmsg = std::string(message);                                                                                                   \
-        throw ParserException(errmsg);                                                                                                               \
+inline void ParserAssert(bool is_true, const String &message) {
+    if (!(is_true)) {
+        throw ParserException(errmsg);
     }
+}
 #endif
 
 #define ParserError(message) ParserAssert(false, message)

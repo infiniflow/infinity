@@ -50,6 +50,7 @@ std::string EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
         default:
             ParserError("Unexpected embedding type");
     }
+    return std::string();
 }
 
 } // namespace infinity

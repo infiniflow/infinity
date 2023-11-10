@@ -49,13 +49,14 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
             Error<TypeException>(Format("Can't cast from DateTime type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct DateTimeTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
     }
 };
 
@@ -63,32 +64,32 @@ struct DateTimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
     }
 };
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, DateT &target) {
-    Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, TimeT &target) {
-        Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampT &target) {
-        Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        Error<FunctionException>(
-            "Not implemented");;
+    Error<FunctionException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

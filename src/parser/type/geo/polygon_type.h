@@ -115,7 +115,10 @@ public:
         bounding_box.lower_right.y = std::numeric_limits<double>::max();
     }
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); }
+    [[nodiscard]] inline std::string ToString() const {
+        ParserError("ToString() isn't implemented");
+        return std::string();
+    }
 };
 
 } // namespace infinity

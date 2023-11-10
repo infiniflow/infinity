@@ -62,6 +62,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
             Error<TypeException>(Format("Can't cast from Boolean to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 } // namespace infinity

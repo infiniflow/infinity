@@ -17,6 +17,7 @@ module;
 import stl;
 import fragment_task;
 import query_context;
+import profiler;
 import physical_operator;
 import physical_source;
 import physical_sink;
@@ -54,6 +55,10 @@ public:
 
     inline void IncreaseTask() { task_n_.fetch_add(1); }
 
+    inline void FlushProfiler(TaskProfiler &&profiler) {
+        query_context_->FlushProfiler(Move(profiler));
+    }
+
     inline void FinishTask() {
         u64 unfinished_task = task_n_.fetch_sub(1);
         auto sink_op = GetSinkOperator();
@@ -88,13 +93,15 @@ public:
 
     inline QueryContext *query_context() { return query_context_; }
 
+    inline PlanFragment *fragment_ptr() { return fragment_ptr_; }
+
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
 protected:
     virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
 protected:
-    au64 task_n_{0};
+    atomic_u64 task_n_{0};
 
     Mutex locker_{};
     CondVar cv_{};

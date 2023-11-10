@@ -41,10 +41,11 @@ private:
     void StartConnection(SharedPtr<Connection> &connection);
 
     atomic_bool initialized{false};
-    au64 running_connection_count_{0};
+    atomic_u64 running_connection_count_{0};
     AsioIOService io_service_{};
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
+    Thread grpc_thread_{};
 };
 
 }

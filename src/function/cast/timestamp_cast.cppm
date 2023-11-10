@@ -48,6 +48,7 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
             Error<TypeException>(Format("Can't cast from Timestamp type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct TimestampTryCastToFixlen {
@@ -55,6 +56,7 @@ struct TimestampTryCastToFixlen {
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -63,27 +65,32 @@ struct TimestampTryCastToVarlen {
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT source, DateT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT source, TimeT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT source, DateTimeT &target) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

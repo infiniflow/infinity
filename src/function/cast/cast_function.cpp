@@ -157,6 +157,7 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         default:
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
     }
+    return BoundCastFunc(nullptr);
 }
 
 } // namespace infinity
