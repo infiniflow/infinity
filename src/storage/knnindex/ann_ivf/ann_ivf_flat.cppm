@@ -15,7 +15,6 @@
 module;
 #include <algorithm>
 #include <functional>
-#include <iostream>
 import stl;
 import knn_distance;
 import parser;

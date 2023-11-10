@@ -13,10 +13,6 @@
 // limitations under the License.
 
 module;
-// #define rectime 0
-#include <iomanip>
-#include <iostream>
-#include <sys/time.h>
 
 import stl;
 import index_def;
@@ -29,13 +25,6 @@ import infinity_exception;
 export module annivfflat_index_data;
 
 namespace infinity {
-
-// from faiss
-double elapsed_334() {
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    return tv.tv_sec + tv.tv_usec * 1e-6;
-}
 
 export template <typename CentroidsDataType, typename VectorDataType = CentroidsDataType>
 struct AnnIVFFlatIndexData {
@@ -170,27 +159,10 @@ void add_data_to_partition(u32 dimension,
     auto &vectors = index_data->vectors_;
     auto &ids = index_data->ids_;
     Vector<u32> assigned_partition_id(vector_count);
-    // record time
-#ifdef rectime
-    f64 t0;
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << ((t0 = elapsed_334()), 0.0) << " s] "
-              << "input vectors classification begin.\n"
-              << "##################################################" << std::endl;
-#endif
 
     // Classify vectors
     // search_top_1
     search_top_1_without_dis<f32>(dimension, vector_count, vectors_ptr, partition_num, centroids.data(), assigned_partition_id.data());
-
-#ifdef rectime
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << elapsed_334() - t0 << " s] "
-              << "input vectors classification finished.\n"
-              << "##################################################" << std::endl;
-#endif
 
     Vector<u32> partition_element_count(partition_num);
     // calculate partition_element_count
@@ -211,14 +183,6 @@ void add_data_to_partition(u32 dimension,
     }
     // update data_num_
     index_data->data_num_ += vector_count;
-
-#ifdef rectime
-    std::cout << "\n"
-              << "##################################################\n"
-              << "[" << std::fixed << std::setprecision(3) << elapsed_334() - t0 << " s] "
-              << "input vectors insertion finished.\n"
-              << "##################################################" << std::endl;
-#endif
 }
 
 } // namespace infinity

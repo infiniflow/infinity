@@ -8,7 +8,7 @@
  * 4. ann_ivfflatip (train, add, search, save to / load from file)
  */
 
-#define ann_verbose 0
+// #define ann_verbose 0
 #include "base_profiler.h"
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
@@ -28,15 +28,10 @@ import annivfflat_index_data;
 import parser;
 import local_file_system;
 
-static const char *sift1m_train = "/home/yzq/sift1M/sift_learn.fvecs";
-static const char *sift1m_base = "/home/yzq/sift1M/sift_base.fvecs";
-static const char *sift1m_query = "/home/yzq/sift1M/sift_query.fvecs";
-static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivecs";
-
-// static const char *sift1m_train = "./test/data/fvecs/sift_learn.fvecs";
-// static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
-// static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
-// static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
+static const char *sift1m_train = "./test/data/fvecs/sift_learn.fvecs";
+static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
+static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
+static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
 
 using namespace infinity;
 
