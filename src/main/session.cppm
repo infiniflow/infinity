@@ -44,8 +44,6 @@ public:
 
     inline static u64 GetNextSessionID() { return ++session_id_generator_; }
 
-    inline Txn*& txn() { return txn_; }
-
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
         txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
     }
