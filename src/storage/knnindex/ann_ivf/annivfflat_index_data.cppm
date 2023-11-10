@@ -166,8 +166,8 @@ void add_data_to_partition(u32 dimension,
 
     Vector<u32> partition_element_count(partition_num);
     // calculate partition_element_count
-    for (auto i : assigned_partition_id)
-        ++partition_element_count[i];
+    for (u32 i = 0; i < vector_count; ++i)
+        ++partition_element_count[assigned_partition_id[i]];
     // Reserve space
     for (u32 i = 0; i < partition_num; ++i) {
         vectors[i].reserve(vectors[i].size() + partition_element_count[i] * dimension);
