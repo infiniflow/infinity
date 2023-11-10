@@ -25,12 +25,15 @@ export const String profile_history_capacity_name = "profile_history_capacity";
 export const String enable_profiling_name = "enable_profile";
 
 export struct SessionOptions {
-    bool enable_profiling_{false};    // enable_profile
+    inline bool enable_profiling() const { return enable_profiling_; }
+    inline u64 profile_history_capacity() const { return profile_history_capacity_; }
+
+    bool enable_profiling_{false};      // enable_profile
     u64 profile_history_capacity_{128}; // profile_history_capacity
 };
 
 export struct SystemOptions {
-// General
+    // General
     String version{};
     String time_zone{};
     i32 time_zone_bias{};
@@ -48,23 +51,23 @@ export struct SystemOptions {
     u32 sdk_port{};
 
     // Log
-    SharedPtr <String> log_filename{MakeShared<String>("infinity.log")};
-    SharedPtr <String> log_dir{};
-    SharedPtr <String> log_file_path{};
+    SharedPtr<String> log_filename{MakeShared<String>("infinity.log")};
+    SharedPtr<String> log_dir{};
+    SharedPtr<String> log_file_path{};
     bool log_to_stdout{};
     u64 log_max_size{};
     SizeT log_file_rotate_count{};
     LogLevel log_level{};
-//    spdlog::level::level_enum log_level{spdlog::level::info};
+    //    spdlog::level::level_enum log_level{spdlog::level::info};
 
     // Storage
-    SharedPtr <String> data_dir{};
-    SharedPtr <String> wal_dir{};
+    SharedPtr<String> data_dir{};
+    SharedPtr<String> wal_dir{};
     u64 default_row_size{};
 
     // Buffer
     u64 buffer_pool_size{};
-    SharedPtr <String> temp_dir{};
+    SharedPtr<String> temp_dir{};
 
     // Wal
     u64 wal_size_threshold_{};
@@ -74,4 +77,4 @@ export struct SystemOptions {
     u64 delta_checkpoint_interval_wal_bytes_{};
 };
 
-}
+} // namespace infinity
