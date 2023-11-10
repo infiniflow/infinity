@@ -113,6 +113,8 @@ struct AnnIVFFlatIndexData {
         file_handler.Read(&partition_num_, sizeof(partition_num_));
         file_handler.Read(&data_num_, sizeof(data_num_));
         centroids_.resize(dimension_ * partition_num_);
+        ids_.resize(partition_num_);
+        vectors_.resize(partition_num_);
         file_handler.Read(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
         u32 vector_element_num;
         for (u32 i = 0; i < partition_num_; ++i) {

@@ -88,6 +88,8 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
+    // TODO: now use ivfflat_index_def->metric_type_.
+    //  CreateAnnIVFFlatPara maybe unnecessary.
     auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
     switch (GetType()) {
         case kElemFloat: {
