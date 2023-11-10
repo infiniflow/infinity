@@ -116,11 +116,11 @@ void search_top_1_with_sgemm(u32 dimension,
                 _mm256_storeu_ps(min_distances_scalar, min_distances);
                 _mm256_storeu_si256((__m256i *)(min_indices_scalar), min_indices);
 
-                f32 current_min_distance = std::numeric_limits<f32>::max();
-                ID current_min_index{};
+                f32 current_min_distance = distances[x_id];
+                ID current_min_index = labels[x_id];
 
                 for (u32 jv = 0; jv < 8; ++jv) {
-                    f32 distance_candidate = min_distances_scalar[jv] + square_x[i];
+                    f32 distance_candidate = min_distances_scalar[jv] + square_x[x_id];
 
                     if (distance_candidate < 0)
                         distance_candidate = 0;
@@ -145,8 +145,10 @@ void search_top_1_with_sgemm(u32 dimension,
                         current_min_index = j + y_part_begin;
                     }
                 }
-                distances[x_id] = current_min_distance;
-                labels[x_id] = current_min_index;
+                if (distances[x_id] > current_min_distance) {
+                    distances[x_id] = current_min_distance;
+                    labels[x_id] = current_min_index;
+                }
             }
         }
     }

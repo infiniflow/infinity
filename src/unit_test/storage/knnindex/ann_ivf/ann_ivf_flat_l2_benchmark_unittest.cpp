@@ -253,7 +253,7 @@ void benchmark_faiss_ivfflatip() {
     // std::cout << "max omp threads: " << omp_get_max_threads() << std::endl;
     double t0 = elapsed();
 
-    faiss::IndexFlatIP *quantizer;
+    faiss::IndexFlatL2 *quantizer;
     // faiss::Index *index;
     faiss::IndexIVFFlat *index;
 
@@ -266,7 +266,7 @@ void benchmark_faiss_ivfflatip() {
         float *xt = fvecs_read(sift1m_train, &d, &nt);
 
         // printf("[%.3f s] Preparing index \"%s\" d=%ld\n", elapsed() - t0, index_key, d);
-        quantizer = new faiss::IndexFlatIP(d);
+        quantizer = new faiss::IndexFlatL2(d);
         quantizer->verbose = true;
 
         n_lists = (size_t)sqrt(nt);
@@ -527,7 +527,7 @@ void benchmark_annivfflatl2() {
         printf("R@100 = %.4f\n", n_100 / float(nq * 100));
 
         std::cout << "\n######################################\n" << std::endl;
-        if (false) {
+        if (true) {
             // compare I1,I2, D1,D2
             {
                 std::cout << "############################" << std::endl;
@@ -663,6 +663,7 @@ void benchmark_annivfflatip() {
 
         int n_1 = 0, n_10 = 0, n_100 = 0;
         for (int i = 0; i < nq; i++) {
+            int n_1_ = 0, n_10_ = 0, n_100_ = 0;
             std::unordered_set<int32_t> gt1, gt10, gt100;
             for (int j = 0; j < k; ++j) {
                 int32_t gt_id = gt[i * k + j];
@@ -679,15 +680,18 @@ void benchmark_annivfflatip() {
             for (int j = 0; j < k; j++) {
                 int32_t result_id = I3[i * k + j].segment_offset_;
                 if (j < 1 && gt1.contains(result_id)) {
-                    ++n_1;
+                    ++n_1_;
                 }
                 if (j < 10 && gt10.contains(result_id)) {
-                    ++n_10;
+                    ++n_10_;
                 }
                 if (j < 100 && gt100.contains(result_id)) {
-                    ++n_100;
+                    ++n_100_;
                 }
             }
+            n_1 += n_1_;
+            n_10 += n_10_;
+            n_100 += n_100_;
         }
         // output n_1, n_10, n_100
         std::cout << "############################" << std::endl;

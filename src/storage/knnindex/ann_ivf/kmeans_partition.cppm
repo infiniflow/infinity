@@ -80,6 +80,24 @@ Vector<u32> random_permutation_id_partially(u32 vector_count, u32 random_num = 0
 // normalize centroids
 template <typename CentroidType>
 inline void normalize_centroids(u32 dimension, u32 partition_num, CentroidType *centroids) {
+    // TODO:remove this
+    if constexpr (false) {
+        // output "before normalize"
+        std::cout << "before normalize" << std::endl;
+        // output norm of first 3 centroids
+        for (u32 i = 0; i < 3; ++i) {
+            std::cout << "norm of centroid " << i << ": " << std::fixed << std::setprecision(10)
+                      << IPDistance<f32>(centroids + i * dimension, centroids + i * dimension, dimension) << std::endl;
+        }
+        // output content of first 3 centroids per line
+        for (u32 i = 0; i < 3; ++i) {
+            std::cout << "content of centroid " << i << ": ";
+            for (u32 j = 0; j < dimension; ++j) {
+                std::cout << centroids[i * dimension + j] << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
     for (u32 i = 0; i < partition_num; ++i) {
         CentroidType *centroid = centroids + i * dimension;
         f32 square = IPDistance<f32>(centroid, centroid, dimension);
@@ -88,6 +106,37 @@ inline void normalize_centroids(u32 dimension, u32 partition_num, CentroidType *
             for (u32 j = 0; j < dimension; ++j) {
                 centroid[j] *= div;
             }
+        }
+    }
+    // TODO:remove this
+    if constexpr (false) {
+        // output "after normalize"
+        std::cout << "after normalize" << std::endl;
+        // output norm of first 3 centroids
+        for (u32 i = 0; i < 3; ++i) {
+            std::cout << "norm of centroid " << i << ": " << std::fixed << std::setprecision(10)
+                      << IPDistance<f32>(centroids + i * dimension, centroids + i * dimension, dimension) << std::endl;
+        }
+        // output norm of centroids 313, 314, 315 per line
+        for (u32 i = 313; i < 316; ++i) {
+            std::cout << "norm of centroid " << i << ": " << std::fixed << std::setprecision(10)
+                      << IPDistance<f32>(centroids + i * dimension, centroids + i * dimension, dimension) << std::endl;
+        }
+        // output content of first 3 centroids per line
+        for (u32 i = 0; i < 3; ++i) {
+            std::cout << "content of centroid " << i << ": ";
+            for (u32 j = 0; j < dimension; ++j) {
+                std::cout << centroids[i * dimension + j] << " ";
+            }
+            std::cout << std::endl;
+        }
+        // output content of centroids 313, 314, 315 per line
+        for (u32 i = 313; i < 316; ++i) {
+            std::cout << "content of centroid " << i << ": ";
+            for (u32 j = 0; j < dimension; ++j) {
+                std::cout << centroids[i * dimension + j] << " ";
+            }
+            std::cout << std::endl;
         }
     }
 }
@@ -281,11 +330,48 @@ void k_means_partition_only_centroids(MetricType metric,
                                   centroids,
                                   training_data_partition_id.data(),
                                   partition_element_distance.data());
+            // TODO:remove this
+            if constexpr (false) {
+
+                // output training_data_partition_id of 1000, 1001, 1002
+                std::cout << "training_data_partition_id of 1000, 1001, 1002" << std::endl;
+                std::cout << training_data_partition_id[1000] << " " << training_data_partition_id[1001] << " " << training_data_partition_id[1002]
+                          << std::endl;
+                // output training_data_partition_id of 80000, 80001, 80002
+                std::cout << "training_data_partition_id of 80000, 80001, 80002" << std::endl;
+                std::cout << training_data_partition_id[80000] << " " << training_data_partition_id[80001] << " " << training_data_partition_id[80002]
+                          << std::endl;
+                // output partition_element_distance of 1000, 1001, 1002
+                std::cout << "partition_element_distance of 1000, 1001, 1002" << std::endl;
+                std::cout << partition_element_distance[1000] << " " << partition_element_distance[1001] << " " << partition_element_distance[1002]
+                          << std::endl;
+                // output partition_element_distance of 80000, 80001, 80002
+                std::cout << "partition_element_distance of 80000, 80001, 80002" << std::endl;
+                std::cout << partition_element_distance[80000] << " " << partition_element_distance[80001] << " " << partition_element_distance[80002]
+                          << std::endl;
+            }
+
             // Clear partition_element_count
             memset(partition_element_count.data(), 0, sizeof(u32) * partition_num);
             // calculate partition_element_count
             for (auto i : training_data_partition_id)
                 ++partition_element_count[i];
+
+            // TODO:remove this
+            if constexpr (false) {
+                // output partition_element_count content
+                std::cout << "partition_element_count content" << std::endl;
+                for (u32 i = 0; i < partition_num; ++i) {
+                    std::cout << partition_element_count[i] << " ";
+                }
+                std::cout << std::endl;
+                // output sum of partition_element_count
+                u32 sum = 0;
+                for (u32 i = 0; i < partition_num; ++i) {
+                    sum += partition_element_count[i];
+                }
+                std::cout << "sum of partition_element_count: " << sum << std::endl;
+            }
 
             // add distance to this_iter_distance
             this_iter_distance += std::reduce(partition_element_distance.begin(), partition_element_distance.end());
