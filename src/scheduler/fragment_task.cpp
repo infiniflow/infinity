@@ -15,6 +15,8 @@
 module;
 
 import fragment_context;
+import profiler;
+import plan_fragment;
 import stl;
 import third_party;
 import logger;
@@ -49,20 +51,27 @@ void FragmentTask::OnExecute(i64 worker_id) {
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
+    bool enable_profiler = fragment_context->query_context()->is_enable_profiler();
+    TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+    profiler.Begin();
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
+            profiler.StartOperator(operator_refs[op_idx]);
             operator_refs[op_idx]->Execute(fragment_context->query_context(),
                                            operator_states_[op_idx].get());
+            profiler.StopOperator(operator_states_[op_idx].get());
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
     }
-
+    profiler.End();
     if (sink_state_->error_message_.get() == nullptr and err_msg.get() != nullptr) {
         sink_state_->error_message_ = Move(err_msg);
     } else {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
+
+        fragment_context->FlushProfiler(Move(profiler));
         sink_op->Execute(fragment_context->query_context(), sink_state_.get());
     }
 }
@@ -77,6 +86,15 @@ bool FragmentTask::IsComplete() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     PhysicalSink *sink_op = fragment_context->GetSinkOperator();
     return sink_state_->prev_op_state_->Complete();
+}
+
+TaskBinding FragmentTask::TaskBinding() const {
+    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+    struct TaskBinding binding{};
+
+    binding.task_id_ = task_id_;
+    binding.fragment_id_ = fragment_context->fragment_ptr()->FragmentID();
+    return binding;
 }
 
 void FragmentTask::TryCompleteFragment() {

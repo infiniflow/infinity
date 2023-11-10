@@ -18,6 +18,8 @@ import stl;
 import txn;
 import config;
 import options;
+import profiler;
+import new_catalog;
 
 export module session;
 
@@ -41,6 +43,16 @@ public:
     inline Txn *&txn() { return txn_; }
 
     inline static u64 GetNextSessionID() { return ++session_id_generator_; }
+
+    inline Txn*& txn() { return txn_; }
+
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
+    }
+
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        return txn_->GetCatalog()->GetProfilerRecord(index);
+    }
 
 protected:
     // Current schema

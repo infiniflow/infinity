@@ -24,10 +24,56 @@ import function_set;
 import table_function;
 import third_party;
 import buffer_manager;
+import profiler;
 
 export module new_catalog;
 
 namespace infinity {
+
+class ProfileHistory {
+private:
+    Mutex lock_{};
+    Vector<SharedPtr<QueryProfiler>> queue;
+    int front;
+    int rear;
+    int maxSize;
+
+public:
+    ProfileHistory(int size) {
+        maxSize = size + 1;
+        queue.resize(maxSize);
+        front = 0;
+        rear = 0;
+    }
+
+    void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
+        UniqueLock<Mutex> lk(lock_);
+        if ((rear + 1) % maxSize == front) {
+            return;
+        }
+        queue[rear] = profiler;
+        rear = (rear + 1) % maxSize;
+    }
+
+    SharedPtr<QueryProfiler> Dequeue() {
+        UniqueLock<Mutex> lk(lock_);
+        if (front == rear) {
+            return nullptr;
+        }
+        SharedPtr<QueryProfiler> value = queue[front];
+        front = (front + 1) % maxSize;
+        return value;
+    }
+
+    QueryProfiler *GetElement(int index) {
+        UniqueLock<Mutex> lk(lock_);
+        if (index < 0 || index >= (rear - front + maxSize) % maxSize) {
+            return nullptr;
+        }
+        int actualIndex = (front + index) % maxSize;
+        return queue[actualIndex].get();
+    }
+};
 
 export struct NewCatalog {
 public:
@@ -70,6 +116,13 @@ public:
 
     void MergeFrom(NewCatalog &other);
 
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        history.Enqueue(Move(profiler));
+    }
+
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        return history.GetElement(index);
+    }
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
@@ -80,6 +133,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
+    ProfileHistory history{ 100 };
 };
 
 } // namespace infinity

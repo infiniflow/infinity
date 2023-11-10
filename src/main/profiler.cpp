@@ -18,6 +18,9 @@ module;
 
 import stl;
 import third_party;
+import physical_operator;
+import plan_fragment;
+import operator_state;
 
 import infinity_exception;
 
@@ -77,6 +80,36 @@ String OptimizerProfiler::ToString(SizeT intent) const {
     return result;
 }
 
+void TaskProfiler::StartOperator(const PhysicalOperator *op) {
+    if (!enable_) {
+        return;
+    }
+    if (active_operator_ != nullptr) {
+        Error<ProfilerException>("Attempting to call StartOperator while another operator is active.", __FILE_NAME__, __LINE__);
+    }
+    active_operator_ = op;
+    profiler_.Begin();
+}
+void TaskProfiler::StopOperator(const OperatorState *operator_state) {
+    if (!enable_) {
+        return;
+    }
+    if (active_operator_ == nullptr) {
+        Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
+    }
+    profiler_.End();
+
+    auto output_block = operator_state->data_block_;
+    auto input_rows = operator_state->prev_op_state_ ? operator_state->prev_op_state_->data_block_->row_count() : 0;
+    auto output_data_size = output_block && output_block->Finalized() ? output_block->GetSizeInBytes() : 0;
+    auto output_rows = output_block ? output_block->row_count() : 0;
+
+    OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
+
+    timings_.push_back(Move(info));
+    active_operator_ = nullptr;
+}
+
 String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
     switch (phase) {
         case QueryPhase::kParser: {
@@ -104,6 +137,9 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {
+    if (!enable_) {
+        return;
+    }
     SizeT phase_idx = EnumInteger(phase);
 
     // Validate current query phase.
@@ -118,6 +154,10 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
 }
 
 void QueryProfiler::StopPhase(QueryPhase phase) {
+    if (!enable_) {
+        return;
+    }
+
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
         Error<ExecutorException>("Query phase isn't started, yet");
@@ -125,6 +165,39 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     current_phase_ = QueryPhase::kInvalid;
     profilers_[EnumInteger(phase)].End();
+}
+
+void QueryProfiler::Flush(TaskProfiler &&profiler) {
+    if (!enable_) {
+        return;
+    }
+
+    UniqueLock<Mutex> lk(flush_lock_);
+    records_[profiler.binding_.fragment_id_][profiler.binding_.task_id_].push_back(profiler);
+}
+
+void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
+    for (const auto &fragment : records_) {
+        ss << "Fragment #" << fragment.first << std::endl;
+        for (const auto &task : fragment.second) {
+            ss << "|- Task #" << task.first << std::endl;
+            SizeT times = 0;
+            for (const auto &operators : task.second) {
+                ss << "  |- Times: " << times << std::endl;
+                for (const auto &op : operators.timings_) {
+                    ss << "    -> " << op.name_
+                       << ": BeginTime: " << op.start_
+                       << ": EndTime: " << op.end_
+                       << ": ElapsedTime: " << op.elapsed_
+                       << ", InputRows: " << op.input_rows_
+                       << ", OutputRows: " << op.output_rows_
+                       << ", OutputDataSize: " << op.output_data_size_
+                       << std::endl;
+                }
+                times ++;
+            }
+        }
+    }
 }
 
 String QueryProfiler::ToString() const {
@@ -147,8 +220,75 @@ String QueryProfiler::ToString() const {
         if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kOptimizer) {
             ss << optimizer_.ToString(4) << std::endl;
         }
+        if (magic_enum::enum_value<QueryPhase>(idx) == QueryPhase::kExecution) {
+            ExecuteRender(ss);
+        }
     }
     return ss.str();
+}
+
+Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
+    Json json;
+
+    i64 total = 0;
+    for (const auto &fragment : profiler->records_) {
+        Json json_fragments;
+        json_fragments["fragment_id"] = fragment.first;
+
+        i64 fragment_start = std::numeric_limits<i64>::max();
+        i64 fragment_end = 0;
+        i64 fragment_total = 0;
+        for (const auto &task : fragment.second) {
+            Json json_tasks;
+            SizeT times = 0;
+            json_tasks["task_id"] = task.first;
+
+            i64 task_start = std::numeric_limits<i64>::max();
+            i64 task_end = 0;
+            i64 task_total = 0;
+            for (const auto &operators : task.second) {
+                task_start = Min(task_start, operators.task_profiler_.GetBegin());
+                task_end = Max(task_end, operators.task_profiler_.GetEnd());
+                task_total += operators.task_profiler_.Elapsed();
+
+                Json json_operators;
+                json_operators["times"] = times;
+                for (const auto &op : operators.timings_) {
+                    Json json_info;
+                    json_info["name"] = op.name_;
+                    json_info["start"] = op.start_;
+                    json_info["end"] = op.end_;
+                    json_info["elapsed"] = op.elapsed_;
+                    json_info["input_rows"] = op.input_rows_;
+                    json_info["output_rows"] = op.output_rows_;
+                    json_info["output_data_size"] = op.output_data_size_;
+                    json_operators["infos"].push_back(json_info);
+                }
+                times ++;
+                json_tasks["operators"].push_back(json_operators);
+            }
+            json_tasks["task_start"] = task_start;
+            json_tasks["task_end"] = task_end;
+            json_tasks["task_total"] = task_total;
+
+            fragment_start = Min(fragment_start, task_start);
+            fragment_end = Max(fragment_end, task_end);
+            fragment_total += task_total;
+
+            json_fragments["tasks"].push_back(json_tasks);
+        }
+        total += fragment_total;
+
+        json_fragments["fragment_start"] = fragment_start;
+        json_fragments["fragment_end"] = fragment_end;
+        json_fragments["fragment_total"] = fragment_total;
+
+        json["fragments"].push_back(json_fragments);
+    }
+    json["total"] = total;
+    json["time_unit"] = "ns";
+
+    return json;
 }
 
 } // namespace infinity
