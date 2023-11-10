@@ -139,6 +139,11 @@ class Not : public filter, public AllDocsProvider {
     return static_cast<type&>(*filter_);
   }
 
+  void set_filter(filter::ptr &&filter) {
+      IRS_ASSERT(filter);
+      filter_ = std::move(filter);
+  }
+
   void clear() { filter_.reset(); }
   bool empty() const { return nullptr == filter_; }
 

@@ -22,6 +22,7 @@
 *.exe
 *.gch
 *.gz
+*.l.cc
 *.la
 *.lai
 *.lib
@@ -32,6 +33,7 @@
 *.obj
 *.orig
 *.out
+*.output
 *.pb.h
 *.pb.cc
 *.pch
@@ -39,15 +41,19 @@
 *.slo
 *.smod
 *.so
+*.tab.c
+*.tab.h
+*.tab.cc
+*.tab.hh
 *.tar
 *.tgz
 *.xz
 
 
-# Clion
+# build directory of Gradle, CMake etc
+tmp
 build
 cmake-build-*
-Infinity.xml
 
 # ignore compilation configure file
 src/bin/compilation_config.h
@@ -61,17 +67,17 @@ lexer.cpp
 lexer.h
 parser.cpp
 parser.h
+location.h
+location.hh
+query_lexer.h
+query_lexer.cpp
+query_parser.h
+query_parser.cpp
 
 test/data/csv/*big*.csv
 test/sql/**/*big*.slt
 test/data/fvecs/
 test/sql/**/*fvecs*.slt
-
-#clang-format
-clang-format-all
-
-#a place for any file unwant to commit
-tmp/
 
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
