@@ -34,12 +34,12 @@ class ProfileHistory {
 private:
     Mutex lock_{};
     Vector<SharedPtr<QueryProfiler>> queue;
-    int front;
-    int rear;
-    int max_size;
+    SizeT front;
+    SizeT rear;
+    SizeT max_size;
 
 public:
-    ProfileHistory(int size) {
+    ProfileHistory(SizeT size) {
         max_size = size + 1;
         queue.resize(max_size);
         front = 0;
@@ -55,12 +55,12 @@ public:
         rear = (rear + 1) % max_size;
     }
 
-    QueryProfiler *GetElement(int index) {
+    QueryProfiler *GetElement(SizeT index) {
         UniqueLock<Mutex> lk(lock_);
         if (index < 0 || index >= (rear - front + max_size) % max_size) {
             return nullptr;
         }
-        int actualIndex = (front + index) % max_size;
+        SizeT actualIndex = (front + index) % max_size;
         return queue[actualIndex].get();
     }
 
@@ -69,7 +69,7 @@ public:
         elements.reserve(max_size);
 
         UniqueLock<Mutex> lk(lock_);
-        for (int i = 0; i < queue.size(); ++i) {
+        for (SizeT i = 0; i < queue.size(); ++i) {
             if (queue[i].get() != nullptr) {
                 elements.push_back(queue[i]);
             }

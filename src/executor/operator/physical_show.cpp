@@ -425,12 +425,12 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
-    for (int i = 0; i < records.size(); ++i) {
+    for (SizeT i = 0; i < records.size(); ++i) {
         i64 total_cost = 0;
         ValueExpression value_expr(Value::MakeVarchar(Format("{}", i)));
 
         value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-        for (int j = 0; j < 7; ++j) {
+        for (SizeT j = 0; j < 7; ++j) {
             i64 this_time = total_cost;
             if (j != 6) {
                 this_time = records[i]->ElapsedAt(j);
