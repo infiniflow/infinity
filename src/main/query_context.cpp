@@ -15,6 +15,7 @@
 module;
 
 #include <sstream>
+//#include "gperftools/profiler.h"
 
 import stl;
 import session;
@@ -89,6 +90,7 @@ QueryResult QueryContext::Query(const String &query) {
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     QueryResult query_result;
+//    ProfilerStart("Query");
     try {
         this->CreateTxn();
         this->BeginTxn();
@@ -132,6 +134,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_result.result_table_ = nullptr;
         query_result.status_.Init(ErrorCode::kError, e.what());
     }
+//    ProfilerStop();
     return query_result;
 }
 

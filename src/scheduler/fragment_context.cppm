@@ -101,7 +101,7 @@ protected:
     virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
 protected:
-    au64 task_n_{0};
+    atomic_u64 task_n_{0};
 
     Mutex locker_{};
     CondVar cv_{};

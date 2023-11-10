@@ -43,8 +43,8 @@ public:
     }
 
 private:
-    au64 total_cpu_count_;
-    au64 total_memory_;
+    atomic_u64 total_cpu_count_;
+    atomic_u64 total_memory_;
 };
 
 } // namespace infinity

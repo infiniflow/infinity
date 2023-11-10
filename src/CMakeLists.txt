@@ -212,6 +212,7 @@ target_link_libraries(infinity
         newpfor
         openfst
         iresearch
+#        profiler
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -326,6 +327,7 @@ target_link_libraries(unit_test
         newpfor
         openfst
         iresearch
+#        profiler
 )
 
 target_sources(unit_test
