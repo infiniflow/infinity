@@ -1,0 +1,286 @@
+
+#include "../third_party/mlas/inc/mlas.h"
+#include "faiss/Index.h"
+#include "faiss/IndexFlat.h"
+#include "faiss/IndexIVF.h"
+#include "faiss/IndexIVFFlat.h"
+#include "helper.h"
+#include <cmath>
+#include <cstdio>
+#include <iostream>
+#include <sys/time.h>
+
+import stl;
+import ann_ivf_flat;
+import index_def;
+import annivfflat_index_data;
+import parser;
+
+static const char *sift1m_train = "/home/yzq/sift1M/sift_learn.fvecs";
+static const char *sift1m_base = "/home/yzq/sift1M/sift_base.fvecs";
+static const char *sift1m_query = "/home/yzq/sift1M/sift_query.fvecs";
+static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivecs";
+
+using namespace infinity;
+
+float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out);
+
+int *ivecs_read(const char *fname, size_t *d_out, size_t *n_out);
+
+double ann_benchmark_elapsed() {
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return tv.tv_sec + tv.tv_usec * 1e-6;
+}
+
+template <typename T1, typename T2>
+void compute_recall(const T1 *Igt, const T2 I_comp, size_t nq, size_t k) {
+    int n_1 = 0, n_10 = 0, n_100 = 0;
+    for (int i = 0; i < nq; i++) {
+        std::unordered_set<int32_t> gt1, gt10, gt100;
+        for (int j = 0; j < k; ++j) {
+            auto gt_id = Igt[i * k + j];
+            if (j < 1) {
+                gt1.insert(gt_id);
+            }
+            if (j < 10) {
+                gt10.insert(gt_id);
+            }
+            if (j < 100) {
+                gt100.insert(gt_id);
+            }
+        }
+        for (int j = 0; j < k; j++) {
+            auto result_id = I_comp(i * k + j);
+            if (j < 1 && gt1.contains(result_id)) {
+                ++n_1;
+            }
+            if (j < 10 && gt10.contains(result_id)) {
+                ++n_10;
+            }
+            if (j < 100 && gt100.contains(result_id)) {
+                ++n_100;
+            }
+        }
+    }
+    // output n_1, n_10, n_100
+    std::cout << "############################" << std::endl;
+    std::cout << "n_1: " << n_1 << std::endl;
+    std::cout << "n_10: " << n_10 << std::endl;
+    std::cout << "n_100: " << n_100 << std::endl;
+    std::cout << "############################" << std::endl;
+    printf("R@1 = %.4f\n", n_1 / float(nq));
+    printf("R@10 = %.4f\n", n_10 / float(nq * 10));
+    printf("R@100 = %.4f\n", n_100 / float(nq * 100));
+    std::cout << "############################" << std::endl;
+}
+
+std::pair<int64_t *, float *> benchmark_faiss_ivfflatl2(double t0,
+                                                        size_t d,
+                                                        size_t nt,
+                                                        const float *xt,
+                                                        size_t nb,
+                                                        const float *xb,
+                                                        size_t nq,
+                                                        const float *xq,
+                                                        int k,
+                                                        const int *gt,
+                                                        size_t n_probes,
+                                                        size_t n_centroids) {
+    auto *I_faiss_l2 = new int64_t[nq * k];
+    auto *D_faiss_l2 = new float[nq * k];
+    auto *quantizer = new faiss::IndexFlatL2(d);
+    quantizer->verbose = true;
+    auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_L2);
+    index->verbose = true;
+    {
+        printf("[%.3f s] Training on %ld vectors\n, with %d centroids", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        index->train(nt, xt);
+    }
+    {
+        printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+        index->add(nb, xb);
+    }
+    {
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        faiss::IVFSearchParameters p;
+        p.nprobe = n_probes;
+        index->search(nq, xq, k, D_faiss_l2, I_faiss_l2, &p);
+    }
+    {
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [I_faiss_l2](size_t i) { return I_faiss_l2[i]; };
+        compute_recall(gt, I, nq, k);
+    }
+    return {I_faiss_l2, D_faiss_l2};
+}
+
+std::pair<int64_t *, float *> benchmark_faiss_ivfflatip(double t0,
+                                                        size_t d,
+                                                        size_t nt,
+                                                        const float *xt,
+                                                        size_t nb,
+                                                        const float *xb,
+                                                        size_t nq,
+                                                        const float *xq,
+                                                        int k,
+                                                        const int *gt,
+                                                        size_t n_probes,
+                                                        size_t n_centroids) {
+    auto *I_faiss_ip = new int64_t[nq * k];
+    auto *D_faiss_ip = new float[nq * k];
+    auto *quantizer = new faiss::IndexFlatL2(d);
+    quantizer->verbose = true;
+    auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_INNER_PRODUCT);
+    index->verbose = true;
+    {
+        printf("[%.3f s] Training on %ld vectors\n, with %d centroids", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        index->train(nt, xt);
+    }
+    {
+        printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+        index->add(nb, xb);
+    }
+    {
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        faiss::IVFSearchParameters p;
+        p.nprobe = n_probes;
+        index->search(nq, xq, k, D_faiss_ip, I_faiss_ip, &p);
+    }
+    {
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [I_faiss_ip](size_t i) { return I_faiss_ip[i]; };
+        compute_recall(gt, I, nq, k);
+    }
+    return {I_faiss_ip, D_faiss_ip};
+}
+
+void benchmark_annivfflatl2(double t0,
+                            size_t d,
+                            size_t nt,
+                            const float *xt,
+                            size_t nb,
+                            const float *xb,
+                            size_t nq,
+                            const float *xq,
+                            int k,
+                            const int *gt,
+                            size_t n_probes,
+                            size_t n_centroids) {
+    UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
+    {
+        printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, n_centroids);
+    }
+    {
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        AnnIVFFlatL2<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
+        test_ivf.Begin();
+        test_ivf.Search(ann_index_data.get(), 0, n_probes);
+        test_ivf.End();
+        auto ID = test_ivf.GetIDs();
+        auto D = test_ivf.GetDistances();
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [ID](size_t i) { return ID[i].segment_offset_; };
+        compute_recall(gt, I, nq, k);
+    }
+}
+
+void benchmark_annivfflatip(double t0,
+                            size_t d,
+                            size_t nt,
+                            const float *xt,
+                            size_t nb,
+                            const float *xb,
+                            size_t nq,
+                            const float *xq,
+                            int k,
+                            const int *gt,
+                            size_t n_probes,
+                            size_t n_centroids) {
+    UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
+    {
+        printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        ann_index_data = AnnIVFFlatIP<float>::CreateIndex(d, nt, xt, nb, xb, n_centroids);
+    }
+    {
+        printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        AnnIVFFlatIP<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
+        test_ivf.Begin();
+        test_ivf.Search(ann_index_data.get(), 0, n_probes);
+        test_ivf.End();
+        auto ID = test_ivf.GetIDs();
+        auto D = test_ivf.GetDistances();
+        std::cout << "############################" << std::endl;
+        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
+        std::cout << "############################" << std::endl;
+        auto I = [ID](size_t i) { return ID[i].segment_offset_; };
+        compute_recall(gt, I, nq, k);
+    }
+}
+
+int main() {
+    std::cout << "##########################################################" << std::endl;
+    auto t0 = ann_benchmark_elapsed();
+    size_t d, k, n_probes = 10, n_centroids;
+    printf("[%.3f s] Loading train set\n", ann_benchmark_elapsed() - t0);
+    size_t nt;
+    float *xt = fvecs_read(sift1m_train, &d, &nt);
+    printf("[%.3f s] Loading database\n", ann_benchmark_elapsed() - t0);
+    size_t nb, d2;
+    float *xb = fvecs_read(sift1m_base, &d2, &nb);
+    assert(d == d2 || !"dataset does not have same dimension as train set");
+    // n_centroids = (size_t)sqrt(nb);
+    n_centroids = (size_t)sqrt(nb);
+    printf("[%.3f s] Loading queries\n", ann_benchmark_elapsed() - t0);
+    size_t nq, d3;
+    float *xq = fvecs_read(sift1m_query, &d3, &nq);
+    assert(d == d2 || !"query does not have same dimension as train set");
+    printf("[%.3f s] Loading ground truth for %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+    size_t nq2;
+    int *gt_int = ivecs_read(sift1m_ground_truth, &k, &nq2);
+    assert(nq2 == nq || !"incorrect nb of ground truth entries");
+    printf("[%.3f s] Data loaded\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] Begin faiss ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
+    std::cout << "##########################################################" << std::endl;
+    auto [Il2, Dl2] = benchmark_faiss_ivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] End faiss ivfflatl2\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] Begin ann ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
+    std::cout << "##########################################################" << std::endl;
+    benchmark_annivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] End ann ivfflatl2\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] Test inner product\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] Begin faiss ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
+    std::cout << "##########################################################" << std::endl;
+    auto [Iip, Dip] = benchmark_faiss_ivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] End faiss ivfflatip\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] Begin ann ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
+    std::cout << "##########################################################" << std::endl;
+    benchmark_annivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    std::cout << "##########################################################" << std::endl;
+    printf("[%.3f s] End ann ivfflatip\n", ann_benchmark_elapsed() - t0);
+    std::cout << "##########################################################" << std::endl;
+    delete[] xt;
+    delete[] xb;
+    delete[] xq;
+    delete[] gt_int;
+    delete[] Il2;
+    delete[] Dl2;
+    delete[] Iip;
+    delete[] Dip;
+    return 0;
+}

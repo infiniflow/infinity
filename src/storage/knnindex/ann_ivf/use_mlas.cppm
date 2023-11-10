@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include "/home/yzq/GitHub/infinity/third_party/mlas/inc/mlas.h"
+#include "../third_party/mlas/inc/mlas.h"
 
 export module use_mlas;
 
