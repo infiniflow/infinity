@@ -55,36 +55,43 @@ struct GeographyTryCastToVarlen {
 template <>
 inline bool GeographyTryCastToVarlen::Run(const PointT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const LineT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const LineSegT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const BoxT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const PathT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 template <>
 inline bool GeographyTryCastToVarlen::Run(const CircleT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
+    return false;
 }
 
 } // namespace infinity

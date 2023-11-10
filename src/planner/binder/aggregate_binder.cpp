@@ -33,6 +33,7 @@ SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &exp
 
 SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     Error<PlannerException>("KNN expression isn't supported in in aggregate function");
+    return nullptr;
 }
 
 } // namespace infinity

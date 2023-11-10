@@ -452,6 +452,25 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(schema_name));
             break;
         }
+        case ShowStmtType::kDatabases: {
+            result->emplace_back(MakeShared<String>("SHOW DATABASES"));
+            break;
+        }
+        case ShowStmtType::kIndexes: {
+            result->emplace_back(MakeShared<String>("SHOW INDEXES: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "schema: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            break;
+        }
+        case ShowStmtType::kConfigs: {
+            result->emplace_back(MakeShared<String>("SHOW CONFIGS"));
+            break;
+        }
+        case ShowStmtType::kProfiles: {
+            result->emplace_back(MakeShared<String>("SHOW PROFILES"));
+            break;
+        }
     }
 }
 

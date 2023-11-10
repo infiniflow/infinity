@@ -94,6 +94,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
     } else {
         Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
     }
+    return nullptr;
 }
 
 SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
@@ -133,6 +134,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     Error<PlannerException>("KNN expression isn't supported in having clause");
+    return nullptr;
 }
 
 } // namespace infinity

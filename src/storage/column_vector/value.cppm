@@ -97,12 +97,15 @@ public:
 
     static Value MakeNull();
 
+    static Value MakeInvalid();
+
     // Object member
 public:
     // Value getter template
     template <class T>
     T GetValue() const {
         Error<TypeException>("Not implemented value getter.");
+        return T();
     }
 
     [[nodiscard]] const DataType &type() const { return type_; }

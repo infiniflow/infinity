@@ -282,6 +282,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         }
     }
     Error<PlannerException>("Unreachable");
+    return nullptr;
 }
 
 SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const SharedPtr<LogicalNode> &subquery_plan) {

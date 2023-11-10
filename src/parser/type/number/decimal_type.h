@@ -36,7 +36,10 @@ public:
         lower = 0;
     }
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); }
+    [[nodiscard]] inline std::string ToString() const {
+        ParserError("ToString() isn't implemented");
+        return std::string();
+    }
 
     int64_t upper{0};
     int64_t lower{0};

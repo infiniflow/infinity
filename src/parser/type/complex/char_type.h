@@ -65,7 +65,7 @@ public:
 
     bool operator==(const CharType &other) const { return strcmp(this->ptr, other.ptr); }
 
-    inline void Initialize(const std::string &input, size_t limit) {
+    inline void Initialize(const std::string &input, size_t limit) const {
         ParserAssert(input.size() < limit,
                      "Attempt to store size: " + std::to_string(input.size() + 1) + " string into CharT with capacity: " + std::to_string(limit));
         memcpy(this->ptr, input.c_str(), input.size());
@@ -80,7 +80,10 @@ public:
 
     inline void SetNull() { ptr = nullptr; }
 
-    [[nodiscard]] inline size_t size() const { ParserAssert(this->ptr != nullptr, "Char type isn't initialized.") return std::strlen(ptr) + 1; }
+    [[nodiscard]] inline size_t size() const {
+        ParserAssert(this->ptr != nullptr, "Char type isn't initialized.");
+        return std::strlen(ptr) + 1;
+    }
 
     [[nodiscard]] inline char *GetDataPtr() const { return this->ptr; }
 

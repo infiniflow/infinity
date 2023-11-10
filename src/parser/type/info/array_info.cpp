@@ -26,6 +26,9 @@ bool ArrayInfo::operator==(const TypeInfo &other) const {
     return this->elem_type_ == array_info_ptr->elem_type_;
 }
 
-nlohmann::json ArrayInfo::Serialize() const { ParserError("ArrayInfo::Serialize"); }
+nlohmann::json ArrayInfo::Serialize() const {
+    ParserError("ArrayInfo::Serialize");
+    return nlohmann::json();
+}
 
 } // namespace infinity

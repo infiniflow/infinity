@@ -275,6 +275,11 @@ Value Value::MakeNull() {
     return value;
 }
 
+Value Value::MakeInvalid() {
+    Value value(LogicalType::kInvalid);
+    return value;
+}
+
 // Value getter
 template <>
 BooleanT Value::GetValue() const {
@@ -1215,5 +1220,6 @@ String Value::ToString() const {
             break;
     }
     Error<TypeException>("Unexpected error.");
+    return String();
 }
 } // namespace infinity

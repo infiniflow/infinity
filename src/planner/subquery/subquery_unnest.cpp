@@ -211,6 +211,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
         }
     }
     Error<PlannerException>("Not implement to unnest uncorrelated subquery.");
+    return nullptr;
 }
 
 SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *expr_ptr,
@@ -389,6 +390,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
         }
     }
     Error<PlannerException>("Unreachable");
+    return nullptr;
 }
 
 void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,

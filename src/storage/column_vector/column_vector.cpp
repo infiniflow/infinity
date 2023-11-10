@@ -932,6 +932,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             // Null/Missing/Invalid
         }
     }
+    return String();
 }
 
 Value ColumnVector::GetValue(SizeT index) const {
@@ -1043,6 +1044,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             // Null/Missing/Invalid
         }
     }
+    return Value::MakeInvalid();
 }
 
 void ColumnVector::SetValue(SizeT index, const Value &value) {

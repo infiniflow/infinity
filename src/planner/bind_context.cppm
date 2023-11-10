@@ -188,13 +188,6 @@ public:
 
     inline bool HasCorrelatedColumn() const { return !correlated_column_exprs_.empty(); }
 
-    inline const String &GetTableNameByIndex(u64 index) {
-        if (table_table_index2table_name_.contains(index)) {
-            return table_table_index2table_name_[index];
-        }
-        Error<PlannerException>(Format("Can't get table name by table index: {}", index));
-    }
-
     const Binding *GetBindingFromCurrentOrParentByName(const String &binding_name) const;
 
     void AddKnnExpr(const SharedPtr<BaseExpression> &knn_expr);

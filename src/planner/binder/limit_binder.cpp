@@ -57,6 +57,7 @@ SharedPtr<BaseExpression> LimitBinder::BuildColExpr(const ColumnExpr &expr, Bind
 
 SharedPtr<BaseExpression> LimitBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     Error<PlannerException>("KNN expression isn't supported in limit clause");
+    return nullptr;
 }
 
 } // namespace infinity

@@ -64,6 +64,9 @@ public:
     }
 };
 
-std::string HugeInt::ToString() const { ParserError("ToString() isn't implemented"); }
+std::string HugeInt::ToString() const {
+    ParserError("ToString() isn't implemented");
+    return std::string();
+}
 
 } // namespace infinity

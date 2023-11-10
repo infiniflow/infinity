@@ -95,7 +95,7 @@ static const int32_t CUMULATIVE_YEAR_DAYS[401] = {
 
 void DateType::FromString(const char *date_ptr, size_t length) {
     if (!ConvertFromString(date_ptr, length, *this)) {
-        ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).")
+        ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).");
     }
 }
 
@@ -432,6 +432,7 @@ int64_t DateType::GetDatePart(DateType input, TimeUnit unit) {
             ParserError("Invalid time unit");
         }
     }
+    return -1;
 }
 
 } // namespace infinity

@@ -38,6 +38,7 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
     } else {
         Error<PlannerException>(Format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
+    return nullptr;
 }
 
 bool CastExpression::CanCast(const DataType &source, const DataType &target) {
@@ -127,6 +128,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             Error<PlannerException>("Invalid data type");
         }
     }
+    return false;
 }
 
 String CastExpression::ToString() const { return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }

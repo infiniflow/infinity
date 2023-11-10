@@ -46,6 +46,7 @@ struct ModuloFunction {
 template <>
 inline bool ModuloFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
     Error<NotImplementException>("Not implement");
+    return false;
 }
 
 template <>
