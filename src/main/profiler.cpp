@@ -248,11 +248,9 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
 
             i64 task_start = std::numeric_limits<i64>::max();
             i64 task_end = 0;
-            i64 task_total = 0;
             for (const auto &operators : task.second) {
                 task_start = Min(task_start, operators.task_profiler_.GetBegin());
                 task_end = Max(task_end, operators.task_profiler_.GetEnd());
-                task_total += operators.task_profiler_.Elapsed();
 
                 Json json_operators;
                 json_operators["times"] = times;
@@ -272,7 +270,7 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
             }
             json_tasks["task_start"] = task_start;
             json_tasks["task_end"] = task_end;
-            json_tasks["task_total"] = task_total;
+            json_tasks["task_total"] = task_end - task_start;
 
             fragment_start = Min(fragment_start, task_start);
             fragment_end = Max(fragment_end, task_end);
