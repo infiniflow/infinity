@@ -1,5 +1,5 @@
 
-#include "../third_party/mlas/inc/mlas.h"
+#include "base_profiler.h"
 #include "faiss/Index.h"
 #include "faiss/IndexFlat.h"
 #include "faiss/IndexIVF.h"
@@ -15,11 +15,17 @@ import ann_ivf_flat;
 import index_def;
 import annivfflat_index_data;
 import parser;
+import local_file_system;
 
 static const char *sift1m_train = "/home/yzq/sift1M/sift_learn.fvecs";
 static const char *sift1m_base = "/home/yzq/sift1M/sift_base.fvecs";
 static const char *sift1m_query = "/home/yzq/sift1M/sift_query.fvecs";
 static const char *sift1m_ground_truth = "/home/yzq/sift1M/sift_groundtruth.ivecs";
+
+// static const char *sift1m_train = "./test/data/fvecs/sift_learn.fvecs";
+// static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
+// static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
+// static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
 
 using namespace infinity;
 
@@ -75,18 +81,18 @@ void compute_recall(const T1 *Igt, const T2 I_comp, size_t nq, size_t k) {
     std::cout << "############################" << std::endl;
 }
 
-std::pair<int64_t *, float *> benchmark_faiss_ivfflatl2(double t0,
-                                                        size_t d,
-                                                        size_t nt,
-                                                        const float *xt,
-                                                        size_t nb,
-                                                        const float *xb,
-                                                        size_t nq,
-                                                        const float *xq,
-                                                        int k,
-                                                        const int *gt,
-                                                        size_t n_probes,
-                                                        size_t n_centroids) {
+void benchmark_faiss_ivfflatl2(double t0,
+                               size_t d,
+                               size_t nt,
+                               const float *xt,
+                               size_t nb,
+                               const float *xb,
+                               size_t nq,
+                               const float *xq,
+                               int k,
+                               const int *gt,
+                               size_t n_probes,
+                               size_t n_centroids) {
     auto *I_faiss_l2 = new int64_t[nq * k];
     auto *D_faiss_l2 = new float[nq * k];
     auto *quantizer = new faiss::IndexFlatL2(d);
@@ -94,18 +100,33 @@ std::pair<int64_t *, float *> benchmark_faiss_ivfflatl2(double t0,
     auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_L2);
     index->verbose = true;
     {
-        printf("[%.3f s] Training on %ld vectors\n, with %d centroids", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        printf("[%.3f s] Training on %ld vectors, with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         index->train(nt, xt);
+        profiler.End();
+        std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         index->add(nb, xb);
+        profiler.End();
+        std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         faiss::IVFSearchParameters p;
         p.nprobe = n_probes;
         index->search(nq, xq, k, D_faiss_l2, I_faiss_l2, &p);
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         std::cout << "############################" << std::endl;
@@ -114,21 +135,22 @@ std::pair<int64_t *, float *> benchmark_faiss_ivfflatl2(double t0,
         auto I = [I_faiss_l2](size_t i) { return I_faiss_l2[i]; };
         compute_recall(gt, I, nq, k);
     }
-    return {I_faiss_l2, D_faiss_l2};
+    delete[] I_faiss_l2;
+    delete[] D_faiss_l2;
 }
 
-std::pair<int64_t *, float *> benchmark_faiss_ivfflatip(double t0,
-                                                        size_t d,
-                                                        size_t nt,
-                                                        const float *xt,
-                                                        size_t nb,
-                                                        const float *xb,
-                                                        size_t nq,
-                                                        const float *xq,
-                                                        int k,
-                                                        const int *gt,
-                                                        size_t n_probes,
-                                                        size_t n_centroids) {
+void benchmark_faiss_ivfflatip(double t0,
+                               size_t d,
+                               size_t nt,
+                               const float *xt,
+                               size_t nb,
+                               const float *xb,
+                               size_t nq,
+                               const float *xq,
+                               int k,
+                               const int *gt,
+                               size_t n_probes,
+                               size_t n_centroids) {
     auto *I_faiss_ip = new int64_t[nq * k];
     auto *D_faiss_ip = new float[nq * k];
     auto *quantizer = new faiss::IndexFlatL2(d);
@@ -136,18 +158,33 @@ std::pair<int64_t *, float *> benchmark_faiss_ivfflatip(double t0,
     auto *index = new faiss::IndexIVFFlat(quantizer, d, n_centroids, faiss::METRIC_INNER_PRODUCT);
     index->verbose = true;
     {
-        printf("[%.3f s] Training on %ld vectors\n, with %d centroids", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        printf("[%.3f s] Training on %ld vectors , with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         index->train(nt, xt);
+        profiler.End();
+        std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         index->add(nb, xb);
+        profiler.End();
+        std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         faiss::IVFSearchParameters p;
         p.nprobe = n_probes;
         index->search(nq, xq, k, D_faiss_ip, I_faiss_ip, &p);
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
     }
     {
         std::cout << "############################" << std::endl;
@@ -156,7 +193,8 @@ std::pair<int64_t *, float *> benchmark_faiss_ivfflatip(double t0,
         auto I = [I_faiss_ip](size_t i) { return I_faiss_ip[i]; };
         compute_recall(gt, I, nq, k);
     }
-    return {I_faiss_ip, D_faiss_ip};
+    delete[] I_faiss_ip;
+    delete[] D_faiss_ip;
 }
 
 void benchmark_annivfflatl2(double t0,
@@ -173,15 +211,28 @@ void benchmark_annivfflatl2(double t0,
                             size_t n_centroids) {
     UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
     {
-        printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        printf("[%.3f s] Training and Indexing on %ld vectors, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         ann_index_data = AnnIVFFlatL2<float>::CreateIndex(d, nt, xt, nb, xb, n_centroids);
+        profiler.End();
+        std::cout << "training and adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB"
+                  << std::endl;
     }
     {
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         AnnIVFFlatL2<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
         test_ivf.Begin();
         test_ivf.Search(ann_index_data.get(), 0, n_probes);
         test_ivf.End();
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         auto ID = test_ivf.GetIDs();
         auto D = test_ivf.GetDistances();
         std::cout << "############################" << std::endl;
@@ -206,15 +257,28 @@ void benchmark_annivfflatip(double t0,
                             size_t n_centroids) {
     UniquePtr<AnnIVFFlatIndexData<float>> ann_index_data;
     {
-        printf("[%.3f s] Training and Indexing on %ld vectors\n, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+        printf("[%.3f s] Training and Indexing on %ld vectors, with %ld centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         ann_index_data = AnnIVFFlatIP<float>::CreateIndex(d, nt, xt, nb, xb, n_centroids);
+        profiler.End();
+        std::cout << "training and adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB"
+                  << std::endl;
     }
     {
         printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
+
+        infinity::BaseProfiler profiler;
+        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
+        profiler.Begin();
         AnnIVFFlatIP<float> test_ivf(xq, nq, k, d, EmbeddingDataType::kElemFloat);
         test_ivf.Begin();
         test_ivf.Search(ann_index_data.get(), 0, n_probes);
         test_ivf.End();
+        profiler.End();
+        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
         auto ID = test_ivf.GetIDs();
         auto D = test_ivf.GetDistances();
         std::cout << "############################" << std::endl;
@@ -250,7 +314,7 @@ int main() {
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin faiss ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
-    auto [Il2, Dl2] = benchmark_faiss_ivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    benchmark_faiss_ivfflatl2(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End faiss ivfflatl2\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
@@ -264,7 +328,7 @@ int main() {
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] Begin faiss ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
     std::cout << "##########################################################" << std::endl;
-    auto [Iip, Dip] = benchmark_faiss_ivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
+    benchmark_faiss_ivfflatip(t0, d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
     std::cout << "##########################################################" << std::endl;
     printf("[%.3f s] End faiss ivfflatip\n", ann_benchmark_elapsed() - t0);
     std::cout << "##########################################################" << std::endl;
@@ -278,9 +342,5 @@ int main() {
     delete[] xb;
     delete[] xq;
     delete[] gt_int;
-    delete[] Il2;
-    delete[] Dl2;
-    delete[] Iip;
-    delete[] Dip;
     return 0;
 }
