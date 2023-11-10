@@ -14,10 +14,14 @@
 
 module;
 
+#include <fstream>
 import stl;
 import query_context;
 import operator_state;
 import parser;
+import profiler;
+import local_file_system;
+import file_writer;
 import table_def;
 import data_table;
 import options;
@@ -59,6 +63,16 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
+            auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
+            if (profiler_record == nullptr) {
+                Error<ExecutorException>(Format("The record does not exist: {}", export_command->file_no()));
+            }
+            LocalFileSystem fs;
+            FileWriter file_writer(fs, export_command->file_name(), 128);
+
+            auto json = QueryProfiler::Serialize(profiler_record).dump();
+            file_writer.Write(json.c_str(), json.size());
+            file_writer.Flush();
             break;
         }
         case CommandType::kCheckTable: {

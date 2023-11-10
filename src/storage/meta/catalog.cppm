@@ -24,10 +24,59 @@ import function_set;
 import table_function;
 import third_party;
 import buffer_manager;
+import profiler;
 
 export module new_catalog;
 
 namespace infinity {
+
+class ProfileHistory {
+private:
+    Mutex lock_{};
+    Vector<SharedPtr<QueryProfiler>> queue;
+    SizeT front;
+    SizeT rear;
+    SizeT max_size;
+
+public:
+    ProfileHistory(SizeT size) {
+        max_size = size + 1;
+        queue.resize(max_size);
+        front = 0;
+        rear = 0;
+    }
+
+    void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
+        UniqueLock<Mutex> lk(lock_);
+        if ((rear + 1) % max_size == front) {
+            return;
+        }
+        queue[rear] = profiler;
+        rear = (rear + 1) % max_size;
+    }
+
+    QueryProfiler *GetElement(SizeT index) {
+        UniqueLock<Mutex> lk(lock_);
+        if (index < 0 || index >= (rear - front + max_size) % max_size) {
+            return nullptr;
+        }
+        SizeT actualIndex = (front + index) % max_size;
+        return queue[actualIndex].get();
+    }
+
+    Vector<SharedPtr<QueryProfiler>> GetElements() {
+        Vector<SharedPtr<QueryProfiler>> elements;
+        elements.reserve(max_size);
+
+        UniqueLock<Mutex> lk(lock_);
+        for (SizeT i = 0; i < queue.size(); ++i) {
+            if (queue[i].get() != nullptr) {
+                elements.push_back(queue[i]);
+            }
+        }
+        return elements;
+    }
+};
 
 export struct NewCatalog {
 public:
@@ -70,6 +119,17 @@ public:
 
     void MergeFrom(NewCatalog &other);
 
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        history.Enqueue(Move(profiler));
+    }
+
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        return history.GetElement(index);
+    }
+
+    const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() {
+        return history.GetElements();
+    }
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
@@ -80,6 +140,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
+    ProfileHistory history{ 100 };
 };
 
 } // namespace infinity

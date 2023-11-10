@@ -82,6 +82,10 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 default_query_cpu_limit = default_total_cpu_number;
     u64 default_query_memory_limit = default_total_memory_size;
 
+    // Default profiler config
+    bool default_enable_profiler = false;
+    bool default_profile_record_capacity = 100;
+
     // Default network config
     String default_listen_address = "0.0.0.0";
     u32 default_pg_port = 5432;
@@ -130,6 +134,12 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.total_memory_size = default_total_memory_size;
             system_option_.query_cpu_limit = default_query_cpu_limit;
             system_option_.query_memory_limit = default_query_memory_limit;
+        }
+
+        // Profiler
+        {
+            system_option_.enable_profiler = default_enable_profiler;
+            system_option_.profile_record_capacity = default_profile_record_capacity;
         }
 
         // Network
@@ -223,6 +233,13 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             if (system_option_.query_memory_limit > default_query_memory_limit) {
                 system_option_.query_memory_limit = default_query_memory_limit;
             }
+        }
+
+        // Profiler
+        {
+            auto profiler_config = config["profiler"];
+            system_option_.enable_profiler = profiler_config["enable"].value_or(default_enable_profiler);
+            system_option_.profile_record_capacity = profiler_config["profile_record_capacity"].value_or(default_profile_record_capacity);
         }
 
         // Network

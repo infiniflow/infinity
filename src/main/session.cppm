@@ -18,6 +18,8 @@ import stl;
 import txn;
 import config;
 import options;
+import profiler;
+import new_catalog;
 
 export module session;
 
@@ -31,13 +33,25 @@ enum class SessionType {
 export class SessionBase {
 
 public:
-    explicit SessionBase(SessionType session_type) : current_database_("default"), session_type_(session_type) {}
+    explicit SessionBase(SessionType session_type) : current_database_("default"), session_type_(session_type) { session_id_ = GetNextSessionID(); }
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
-    SessionOptions* options() { return &session_options; }
+    SessionOptions *options() { return &session_options; }
+    [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
-    inline Txn*& txn() { return txn_; }
+    inline Txn *&txn() { return txn_; }
+
+    inline static u64 GetNextSessionID() { return ++session_id_generator_; }
+
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
+        txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
+    }
+
+    const QueryProfiler *GetProfilerRecord(SizeT index) {
+        return txn_->GetCatalog()->GetProfilerRecord(index);
+    }
+
 protected:
     // Current schema
     String current_database_{};
@@ -48,12 +62,18 @@ protected:
     SessionType session_type_{SessionType::kRemote};
 
     SessionOptions session_options;
+
+    u64 session_id_{0};
+
+    static atomic_u64 session_id_generator_;
 };
 
-export class EmbeddedSession : public SessionBase {
+atomic_u64 SessionBase::session_id_generator_{0};
+
+export class LocalSession : public SessionBase {
 
 public:
-    EmbeddedSession() : SessionBase(SessionType::kEmbedded) {}
+    LocalSession() : SessionBase(SessionType::kEmbedded) {}
 };
 
 export class RemoteSession : public SessionBase {
@@ -81,37 +101,37 @@ private:
     u16 client_port_{};
 };
 
-//export class Session {
-//public:
-//    explicit Session() : current_database_("default") {}
+// export class Session {
+// public:
+//     explicit Session() : current_database_("default") {}
 //
-//    [[nodiscard]] inline String &current_database() { return current_database_; }
+//     [[nodiscard]] inline String &current_database() { return current_database_; }
 //
-//    [[nodiscard]] inline const String &user_name() const { return user_name_; }
+//     [[nodiscard]] inline const String &user_name() const { return user_name_; }
 //
-//    [[nodiscard]] inline u64 user_id() const { return user_id_; }
+//     [[nodiscard]] inline u64 user_id() const { return user_id_; }
 //
-//    inline void SetClientInfo(const String &ip_address, u16 port) {
-//        client_address_ = ip_address;
-//        client_port_ = port;
-//    }
+//     inline void SetClientInfo(const String &ip_address, u16 port) {
+//         client_address_ = ip_address;
+//         client_port_ = port;
+//     }
 //
-//public:
-//    // Txn is session level.
-//    Txn *txn_{};
+// public:
+//     // Txn is session level.
+//     Txn *txn_{};
 //
-//private:
-//    // Current schema
-//    String current_database_;
+// private:
+//     // Current schema
+//     String current_database_;
 //
-//    // User / Tenant information
-//    String tenant_name_;
-//    String user_name_;
+//     // User / Tenant information
+//     String tenant_name_;
+//     String user_name_;
 //
-//    u64 user_id_{0};
+//     u64 user_id_{0};
 //
-//    String client_address_{};
-//    u16 client_port_{};
-//};
+//     String client_address_{};
+//     u16 client_port_{};
+// };
 
 } // namespace infinity

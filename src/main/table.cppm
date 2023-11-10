@@ -25,10 +25,14 @@ namespace infinity {
 
 export class Table {
 public:
-    Table(String table_name, SharedPtr<EmbeddedSession> session)
+    Table(String table_name, SharedPtr<SessionBase> session)
         : table_name_(Move(table_name)), session_(Move(session)) {}
 
-    QueryResult CreateIndex(const String &index_name, Vector<String> *column_names, CreateIndexOptions create_index_options);
+    QueryResult CreateIndex(const String &index_name,
+                            Vector<String> *column_names,
+                            const String &method_type,
+                            Vector<InitParameter *> *index_para_list,
+                            CreateIndexOptions create_index_options);
 
     QueryResult DropIndex(const String &index_name);
 
@@ -49,7 +53,7 @@ public:
 
 private:
     String table_name_{};
-    SharedPtr<EmbeddedSession> session_{};
+    SharedPtr<SessionBase> session_{};
 };
 
 } // namespace infinity

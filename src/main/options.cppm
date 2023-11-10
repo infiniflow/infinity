@@ -44,6 +44,10 @@ export struct SystemOptions {
     u64 query_cpu_limit{};
     u64 query_memory_limit{};
 
+    // profiler
+    bool enable_profiler{};
+    u64 profile_record_capacity{};
+
     // Network
     String listen_address{};
     u16 pg_port{};

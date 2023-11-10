@@ -87,8 +87,8 @@ int main() {
         size_t round_n = 100;
         size_t thread_n = 16;
         Vector<std::thread> threads;
-        au64 global_idx = 0;
-        au64 n_valid = 0;
+        atomic_u64 global_idx = 0;
+        atomic_u64 n_valid = 0;
 
         knn_hnsw->SetEf(ef_construction);
         infinity::BaseProfiler profiler;
