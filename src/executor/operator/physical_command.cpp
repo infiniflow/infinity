@@ -26,6 +26,7 @@ import table_def;
 import data_table;
 import options;
 import third_party;
+import defer_op;
 
 import infinity_exception;
 
@@ -36,7 +37,7 @@ namespace infinity {
 void PhysicalCommand::Init() {}
 
 void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    operator_state->SetComplete();
+    DeferFn defer_fn([&]() { operator_state->SetComplete(); });
     switch (command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command = (UseCmd *)(command_info_.get());

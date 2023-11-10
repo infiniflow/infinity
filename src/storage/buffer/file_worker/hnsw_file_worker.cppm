@@ -14,24 +14,39 @@
 
 module;
 
-import infinity_exception;
 import stl;
-import file_worker;
+import index_file_worker;
 import dist_func;
 import knn_hnsw;
+import hnsw_index_def;
+import parser;
+import index_def;
+import dist_func;
 
 export module hnsw_file_worker;
 
 namespace infinity {
 
-export template <typename DataType>
-class HnswFileWorker : public FileWorker {
-    explicit HnswFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size, UniquePtr<SpaceBase<DataType>> space)
-        : FileWorker(Move(file_dir), Move(file_name), buffer_size), space_(Move(space)) {}
+export struct CreateHnswPara : public CreateIndexPara {
+    const SizeT max_element_;
+
+    CreateHnswPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def, SizeT max_element)
+        : CreateIndexPara(index_def, column_def), max_element_(max_element) {}
+};
+
+export class HnswFileWorker : public IndexFileWorker {
+    const SizeT max_element_;
+
+public:
+    explicit HnswFileWorker(SharedPtr<String> file_dir,
+                            SharedPtr<String> file_name,
+                            SharedPtr<IndexDef> index_def,
+                            SharedPtr<ColumnDef> column_def,
+                            SizeT max_element)
+        : IndexFileWorker(file_dir, file_name, index_def, column_def), max_element_(max_element) {}
 
     virtual ~HnswFileWorker() override;
 
-public:
     void AllocateInMemory() override;
 
     void FreeInMemory() override;
@@ -42,44 +57,12 @@ protected:
     void ReadFromFileImpl() override;
 
 private:
-    UniquePtr<SpaceBase<DataType>> space_;
+    EmbeddingDataType GetType() const;
+
+    SizeT GetDimension() const;
+
+    template <typename DataType>
+    UniquePtr<SpaceBase<DataType>> GetDistFunc(SizeT dimension) const;
 };
-
-template <typename DataType>
-HnswFileWorker<DataType>::~HnswFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
-}
-
-template <typename DataType>
-void HnswFileWorker<DataType>::AllocateInMemory() {
-    if (data_) {
-        Error<StorageException>("Data is already allocated.");
-    }
-}
-
-template <typename DataType>
-void HnswFileWorker<DataType>::FreeInMemory() {
-    if (!data_) {
-        Error<StorageException>("Data is not allocated.");
-    }
-    auto hnsw_index_ptr = static_cast<KnnHnsw<DataType> *>(data_);
-    delete hnsw_index_ptr;
-    data_ = nullptr;
-}
-
-template <typename DataType>
-void HnswFileWorker<DataType>::WriteToFileImpl(bool &prepare_success) {
-    auto *hnsw_index_ptr = static_cast<KnnHnsw<DataType> *>(data_);
-    hnsw_index_ptr->SaveIndexInner(*file_handler_);
-    prepare_success = true;
-}
-
-template <typename DataType>
-void HnswFileWorker<DataType>::ReadFromFileImpl() {
-    KnnHnsw<DataType>::LoadIndexInner(*file_handler_, *space_);
-}
 
 } // namespace infinity
