@@ -16,11 +16,10 @@ module;
 
 import stl;
 import parser;
-// import txn;
+import txn_store;
 import buffer_manager;
 import third_party;
 import table_collection_type;
-import index_def;
 import base_entry;
 import segment_entry;
 import block_index;
@@ -37,6 +36,8 @@ export module table_collection_entry;
 namespace infinity {
 
 class DBEntry;
+class IndexDef;
+class IndexDefEntry;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
@@ -65,14 +66,14 @@ public:
 
     static EntryResult GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static void RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr);
+    static void RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
 public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
 
     static void CreateIndexFile(TableCollectionEntry *table_entry,
                                 void *txn_store,
-                                SharedPtr<IndexDef> index_def,
+                                IndexDefEntry *index_def_entry,
                                 TxnTimeStamp begin_ts,
                                 BufferManager *buffer_mgr);
 
@@ -80,7 +81,7 @@ public:
 
     static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);
 
-    static void CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u32, SharedPtr<IndexEntry>> &uncommitted_indexes);
+    static void CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_);
 
     static void RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store);
 

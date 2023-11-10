@@ -93,10 +93,11 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
 
     if (index_def_meta == nullptr) {
         LOG_TRACE(Format("Create new index: {}", *index_def->index_name_));
-        auto new_index_def_meta = MakeUnique<IndexDefMeta>(index_def->index_name_, table_entry);
+        auto new_index_def_meta = MakeUnique<IndexDefMeta>(table_entry);
         index_def_meta = new_index_def_meta.get();
 
         table_entry->rw_locker_.lock();
+        // Insert index_def meta here
         table_entry->indexes_[*index_def->index_name_] = Move(new_index_def_meta);
         table_entry->rw_locker_.unlock();
 
@@ -141,7 +142,7 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
     }
     LOG_TRACE(Format("Drop index entry {}", index_name));
     auto res = IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
-    
+
     return res;
 }
 
@@ -152,16 +153,16 @@ EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, co
     return {.entry_ = nullptr, .err_ = MakeUnique<String>("Cannot find index def")};
 }
 
-void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const SharedPtr<String> &index_name, u64 txn_id, TxnManager *txn_mgr) {
+void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
     table_entry->rw_locker_.lock_shared();
 
     IndexDefMeta *index_def_meta{nullptr};
-    if (auto iter = table_entry->indexes_.find(*index_name); iter != table_entry->indexes_.end()) {
+    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
         index_def_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
 
-    LOG_TRACE(Format("Remove index entry: {}", *index_name));
+    LOG_TRACE(Format("Remove index entry: {}", index_name));
     IndexDefMeta::DeleteNewEntry(index_def_meta, txn_id, txn_mgr);
 }
 
@@ -194,9 +195,10 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
 
 void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            void *txn_store,
-                                           SharedPtr<IndexDef> index_def,
+                                           IndexDefEntry *index_def_entry,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
+    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
     if (index_def->column_names_.size() != 1) {
         StorageException("Not implemented");
@@ -205,7 +207,7 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     u64 column_id = table_entry->GetColumnIdByName(column_name);
     SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
     for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-        SegmentEntry::CreateIndexFile(segment_entry.get(), index_def, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+        SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
     }
 }
 
@@ -234,10 +236,12 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
     }
 }
 
-void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, const HashMap<u32, SharedPtr<IndexEntry>> &uncommitted_indexes) {
-    // FIXME: One index_entry is created for one segment_entry.
-    for (const auto &[segment_id, index_entry] : uncommitted_indexes) {
-        SegmentEntry::CommitCreateIndex(table_entry->segments_[segment_id].get(), index_entry);
+void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
+    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        IndexDefEntry *index_def_entry = txn_index_store.index_def_entry_;
+        for (auto &[segment_id, index_entry] : txn_index_store.index_entry_map_) {
+            IndexDefEntry::CommitCreatedIndex(index_def_entry, segment_id, index_entry);
+        }
     }
 }
 
@@ -316,8 +320,6 @@ SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *
 
 Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
-    Vector<SharedPtr<SegmentEntry>> segments;
-    Vector<SharedPtr<IndexDef>> indexes{};
 
     {
         SharedLock<RWMutex> lck(table_entry->rw_locker_);
@@ -343,22 +345,16 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
         }
         u32 next_segment_id = table_entry->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
-
-        for (const auto &segment_pair : table_entry->segments_) {
-            segments.push_back(segment_pair.second);
-        }
-
-        for (const auto &[index_name, index_def_meta] : table_entry->indexes_) {
-            json_res["indexes"].emplace_back(IndexDefMeta::Serialize(index_def_meta.get()));
-        }
     }
 
-    for (const auto &segment : segments) {
-        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment.get(), max_commit_ts, is_full_checkpoint));
+    for (const auto &[segment_id, segment_entry] : table_entry->segments_) {
+        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_entry.get(), max_commit_ts, is_full_checkpoint));
     }
 
-    for (const auto &index : indexes) {
-        json_res["indexes"].emplace_back(index->Serialize());
+    for (const auto &[index_name, index_entry] : table_entry->indexes_) {
+        Json index_def_meta_json = IndexDefMeta::Serialize(index_entry.get(), max_commit_ts);
+        index_def_meta_json["index_name"] = index_name;
+        json_res["indexes"].emplace_back(index_def_meta_json);
     }
 
     return json_res;
@@ -374,7 +370,6 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
-    HashMap<String, SharedPtr<ColumnDef>> column_def_map;
 
     if (table_entry_json.contains("column_definition")) {
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
@@ -392,7 +387,6 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
 
             SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
             columns.emplace_back(column_def);
-            column_def_map.emplace(column_name, column_def);
         }
     }
 
@@ -405,22 +399,10 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
     table_entry->table_entry_dir_ = table_entry_dir;
 
-    HashMap<String, SharedPtr<IndexDef>> index_def_map;
-    if (table_entry_json.contains("indexes")) {
-        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
-            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get());
-            auto res = IndexDefMeta::GetEntry(index_def_meta.get(), 0, 0); // get the last entry from entry list, so set the begin_ts = 0
-            Assert<StorageException>(res.entry_ != nullptr, "index_def_meta should have at least one entry");
-            index_def_map.emplace(*index_def_meta->index_name_, static_cast<IndexDefEntry *>(res.entry_)->index_def_);
-            table_entry->indexes_.emplace(*index_def_meta->index_name_, Move(index_def_meta));
-        }
-    }
-
     if (table_entry_json.contains("segments")) {
         u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
-            SharedPtr<SegmentEntry> segment_entry =
-                SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr, index_def_map, column_def_map);
+            SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
             max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
@@ -434,6 +416,16 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
         Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");
     else
         Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0].get() != nullptr, "table segment 0 should be valid");
+
+    if (table_entry_json.contains("indexes")) {
+        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
+
+            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
+            String index_name = index_def_meta_json["index_name"];
+            table_entry->indexes_.emplace(Move(index_name), Move(index_def_meta));
+        }
+    }
+
     return table_entry;
 }
 

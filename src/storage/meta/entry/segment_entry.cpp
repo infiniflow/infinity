@@ -155,17 +155,15 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
 }
 
 SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
-                                                    SharedPtr<IndexDef> index_def,
+                                                    IndexDefEntry *index_def_entry,
                                                     SharedPtr<ColumnDef> column_def,
                                                     TxnTimeStamp create_ts,
                                                     BufferManager *buffer_mgr,
                                                     TxnTableStore *txn_store) {
     u64 column_id = column_def->id();
-    SharedPtr<IndexEntry> index_entry = IndexEntry::NewIndexEntry(segment_entry,
-                                                                  index_def->index_name_,
-                                                                  create_ts,
-                                                                  buffer_mgr,
-                                                                  GetCreateIndexPara(segment_entry, index_def, column_def));
+    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
+    SharedPtr<IndexEntry> index_entry =
+        IndexEntry::NewIndexEntry(index_def_entry, segment_entry, create_ts, buffer_mgr, GetCreateIndexPara(segment_entry, index_def, column_def));
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
@@ -233,7 +231,7 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
             throw NotImplementException("Not implemented.");
         }
     }
-    txn_store->CreateIndexFile(segment_entry->segment_id_, index_entry);
+    txn_store->CreateIndexFile(index_def_entry, segment_entry->segment_id_, index_entry);
     return index_entry;
 }
 
@@ -249,10 +247,6 @@ void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 b
         block_entry = segment_entry->block_entries_[block_id];
     }
     BlockEntry::CommitAppend(block_entry.get(), txn_ptr);
-}
-
-void SegmentEntry::CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry) {
-    segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
 }
 
 void SegmentEntry::CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
@@ -319,18 +313,10 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
         }
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry, max_commit_ts));
     }
-    for (const auto &[_index_name, index_entry] : segment_entry->index_entry_map_) {
-        IndexEntry::Flush(index_entry.get(), max_commit_ts);
-        json_res["index_entries"].emplace_back(IndexEntry::Serialize(index_entry.get()));
-    }
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json,
-                                                  TableCollectionEntry *table_entry,
-                                                  BufferManager *buffer_mgr,
-                                                  const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
-                                                  const HashMap<String, SharedPtr<ColumnDef>> &column_def_map) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -353,18 +339,6 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
         }
     }
     LOG_TRACE(Format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
-
-    if (segment_entry_json.contains("index_entries")) {
-        for (const auto &index_json : segment_entry_json["index_entries"]) {
-            SharedPtr<IndexDef> index_def = index_def_map.at(index_json["index_name"].get<String>());
-            SharedPtr<ColumnDef> column_def = column_def_map.at(index_def->column_names_[0]);
-            SharedPtr<IndexEntry> index_entry = IndexEntry::Deserialize(index_json,
-                                                                        segment_entry.get(),
-                                                                        buffer_mgr,
-                                                                        SegmentEntry::GetCreateIndexPara(segment_entry.get(), index_def, column_def));
-            segment_entry->index_entry_map_.emplace(*index_entry->index_name_, Move(index_entry));
-        }
-    }
 
     return segment_entry;
 }
@@ -403,13 +377,13 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
             block_entry1->MergeFrom(*block_entry2);
     }
 
-    for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
-        if (this->index_entry_map_.find(index_name) == this->index_entry_map_.end()) {
-            this->index_entry_map_.emplace(index_name, index_entry);
-        } else {
-            this->index_entry_map_[index_name]->MergeFrom(*index_entry);
-        }
-    }
+    // for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
+    //     if (this->index_entry_map_.find(index_name) == this->index_entry_map_.end()) {
+    //         this->index_entry_map_.emplace(index_name, index_entry);
+    //     } else {
+    //         this->index_entry_map_[index_name]->MergeFrom(*index_entry);
+    //     }
+    // }
 }
 
 UniquePtr<CreateIndexPara>

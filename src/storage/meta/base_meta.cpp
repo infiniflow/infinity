@@ -82,40 +82,6 @@ BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_
     }
 }
 
-EntryResult BaseMeta::DropNewEntry(BaseMeta *meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    UniqueLock<RWMutex> w_locker(meta->rw_locker_);
-
-    EntryStatus status = meta->AddEntryInternal(txn_id, begin_ts, txn_mgr);
-    switch (status) {
-        case kExisted: {
-            auto delete_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
-            delete_entry->deleted_ = true;
-            meta->entry_list_.emplace_front(Move(delete_entry));
-            return {.entry_ = meta->entry_list_.front().get(), .err_ = nullptr};
-        }
-        case kNotExisted: {
-            LOG_TRACE(Format("Attempt to drop not existed entry."));
-            switch (conflict_type) {
-                case ConflictType::kIgnore: {
-                    return {.entry_ = nullptr, .err_ = nullptr};
-                }
-                case ConflictType::kError: {
-                    return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated entry.")};
-                }
-                default: {
-                    throw StorageException("Invalid conflict type");
-                }
-            }
-        }
-        case kConflict: {
-            // Write-Write conflict
-            LOG_TRACE("Write-Write conflict: There is a committed entry which is later than current transaction.");
-            return {.entry_ = nullptr,
-                    .err_ = MakeUnique<String>("Write-Write conflict. There is a committed entry which is later than current transaction.")};
-        }
-    }
-}
-
 void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
     UniqueLock<RWMutex> w_locker(meta->rw_locker_);
     if (meta->entry_list_.empty()) {

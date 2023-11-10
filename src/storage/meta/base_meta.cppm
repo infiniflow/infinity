@@ -26,7 +26,10 @@ class TxnManager;
 
 export class BaseMeta {
 public:
-    static EntryResult DropNewEntry(BaseMeta *meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    BaseMeta() {
+        // Insert a dummy entry
+        entry_list_.emplace_front(MakeUnique<BaseEntry>(EntryType::kDummy));
+    }
 
     static void DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr);
 

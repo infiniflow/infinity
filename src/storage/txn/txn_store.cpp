@@ -29,6 +29,7 @@ import logger;
 import data_access_state;
 import txn;
 import index_entry;
+import index_def_entry;
 import default_values;
 
 module txn_store;
@@ -87,8 +88,15 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
-UniquePtr<String> TxnTableStore::CreateIndexFile(u32 segment_id, SharedPtr<IndexEntry> index) {
-    uncommitted_indexes_.emplace(segment_id, Move(index));
+UniquePtr<String> TxnTableStore::CreateIndexFile(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index) {
+    const String &index_name = *index_def_entry->index_def_->index_name_;
+    if (auto iter = txn_indexes_store_.find(index_name); iter != txn_indexes_store_.end()) {
+        iter->second.index_entry_map_.emplace(segment_id, index);
+    } else {
+        TxnIndexStore index_store(index_def_entry);
+        index_store.index_entry_map_.emplace(segment_id, index);
+        txn_indexes_store_.emplace(index_name, Move(index_store));
+    }
     return nullptr;
 }
 
@@ -147,7 +155,7 @@ void TxnTableStore::PrepareCommit() {
 
     TableCollectionEntry::Delete(table_entry_, txn_, delete_state_);
 
-    TableCollectionEntry::CommitCreateIndex(table_entry_, uncommitted_indexes_);
+    TableCollectionEntry::CommitCreateIndex(table_entry_, txn_indexes_store_);
 
     LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->table_collection_name_));
 }

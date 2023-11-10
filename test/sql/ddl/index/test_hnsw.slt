@@ -20,5 +20,5 @@ statement ok
 DROP INDEX idx1 ON test_hnsw;
 
 statement ok
-CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
 

@@ -351,7 +351,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
         return {nullptr, MakeUnique<String>("Invalid index type")};
     }
     auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
-    txn_indexes_.insert(index_def_entry);
+    txn_indexes_.emplace(*index_def->index_name_, index_def_entry);
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
@@ -359,7 +359,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     }
     table_store = txn_tables_store_[table_name].get();
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store, index_def, begin_ts, GetBufferMgr());
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store, index_def_entry, begin_ts, GetBufferMgr());
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
     return res;
@@ -402,7 +402,7 @@ EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &
 }
 
 EntryResult Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
-    TxnState txn_state = txn_context_.GetTxnState();
+    TxnState txn_state =  txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
         LOG_TRACE("Transaction isn't started.");
         return {nullptr, MakeUnique<String>("Transaction isn't started.")};
@@ -420,11 +420,10 @@ EntryResult Txn::DropIndexByName(const String &db_name, const String &table_name
         return res;
     }
 
-    auto dropped_index_entry = static_cast<IndexDefEntry *>(res.entry_);
-    if (txn_indexes_.contains(dropped_index_entry)) {
-        txn_indexes_.erase(dropped_index_entry);
+    if (auto iter = txn_indexes_.find(index_name); iter != txn_indexes_.end()) {
+        txn_indexes_.erase(iter);
     } else {
-        txn_indexes_.insert(dropped_index_entry);
+        txn_indexes_.emplace(index_name, static_cast<IndexDefEntry *>(res.entry_));
     }
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
@@ -569,7 +568,7 @@ void Txn::CommitTxnBottom() {
     }
 
     //  Commit indexes in catalog
-    for (auto *index_def_entry : txn_indexes_) {
+    for (const auto &[index_name, index_def_entry] : txn_indexes_) {
         index_def_entry->Commit(commit_ts);
     }
     LOG_TRACE(Format("Txn: {} is committed.", txn_id_));
@@ -605,10 +604,10 @@ void Txn::RollbackTxn() {
         DBEntry::RemoveTableCollectionEntry(db_entry, *table_meta->table_collection_name_, txn_id_, txn_mgr_);
     }
 
-    for (const auto &index_def_entry : txn_indexes_) {
+    for (const auto &[index_name, index_def_entry] : txn_indexes_) {
         IndexDefMeta *index_def_meta = index_def_entry->index_def_meta_;
         TableCollectionEntry *table_entry = index_def_meta->table_collection_entry_;
-        TableCollectionEntry::RemoveIndexEntry(table_entry, index_def_meta->index_name_, txn_id_, txn_mgr_);
+        TableCollectionEntry::RemoveIndexEntry(table_entry, index_name, txn_id_, txn_mgr_);
     }
 
     for (const auto &db_name : db_names_) {
