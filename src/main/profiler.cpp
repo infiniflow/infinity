@@ -45,8 +45,7 @@ NanoSeconds BaseProfiler::ElapsedInternal() const {
     return ElapsedFromStart(now, begin_ts_);
 }
 
-String BaseProfiler::ElapsedToString() const {
-    auto duration = this->ElapsedInternal();
+String BaseProfiler::ElapsedToString(NanoSeconds duration) {
     String result;
     if (duration.count() <= 1000) {
         result.append(Format("{}ns", duration.count()));
@@ -58,6 +57,10 @@ String BaseProfiler::ElapsedToString() const {
         result.append(Format("{}s", ChronoCast<Seconds>(duration).count()));
     }
     return result;
+}
+
+String BaseProfiler::ElapsedToString() const {
+    return ElapsedToString(this->ElapsedInternal());
 }
 
 void OptimizerProfiler::StartRule(const String &rule_name) {
@@ -231,14 +234,14 @@ String QueryProfiler::ToString() const {
 Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
     Json json;
 
-    i64 total = 0;
+    i64 start = std::numeric_limits<i64>::max();
+    i64 end = 0;
     for (const auto &fragment : profiler->records_) {
         Json json_fragments;
         json_fragments["fragment_id"] = fragment.first;
 
         i64 fragment_start = std::numeric_limits<i64>::max();
         i64 fragment_end = 0;
-        i64 fragment_total = 0;
         for (const auto &task : fragment.second) {
             Json json_tasks;
             SizeT times = 0;
@@ -246,11 +249,9 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
 
             i64 task_start = std::numeric_limits<i64>::max();
             i64 task_end = 0;
-            i64 task_total = 0;
             for (const auto &operators : task.second) {
                 task_start = Min(task_start, operators.task_profiler_.GetBegin());
                 task_end = Max(task_end, operators.task_profiler_.GetEnd());
-                task_total += operators.task_profiler_.Elapsed();
 
                 Json json_operators;
                 json_operators["times"] = times;
@@ -270,23 +271,25 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
             }
             json_tasks["task_start"] = task_start;
             json_tasks["task_end"] = task_end;
-            json_tasks["task_total"] = task_total;
+            json_tasks["task_total"] = task_end - task_start;
 
             fragment_start = Min(fragment_start, task_start);
             fragment_end = Max(fragment_end, task_end);
-            fragment_total += task_total;
 
             json_fragments["tasks"].push_back(json_tasks);
         }
-        total += fragment_total;
+        i64 fragment_total = fragment_end - fragment_start;
 
         json_fragments["fragment_start"] = fragment_start;
         json_fragments["fragment_end"] = fragment_end;
         json_fragments["fragment_total"] = fragment_total;
 
+        start = Min(start, fragment_start);
+        end = Max(end, fragment_end);
+
         json["fragments"].push_back(json_fragments);
     }
-    json["total"] = total;
+    json["total"] = end - start;
     json["time_unit"] = "ns";
 
     return json;

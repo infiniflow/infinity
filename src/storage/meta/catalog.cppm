@@ -34,44 +34,47 @@ class ProfileHistory {
 private:
     Mutex lock_{};
     Vector<SharedPtr<QueryProfiler>> queue;
-    int front;
-    int rear;
-    int maxSize;
+    SizeT front;
+    SizeT rear;
+    SizeT max_size;
 
 public:
-    ProfileHistory(int size) {
-        maxSize = size + 1;
-        queue.resize(maxSize);
+    ProfileHistory(SizeT size) {
+        max_size = size + 1;
+        queue.resize(max_size);
         front = 0;
         rear = 0;
     }
 
     void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
         UniqueLock<Mutex> lk(lock_);
-        if ((rear + 1) % maxSize == front) {
+        if ((rear + 1) % max_size == front) {
             return;
         }
         queue[rear] = profiler;
-        rear = (rear + 1) % maxSize;
+        rear = (rear + 1) % max_size;
     }
 
-    SharedPtr<QueryProfiler> Dequeue() {
+    QueryProfiler *GetElement(SizeT index) {
         UniqueLock<Mutex> lk(lock_);
-        if (front == rear) {
+        if (index < 0 || index >= (rear - front + max_size) % max_size) {
             return nullptr;
         }
-        SharedPtr<QueryProfiler> value = queue[front];
-        front = (front + 1) % maxSize;
-        return value;
-    }
-
-    QueryProfiler *GetElement(int index) {
-        UniqueLock<Mutex> lk(lock_);
-        if (index < 0 || index >= (rear - front + maxSize) % maxSize) {
-            return nullptr;
-        }
-        int actualIndex = (front + index) % maxSize;
+        SizeT actualIndex = (front + index) % max_size;
         return queue[actualIndex].get();
+    }
+
+    Vector<SharedPtr<QueryProfiler>> GetElements() {
+        Vector<SharedPtr<QueryProfiler>> elements;
+        elements.reserve(max_size);
+
+        UniqueLock<Mutex> lk(lock_);
+        for (SizeT i = 0; i < queue.size(); ++i) {
+            if (queue[i].get() != nullptr) {
+                elements.push_back(queue[i]);
+            }
+        }
+        return elements;
     }
 };
 
@@ -122,6 +125,10 @@ public:
 
     const QueryProfiler *GetProfilerRecord(SizeT index) {
         return history.GetElement(index);
+    }
+
+    const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() {
+        return history.GetElements();
     }
 public:
     SharedPtr<String> current_dir_{nullptr};
