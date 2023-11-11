@@ -27,6 +27,7 @@ import infinity_exception;
 import base_entry;
 import index_file_worker;
 import faiss_index_file_worker;
+import annivfflat_index_file_worker;
 import hnsw_file_worker;
 
 module index_entry;
@@ -39,7 +40,18 @@ static UniquePtr<IndexFileWorker> CreateFileWorker(SegmentEntry *segment_entry, 
     auto column_def = para->column_def_;
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
-            file_worker = MakeUnique<FaissIndexFileWorker>(segment_entry->segment_dir_, index_def->index_name_, index_def, column_def);
+            auto create_annivfflat_para = static_cast<CreateAnnIVFFlatPara *>(para.get());
+            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
+            switch (elem_type) {
+                case kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(segment_entry->segment_dir_,
+                                                                             index_def->index_name_,
+                                                                             index_def,
+                                                                             column_def,
+                                                                             create_annivfflat_para->row_count_);
+                    break;
+                }
+            }
             break;
         }
         case IndexMethod::kHnsw: {

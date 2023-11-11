@@ -54,3 +54,19 @@ target_link_libraries(
     infinity_core
     benchmark_profiler
 )
+
+add_executable(ann_ivfflat_benchmark
+        ann_ivfflat_benchmark.cpp
+        helper.cpp
+        helper.h
+)
+target_include_directories(ann_ivfflat_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
+target_include_directories(ann_ivfflat_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
+target_include_directories(ann_ivfflat_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+        ann_ivfflat_benchmark
+        infinity_core
+        benchmark_profiler
+        faiss
+        onnxruntime_mlas
+)
