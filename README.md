@@ -48,6 +48,8 @@ $ sudo apt install g++-13 bison flex cmake libomp-18-dev libblas-dev liblapack-d
 $ wget https://apt.llvm.org/llvm.sh
 $ chmod +x llvm.sh
 $ sudo ./llvm.sh 18
+# dependencies for grpc
+$ sudo apt install libgrpc++-dev libgrpc-dev protobuf-compiler-grpc libprotobuf-dev python3-grpcio python3-grpc-tools
 ```
 
 On OpenSUSE Tumbleweed,

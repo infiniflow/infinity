@@ -13,39 +13,12 @@
 // limitations under the License.
 
 module;
+#include "../third_party/mlas/inc/mlas.h"
 
-import stl;
-import singleton;
-import boost;
-import connection;
-
-export module db_server;
+export module use_mlas;
 
 namespace infinity {
-
-export struct StartupParameter {
-    SharedPtr<String> config_path{};
-};
-
-export class DBServer {
-public:
-    void Init(const StartupParameter& parameter);
-
-    void Run();
-
-    void Shutdown();
-
-private:
-    void CreateConnection();
-
-    void StartConnection(SharedPtr<Connection> &connection);
-
-    atomic_bool initialized{false};
-    atomic_u64 running_connection_count_{0};
-    AsioIOService io_service_{};
-    UniquePtr<AsioAcceptor> acceptor_ptr_{};
-    SharedPtr<String> config_path_{};
-//    Thread grpc_thread_{};
-};
-
+export void matrixA_multiply_transpose_matrixB_output_to_C(const float *x, const float *y, size_t nx, size_t ny, size_t dimension, float *output) {
+    MlasGemm(CblasNoTrans, CblasTrans, nx, ny, dimension, 1.0f, x, dimension, y, dimension, 0.0f, output, ny, nullptr);
 }
+} // namespace infinity
