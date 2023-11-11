@@ -45,7 +45,7 @@ private:
     AsioIOService io_service_{};
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
-    Thread grpc_thread_{};
+//    Thread grpc_thread_{};
 };
 
 }
