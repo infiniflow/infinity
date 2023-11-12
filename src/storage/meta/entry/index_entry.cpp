@@ -33,42 +33,8 @@ import hnsw_file_worker;
 module index_entry;
 
 namespace infinity {
-
-static UniquePtr<IndexFileWorker> CreateFileWorker(SegmentEntry *segment_entry, UniquePtr<CreateIndexPara> para) {
-    UniquePtr<IndexFileWorker> file_worker = nullptr;
-    auto index_def = para->index_def_;
-    auto column_def = para->column_def_;
-    switch (index_def->method_type_) {
-        case IndexMethod::kIVFFlat: {
-            auto create_annivfflat_para = static_cast<CreateAnnIVFFlatPara *>(para.get());
-            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
-            switch (elem_type) {
-                case kElemFloat: {
-                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(segment_entry->segment_dir_,
-                                                                             index_def->index_name_,
-                                                                             index_def,
-                                                                             column_def,
-                                                                             create_annivfflat_para->row_count_);
-                    break;
-                }
-            }
-            break;
-        }
-        case IndexMethod::kHnsw: {
-            auto create_hnsw_para = static_cast<CreateHnswPara *>(para.get());
-            file_worker = MakeUnique<HnswFileWorker>(segment_entry->segment_dir_,
-                                                     index_def->index_name_,
-                                                     index_def,
-                                                     column_def,
-                                                     create_hnsw_para->max_element_);
-            break;
-        }
-        default: {
-            NotImplementException("Not implemented.");
-        }
-    }
-    return file_worker;
-}
+IndexEntry::IndexEntry(IndexDefEntry *index_def_entry, SegmentEntry *segment_entry, BufferObj *buffer)
+    : BaseEntry(EntryType::kIndex), index_def_entry_(index_def_entry), segment_entry_(segment_entry), buffer_(buffer){};
 
 SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(IndexDefEntry *index_def_entry,
                                                 SegmentEntry *segment_entry,
@@ -165,7 +131,18 @@ UniquePtr<IndexFileWorker> IndexEntry::CreateFileWorker(IndexDefEntry *index_def
     auto file_name = MakeShared<String>(IndexEntry::IndexFileName(*index_def->index_name_));
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
-            file_worker = MakeUnique<FaissIndexFileWorker>(index_def_entry->index_dir_, file_name, index_def, column_def);
+            auto create_annivfflat_para = static_cast<CreateAnnIVFFlatPara *>(para.get());
+            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
+            switch (elem_type) {
+                case kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(index_def_entry->index_dir_,
+                                                                             file_name,
+                                                                             index_def,
+                                                                             column_def,
+                                                                             create_annivfflat_para->row_count_);
+                    break;
+                }
+            }
             break;
         }
         case IndexMethod::kHnsw: {

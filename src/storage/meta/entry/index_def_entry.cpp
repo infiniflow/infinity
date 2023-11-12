@@ -82,8 +82,11 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const Json &index_def_entry_
     u64 txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
-    bool deleted = index_def_entry_json["delete"];
-    Assert<StorageException>(!deleted, "Bug.");
+    bool deleted = index_def_entry_json["deleted"];
+
+    if (deleted) {
+        return MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts, nullptr);
+    }
 
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     SharedPtr<IndexDef> index_def = IndexDef::Deserialize(index_def_entry_json["index_def"]);

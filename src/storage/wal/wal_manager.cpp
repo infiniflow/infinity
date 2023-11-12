@@ -648,6 +648,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
 
     TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), index_def_entry, commit_ts, storage_->buffer_manager());
     TableCollectionEntry::CommitCreateIndex(table_entry, table_store->txn_indexes_store_);
+    index_def_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
