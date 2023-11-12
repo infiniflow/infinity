@@ -23,6 +23,7 @@ module;
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <experimental/source_location>
 #include <filesystem>
 #include <forward_list>
 #include <iostream>
@@ -41,16 +42,15 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <experimental/source_location>
 
 export module stl;
 
 export namespace std {
 
 using std::experimental::source_location;
-//using std::stringstream;
+// using std::stringstream;
 
-}
+} // namespace std
 
 namespace infinity {
 
@@ -60,6 +60,9 @@ export {
 
     template <typename T1, typename T2>
     using Pair = std::pair<T1, T2>;
+
+    template <typename T1, typename... T2>
+    using Tuple = std::tuple<T1, T2...>;
 
     template <typename T, std::size_t N>
     using Array = std::array<T, N>;
@@ -262,8 +265,8 @@ export {
         return std::make_unique<T>(std::forward<Args>(args)...);
     }
 
-    template<typename T, typename U>
-    inline constexpr Pair<T, U> MakePair(T&& first, U&& second) {
+    template <typename T, typename U>
+    inline constexpr Pair<T, U> MakePair(T && first, U && second) {
         return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
 

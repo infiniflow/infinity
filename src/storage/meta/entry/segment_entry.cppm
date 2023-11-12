@@ -32,14 +32,9 @@ export module segment_entry;
 
 namespace infinity {
 
-// class BufferManager;
-//
-// class Txn;
-//
+class IndexDefEntry;
 class TableCollectionEntry;
-//
-// class IndexDef;
-//
+
 export class SegmentEntry;
 
 struct SegmentEntry : public BaseEntry {
@@ -62,9 +57,6 @@ public:
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
-    // Want key type to be const String or shared_ptr<const String>
-    HashMap<String, SharedPtr<IndexEntry>> index_entry_map_{};
-
 public:
     static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableCollectionEntry *table_entry, u32 segment_id, BufferManager *buffer_mgr);
 
@@ -76,17 +68,13 @@ public:
     static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     static SharedPtr<IndexEntry> CreateIndexFile(SegmentEntry *segment_entry,
-                                                 SharedPtr<IndexDef> index_def,
+                                                 IndexDefEntry *index_def_entry,
                                                  SharedPtr<ColumnDef> column_def,
                                                  TxnTimeStamp create_ts,
                                                  BufferManager *buffer_mgr,
                                                  TxnTableStore *txn_store);
 
-    
-
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
-
-    static void CommitCreateIndex(SegmentEntry *segment_entry, SharedPtr<IndexEntry> index_entry);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
@@ -96,11 +84,7 @@ public:
 
     static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json,
-                                               TableCollectionEntry *table_entry,
-                                               BufferManager *buffer_mgr,
-                                               const HashMap<String, SharedPtr<IndexDef>> &index_def_map,
-                                               const HashMap<String, SharedPtr<ColumnDef>> &column_def_map);
+    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
     static int Room(SegmentEntry *segment_entry);
 
@@ -109,6 +93,7 @@ public:
 private:
     static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u32 seg_id);
 
+public:
     static UniquePtr<CreateIndexPara>
     GetCreateIndexPara(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def);
 };

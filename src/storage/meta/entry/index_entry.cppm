@@ -26,27 +26,28 @@ export module index_entry;
 
 namespace infinity {
 
-class SegmentEntry;
+class IndexDefEntry;
 class FaissIndexPtr;
 class BufferManager;
 class IndexDef;
+class SegmentEntry;
 
 export class IndexEntry : public BaseEntry {
 private:
-    explicit IndexEntry(SegmentEntry *segment_entry, SharedPtr<String> index_name, BufferObj *buffer);
+    explicit IndexEntry(IndexDefEntry *index_def_entry, SegmentEntry *segment_entry, BufferObj *buffer);
 
 public:
-    static SharedPtr<IndexEntry> NewIndexEntry(SegmentEntry *segment_entry,
-                                               SharedPtr<String> index_name,
+    static SharedPtr<IndexEntry> NewIndexEntry(IndexDefEntry *index_def_entry,
+                                               SegmentEntry *segment_entry,
                                                TxnTimeStamp create_ts,
                                                BufferManager *buffer_manager,
                                                UniquePtr<CreateIndexPara> create_index_para);
 
 private:
     // Load from disk. Is called by IndexEntry::Deserialize.
-    static SharedPtr<IndexEntry> LoadIndexEntry(SegmentEntry *segment_entry,
+    static SharedPtr<IndexEntry> LoadIndexEntry(IndexDefEntry *index_def_entry,
+                                                SegmentEntry *segment_entry,
                                                 BufferManager *buffer_manager,
-                                                SharedPtr<String> file_name,
                                                 UniquePtr<CreateIndexPara> create_index_para);
 
 public:
@@ -58,22 +59,25 @@ public:
 
     static Json Serialize(const IndexEntry *index_entry);
 
-    static SharedPtr<IndexEntry>
-    Deserialize(const Json &index_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr, UniquePtr<CreateIndexPara> create_index_para);
+    static SharedPtr<IndexEntry> Deserialize(const Json &index_entry_json,
+                                             IndexDefEntry *index_def_entry_,
+                                             SegmentEntry *segment_entry,
+                                             BufferManager *buffer_mgr,
+                                             UniquePtr<CreateIndexPara> create_index_para);
 
     void MergeFrom(BaseEntry &other);
 
 private:
+    static UniquePtr<IndexFileWorker> CreateFileWorker(IndexDefEntry *index_def_entry, UniquePtr<CreateIndexPara> para);
+
     static String IndexFileName(const String &index_name);
 
-    static String IndexDirName(const String &segment_entry_dir);
-
 public:
-    const SegmentEntry *segment_entry_{};
-    const SharedPtr<String> index_name_{};
+    IndexDefEntry *const index_def_entry_;
+    SegmentEntry *const segment_entry_;
 
 private:
-    BufferObj *buffer_{};
+    BufferObj *const buffer_{};
 
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this IndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this IndexEntry

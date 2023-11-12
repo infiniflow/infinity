@@ -38,6 +38,7 @@ import segment_entry;
 import block_entry;
 import table_collection_entry;
 import data_access_state;
+import index_def_entry;
 
 import infinity_exception;
 #include "statement/extra/extra_ddl_info.h"
@@ -641,11 +642,13 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     if (!index_def_entry_result.Success()) {
         Error<StorageException>("Wal Replay: Create index failed");
     }
+    IndexDefEntry *index_def_entry = static_cast<IndexDefEntry *>(index_def_entry_result.entry_);
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), cmd.index_def_, commit_ts, storage_->buffer_manager());
-    TableCollectionEntry::CommitCreateIndex(table_entry, table_store->uncommitted_indexes_);
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), index_def_entry, commit_ts, storage_->buffer_manager());
+    TableCollectionEntry::CommitCreateIndex(table_entry, table_store->txn_indexes_store_);
+    index_def_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
