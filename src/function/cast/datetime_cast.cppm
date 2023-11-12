@@ -57,6 +57,7 @@ struct DateTimeTryCastToFixlen {
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 

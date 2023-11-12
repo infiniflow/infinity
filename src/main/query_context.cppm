@@ -99,7 +99,7 @@ public:
         }
     }
 
-    [[nodiscard]] Txn *GetTxn() const { return session_ptr_->txn(); }
+    [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 

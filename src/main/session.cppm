@@ -40,7 +40,8 @@ public:
     SessionOptions *options() { return &session_options; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
-    inline Txn *&txn() { return txn_; }
+    inline Txn* GetTxn() const { return txn_; }
+    inline void SetTxn(Txn* txn) { txn_ = txn; }
 
     inline static u64 GetNextSessionID() { return ++session_id_generator_; }
 

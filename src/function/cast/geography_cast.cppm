@@ -42,6 +42,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
             Error<TypeException>(Format("Can't cast from geography type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct GeographyTryCastToVarlen {
@@ -49,6 +50,7 @@ struct GeographyTryCastToVarlen {
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 

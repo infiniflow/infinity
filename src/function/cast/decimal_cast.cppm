@@ -67,6 +67,7 @@ inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
             Error<TypeException>(Format("Can't cast from Decimal type to {}", target.ToString()));
         }
     }
+    return BoundCastFunc(nullptr);
 }
 
 struct DecimalTryCastToFixlen {

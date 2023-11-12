@@ -31,6 +31,7 @@ export struct TryCastBoolean {
     static inline bool Run(SourceType input, TargetType &target) {
         Error<FunctionException>("No implementation to cast from " + DataType::TypeToString<SourceType>() + " to " +
                                  DataType::TypeToString<TargetType>());
+        return false;
     }
 };
 

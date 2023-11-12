@@ -86,6 +86,7 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     Error<NetworkException>("Not reachable");
+    return QueryResult::UnusedResult();
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
@@ -95,8 +96,8 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         this->CreateTxn();
         this->BeginTxn();
         LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
-                        session_ptr_->txn()->TxnID(),
-                        session_ptr_->txn()->BeginTS(),
+                        session_ptr_->GetTxn()->TxnID(),
+                        session_ptr_->GetTxn()->BeginTS(),
                         statement->ToString()));
         TryMarkProfiler(statement->type_);
 
@@ -141,21 +142,22 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 }
 
 void QueryContext::CreateTxn() {
-    if (session_ptr_->txn() == nullptr) {
-        session_ptr_->txn() = storage_->txn_manager()->CreateTxn();
+    if (session_ptr_->GetTxn() == nullptr) {
+        Txn* new_txn = storage_->txn_manager()->CreateTxn();
+        session_ptr_->SetTxn(new_txn);
     }
 }
 
-void QueryContext::BeginTxn() { session_ptr_->txn()->BeginTxn(); }
+void QueryContext::BeginTxn() { session_ptr_->GetTxn()->BeginTxn(); }
 
 void QueryContext::CommitTxn() {
-    session_ptr_->txn()->CommitTxn();
-    session_ptr_->txn() = nullptr;
+    session_ptr_->GetTxn()->CommitTxn();
+    session_ptr_->SetTxn(nullptr);
 }
 
 void QueryContext::RollbackTxn() {
-    session_ptr_->txn()->RollbackTxn();
-    session_ptr_->txn() = nullptr;
+    session_ptr_->GetTxn()->RollbackTxn();
+    session_ptr_->SetTxn(nullptr);
 }
 
 } // namespace infinity

@@ -47,6 +47,7 @@ std::string QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             assert(false);
         }
     }
+    return {};
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {
