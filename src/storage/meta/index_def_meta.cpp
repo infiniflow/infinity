@@ -36,10 +36,7 @@ namespace infinity {
 
 class SegmentEntry;
 
-IndexDefMeta::IndexDefMeta(TableCollectionEntry *table_collection_entry) : table_collection_entry_(table_collection_entry) {
-    // Insert a dummy entry
-    entry_list_.emplace_front(MakeUnique<BaseEntry>(EntryType::kDummy));
-}
+IndexDefMeta::IndexDefMeta(TableCollectionEntry *table_collection_entry) : table_collection_entry_(table_collection_entry) {}
 
 EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
                                          SharedPtr<IndexDef> index_def,
@@ -49,7 +46,8 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
                                          TxnManager *txn_mgr) {
     UniqueLock<RWMutex> w_locker(index_def_meta->rw_locker_);
 
-    EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr);
+    BaseEntry *last_entry = nullptr;
+    EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr, last_entry);
     switch (status) {
         case BaseMeta::kExisted: {
             LOG_TRACE(Format("Duplicated index."));
@@ -67,8 +65,7 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
         }
         case BaseMeta::kNotExisted: {
             String &table_dir = *index_def_meta->table_collection_entry_->table_entry_dir_;
-            SharedPtr<String> index_dir = index_def_meta->IndexDirName(table_dir, *index_def->index_name_);
-            auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts, index_dir);
+            auto index_def_entry = IndexDefEntry::NewIndexDefEntry(index_def, index_def_meta, txn_id, begin_ts);
             IndexDefEntry *res = index_def_entry.get();
             index_def_meta->entry_list_.emplace_front(Move(index_def_entry));
             return {.entry_ = res, .err_ = nullptr};
@@ -86,10 +83,12 @@ EntryResult
 IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     UniqueLock<RWMutex> w_locker(index_def_meta->rw_locker_);
 
-    EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr);
+    BaseEntry *last_entry = nullptr;
+    EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr, last_entry);
     switch (status) {
         case kExisted: {
-            auto delete_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts, nullptr);
+            auto delete_entry =
+                MakeUnique<IndexDefEntry>(nullptr, index_def_meta, static_cast<IndexDefEntry *>(last_entry)->index_dir_, txn_id, begin_ts);
             delete_entry->deleted_ = true;
             index_def_meta->entry_list_.emplace_front(Move(delete_entry));
             return {.entry_ = index_def_meta->entry_list_.front().get(), .err_ = nullptr};
@@ -147,9 +146,5 @@ UniquePtr<IndexDefMeta> IndexDefMeta::Deserialize(const Json &index_def_meta_jso
         }
     }
     return res;
-}
-
-SharedPtr<String> IndexDefMeta::IndexDirName(const String &table_dir, const String &index_name) const {
-    return MakeShared<String>(Format("{}/{}", table_dir, index_name));
 }
 } // namespace infinity

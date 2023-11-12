@@ -15,7 +15,7 @@
 module;
 
 #include "faiss/index_io.h"
-#include <vector>
+#include <time.h>
 
 import stl;
 import base_entry;
@@ -39,18 +39,27 @@ import knn_hnsw;
 import dist_func;
 import table_collection_entry;
 import segment_entry;
+import local_file_system;
+import default_values;
+import random;
 
 module index_def_entry;
 
 namespace infinity {
 IndexDefEntry::IndexDefEntry(SharedPtr<IndexDef> index_def,
                              IndexDefMeta *index_def_meta,
+                             SharedPtr<String> index_dir,
                              u64 txn_id,
-                             TxnTimeStamp begin_ts,
-                             SharedPtr<String> index_dir)
-    : BaseEntry(EntryType::kIndexDef), index_def_meta_(index_def_meta), index_dir_(index_dir), index_def_(index_def) {
-    begin_ts_ = begin_ts; // TODO shenyushi:: begin_ts and txn_id should be const and set in BaseEntry
+                             TxnTimeStamp begin_ts)
+    : BaseEntry(EntryType::kIndexDef), index_def_(index_def), index_def_meta_(index_def_meta), index_dir_(index_dir) {
+    begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
+}
+
+UniquePtr<IndexDefEntry>
+IndexDefEntry::NewIndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+    SharedPtr<String> index_dir = DetermineIndexDir(*index_def_meta->table_collection_entry_->table_entry_dir_, *index_def->index_name_);
+    return MakeUnique<IndexDefEntry>(index_def, index_def_meta, index_dir, txn_id, begin_ts);
 }
 
 void IndexDefEntry::CommitCreatedIndex(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index_entry) {
@@ -85,13 +94,13 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const Json &index_def_entry_
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        return MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts, nullptr);
+        return MakeUnique<IndexDefEntry>(nullptr, index_def_meta, nullptr, txn_id, begin_ts);
     }
 
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     SharedPtr<IndexDef> index_def = IndexDef::Deserialize(index_def_entry_json["index_def"]);
 
-    auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts, index_dir);
+    auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, index_dir, txn_id, begin_ts);
     index_def_entry->commit_ts_.store(commit_ts);
     index_def_entry->deleted_ = deleted;
 
@@ -115,4 +124,15 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const Json &index_def_entry_
 
     return index_def_entry;
 }
+
+SharedPtr<String> IndexDefEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
+    LocalFileSystem fs;
+    SharedPtr<String> index_dir;
+    do {
+        u32 seed = time(nullptr);
+        index_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_index_" + index_name);
+    } while (!fs.CreateDirectoryNoExp(*index_dir));
+    return index_dir;
+}
+
 } // namespace infinity

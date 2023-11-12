@@ -56,8 +56,5 @@ public:
     RWMutex rw_locker_{};
 
     TableCollectionEntry *const table_collection_entry_{};
-
-private:
-    SharedPtr<String> IndexDirName(const String &table_dir, const String &index_name) const;
 };
 } // namespace infinity

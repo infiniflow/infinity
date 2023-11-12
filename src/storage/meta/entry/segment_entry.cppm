@@ -91,7 +91,7 @@ public:
     void MergeFrom(infinity::BaseEntry &other) override;
 
 private:
-    static SharedPtr<String> DetermineSegFilename(const String &parent_dir, u32 seg_id);
+    static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);
 
 public:
     static UniquePtr<CreateIndexPara>
