@@ -30,6 +30,7 @@ import wal_entry;
 import txn_store;
 import index_def_entry;
 import database_detail;
+import status;
 
 export module txn;
 
@@ -80,7 +81,7 @@ public:
 
     EntryResult CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    EntryResult CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type);
+    Status CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type);
 
     EntryResult GetTableByName(const String &db_name, const String &table_name);
 
@@ -88,7 +89,7 @@ public:
 
     EntryResult DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
 
-    EntryResult DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
+    Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
     EntryResult GetCollectionByName(const String &db_name, const String &table_name);
 
@@ -111,9 +112,7 @@ public:
 
     BufferManager *GetBufferMgr() const;
 
-    NewCatalog *GetCatalog() {
-        return catalog_;
-    }
+    NewCatalog *GetCatalog() { return catalog_; }
 
     inline u64 TxnID() const { return txn_id_; }
 

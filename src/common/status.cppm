@@ -42,6 +42,8 @@ public:
 
     inline explicit Status(ErrorCode code) : code_(code) {}
 
+    inline Status(ErrorCode code, UniquePtr<String> message): code_(code), msg_(Move(message)) {}
+
     Status(ErrorCode code, const char *msg);
 
     Status(Status &s);

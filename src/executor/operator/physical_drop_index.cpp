@@ -20,7 +20,7 @@ import operator_state;
 import parser;
 import table_def;
 import data_table;
-
+import status;
 import infinity_exception;
 
 module physical_drop_index;
@@ -31,10 +31,10 @@ void PhysicalDropIndex::Init() {}
 
 void PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
-    auto res = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
+    Status status = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
 
     auto drop_index_operator_state = static_cast<DropIndexOperatorState *>(operator_state);
-    drop_index_operator_state->error_message_ = Move(res.err_);
+    drop_index_operator_state->error_message_ = Move(status.msg_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

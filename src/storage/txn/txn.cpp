@@ -42,7 +42,7 @@ import table_collection_detail;
 import table_collection_type;
 import new_catalog;
 import database_detail;
-
+import status;
 import table_def;
 import index_def;
 import index_def_meta;
@@ -327,30 +327,35 @@ EntryResult Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &t
     return res;
 }
 
-EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+Status Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        LOG_TRACE("Transaction is not started");
-        return {.entry_ = nullptr, .err_ = MakeUnique<String>("Transaction is not started")};
+        Error<TransactionException>("Transaction is not started");
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg.get() != nullptr) {
-        return {nullptr, Move(err_msg)};
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
-    EntryResult res = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    BaseEntry* base_entry{nullptr};
+    Status status = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, base_entry);
 
-    if (res.entry_ == nullptr) {
-        return res;
+    if(!status.ok()) {
+        return status;
     }
-    if (res.entry_->entry_type_ != EntryType::kIndexDef) {
-        return {nullptr, MakeUnique<String>("Invalid index type")};
+
+    if(status.ok() && base_entry == nullptr && conflict_type == ConflictType::kIgnore) {
+        return status;
     }
-    auto index_def_entry = static_cast<IndexDefEntry *>(res.entry_);
+
+    if (base_entry->entry_type_ != EntryType::kIndexDef) {
+        Error<TransactionException>("Invalid index type");
+    }
+    auto index_def_entry = static_cast<IndexDefEntry *>(base_entry);
     txn_indexes_.emplace(*index_def->index_name_, index_def_entry);
 
     TxnTableStore *table_store{nullptr};
@@ -362,7 +367,7 @@ EntryResult Txn::CreateIndex(const String &db_name, const String &table_name, Sh
     TableCollectionEntry::CreateIndexFile(table_entry, table_store, index_def_entry, begin_ts, GetBufferMgr());
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
-    return res;
+    return status;
 }
 
 EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
@@ -401,33 +406,37 @@ EntryResult Txn::DropTableCollectionByName(const String &db_name, const String &
     return res;
 }
 
-EntryResult Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
+Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     TxnState txn_state =  txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        LOG_TRACE("Transaction isn't started.");
-        return {nullptr, MakeUnique<String>("Transaction isn't started.")};
+        Error<TransactionException>("Transaction is not started");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
     TableCollectionEntry *table_entry{nullptr};
     UniquePtr<String> err_msg = GetTableEntry(db_name, table_name, table_entry);
     if (err_msg.get() != nullptr) {
-        return {nullptr, Move(err_msg)};
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
-    EntryResult res = TableCollectionEntry::DropIndex(table_entry, index_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
-    if (res.entry_ == nullptr) {
-        return res;
+    BaseEntry* base_entry{nullptr};
+    Status status = TableCollectionEntry::DropIndex(table_entry, index_name, conflict_type, txn_id_, begin_ts, txn_mgr_, base_entry);
+    if(!status.ok()) {
+        return status;
+    }
+
+    if(status.ok() && base_entry == nullptr && conflict_type == ConflictType::kIgnore) {
+        return status;
     }
 
     if (auto iter = txn_indexes_.find(index_name); iter != txn_indexes_.end()) {
         txn_indexes_.erase(iter);
     } else {
-        txn_indexes_.emplace(index_name, static_cast<IndexDefEntry *>(res.entry_));
+        txn_indexes_.emplace(index_name, static_cast<IndexDefEntry *>(base_entry));
     }
 
     wal_entry_->cmds.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
-    return res;
+    return status;
 }
 
 EntryResult Txn::GetTableByName(const String &db_name, const String &table_name) {

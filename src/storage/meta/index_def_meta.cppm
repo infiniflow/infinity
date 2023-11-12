@@ -21,6 +21,8 @@ import txn_manager;
 import third_party;
 import index_def;
 import base_meta;
+import base_entry;
+import status;
 
 export module index_def_meta;
 
@@ -35,14 +37,20 @@ public:
     explicit IndexDefMeta(TableCollectionEntry *table_collection_entry);
 
 public:
-    static EntryResult CreateNewEntry(IndexDefMeta *index_def_meta,
-                                      SharedPtr<IndexDef> index_def,
-                                      ConflictType conflict_type,
-                                      u64 txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnManager *txn_mgr);
+    static Status CreateNewEntry(IndexDefMeta *index_def_meta,
+                                 SharedPtr<IndexDef> index_def,
+                                 ConflictType conflict_type,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr,
+                                 BaseEntry *&new_index_entry);
 
-    static EntryResult DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static Status DropNewEntry(IndexDefMeta *index_def_meta,
+                               ConflictType conflict_type,
+                               u64 txn_id,
+                               TxnTimeStamp begin_ts,
+                               TxnManager *txn_mgr,
+                               BaseEntry *&new_index_entry);
 
     static SharedPtr<String> ToString(IndexDefMeta *index_def_meta);
 

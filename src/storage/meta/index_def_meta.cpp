@@ -29,6 +29,7 @@ import third_party;
 
 import infinity_exception;
 import table_collection_entry;
+import status;
 
 module index_def_meta;
 
@@ -41,27 +42,30 @@ IndexDefMeta::IndexDefMeta(TableCollectionEntry *table_collection_entry) : table
     entry_list_.emplace_front(MakeUnique<BaseEntry>(EntryType::kDummy));
 }
 
-EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
-                                         SharedPtr<IndexDef> index_def,
-                                         ConflictType conflict_type,
-                                         u64 txn_id,
-                                         TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr) {
+Status IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
+                                    SharedPtr<IndexDef> index_def,
+                                    ConflictType conflict_type,
+                                    u64 txn_id,
+                                    TxnTimeStamp begin_ts,
+                                    TxnManager *txn_mgr,
+                                    BaseEntry *&new_index_entry) {
     UniqueLock<RWMutex> w_locker(index_def_meta->rw_locker_);
 
     EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr);
     switch (status) {
         case BaseMeta::kExisted: {
-            LOG_TRACE(Format("Duplicated index."));
+
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
-                    return {.entry_ = nullptr, .err_ = nullptr};
+                    return Status::OK();
                 }
                 case ConflictType::kError: {
-                    return {.entry_ = nullptr, .err_ = MakeUnique<String>("Duplicated index.")};
+                    String error_message = "Duplicated index.";
+                    LOG_TRACE(error_message);
+                    return Status(ErrorCode::kDuplicate, error_message.c_str());
                 }
                 default: {
-                    throw StorageException("Invalid conflict type.");
+                    Error<StorageException>("Invalid conflict type.");
                 }
             }
         }
@@ -69,21 +73,25 @@ EntryResult IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
             String &table_dir = *index_def_meta->table_collection_entry_->table_entry_dir_;
             SharedPtr<String> index_dir = index_def_meta->IndexDirName(table_dir, *index_def->index_name_);
             auto index_def_entry = MakeUnique<IndexDefEntry>(index_def, index_def_meta, txn_id, begin_ts, index_dir);
-            IndexDefEntry *res = index_def_entry.get();
+            new_index_entry = index_def_entry.get();
             index_def_meta->entry_list_.emplace_front(Move(index_def_entry));
-            return {.entry_ = res, .err_ = nullptr};
+            return Status::OK();
         }
         case BaseMeta::kConflict: {
             // Write-Write conflict
-            LOG_TRACE("Write-Write conflict: There is a committed index: which is later than current transaction.");
-            return {.entry_ = nullptr,
-                    .err_ = MakeUnique<String>("Write-Write conflict. There is a committed index which is later than current transaction.")};
+            String error_message = "Write-Write conflict: There is a committed index: which is later than current transaction.";
+            LOG_ERROR(error_message);
+            return Status(ErrorCode::kWWConflict, error_message.c_str());
         }
     }
 }
 
-EntryResult
-IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Status IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta,
+                                  ConflictType conflict_type,
+                                  u64 txn_id,
+                                  TxnTimeStamp begin_ts,
+                                  TxnManager *txn_mgr,
+                                  BaseEntry *&new_index_entry) {
     UniqueLock<RWMutex> w_locker(index_def_meta->rw_locker_);
 
     EntryStatus status = index_def_meta->AddEntryInternal(txn_id, begin_ts, txn_mgr);
@@ -91,28 +99,30 @@ IndexDefMeta::DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_t
         case kExisted: {
             auto delete_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, txn_id, begin_ts, nullptr);
             delete_entry->deleted_ = true;
+            new_index_entry = delete_entry.get();
             index_def_meta->entry_list_.emplace_front(Move(delete_entry));
-            return {.entry_ = index_def_meta->entry_list_.front().get(), .err_ = nullptr};
+            return Status::OK();
         }
         case kNotExisted: {
-            LOG_TRACE(Format("Attempt to drop not existed entry."));
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
-                    return {.entry_ = nullptr, .err_ = nullptr};
+                    return Status::OK();
                 }
                 case ConflictType::kError: {
-                    return {.entry_ = nullptr, .err_ = MakeUnique<String>("Not existed entry.")};
+                    String error_message = "Attempt to drop not existed entry.";
+                    LOG_ERROR(error_message);
+                    return Status(ErrorCode::kNotFound, error_message.c_str());
                 }
                 default: {
-                    throw StorageException("Invalid conflict type");
+                    Error<StorageException>("Invalid conflict type");
                 }
             }
         }
         case kConflict: {
             // Write-Write conflict
-            LOG_TRACE("Write-Write conflict: There is a committed entry which is later than current transaction.");
-            return {.entry_ = nullptr,
-                    .err_ = MakeUnique<String>("Write-Write conflict. There is a committed entry which is later than current transaction.")};
+            String error_message = "Write-Write conflict: There is a committed entry which is later than current transaction.";
+            LOG_ERROR(error_message);
+            return Status(ErrorCode::kWWConflict, error_message.c_str());
         }
     }
 }

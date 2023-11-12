@@ -22,7 +22,7 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
-
+import status;
 import infinity_exception;
 
 module physical_create_index;
@@ -33,9 +33,9 @@ void PhysicalCreateIndex::Init() {}
 
 void PhysicalCreateIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    auto result = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_, conflict_type_);
-    if (result.err_.get() != nullptr) {
-        operator_state->error_message_ = Move(result.err_);
+    Status status = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_, conflict_type_);
+    if (!status.ok()) {
+        operator_state->error_message_ = Move(status.msg_);
     }
     operator_state->SetComplete();
 }
