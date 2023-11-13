@@ -177,17 +177,18 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
                 case kElemFloat: {
                     auto annivfflat_index = static_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
                     // TODO: How to select training data?
-                    bool trained = false;
+                    Vector<f32> segment_column_data;
+                    segment_column_data.reserve(segment_entry->row_count_ * dimension);
                     for (const auto &block_entry : segment_entry->block_entries_) {
                         auto block_column_entry = block_entry->columns_[column_id].get();
                         BufferHandle buffer_handle = block_column_entry->buffer_->Load();
                         auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
                         SizeT block_row_cnt = block_entry->row_count_;
-                        if (!trained) {
-                            annivfflat_index->train_centroids(dimension, block_row_cnt, block_data_ptr);
-                        }
-                        annivfflat_index->insert_data(dimension, block_row_cnt, block_data_ptr);
+                        segment_column_data.insert(segment_column_data.end(), block_data_ptr, block_data_ptr + block_row_cnt * dimension);
                     }
+                    SizeT total_row_cnt = segment_column_data.size() / dimension;
+                    annivfflat_index->train_centroids(dimension, total_row_cnt, segment_column_data.data());
+                    annivfflat_index->insert_data(dimension, total_row_cnt, segment_column_data.data());
                     break;
                 }
                 default: {
