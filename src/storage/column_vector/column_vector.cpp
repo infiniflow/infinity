@@ -2039,6 +2039,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         case kCircle:
         case kBitmap:
         case kUuid:
+        case kRowID:
         case kEmbedding: {
             size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
             break;
