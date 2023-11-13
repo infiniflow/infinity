@@ -94,7 +94,7 @@ void MakeKnnScanState(UniquePtr<OperatorState> &operator_state, PhysicalKnnScan 
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
     operator_state = MakeUnique<KnnScanOperatorState>();
-    KnnScanOperatorState* knn_scan_op_state_ptr = (KnnScanOperatorState*)(operator_state.get());
+    KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
     knn_scan_op_state_ptr->knn_scan_function_data_ = MakeShared<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
                                                                                      knn_scan_source_state->global_ids_,
                                                                                      physical_knn_scan->ColumnIDs(),
@@ -109,9 +109,7 @@ void MakeKnnScanState(UniquePtr<OperatorState> &operator_state, PhysicalKnnScan 
     knn_scan_op_state_ptr->knn_scan_function_data_->Init();
 }
 
-void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state,
-                       PhysicalMergeKnn *physical_merge_knn,
-                       FragmentTask *task) {
+void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
     // if (physical_merge_knn->knn_expressions_.size() != 1) {
     //     Error<SchedulerException>("Currently, we only support one knn column scenario");
     // }
@@ -124,17 +122,14 @@ void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state,
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
     operator_state = MakeUnique<MergeKnnOperatorState>();
-    MergeKnnOperatorState* merge_knn_op_state_ptr = (MergeKnnOperatorState*)(operator_state.get());
+    MergeKnnOperatorState *merge_knn_op_state_ptr = (MergeKnnOperatorState *)(operator_state.get());
 
     // Set fake parallel number here. It will be set in SetMergeKnnState
     merge_knn_op_state_ptr->merge_knn_function_data_ =
         MakeShared<MergeKnnFunctionData>(0, 1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
 }
 
-void MakeTaskState(UniquePtr<OperatorState> &operator_state,
-                   SizeT operator_id,
-                   const Vector<PhysicalOperator *> &physical_ops,
-                   FragmentTask *task) {
+void MakeTaskState(UniquePtr<OperatorState> &operator_state, SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops, FragmentTask *task) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             Error<SchedulerException>("Invalid physical operator type");
@@ -166,8 +161,7 @@ void MakeTaskState(UniquePtr<OperatorState> &operator_state,
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate: {
-            MakeTaskStateTemplate<MergeParallelAggregateOperatorState>(operator_state,
-                                                                                                       physical_ops[operator_id]);
+            MakeTaskStateTemplate<MergeParallelAggregateOperatorState>(operator_state, physical_ops[operator_id]);
             break;
         }
         case PhysicalOperatorType::kFilter: {
@@ -372,10 +366,10 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     }
 }
 
-void FragmentContext::MakeFragmentContext(QueryContext *query_context,
-                                          FragmentContext *parent_context,
-                                          PlanFragment *fragment_ptr,
-                                          Vector<FragmentTask *> &task_array) {
+void FragmentContext::BuildTask(QueryContext *query_context,
+                                FragmentContext *parent_context,
+                                PlanFragment *fragment_ptr,
+                                Vector<FragmentTask *> &task_array) {
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
@@ -471,7 +465,7 @@ void FragmentContext::MakeFragmentContext(QueryContext *query_context,
     if (fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : fragment_ptr->Children()) {
-            FragmentContext::MakeFragmentContext(query_context, fragment_context.get(), child_fragment.get(), task_array);
+            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), task_array);
         }
     }
     switch (fragment_operators[0]->operator_type()) {

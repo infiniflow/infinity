@@ -40,6 +40,8 @@ std::string QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "PhysicalPlan";
         case QueryPhase::kPipelineBuild:
             return "PipelineBuild";
+        case QueryPhase::kTaskBuild:
+            return "TaskBuild";
         case QueryPhase::kExecution:
             return "Execution";
         default: {

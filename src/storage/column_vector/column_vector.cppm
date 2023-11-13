@@ -133,7 +133,7 @@ public:
     // from - start RowID
     // count - total row count to be copied. These rows shall be in the same BlockEntry.
     // return value: appended rows actually
-    SizeT AppendWith(RowT from, SizeT count);
+    SizeT AppendWith(RowID from, SizeT count);
 
     void ShallowCopy(const ColumnVector &other);
 

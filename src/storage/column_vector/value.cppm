@@ -91,7 +91,7 @@ public:
 
     static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info);
 
-    static Value MakeRow(RowT input);
+    static Value MakeRow(RowID input);
 
     static Value MakeMixedData(MixedT input);
 
@@ -174,7 +174,7 @@ public:
         UuidT uuid;
         BlobT blob;
         EmbeddingT embedding;
-        RowT row;
+        RowID row;
 
         MixedT mixed_value;
 
@@ -280,6 +280,9 @@ BlobT Value::GetValue() const;
 
 template <>
 EmbeddingT Value::GetValue() const;
+
+template <>
+RowID Value::GetValue() const;
 
 template <>
 MixedT Value::GetValue() const;

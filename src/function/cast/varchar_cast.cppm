@@ -121,7 +121,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             Error<TypeException>("Cast from varchar to embedding");
         }
         case kRowID: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowID, TryCastVarchar>);
         }
         case kMixed: {
             Error<TypeException>("Cast from varchar to mix");

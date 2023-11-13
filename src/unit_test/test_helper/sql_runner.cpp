@@ -30,6 +30,8 @@ import bind_context;
 import logical_node;
 import physical_operator;
 import fragment_scheduler;
+import fragment_context;
+import fragment_task;
 
 import infinity_exception;
 import singleton;
@@ -93,8 +95,11 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
     auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment(physical_plan.get());
 
-    // Schedule the query pipeline
-    query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
+    Vector<FragmentTask *> tasks;
+    FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), tasks);
+
+    // Schedule the query tasks
+    query_context_ptr->scheduler()->Schedule(tasks);
 
     // Initialize query result
     QueryResult query_result;

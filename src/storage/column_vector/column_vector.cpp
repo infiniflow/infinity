@@ -15,6 +15,7 @@
 module;
 
 #include <sstream>
+#include <iostream>
 import stl;
 import selection;
 import parser;
@@ -213,7 +214,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kRowID: {
-                CopyFrom<RowT>(other.data(), this->data(), tail_index_, input_select);
+                CopyFrom<RowID>(other.data(), this->data(), tail_index_, input_select);
                 break;
             }
             case kMixed: {
@@ -460,7 +461,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 break;
             }
             case kRowID: {
-                CopyFrom<RowT>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
+                CopyFrom<RowID>(other.data(), this->data(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kMixed: {
@@ -610,7 +611,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kRowID: {
-            CopyRowFrom<RowT>(other.data(), src_idx, this->data(), dst_idx);
+            CopyRowFrom<RowID>(other.data(), src_idx, this->data(), dst_idx);
             break;
         }
         case kMixed: {
@@ -797,7 +798,7 @@ String ColumnVector::ToString() const {
         }
         case kRowID: {
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((RowT *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
+                ss << ((RowID *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
             }
             break;
         }
@@ -922,7 +923,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return embedding_str;
         }
         case kRowID: {
-            return (((RowT *)data_ptr_)[row_index]).ToString();
+            return (((RowID *)data_ptr_)[row_index]).ToString();
         }
         case kMixed: {
             Error<TypeException>("Not implemented");
@@ -1034,7 +1035,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeEmbedding(ptr, data_type_->type_info());
         }
         case kRowID: {
-            return Value::MakeRow(((RowT *)data_ptr_)[index]);
+            return Value::MakeRow(((RowID *)data_ptr_)[index]);
         }
         case kMixed: {
             return Value::MakeMixedData(((MixedT *)data_ptr_)[index]);
@@ -1222,7 +1223,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kRowID: {
-            ((RowT *)data_ptr_)[index] = value.GetValue<RowT>();
+            ((RowID *)data_ptr_)[index] = value.GetValue<RowID>();
             break;
         }
         case kMixed: {
@@ -1420,7 +1421,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
         case kRowID: {
-            ((RowT *)data_ptr_)[index] = *(RowT *)(raw_ptr);
+            ((RowID *)data_ptr_)[index] = *(RowID *)(raw_ptr);
             break;
         }
         case kMixed: {
@@ -1776,8 +1777,8 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         case kRowID: {
-            auto *src_ptr = (RowT *)(other.data_ptr_);
-            RowT *dst_ptr = &((RowT *)(data_ptr_))[this->tail_index_];
+            auto *src_ptr = (RowID *)(other.data_ptr_);
+            RowID *dst_ptr = &((RowID *)(data_ptr_))[this->tail_index_];
             for (SizeT idx = 0; idx < count; ++idx) {
                 dst_ptr[idx] = src_ptr[idx];
             }
@@ -1874,7 +1875,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
     return appended_rows;
 }
 
-SizeT ColumnVector::AppendWith(RowT from, SizeT row_count) {
+SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
     Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only RowID column vector supports this method");
     if (row_count == 0) {
         return 0;

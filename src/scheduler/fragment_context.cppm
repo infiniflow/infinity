@@ -46,7 +46,7 @@ export enum class FragmentType {
 export class FragmentContext {
 public:
     static void
-    MakeFragmentContext(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Vector<FragmentTask *> &tasks);
+    BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Vector<FragmentTask *> &tasks);
 
 public:
     explicit FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context);

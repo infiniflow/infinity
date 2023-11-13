@@ -33,6 +33,8 @@ import data_block;
 import optimizer;
 import physical_planner;
 import fragment_builder;
+import fragment_task;
+import fragment_context;
 import bind_context;
 import logical_node;
 import physical_operator;
@@ -125,8 +127,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         query_metrics_->StopPhase(QueryPhase::kPipelineBuild);
 
+        query_metrics_->StartPhase(QueryPhase::kTaskBuild);
+        Vector<FragmentTask *> tasks;
+        FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), tasks);
+        query_metrics_->StopPhase(QueryPhase::kTaskBuild);
+
         query_metrics_->StartPhase(QueryPhase::kExecution);
-        scheduler_->Schedule(this, plan_fragment.get());
+        scheduler_->Schedule(tasks);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
         query_metrics_->StopPhase(QueryPhase::kExecution);

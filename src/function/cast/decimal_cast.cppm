@@ -74,7 +74,8 @@ struct DecimalTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
@@ -82,7 +83,8 @@ struct DecimalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));;
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
     }
 };
 
