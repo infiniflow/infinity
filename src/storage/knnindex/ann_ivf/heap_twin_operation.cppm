@@ -94,6 +94,11 @@ public:
         }
         size = 0;
     }
+    void sort() {
+        for (u64 q_id = 0; q_id < nq; ++q_id) {
+            sort(q_id);
+        }
+    }
 };
 
 // assume that distances have been initialized to std::numeric_limits<DistType>::max() / lowest()
