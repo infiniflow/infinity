@@ -70,7 +70,7 @@ void PhysicalImport::Init() {}
  * @param output_state
  */
 void PhysicalImport::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    ImportOperatorState* import_op_state = static_cast<ImportOperatorState *>(operator_state);
+    ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
     switch (file_type_) {
         case CopyFileType::kCSV: {
             ImportCSV(query_context, import_op_state);
@@ -88,7 +88,7 @@ void PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     import_op_state->SetComplete();
 }
 
-void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState* import_op_state) {
+void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
     if (table_collection_entry_->columns_.size() != 1) {
         Error<ExecutorException>("FVECS file must have only one column.");
     }
@@ -131,17 +131,36 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
     BufferHandle buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
     SizeT row_idx = 0;
-
+    auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
     while (true) {
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
             Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
         }
-        ptr_t dst_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut()) + row_idx * sizeof(FloatT) * dimension;
+        ptr_t dst_ptr = buf_ptr + last_block_entry->row_count_ * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
         ++segment_entry->row_count_;
         ++last_block_entry->row_count_;
+
+        ++row_idx;
+        if (row_idx == vector_n) {
+            SaveSegmentData(txn_store, segment_entry);
+            break;
+        }
+
+        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+            SaveSegmentData(txn_store, segment_entry);
+
+            segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
+            if (segment_id == 60) {
+                int a = 1;
+            }
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
+
+            last_block_entry = segment_entry->block_entries_.back().get();
+            buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
+        }
 
         if (BlockEntry::Room(last_block_entry) <= 0) {
             segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
@@ -150,28 +169,15 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
                                                                               segment_entry->column_count_,
                                                                               txn->GetBufferMgr()));
             last_block_entry = segment_entry->block_entries_.back().get();
-        }
-
-        row_idx++;
-        if (row_idx == vector_n) {
-            SaveSegmentData(txn_store, segment_entry);
-            break;
-        }
-        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
-            SaveSegmentData(txn_store, segment_entry);
-
-            segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
-
-            last_block_entry = segment_entry->block_entries_.back().get();
             buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
+            buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         }
     }
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));
     import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState* import_op_state) {
+void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state) {
     // opts, parser and parser_context points to each other.
     // opt -> parser_context
     // parser->opt
@@ -226,7 +232,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState*
     import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState* import_op_state) {}
+void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext *>(context);
