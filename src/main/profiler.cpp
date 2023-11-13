@@ -130,6 +130,9 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
         case QueryPhase::kPipelineBuild: {
             return "PipelineBuild";
         }
+        case QueryPhase::kTaskBuild: {
+            return "TaskBuild";
+        }
         case QueryPhase::kExecution: {
             return "Execution";
         }
