@@ -162,11 +162,11 @@ void PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
         column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
     }
     if (explain_type_ == ExplainType::kPipeline) {
-        for (SizeT idx = 0; idx < this->task_texts->size(); ++idx) {
-            task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts)[idx]));
-        }
+        AlignParagraphs(*this->texts_, *this->task_texts_);
 
-        AlignParagraphs(*this->texts_, *this->task_texts);
+        for (SizeT idx = 0; idx < this->task_texts_->size(); ++idx) {
+            task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts_)[idx]));
+        }
     }
 
     Vector<SharedPtr<ColumnVector>> column_vectors;
