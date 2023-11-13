@@ -110,7 +110,8 @@ public:
                                   base_ivf->partition_num_,
                                   base_ivf->centroids_.data(),
                                   centroid_ids.data(),
-                                  centroid_dists.data());
+                                  centroid_dists.data(),
+                                  false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
                 for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::max(); ++k) {
@@ -250,7 +251,8 @@ public:
                                   base_ivf->partition_num_,
                                   base_ivf->centroids_.data(),
                                   centroid_ids.data(),
-                                  centroid_dists.data());
+                                  centroid_dists.data(),
+                                  false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
                 for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::lowest(); ++k) {

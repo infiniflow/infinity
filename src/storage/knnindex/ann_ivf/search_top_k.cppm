@@ -80,7 +80,7 @@ void search_top_1_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, con
 }
 
 template <typename TypeX, typename TypeY, typename ID, typename DistType>
-void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances) {
+void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
     heap_twin_multiple<std::greater<DistType>, DistType, ID> heap(nx, k, distances, labels);
     std::fill(distances, distances + nx * k, std::numeric_limits<DistType>::max());
     for (u32 i = 0; i < nx; ++i) {
@@ -91,15 +91,17 @@ void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, 
             heap.add(i, distance, j);
         }
     }
-    heap.sort();
+    if (sort_) {
+        heap.sort();
+    }
 }
 
 export template <typename TypeX, typename TypeY, typename ID, typename DistType>
-void search_top_k_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances) {
+void search_top_k_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
     if constexpr (std::is_same_v<DistType, TypeX> && std::is_same_v<DistType, TypeY> && std::is_same_v<DistType, f32>) {
-        search_top_k_with_sgemm(k, dimension, nx, x, ny, y, labels, distances);
+        search_top_k_with_sgemm(k, dimension, nx, x, ny, y, labels, distances, sort_);
     } else {
-        search_top_k_simple_with_dis(k, dimension, nx, x, ny, y, labels, distances);
+        search_top_k_simple_with_dis(k, dimension, nx, x, ny, y, labels, distances, sort_);
     }
 }
 

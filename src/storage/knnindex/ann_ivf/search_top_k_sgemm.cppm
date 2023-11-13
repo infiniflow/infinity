@@ -37,6 +37,7 @@ void search_top_k_with_sgemm(u32 k,
                              const f32 *y,
                              ID *labels,
                              f32 *distances = nullptr,
+                             bool sort_ = true,
                              u32 block_size_x = 4096,
                              u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
@@ -128,7 +129,9 @@ void search_top_k_with_sgemm(u32 k,
             }
         }
     }
-    heap.sort();
+    if (sort_) {
+        heap.sort();
+    }
 }
 
 } // namespace infinity
