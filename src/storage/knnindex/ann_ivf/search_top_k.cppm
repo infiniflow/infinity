@@ -21,6 +21,7 @@ module;
 import stl;
 import vector_distance;
 import search_top_1_sgemm;
+import search_top_k_sgemm;
 import heap_twin_operation;
 
 export module search_top_k;

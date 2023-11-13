@@ -101,7 +101,7 @@ public:
                 }
             }
         } else {
-            if constexpr (true) {
+            if constexpr (false) {
                 Vector<DistType> centroid_dists(n_probes);
                 Vector<u32> centroid_ids(n_probes);
                 heap_twin<std::greater<DistType>, DistType, u32> centroids_n_probes(n_probes, centroid_dists.data(), centroid_ids.data());
@@ -125,6 +125,28 @@ public:
                     }
                 }
             } else {
+                Vector<DistType> centroid_dists(n_probes * this->query_count_);
+                Vector<u32> centroid_ids(n_probes * this->query_count_);
+                search_top_k_with_dis(n_probes,
+                                      this->dimension_,
+                                      this->query_count_,
+                                      queries_,
+                                      base_ivf->partition_num_,
+                                      base_ivf->centroids_.data(),
+                                      centroid_ids.data(),
+                                      centroid_dists.data());
+                for (u64 i = 0; i < this->query_count_; i++) {
+                    const DistType *x_i = queries_ + i * this->dimension_;
+                    for (u32 k = 0; k < n_probes && centroid_dists[k + i * this->dimension_] != std::numeric_limits<DistType>::max(); ++k) {
+                        const u32 selected_centroid = centroid_ids[k + i * this->dimension_];
+                        const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
+                        const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
+                        for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
+                            DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                            heap_twin_max_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
+                        }
+                    }
+                }
             }
         }
     }
