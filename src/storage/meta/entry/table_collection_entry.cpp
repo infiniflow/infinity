@@ -456,6 +456,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
         max_segment_id = Max(max_segment_id, seg_id);
         auto it = this->segments_.find(seg_id);
         if (it == this->segments_.end()) {
+            sgement_entry2->table_entry_ = this;
             this->segments_.emplace(seg_id, sgement_entry2);
         } else {
             it->second->MergeFrom(*sgement_entry2.get());

@@ -94,7 +94,9 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const Json &index_def_entry_
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        return MakeUnique<IndexDefEntry>(nullptr, index_def_meta, nullptr, txn_id, begin_ts);
+        auto index_def_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, nullptr, txn_id, begin_ts);
+        index_def_entry->deleted_ = true;
+        return index_def_entry;
     }
 
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);

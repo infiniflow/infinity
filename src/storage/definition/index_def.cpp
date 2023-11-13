@@ -192,6 +192,7 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
             SizeT ef = index_def_json["ef"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             auto ptr = MakeShared<HnswIndexDef>(Move(index_name), Move(column_names), metric_type, M, ef_construction, ef);
+            res = std::static_pointer_cast<IndexDef>(ptr);
             break;
         }
         case IndexMethod::kInvalid: {

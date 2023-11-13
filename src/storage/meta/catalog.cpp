@@ -33,6 +33,8 @@ import local_file_system;
 import file_system_type;
 import file_system;
 
+import table_collection_entry;
+
 module new_catalog;
 
 namespace infinity {
@@ -230,6 +232,28 @@ Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool
     return json_res;
 }
 
+void NewCatalog::CheckCatalog() {
+    for (auto &[db_name, db_meta] : this->databases_) {
+        for (auto &base_entry : db_meta->entry_list_) {
+            if (base_entry->entry_type_ == EntryType::kDummy) {
+                continue;
+            }
+            auto db_entry = static_cast<DBEntry *>(base_entry.get());
+            for (auto &[table_name, table_meta] : db_entry->tables_) {
+                for (auto &base_entry : table_meta->entry_list_) {
+                    if (base_entry->entry_type_ == EntryType::kDummy) {
+                        continue;
+                    }
+                    auto table_entry = static_cast<TableCollectionEntry *>(base_entry.get());
+                    if (table_entry->table_collection_meta_->db_entry_ != db_entry) {
+                        int a = 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog1 = MakeUnique<NewCatalog>(nullptr);
     Assert<CatalogException>(!catalog_paths.empty(), "Catalog paths is empty");
@@ -243,6 +267,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
         UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
         catalog1->MergeFrom(*catalog2);
     }
+    // catalog1->CheckCatalog();
     return catalog1;
 }
 
