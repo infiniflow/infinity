@@ -76,13 +76,11 @@ void search_top_k_with_sgemm(u32 k,
                 _mm_prefetch(ip_line, _MM_HINT_NTA);
                 _mm_prefetch(ip_line + 16, _MM_HINT_NTA);
 
+                const __m256 x_norm = _mm256_set1_ps(square_x[x_id]);
                 const __m256 mul_minus2 = _mm256_set1_ps(-2);
 
-                __m256 min_distances = _mm256_set1_ps(distances[x_id] - square_x[x_id]);
-
-                __m256i min_indices = _mm256_set1_epi32(0);
-
-                __m256i current_indices = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+                __m256i current_indices_0 = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+                __m256i current_indices_1 = _mm256_setr_epi32(8, 9, 10, 11, 12, 13, 14, 15);
                 const __m256i indices_delta = _mm256_set1_epi32(8);
 
                 u32 j = 0;
@@ -100,58 +98,32 @@ void search_top_k_with_sgemm(u32 k,
                     __m256 distances_0 = _mm256_fmadd_ps(ip_0, mul_minus2, y_norm_0);
                     __m256 distances_1 = _mm256_fmadd_ps(ip_1, mul_minus2, y_norm_1);
 
-                    const __m256 comparison_0 = _mm256_cmp_ps(min_distances, distances_0, _CMP_LE_OS);
+                    f32 distances_scalar_0[8];
+                    f32 distances_scalar_1[8];
+                    u32 indices_scalar_0[8];
+                    u32 indices_scalar_1[8];
 
-                    min_distances = _mm256_blendv_ps(distances_0, min_distances, comparison_0);
-                    min_indices =
-                        _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(current_indices), _mm256_castsi256_ps(min_indices), comparison_0));
-                    current_indices = _mm256_add_epi32(current_indices, indices_delta);
+                    _mm256_storeu_ps(distances_scalar_0, _mm256_add_ps(distances_0, x_norm));
+                    _mm256_storeu_si256((__m256i *)(indices_scalar_0), current_indices_0);
+                    current_indices_0 = _mm256_add_epi32(current_indices_0, indices_delta);
 
-                    const __m256 comparison_1 = _mm256_cmp_ps(min_distances, distances_1, _CMP_LE_OS);
+                    _mm256_storeu_ps(distances_scalar_1, _mm256_add_ps(distances_1, x_norm));
+                    _mm256_storeu_si256((__m256i *)(indices_scalar_1), current_indices_1);
+                    current_indices_1 = _mm256_add_epi32(current_indices_1, indices_delta);
 
-                    min_distances = _mm256_blendv_ps(distances_1, min_distances, comparison_1);
-                    min_indices =
-                        _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(current_indices), _mm256_castsi256_ps(min_indices), comparison_1));
-                    current_indices = _mm256_add_epi32(current_indices, indices_delta);
-                }
-
-                f32 min_distances_scalar[8];
-                u32 min_indices_scalar[8];
-                _mm256_storeu_ps(min_distances_scalar, min_distances);
-                _mm256_storeu_si256((__m256i *)(min_indices_scalar), min_indices);
-
-                f32 current_min_distance = distances[x_id];
-                ID current_min_index = labels[x_id];
-
-                for (u32 jv = 0; jv < 8; ++jv) {
-                    f32 distance_candidate = min_distances_scalar[jv] + square_x[x_id];
-
-                    if (distance_candidate < 0)
-                        distance_candidate = 0;
-
-                    u32 index_candidate = min_indices_scalar[jv] + y_part_begin;
-
-                    if (current_min_distance > distance_candidate) {
-                        current_min_distance = distance_candidate;
-                        current_min_index = index_candidate;
-                    } else if (current_min_distance == distance_candidate && current_min_index > index_candidate) {
-                        current_min_index = index_candidate;
+                    for (u32 jv = 0; jv < 8; ++jv) {
+                        f32 distance_candidate_0 = distances_scalar_0[jv];
+                        u32 index_candidate_0 = indices_scalar_0[jv] + y_part_begin;
+                        f32 distance_candidate_1 = distances_scalar_1[jv];
+                        u32 index_candidate_1 = indices_scalar_1[jv] + y_part_begin;
+                        heap.add(x_id, distance_candidate_0, index_candidate_0);
+                        heap.add(x_id, distance_candidate_1, index_candidate_1);
                     }
                 }
-
                 for (; j < y_part_size; ++j, ++ip_line) {
                     f32 ip = *ip_line;
                     f32 dis = square_x[x_id] + square_y[j + y_part_begin] - 2 * ip;
-                    if (dis < 0)
-                        dis = 0;
-                    if (current_min_distance > dis) {
-                        current_min_distance = dis;
-                        current_min_index = j + y_part_begin;
-                    }
-                }
-                if (distances[x_id] > current_min_distance) {
-                    distances[x_id] = current_min_distance;
-                    labels[x_id] = current_min_index;
+                    heap.add(x_id, dis, j + y_part_begin);
                 }
             }
         }
