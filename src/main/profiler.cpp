@@ -130,6 +130,9 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
         case QueryPhase::kPipelineBuild: {
             return "PipelineBuild";
         }
+        case QueryPhase::kTaskBuild: {
+            return "TaskBuild";
+        }
         case QueryPhase::kExecution: {
             return "Execution";
         }
@@ -137,7 +140,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             Error<ExecutorException>("Invalid query phase in query profiler");
         }
     }
-    return String();
+    return {};
 }
 
 void QueryProfiler::StartPhase(QueryPhase phase) {
@@ -153,8 +156,9 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
         Error<ExecutorException>(Format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
-    profilers_[phase_idx].set_name(QueryPhaseToString(phase));
-    profilers_[phase_idx].Begin();
+    BaseProfiler& phase_profiler = profilers_[phase_idx];
+    phase_profiler.set_name(QueryPhaseToString(phase));
+    phase_profiler.Begin();
 }
 
 void QueryProfiler::StopPhase(QueryPhase phase) {

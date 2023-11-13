@@ -71,7 +71,6 @@ using BitmapT = BitmapType;
 using UuidT = UuidType;
 using BlobT = BlobType;
 using EmbeddingT = EmbeddingType;
-using RowT = RowID;
 
 // Heterogeneous
 using MixedT = MixedType;
@@ -265,7 +264,7 @@ template <>
 std::string DataType::TypeToString<EmbeddingT>();
 
 template <>
-std::string DataType::TypeToString<RowT>();
+std::string DataType::TypeToString<RowID>();
 
 template <>
 std::string DataType::TypeToString<MixedT>();

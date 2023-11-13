@@ -41,7 +41,11 @@ public:
 
     void RemoteDisconnect();
 
-    static SharedPtr<Infinity> LocalConnect(const String &path);
+    static void LocalInit(const String &path);
+
+    static void LocalUnInit();
+
+    static SharedPtr<Infinity> LocalConnect();
 
     void LocalDisconnect();
 

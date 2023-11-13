@@ -14,6 +14,8 @@
 
 module;
 
+import stl;
+
 export module status;
 
 namespace infinity {
@@ -29,6 +31,8 @@ export enum class ErrorCode : long {
     kAlreadyExist,
     kNetworkError,
     kServiceUnavailable,
+    kWWConflict,
+    kDuplicate,
 
 };
 
@@ -38,22 +42,17 @@ public:
 
     inline explicit Status(ErrorCode code) : code_(code) {}
 
-    Status(ErrorCode code, const char *msg);
+    inline Status(ErrorCode code, UniquePtr<String> message): code_(code), msg_(Move(message)) {}
 
-    inline ~Status() {
-        if(msg_ != nullptr) {
-            delete[] msg_;
-            msg_ = nullptr;
-        }
-    }
+    Status(ErrorCode code, const char *msg);
 
     Status(Status &s);
 
     Status(Status &&s) noexcept;
 
-    Status &operator=(Status &s) noexcept;
+    [[nodiscard]] Status &operator=(Status &s) noexcept;
 
-    Status &operator=(Status &&s) noexcept;
+    [[nodiscard]] Status &operator=(Status &&s) noexcept;
 
     const Status &operator=(const Status &s) noexcept = delete;
 
@@ -61,23 +60,21 @@ public:
 
     static Status OK() { return {}; }
 
-    [[nodiscard]] bool ok() const { return code_ == ErrorCode::kOk && msg_ == nullptr; }
+    [[nodiscard]] bool ok() const { return code_ == ErrorCode::kOk && msg_.get() == nullptr; }
 
     [[nodiscard]] ErrorCode code() const { return code_; }
 
     void Init(ErrorCode code, const char* msg);
 
     [[nodiscard]] const char* message() const {
-        return msg_;
+        return msg_->c_str();
     }
 
-private:
-    void Move(Status &s);
-    void Move(Status &&s);
+    void MoveStatus(Status &s);
+    void MoveStatus(Status &&s);
 
-private:
     ErrorCode code_{ErrorCode::kOk};
-    char* msg_{nullptr};
+    UniquePtr<String> msg_{};
 };
 
 }

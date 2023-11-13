@@ -41,7 +41,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     auto buffer_obj = MakeUnique<BufferObj>(this, true, Move(file_worker));
 
     auto res = buffer_obj.get();
-    UniqueLock<RWMutex> w_lock(rw_locker_);
+    UniqueLock<RWMutex> w_locker(rw_locker_);
     buffer_map_[file_path] = Move(buffer_obj);
     return res;
 }

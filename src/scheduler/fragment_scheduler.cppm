@@ -39,7 +39,7 @@ public:
 
     void UnInit();
 
-    void Schedule(QueryContext *query_context, PlanFragment *plan_fragment);
+    void Schedule(const Vector<FragmentTask *>& tasks);
 
 private:
     void ScheduleTask(FragmentTask *task);

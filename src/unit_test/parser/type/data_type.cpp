@@ -123,7 +123,7 @@ TEST_F(DataTypeTest, TypeToString) {
     //    EXPECT_STREQ(DataType::TypeToString<UuidT>().c_str(), "UUID");
     //    EXPECT_STREQ(DataType::TypeToString<BlobT>().c_str(), "Blob");
     //    EXPECT_STREQ(DataType::TypeToString<EmbeddingT>().c_str(), "Embedding");
-    //    EXPECT_STREQ(DataType::TypeToString<RowT>().c_str(), "RowID");
+    //    EXPECT_STREQ(DataType::TypeToString<RowID>().c_str(), "RowID");
 }
 
 TEST_F(DataTypeTest, Serialize) {

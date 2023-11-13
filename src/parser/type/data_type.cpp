@@ -465,7 +465,7 @@ std::string DataType::TypeToString<EmbeddingT>() {
 }
 
 template <>
-std::string DataType::TypeToString<RowT>() {
+std::string DataType::TypeToString<RowID>() {
     return "RowID";
 }
 

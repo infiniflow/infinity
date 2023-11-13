@@ -15,6 +15,7 @@ enum class QueryPhase : int8_t {
     kOptimizer,
     kPhysicalPlan,
     kPipelineBuild,
+    kTaskBuild,
     kExecution,
     kInvalid,
 };

@@ -38,7 +38,10 @@ class InfinityTest : public BaseTest {
 TEST_F(InfinityTest, test1) {
     using namespace infinity;
     String path = "/tmp/infinity";
-    SharedPtr<Infinity> infinity = Infinity::LocalConnect(path);
+
+    Infinity::LocalInit(path);
+
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
 
     {
         QueryResult result = infinity->ListDatabases();
@@ -290,6 +293,7 @@ TEST_F(InfinityTest, test1) {
 
         SharedPtr<Database> db_instance = infinity->GetDatabase("default");
     }
-
     infinity->LocalDisconnect();
+
+    Infinity::LocalUnInit();
 }

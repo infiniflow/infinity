@@ -67,6 +67,7 @@ export enum class QueryPhase : i8 {
     kOptimizer,
     kPhysicalPlan,
     kPipelineBuild,
+    kTaskBuild,
     kExecution,
     kInvalid,
 };

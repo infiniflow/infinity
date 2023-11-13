@@ -33,6 +33,8 @@ import data_block;
 import optimizer;
 import physical_planner;
 import fragment_builder;
+import fragment_task;
+import fragment_context;
 import bind_context;
 import logical_node;
 import physical_operator;
@@ -86,6 +88,7 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     Error<NetworkException>("Not reachable");
+    return QueryResult::UnusedResult();
 }
 
 QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
@@ -95,8 +98,8 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         this->CreateTxn();
         this->BeginTxn();
         LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
-                        session_ptr_->txn()->TxnID(),
-                        session_ptr_->txn()->BeginTS(),
+                        session_ptr_->GetTxn()->TxnID(),
+                        session_ptr_->GetTxn()->BeginTS(),
                         statement->ToString()));
         TryMarkProfiler(statement->type_);
 
@@ -124,8 +127,13 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         query_metrics_->StopPhase(QueryPhase::kPipelineBuild);
 
+        query_metrics_->StartPhase(QueryPhase::kTaskBuild);
+        Vector<FragmentTask *> tasks;
+        FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), tasks);
+        query_metrics_->StopPhase(QueryPhase::kTaskBuild);
+
         query_metrics_->StartPhase(QueryPhase::kExecution);
-        scheduler_->Schedule(this, plan_fragment.get());
+        scheduler_->Schedule(tasks);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
         query_metrics_->StopPhase(QueryPhase::kExecution);
@@ -141,21 +149,22 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 }
 
 void QueryContext::CreateTxn() {
-    if (session_ptr_->txn() == nullptr) {
-        session_ptr_->txn() = storage_->txn_manager()->CreateTxn();
+    if (session_ptr_->GetTxn() == nullptr) {
+        Txn* new_txn = storage_->txn_manager()->CreateTxn();
+        session_ptr_->SetTxn(new_txn);
     }
 }
 
-void QueryContext::BeginTxn() { session_ptr_->txn()->BeginTxn(); }
+void QueryContext::BeginTxn() { session_ptr_->GetTxn()->BeginTxn(); }
 
 void QueryContext::CommitTxn() {
-    session_ptr_->txn()->CommitTxn();
-    session_ptr_->txn() = nullptr;
+    session_ptr_->GetTxn()->CommitTxn();
+    session_ptr_->SetTxn(nullptr);
 }
 
 void QueryContext::RollbackTxn() {
-    session_ptr_->txn()->RollbackTxn();
-    session_ptr_->txn() = nullptr;
+    session_ptr_->GetTxn()->RollbackTxn();
+    session_ptr_->SetTxn(nullptr);
 }
 
 } // namespace infinity

@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <iostream>
 import stl;
 import txn;
 import query_context;
@@ -136,8 +137,8 @@ void PhysicalShow::Init() {
         }
         case ShowType::kShowProfiles: {
 
-            output_names_->reserve(8);
-            output_types_->reserve(8);
+            output_names_->reserve(9);
+            output_types_->reserve(9);
 
             output_names_->emplace_back("record_no");
             output_names_->emplace_back("parser");
@@ -145,9 +146,11 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("optimizer");
             output_names_->emplace_back("physical planner");
             output_names_->emplace_back("pipeline builder");
+            output_names_->emplace_back("task builder");
             output_names_->emplace_back("executor");
             output_names_->emplace_back("total_cost");
 
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -403,8 +406,9 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         MakeShared<ColumnDef>(3, varchar_type, "optimizer", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(4, varchar_type, "physical_plan", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(5, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(6, varchar_type, "execution", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(7, varchar_type, "total_cost", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(6, varchar_type, "task_build", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "execution", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(8, varchar_type, "total_cost", HashSet<ConstraintType>()),
     };
 
     auto catalog = txn->GetCatalog();
@@ -420,27 +424,34 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         varchar_type,
         varchar_type,
         varchar_type,
+        varchar_type,
         varchar_type
     };
     output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
     for (SizeT i = 0; i < records.size(); ++i) {
-        i64 total_cost = 0;
-        ValueExpression value_expr(Value::MakeVarchar(Format("{}", i)));
 
-        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        // Output record no
+        ValueExpression record_no_expr(Value::MakeVarchar(Format("{}", i)));
+        record_no_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+
+        // Output each query phase
+        i64 total_cost{};
         for (SizeT j = 0; j < 7; ++j) {
-            i64 this_time = total_cost;
-            if (j != 6) {
-                this_time = records[i]->ElapsedAt(j);
-                total_cost += this_time;
-            }
+            i64 this_time = records[i]->ElapsedAt(j);
+            total_cost += this_time;
+
             NanoSeconds duration(this_time);
-            Value value = Value::MakeVarchar(BaseProfiler::ElapsedToString(duration));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[j + 1]);
+            ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(duration)));
+            phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors[j + 1]);
         }
+
+        // Output total query duration
+        NanoSeconds total_duration(total_cost);
+        ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(total_duration)));
+        phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+
         output_block_ptr->Finalize();
     }
     show_operator_state->output_.emplace_back(Move(output_block_ptr));

@@ -142,6 +142,9 @@ UniquePtr<IndexFileWorker> IndexEntry::CreateFileWorker(IndexDefEntry *index_def
                                                                              create_annivfflat_para->row_count_);
                     break;
                 }
+                default: {
+                    ExecutorException("Create IVF Flat index: unsupported element type.");
+                }
             }
             break;
         }

@@ -255,7 +255,7 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
     return value;
 }
 
-Value Value::MakeRow(RowT input) {
+Value Value::MakeRow(RowID input) {
     Value value(LogicalType::kRowID);
     value.value_.row = input;
     value.is_null_ = false;
@@ -444,7 +444,7 @@ EmbeddingT Value::GetValue() const {
 }
 
 template <>
-RowT Value::GetValue() const {
+RowID Value::GetValue() const {
     Assert<TypeException>(type_.type() == LogicalType::kRowID, Format("Not matched type: {}", type_.ToString()));
     return value_.row;
 }

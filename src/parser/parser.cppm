@@ -74,7 +74,7 @@ export using BitmapT = BitmapType;
 export using UuidT = UuidType;
 export using BlobT = BlobType;
 export using EmbeddingT = EmbeddingType;
-export using RowT = RowID;
+export using RowID = RowID;
 
 // Heterogeneous
 export using MixedT = MixedType;

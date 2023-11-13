@@ -88,12 +88,7 @@ void FragmentScheduler::UnInit() {
     }
 }
 
-void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
-    //    NotImplementError("Not implement FragmentScheduler::BuildFragmentTasks");
-    if (plan_fragment == nullptr) {
-        Error<SchedulerException>("Empty plan fragment");
-    }
-
+void FragmentScheduler::Schedule(const Vector<FragmentTask *>& tasks) {
     //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
     //    if(!children.empty()) {
     //        SchedulerError("Only support one fragment query")
@@ -104,10 +99,9 @@ void FragmentScheduler::Schedule(QueryContext *query_context, PlanFragment *plan
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
-    Vector<FragmentTask *> tasks;
-    FragmentContext::MakeFragmentContext(query_context, nullptr, plan_fragment, tasks);
 
-    LOG_TRACE(Format("Create {} tasks", tasks.size()));
+
+//    LOG_TRACE(Format("Create {} tasks", tasks.size()));
 
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task);

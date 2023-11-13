@@ -31,7 +31,7 @@ import data_access_state;
 import db_entry;
 import logger;
 import txn_store;
-
+import status;
 import infinity_exception;
 import ivfflat_index_def;
 import index_def_meta;
@@ -62,12 +62,13 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
     txn_id_ = txn_id;
 }
 
-EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
-                                              SharedPtr<IndexDef> index_def,
-                                              ConflictType conflict_type,
-                                              u64 txn_id,
-                                              TxnTimeStamp begin_ts,
-                                              TxnManager *txn_mgr) {
+Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
+                                         SharedPtr<IndexDef> index_def,
+                                         ConflictType conflict_type,
+                                         u64 txn_id,
+                                         TxnTimeStamp begin_ts,
+                                         TxnManager *txn_mgr,
+                                         BaseEntry *&new_index_entry) {
     // TODO: lock granularity can be narrowed.
     table_entry->rw_locker_.lock_shared();
     IndexDefMeta *index_def_meta{nullptr};
@@ -107,17 +108,16 @@ EntryResult TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
             Format("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_));
     }
     IndexDef *index_def_ptr = index_def.get();
-    EntryResult res = IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
-EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
-                                            const String &index_name,
-                                            ConflictType conflict_type,
-                                            u64 txn_id,
-                                            TxnTimeStamp begin_ts,
-                                            TxnManager *txn_mgr) {
+Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
+                                       const String &index_name,
+                                       ConflictType conflict_type,
+                                       u64 txn_id,
+                                       TxnTimeStamp begin_ts,
+                                       TxnManager *txn_mgr,
+                                       BaseEntry *&new_index_entry) {
     table_entry->rw_locker_.lock_shared();
 
     IndexDefMeta *index_meta{nullptr};
@@ -127,12 +127,14 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
     table_entry->rw_locker_.unlock_shared();
     if (index_meta == nullptr) {
         switch (conflict_type) {
-            LOG_TRACE(Format("Attempt to drop not existed index entry {}", index_name));
+
             case ConflictType::kIgnore: {
-                return {nullptr, nullptr};
+                return Status::OK();
             }
             case ConflictType::kError: {
-                return {nullptr, MakeUnique<String>("Attempt to drop not existed index entry")};
+                String error_message = Format("Attempt to drop not existed index entry {}", index_name);
+                LOG_TRACE(error_message);
+                return Status(ErrorCode::kNotFound, error_message.c_str());
             }
             default: {
                 Error<StorageException>("Invalid conflict type.");
@@ -141,9 +143,7 @@ EntryResult TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
         Error<StorageException>("Should not reach here.");
     }
     LOG_TRACE(Format("Drop index entry {}", index_name));
-    auto res = IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
 EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {

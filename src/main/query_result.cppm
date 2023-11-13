@@ -30,18 +30,18 @@ public:
     [[nodiscard]] inline DataTable* ResultTable() const { return result_table_.get(); }
     [[nodiscard]] inline const char *ErrorMsg() const { return status_.message(); }
 
-    //    template<typename ObjectType>
-    //    inline ObjectType* AsInfinity() { return static_cast<ObjectType*>(database_object_.get()); }
-
 public:
     Status status_{};
     SharedPtr<DataTable> result_table_{};
-//    SharedPtr<DatabaseObject> database_object_{};
 };
 
 export struct QueryResult : public BaseResult {
     LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
     String ToString() const;
+
+    static QueryResult UnusedResult() {
+        return {};
+    }
 };
 
 }

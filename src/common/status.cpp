@@ -23,50 +23,43 @@ module status;
 namespace infinity {
 
 Status::Status(ErrorCode code, const char *msg) : code_(code) {
-    u64 len = strlen(msg);
-    msg_ = new char[len]();
-    memcpy(msg_, msg, len);
+    msg_ = MakeUnique<String>(msg);
 }
 
 Status::Status(Status &s) {
-    Move(s);
+    MoveStatus(s);
 }
 
 Status::Status(Status &&s) noexcept {
-    Move(s);
+    MoveStatus(s);
 }
 
 Status &Status::operator=(Status &s) noexcept {
-    Move(s);
+    MoveStatus(s);
     return *this;
 }
 
 Status &Status::operator=(Status &&s) noexcept {
-    Move(s);
+    MoveStatus(s);
     return *this;
 }
 
-void Status::Move(Status &s) {
+void Status::MoveStatus(Status &s) {
     code_ = s.code_;
-    msg_ = s.msg_;
-    s.msg_ = nullptr;
+    msg_ = Move(s.msg_);
 }
 
-void Status::Move(Status &&s) {
+void Status::MoveStatus(Status &&s) {
     code_ = s.code_;
-    msg_ = s.msg_;
+    msg_ = Move(s.msg_);
     s.msg_ = nullptr;
 }
 
 void Status::Init(ErrorCode code, const char* msg) {
-    if(msg_ != nullptr) {
-        delete[] msg_;
-        msg_ = nullptr;
+    if(msg_.get() != nullptr) {
+        msg_.reset();
     }
-    u64 len = strlen(msg);
-    msg_ = new char[len]();
-    memcpy(msg_, msg, len);
-
+    msg_ = MakeUnique<String>(msg);
     code_ = code;
 }
 

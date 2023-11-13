@@ -25,6 +25,7 @@ TEST_F(QueryProfilerTest, test1) {
     EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kOptimizer), "Optimizer");
     EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kPhysicalPlan), "PhysicalPlan");
     EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kPipelineBuild), "PipelineBuild");
+    EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kTaskBuild), "TaskBuild");
     EXPECT_EQ(infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kExecution), "Execution");
     try {
         infinity::QueryProfiler::QueryPhaseToString(infinity::QueryPhase::kInvalid);
@@ -81,6 +82,9 @@ TEST_F(QueryProfilerTest, test3) {
     profiler.StartPhase(infinity::QueryPhase::kPipelineBuild);
     usleep(1000 * 1000);
     profiler.StopPhase(infinity::QueryPhase::kPipelineBuild);
+    profiler.StartPhase(infinity::QueryPhase::kTaskBuild);
+    usleep(1000 * 1000);
+    profiler.StopPhase(infinity::QueryPhase::kTaskBuild);
     profiler.StartPhase(infinity::QueryPhase::kExecution);
     usleep(1000 * 1000);
     profiler.StopPhase(infinity::QueryPhase::kExecution);
