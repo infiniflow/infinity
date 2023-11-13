@@ -35,9 +35,11 @@ export struct IndexDefEntry : public BaseEntry {
 public:
     explicit IndexDefEntry(SharedPtr<IndexDef> index_def,
                            IndexDefMeta *index_def_meta,
+                           SharedPtr<String> index_dir,
                            u64 txn_id,
-                           TxnTimeStamp begin_ts,
-                           SharedPtr<String> index_dir);
+                           TxnTimeStamp begin_ts);
+
+    static UniquePtr<IndexDefEntry> NewIndexDefEntry(SharedPtr<IndexDef> index_def, IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static void CommitCreatedIndex(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index_entry);
 
@@ -47,12 +49,14 @@ public:
     Deserialize(const Json &index_def_entry_json, IndexDefMeta *index_def_meta, BufferManager *buffer_mgr, TableCollectionEntry *table_entry);
 
 private:
+    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
+
 public:
     RWMutex rw_locker_{};
 
     IndexDefMeta *const index_def_meta_;
 
-    const SharedPtr<String> index_dir_;
+    SharedPtr<String> index_dir_;
     const SharedPtr<IndexDef> index_def_;
     HashMap<u32, SharedPtr<IndexEntry>> indexes_{};
 };

@@ -65,7 +65,7 @@ SharedPtr<SegmentEntry> SegmentEntry::MakeNewSegmentEntry(const TableCollectionE
     const auto *table_ptr = (const TableCollectionEntry *)table_entry;
     new_entry->column_count_ = table_ptr->columns_.size();
 
-    new_entry->segment_dir_ = SegmentEntry::DetermineSegFilename(*table_entry->table_entry_dir_, segment_id);
+    new_entry->segment_dir_ = SegmentEntry::DetermineSegmentDir(*table_entry->table_entry_dir_, segment_id);
     if (new_entry->block_entries_.empty()) {
         new_entry->block_entries_.emplace_back(
             MakeUnique<BlockEntry>(new_entry.get(), new_entry->block_entries_.size(), 0, new_entry->column_count_, buffer_mgr));
@@ -343,12 +343,12 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
     return segment_entry;
 }
 
-SharedPtr<String> SegmentEntry::DetermineSegFilename(const String &parent_dir, u32 seg_id) {
-    u32 seed = time(nullptr);
+SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
     do {
-        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_SEGMENT_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
+        u32 seed = time(nullptr);
+        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
 }

@@ -48,7 +48,7 @@ export {
     constexpr SizeT MB = 1024 * KB;
     constexpr SizeT GB = 1024 * MB;
 
-    constexpr SizeT DEFAULT_RANDOM_SEGMENT_NAME_LEN = 10;
+    constexpr SizeT DEFAULT_RANDOM_NAME_LEN = 10;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
     constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024;

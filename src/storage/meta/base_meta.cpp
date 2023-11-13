@@ -29,13 +29,14 @@ import third_party;
 module base_meta;
 
 namespace infinity {
-BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) const {
+BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const {
     Assert<StorageException>(!entry_list_.empty(), "entry list should at least has a dummy head.");
     // BaseEntry *header_base_entry = entry_list_.front().get();
 
     auto iter = entry_list_.begin();
     while (true) {
         BaseEntry *header_base_entry = iter->get();
+        last_entry = header_base_entry;
         TxnState header_state = TxnState::kInvalid;
         if (header_base_entry->commit_ts_ < UNCOMMIT_TS) {
             header_state = TxnState::kCommitted;
