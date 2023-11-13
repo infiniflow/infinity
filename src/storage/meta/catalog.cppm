@@ -119,17 +119,14 @@ public:
 
     void MergeFrom(NewCatalog &other);
 
-    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
-        history.Enqueue(Move(profiler));
-    }
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { history.Enqueue(Move(profiler)); }
 
-    const QueryProfiler *GetProfilerRecord(SizeT index) {
-        return history.GetElement(index);
-    }
+    const QueryProfiler *GetProfilerRecord(SizeT index) { return history.GetElement(index); }
 
-    const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() {
-        return history.GetElements();
-    }
+    const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
+
+    void CheckCatalog();
+
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
@@ -140,7 +137,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    ProfileHistory history{ 100 };
+    ProfileHistory history{100};
 };
 
 } // namespace infinity
