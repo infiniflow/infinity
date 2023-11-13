@@ -119,7 +119,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     auto knn_flat = static_cast<KnnDistance<T> *>(knn_scan_function_data_ptr->knn_distance_.get());
     knn_flat->Search((T *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
 
-    block_ids_idx++;
+    ++block_ids_idx;
     if (block_ids_idx == block_ids->size()) {
         // Last block, Get the result according to the topk row.
         knn_flat->End();
