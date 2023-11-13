@@ -20,16 +20,19 @@ import parser;
 import txn_manager;
 import third_party;
 import index_def;
+import base_meta;
 
 export module index_def_meta;
 
 namespace infinity {
 
+class BufferManager;
 class TableCollectionEntry;
+class SegmentEntry;
 
-export class IndexDefMeta {
+export class IndexDefMeta : public BaseMeta {
 public:
-    explicit IndexDefMeta(SharedPtr<String> index_name, TableCollectionEntry *table_collection_entry);
+    explicit IndexDefMeta(TableCollectionEntry *table_collection_entry);
 
 public:
     static EntryResult CreateNewEntry(IndexDefMeta *index_def_meta,
@@ -41,24 +44,17 @@ public:
 
     static EntryResult DropNewEntry(IndexDefMeta *index_def_meta, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static void DeleteNewEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnManager *txn_mgr);
-
-    static EntryResult GetEntry(IndexDefMeta *index_def_meta, u64 txn_id, TxnTimeStamp begin_ts);
-
     static SharedPtr<String> ToString(IndexDefMeta *index_def_meta);
 
     static inline TableCollectionEntry *GetTableCollectionEntry(IndexDefMeta *index_def_meta) { return index_def_meta->table_collection_entry_; }
 
-    static Json Serialize(const IndexDefMeta *index_def_meta);
+    static Json Serialize(const IndexDefMeta *index_def_meta, TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<IndexDefMeta> Deserialize(const Json &index_def_meta_json, TableCollectionEntry *table_collection_entry);
+    static UniquePtr<IndexDefMeta> Deserialize(const Json &index_def_meta_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
     RWMutex rw_locker_{};
 
-    TableCollectionEntry *table_collection_entry_{};
-
-    SharedPtr<String> index_name_{};
-    List<UniquePtr<BaseEntry>> entry_list_{};
+    TableCollectionEntry *const table_collection_entry_{};
 };
 } // namespace infinity

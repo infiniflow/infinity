@@ -150,7 +150,7 @@ private:
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableCollectionEntry *> txn_tables_{};
-    Set<IndexDefEntry *> txn_indexes_{};
+    HashMap<String, IndexDefEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};
