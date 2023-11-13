@@ -81,7 +81,7 @@ void search_top_k_with_sgemm(u32 k,
 
                 __m256i current_indices_0 = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
                 __m256i current_indices_1 = _mm256_setr_epi32(8, 9, 10, 11, 12, 13, 14, 15);
-                const __m256i indices_delta = _mm256_set1_epi32(8);
+                const __m256i indices_delta = _mm256_set1_epi32(16);
 
                 u32 j = 0;
                 for (; j < (y_part_size / 16) * 16; j += 16, ip_line += 16) {
