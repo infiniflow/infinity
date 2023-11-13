@@ -117,7 +117,7 @@ if (Lz4_INCLUDE_DIR AND Lz4_SRC_DIR_LZ4 AND Lz4_SRC_DIR_CMAKE)
   return()
 endif ()
 
-include(Utils)
+include(utils)
 
 # set options for: shared
 if (MSVC)
