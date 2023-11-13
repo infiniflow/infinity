@@ -46,19 +46,19 @@ file(GLOB_RECURSE
         network/*.cppm
 )
 
-#file(GLOB_RECURSE
-#        network_h
-#        CONFIGURE_DEPENDS
-#        network/*.h
-#)
+file(GLOB_RECURSE
+        network_h
+        CONFIGURE_DEPENDS
+        network/*.h
+)
 #
 #
-#file(GLOB_RECURSE
-#        grpc_cpp
-#        CONFIGURE_DEPENDS
-#        network/*.cpp
-#        network/*.cc
-#)
+file(GLOB_RECURSE
+        brpc_cpp
+        CONFIGURE_DEPENDS
+        network/*.cpp
+        network/*.cc
+)
 
 file(GLOB_RECURSE
         function_cpp
@@ -167,7 +167,9 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
-#        ${grpc_cpp}
+        #        ${grpc_cpp}
+        ${brpc_cpp}
+
 )
 
 target_sources(infinity_core
@@ -209,6 +211,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/brpc/src")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
@@ -227,13 +230,20 @@ target_link_libraries(infinity
         newpfor
         openfst
 
-#        protobuf
+
 #        grpc
 #        grpc++
 #        gpr
 #        absl_synchronization
         iresearch
 #        profiler
+
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

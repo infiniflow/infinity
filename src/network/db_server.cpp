@@ -17,6 +17,7 @@ module;
 #include <boost/bind.hpp>
 #include <thread>
 //#include "grpc_server.h"
+#include "brpc_server.h"
 
 module db_server;
 import infinity_context;
@@ -41,6 +42,8 @@ void DBServer::Run() {
     InfinityContext::instance().Init(config_path_);
 
 //    grpc_thread_ = Thread([]() { GrpcServiceImpl::Run(); });
+//    brpc_thread_ = Thread([]() { BrpcServiceImpl::Run(); });
+    BrpcServiceImpl::Run();
 
     u16 pg_port = InfinityContext::instance().config()->pg_port();
     const String &listen_address_ref = InfinityContext::instance().config()->listen_address();
@@ -80,6 +83,7 @@ void DBServer::Shutdown() {
     initialized = false;
     acceptor_ptr_->close();
 //    grpc_thread_.join();
+    brpc_thread_.join();
 
     infinity::InfinityContext::instance().UnInit();
     Printf("Shutdown infinity server successfully\n");

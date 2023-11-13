@@ -1,0 +1,111 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+syntax="proto2";
+import "idl_options.proto";
+option (idl_support) = true;
+option cc_generic_services = true;
+package test;
+
+message EchoRequest {
+    required string message = 1;
+    optional int32 code = 2;
+    optional bool close_fd = 3;
+    optional int32 sleep_us = 4;
+    optional int32 server_fail = 5;
+};
+
+message EchoResponse {
+    required string message = 1;
+    repeated int32 code_list = 2;
+    optional uint64 receiving_socket_id = 3;
+};
+
+message ComboRequest {
+    repeated EchoRequest requests = 1;
+};
+
+message BytesRequest {
+    required bytes databytes = 1;
+};
+
+message BytesResponse {
+    required bytes databytes = 1;
+};
+
+message ComboResponse {
+    repeated EchoResponse responses = 1;
+};
+
+service EchoService {
+    rpc Echo(EchoRequest) returns (EchoResponse);
+    rpc ComboEcho(ComboRequest) returns (ComboResponse);
+    rpc BytesEcho1(BytesRequest) returns (BytesResponse);
+    rpc BytesEcho2(BytesRequest) returns (BytesResponse);
+}
+
+message HttpRequest {}
+message HttpResponse {}
+service DownloadService {
+    rpc Download(HttpRequest) returns (HttpResponse);
+    rpc DownloadFailed(HttpRequest) returns (HttpResponse);
+}
+
+service UploadService {
+    rpc Upload(HttpRequest) returns (HttpResponse);
+    rpc UploadFailed(HttpRequest) returns (HttpResponse);
+}
+
+service UserNamingService {
+    rpc ListNames(HttpRequest) returns (HttpResponse);
+    rpc Touch(HttpRequest) returns (HttpResponse);
+};
+
+service DiscoveryNamingService {
+    rpc Nodes(HttpRequest) returns (HttpResponse);
+    rpc Fetchs(HttpRequest) returns (HttpResponse);
+    rpc Register(HttpRequest) returns (HttpResponse);
+    rpc Renew(HttpRequest) returns (HttpResponse);
+    rpc Cancel(HttpRequest) returns (HttpResponse);
+};
+
+service NacosNamingService {
+    rpc Login(HttpRequest) returns (HttpResponse);
+    rpc List(HttpRequest) returns (HttpResponse);
+};
+
+service HttpService {
+    rpc Head(HttpRequest) returns (HttpResponse);
+}
+
+enum State0 {
+    STATE0_NUM_0 = 0;
+    STATE0_NUM_1 = 1;
+    STATE0_NUM_2 = 2;
+};
+
+enum State1 {
+    STATE1_NUM_0 = 0;
+    STATE1_NUM_1 = 1;
+};
+
+message Message1 {
+    required State0 stat = 1;
+};
+message Message2 {
+    required State1 stat = 1;
+};

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package infinity_proto;
 
+option cc_generic_services = true;
 
 enum LogicType {
   Boolean = 0;

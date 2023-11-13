@@ -46,6 +46,7 @@ private:
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
 //    Thread grpc_thread_{};
+    Thread brpc_thread_{};
 };
 
 }
