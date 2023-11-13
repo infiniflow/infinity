@@ -157,9 +157,7 @@ file(GLOB_RECURSE
 #)
 
 add_library(infinity_core
-#        ${main_cpp}
         ${infinity_cpp}
-        ${network_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -167,9 +165,6 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
-        #        ${grpc_cpp}
-        ${brpc_cpp}
-
 )
 
 target_sources(infinity_core
@@ -177,7 +172,6 @@ target_sources(infinity_core
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${main_cppm}
         ${infinity_cppm}
-        ${network_cppm}
         ${common_cppm}
         ${planner_cppm}
         ${scheduler_cppm}
@@ -186,7 +180,6 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
-#        ${std_cppm}
 )
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -217,6 +210,14 @@ target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -m
 
 add_executable(infinity
         ${main_cpp}
+        ${network_cpp}
+        ${brpc_cpp}
+)
+
+target_sources(infinity
+        PUBLIC
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+        ${network_cppm}
 )
 
 target_link_libraries(infinity
@@ -229,8 +230,6 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
-
-
 #        grpc
 #        grpc++
 #        gpr
@@ -247,6 +246,7 @@ target_link_libraries(infinity
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 ### unit test
 
