@@ -53,27 +53,31 @@ u64 Infinity::GetSessionId() {
     return session_->session_id();
 }
 
-SharedPtr<Infinity> Infinity::LocalConnect(const String &path) {
+void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
     if (!fs.Exists(path)) {
         std::cerr << path << " doesn't exist." << std::endl;
-        return nullptr;
+        return;
     }
 
     SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
 
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     InfinityContext::instance().Init(config_path);
+}
 
-    //    infinity_ptr->Init(config_path);
-    Printf("Connect to database at: {}\n", path);
+void Infinity::LocalUnInit() {
+    InfinityContext::instance().UnInit();
+}
+
+SharedPtr<Infinity> Infinity::LocalConnect() {
+    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     infinity_ptr->session_ = MakeUnique<LocalSession>();
     return infinity_ptr;
 }
 
 void Infinity::LocalDisconnect() {
     Printf("To disconnect the database.\n");
-    InfinityContext::instance().UnInit();
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &options) {
