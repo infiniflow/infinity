@@ -5,6 +5,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src")
 
 add_subdirectory(common)
 add_subdirectory(embedding)
+add_subdirectory(local_infinity)
 add_subdirectory(blocking_scheduler)
 add_subdirectory(polling_scheduler)
 add_subdirectory(csv)
