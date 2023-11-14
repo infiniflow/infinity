@@ -43,7 +43,6 @@ import knn_expression;
 import column_expression;
 
 import buffer_manager;
-import buffer_handle;
 import merge_knn;
 import faiss;
 import index_def;
@@ -173,7 +172,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             case IndexMethod::kIVFFlat: {
                 BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
-                auto metric_type = knn_scan_shared_data->knn_distance_type_;
                 i32 n_probes = 1;
                 auto segment_id = index_entry->segment_entry_->segment_id_;
                 switch (knn_scan_shared_data->knn_distance_type_) {

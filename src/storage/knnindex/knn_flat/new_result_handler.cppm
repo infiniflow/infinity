@@ -83,14 +83,14 @@ struct NewHeapResultHandler : public ResultHandler {
             heap_dis[i] = hr.heap_dis_tab + i * k;
             heap_ids[i] = hr.heap_ids_tab + i * k;
             heap_heapify<C>(k, heap_dis[i], heap_ids[i]);
-            thresh[i] = *heap_dis[0];
+            thresh[i] = *heap_dis[i];
         }
 
         /// add one result for query i
         void add_result(T dis, TI idx, SizeT i) {
-            if (C::cmp(*heap_dis[0], dis)) {
+            if (C::cmp(thresh[i], dis)) {
                 heap_replace_top<C>(k, heap_dis[i], heap_ids[i], dis, idx);
-                thresh[i] = *heap_dis[0];
+                thresh[i] = *heap_dis[i];
             }
         }
 
