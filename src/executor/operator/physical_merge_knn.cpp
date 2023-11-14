@@ -98,6 +98,8 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     merge_knn_data.current_parallel_idx_++;
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
+        merge_knn->End(); // reorder the heap
+
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
         auto &output_data = *merge_knn_state->data_block_;
 
@@ -105,7 +107,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
-            for (i64 top_idx = result_n - 1; top_idx >= 0; --top_idx) {
+            for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
                 u32 segment_id = result_row_ids[top_idx].segment_id_;
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
                 u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
@@ -134,7 +136,6 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         }
         output_data.Finalize();
 
-        merge_knn->End();
         merge_knn_state->SetComplete();
     }
 }

@@ -59,12 +59,9 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 // --------------------------------------------
 
 KnnScanFunctionData1::KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data) : shared_data_(shared_data) {
-    switch (shared_data_->knn_distance_type_) {
-        case KnnDistanceType::kL2: {
-            this->Init<f32>();
-            break;
-        }
-        case KnnDistanceType::kInnerProduct: {
+    switch (shared_data_->elem_type_) {
+        case EmbeddingDataType::kElemFloat: {
+            Init<f32>();
             break;
         }
         default: {
