@@ -30,6 +30,8 @@ namespace infinity {
 
 class PlanFragment;
 
+class KnnScanSharedData;
+
 // enum class FragmentStatus {
 //     kNotStart,
 //     k
@@ -139,6 +141,9 @@ public:
         : FragmentContext(fragment_ptr, query_context) {}
 
     SharedPtr<DataTable> GetResultInternal() final;
+
+public:
+    SharedPtr<KnnScanSharedData> shared_data_;
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

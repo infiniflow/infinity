@@ -42,7 +42,7 @@ public:
 
 private:
     template <typename DistType>
-    void InitMergeKnn(i64 query_count, i64 topk, KnnDistanceType knn_distance_type);
+    void InitMergeKnn(KnnDistanceType knn_distance_type);
 
 public:
     i64 total_parallel_n_{};

@@ -39,9 +39,8 @@ public:
                           u64 table_index,
                           SharedPtr<Vector<String>> column_names,
                           SharedPtr<Vector<SharedPtr<DataType>>> column_types)
-        : TableRef(TableRefType::kTable, alias), table_func_(Move(table_func)), table_entry_ptr_(table_entry_ptr),
-          column_ids_(Move(column_ids)), block_index_(Move(block_index)), column_names_(Move(column_names)),
-          column_types_(Move(column_types)), table_index_(table_index) {}
+        : TableRef(TableRefType::kTable, alias), table_func_(Move(table_func)), table_entry_ptr_(table_entry_ptr), column_ids_(Move(column_ids)),
+          block_index_(Move(block_index)), column_names_(Move(column_names)), column_types_(Move(column_types)), table_index_(table_index) {}
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
         Assert<PlannerException>(std::is_sorted(indices.cbegin(), indices.cend()), "Indices must be in order");
