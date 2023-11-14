@@ -39,6 +39,7 @@ import column_buffer;
 import block_column_entry;
 import table_collection_type;
 import meta_state;
+import status;
 
 class TableCollectionEntryTest : public BaseTest {
     void SetUp() override {
@@ -144,8 +145,10 @@ TEST_F(TableCollectionEntryTest, test2) {
     }
 
     UniquePtr<TableDef> tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
-    table1_res = new_txn->CreateTable("db1", Move(tbl1_def), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    BaseEntry* base_table_entry{nullptr};
+    Status s1 = new_txn->CreateTable("db1", Move(tbl1_def), ConflictType::kError, base_table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(base_table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn->CommitTxn();
@@ -158,8 +161,10 @@ TEST_F(TableCollectionEntryTest, test2) {
         new_txn->BeginTxn();
 
         // Txn2: Get db1, OK
-        get_res = new_txn->GetTableByName("db1", "tbl1");
-        EXPECT_NE(get_res.entry_, nullptr);
+        base_table_entry = nullptr;
+        Status s2 = new_txn->GetTableByName("db1", "tbl1", base_table_entry);
+        EXPECT_TRUE(s2.ok());
+        EXPECT_NE(base_table_entry, nullptr);
 
         // Prepare the input data block
         Vector<SharedPtr<DataType>> column_types;

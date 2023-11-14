@@ -68,7 +68,7 @@ void QueryContext::Init(const Config *global_config_ptr,
     optimizer_ = MakeUnique<Optimizer>(this);
     physical_planner_ = MakeUnique<PhysicalPlanner>(this);
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
-    query_metrics_ = MakeShared<QueryProfiler>(is_enable_profiler());
+    query_metrics_ = MakeShared<QueryProfiler>(is_enable_profiling());
 }
 
 QueryResult QueryContext::Query(const String &query) {
@@ -119,7 +119,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         // Build physical plan
         query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
-        SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
+        UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
         query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
 
         query_metrics_->StartPhase(QueryPhase::kPipelineBuild);

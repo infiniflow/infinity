@@ -22,6 +22,8 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import base_entry;
+import status;
 
 module physical_create_table;
 
@@ -38,23 +40,26 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
       output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index), table_def_ptr_(Move(table_def_ptr)) {}
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
-                                         const SharedPtr<PhysicalOperator> &input,
+                                         UniquePtr<PhysicalOperator> input,
                                          SharedPtr<Vector<String>> output_names,
                                          SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, Move(input), nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
       output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index) {}
 
 void PhysicalCreateTable::Init() {}
 
 void PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
+
     auto txn = query_context->GetTxn();
-    auto result = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
+
+    BaseEntry* new_table_entry{nullptr};
+    Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_, new_table_entry);
     auto create_table_operator_state = (CreateTableOperatorState *)operator_state;
-    if (result.err_.get() != nullptr) {
-        create_table_operator_state->error_message_ = Move(result.err_);
+    if (!status.ok()) {
+        create_table_operator_state->error_message_ = Move(status.msg_);
     }
     operator_state->SetComplete();
 }

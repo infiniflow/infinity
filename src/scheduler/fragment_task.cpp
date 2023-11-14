@@ -24,6 +24,7 @@ import physical_source;
 import physical_sink;
 import physical_operator;
 import infinity_exception;
+import query_context;
 
 module fragment_task;
 
@@ -36,10 +37,11 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64 worker_id) {
-//    LOG_TRACE(Format("Execute fragment task on {}", worker_id));
-//    infinity::BaseProfiler prof;
-//    prof.Begin();
+    //    LOG_TRACE(Format("Execute fragment task on {}", worker_id));
+    //    infinity::BaseProfiler prof;
+    //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+    QueryContext *query_context = fragment_context->query_context();
 
     // TODO:
     // Tell the fragment type:
@@ -49,19 +51,18 @@ void FragmentTask::OnExecute(i64 worker_id) {
     // For streaming type, we need to run sink each execution
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
-    source_op->Execute(fragment_context->query_context(), source_state_.get());
+    source_op->Execute(query_context, source_state_.get());
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
-    bool enable_profiler = fragment_context->query_context()->is_enable_profiler();
+    bool enable_profiler = query_context->is_enable_profiling();
     TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
     profiler.Begin();
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
             profiler.StartOperator(operator_refs[op_idx]);
-            operator_refs[op_idx]->Execute(fragment_context->query_context(),
-                                           operator_states_[op_idx].get());
+            operator_refs[op_idx]->Execute(query_context, operator_states_[op_idx].get());
             profiler.StopOperator(operator_states_[op_idx].get());
         }
     } catch (const Exception &e) {
@@ -73,12 +74,9 @@ void FragmentTask::OnExecute(i64 worker_id) {
     } else {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
 
-        fragment_context->FlushProfiler(Move(profiler));
-        sink_op->Execute(fragment_context->query_context(), sink_state_.get());
+        fragment_context->FlushProfiler(profiler);
+        sink_op->Execute(query_context, sink_state_.get());
     }
-
-//    prof.End();
-//    LOG_TRACE(prof.ElapsedToString());
 }
 
 u64 FragmentTask::ProposedCPUID(u64 max_cpu_count) const {
@@ -100,7 +98,7 @@ bool FragmentTask::IsComplete() const {
 
 TaskBinding FragmentTask::TaskBinding() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    struct TaskBinding binding{};
+    struct TaskBinding binding {};
 
     binding.task_id_ = task_id_;
     binding.fragment_id_ = fragment_context->fragment_ptr()->FragmentID();

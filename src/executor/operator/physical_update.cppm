@@ -30,10 +30,10 @@ namespace infinity {
 export class PhysicalUpdate : public PhysicalOperator {
 public:
     explicit PhysicalUpdate(u64 id,
-                            SharedPtr<PhysicalOperator> left,
+                            UniquePtr<PhysicalOperator> left,
                             TableCollectionEntry *table_entry_ptr,
                             const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
-        : PhysicalOperator(PhysicalOperatorType::kUpdate, left, nullptr, id), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
+        : PhysicalOperator(PhysicalOperatorType::kUpdate, Move(left), nullptr, id), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
 
     ~PhysicalUpdate() override = default;
 

@@ -31,7 +31,7 @@ namespace infinity {
 
 export class PhysicalFilter : public PhysicalOperator {
 public:
-    explicit PhysicalFilter(u64 id, SharedPtr<PhysicalOperator> left, SharedPtr<BaseExpression> condition)
+    explicit PhysicalFilter(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<BaseExpression> condition)
         : PhysicalOperator(PhysicalOperatorType::kFilter, Move(left), nullptr, id), condition_(Move(condition)) {}
 
     ~PhysicalFilter() override = default;

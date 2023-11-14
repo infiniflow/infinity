@@ -32,7 +32,7 @@ export class PhysicalMergeKnn final : public PhysicalOperator {
 public:
     explicit PhysicalMergeKnn(u64 id,
                               SharedPtr<BaseTableRef> table_ref,
-                              SharedPtr<PhysicalOperator> left,
+                              UniquePtr<PhysicalOperator> left,
                               SharedPtr<Vector<String>> output_names,
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                               Vector<SharedPtr<BaseExpression>> knn_exprs,

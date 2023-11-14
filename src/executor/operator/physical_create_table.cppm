@@ -38,7 +38,7 @@ public:
                                  u64 id);
 
     explicit PhysicalCreateTable(SharedPtr<String> schema_name,
-                                 const SharedPtr<PhysicalOperator> &input,
+                                 UniquePtr<PhysicalOperator> input,
                                  SharedPtr<Vector<String>> output_names,
                                  SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                  ConflictType conflict_type,

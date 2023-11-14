@@ -36,14 +36,14 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    static inline SharedPtr<PhysicalCreateIndex> Make(SharedPtr<String> schema_name,
+    static inline UniquePtr<PhysicalCreateIndex> Make(SharedPtr<String> schema_name,
                                                       SharedPtr<String> table_name,
                                                       SharedPtr<IndexDef> index_definition,
                                                       ConflictType conflict_type,
                                                       SharedPtr<Vector<String>> output_names,
                                                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                       u64 id) {
-        return MakeShared<PhysicalCreateIndex>(schema_name, table_name, index_definition, conflict_type, output_names, output_types, id);
+        return MakeUnique<PhysicalCreateIndex>(schema_name, table_name, index_definition, conflict_type, output_names, output_types, id);
     }
 
     PhysicalCreateIndex(SharedPtr<String> schema_name,

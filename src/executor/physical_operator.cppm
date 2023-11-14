@@ -28,16 +28,16 @@ namespace infinity {
 export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 
 public:
-    inline explicit PhysicalOperator(PhysicalOperatorType type, SharedPtr<PhysicalOperator> left, SharedPtr<PhysicalOperator> right, u64 id)
+    inline explicit PhysicalOperator(PhysicalOperatorType type, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, u64 id)
         : operator_id_(id), operator_type_(type), left_(Move(left)), right_(Move(right)) {}
 
     virtual ~PhysicalOperator() = default;
 
     virtual void Init() = 0;
 
-    SharedPtr<PhysicalOperator> left() const { return left_; }
+    inline PhysicalOperator* left() const { return left_.get(); }
 
-    SharedPtr<PhysicalOperator> right() const { return right_; }
+    inline PhysicalOperator* right() const { return right_.get(); }
 
     u64 node_id() const { return operator_id_; }
 
@@ -57,8 +57,8 @@ public:
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    SharedPtr<PhysicalOperator> left_{nullptr};
-    SharedPtr<PhysicalOperator> right_{nullptr};
+    UniquePtr<PhysicalOperator> left_{nullptr};
+    UniquePtr<PhysicalOperator> right_{nullptr};
 
     SharedPtr<DataTable> output_{};
 

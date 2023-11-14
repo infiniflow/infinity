@@ -54,6 +54,7 @@ import view_entry;
 import table_collection_type;
 import block_index;
 import cast_expression;
+import status;
 
 module query_binder;
 namespace infinity {
@@ -360,11 +361,13 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     } else {
         schema_name = from_table->db_name_;
     }
-    EntryResult result = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
-    if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_);
+
+    BaseEntry* base_table_entry{nullptr};
+    Status status = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_, base_table_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
-    TableCollectionEntry *table_collection_entry = static_cast<TableCollectionEntry *>(result.entry_);
+    TableCollectionEntry *table_collection_entry = static_cast<TableCollectionEntry *>(base_table_entry);
     if (table_collection_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
         Error<PlannerException>("Currently, collection isn't supported.");
     }

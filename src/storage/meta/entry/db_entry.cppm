@@ -24,6 +24,7 @@ import table_collection_detail;
 import table_collection_meta;
 import buffer_manager;
 import txn_manager;
+import status;
 
 export module db_entry;
 
@@ -54,13 +55,14 @@ public:
                                            TxnTimeStamp begin_ts,
                                            TxnManager *txn_mgr);
 
-    static EntryResult GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status
+    GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
 
     static void RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
 
     static Vector<TableCollectionEntry *> TableCollections(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static Vector<TableCollectionDetail> GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp);
+    static Status GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts, Vector<TableCollectionDetail> &output_table_array);
 
     static SharedPtr<String> ToString(DBEntry *db_entry);
 

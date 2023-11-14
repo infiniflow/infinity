@@ -14,8 +14,8 @@
 
 module;
 
-#include <string>
 #include <iostream>
+#include <string>
 import stl;
 import txn;
 import query_context;
@@ -47,6 +47,7 @@ import defer_op;
 import config;
 import session;
 import options;
+import status;
 
 module physical_show;
 
@@ -253,7 +254,11 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    Vector<TableCollectionDetail> table_collections_detail = txn->GetTableCollections(db_name_);
+    Vector<TableCollectionDetail> table_collections_detail;
+    Status status = txn->GetTableCollections(db_name_, table_collections_detail);
+    if (!status.ok()) {
+        Error<ExecutorException>(status.message());
+    }
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -416,17 +421,8 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
     // create data block for output state
     auto output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        varchar_type
-    };
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
@@ -465,76 +461,79 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
  */
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    auto result = txn->GetTableByName(db_name_, object_name_);
-    show_operator_state->error_message_ = Move(result.err_);
-    if (result.entry_ != nullptr) {
-        auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
 
-        auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    BaseEntry *base_table_entry{nullptr};
+    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    if (!status.ok()) {
+        show_operator_state->error_message_ = Move(status.msg_);
+        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        return;
+    }
 
-        Vector<SharedPtr<ColumnDef>> column_defs = {
-            MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
-            MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
-        };
+    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
 
-        SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
-        // create data block for output state
-        auto output_block_ptr = DataBlock::Make();
-        Vector<SharedPtr<DataType>> column_types{
-            varchar_type,
-            varchar_type,
-            varchar_type,
-        };
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "constraint", HashSet<ConstraintType>()),
+    };
 
-        output_block_ptr->Init(column_types);
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
-        for (auto &column : table_collection_entry->columns_) {
-            SizeT column_id = 0;
-            {
-                // Append column name to the first column
-                Value value = Value::MakeVarchar(column->name());
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
+    // create data block for output state
+    auto output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
 
-            ++column_id;
-            {
-                // Append column type to the second column, if the column type is embedded type, append the embedded type
-                String column_type;
-                if (column->type()->type() == kEmbedding) {
-                    auto type = column->type();
-                    auto embedding_type = type->type_info()->ToString();
-                    column_type = Format("{}({})", type->ToString(), embedding_type);
+    output_block_ptr->Init(column_types);
 
-                } else {
-                    column_type = column->type()->ToString();
-                }
-                Value value = Value::MakeVarchar(column_type);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-
-            ++column_id;
-            {
-                // Append column constraint to the third column
-                String column_constraint;
-                for (auto &constraint : column->constraints_) {
-                    column_constraint += " " + ConstrainType2String(constraint);
-                }
-
-                Value value = Value::MakeVarchar(column_constraint);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            output_block_ptr->Finalize();
+    for (auto &column : table_collection_entry->columns_) {
+        SizeT column_id = 0;
+        {
+            // Append column name to the first column
+            Value value = Value::MakeVarchar(column->name());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
-        show_operator_state->output_.emplace_back(Move(output_block_ptr));
-    } else {
-        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        ++column_id;
+        {
+            // Append column type to the second column, if the column type is embedded type, append the embedded type
+            String column_type;
+            if (column->type()->type() == kEmbedding) {
+                auto type = column->type();
+                auto embedding_type = type->type_info()->ToString();
+                column_type = Format("{}({})", type->ToString(), embedding_type);
+
+            } else {
+                column_type = column->type()->ToString();
+            }
+            Value value = Value::MakeVarchar(column_type);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append column constraint to the third column
+            String column_constraint;
+            for (auto &constraint : column->constraints_) {
+                column_constraint += " " + ConstrainType2String(constraint);
+            }
+
+            Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+        output_block_ptr->Finalize();
     }
+
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 // Execute describe system table
@@ -550,7 +549,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     };
 
     const Config *global_config = query_context->global_config();
-    const SessionOptions* session_options = query_context->current_session()->options();
+    const SessionOptions *session_options = query_context->current_session()->options();
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("configs"), column_defs);
 
@@ -1055,12 +1054,16 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    auto result = txn->GetTableByName(db_name_, object_name_);
-    show_operator_state->error_message_ = Move(result.err_);
-    if (result.entry_ == nullptr) {
+
+    BaseEntry *base_table_entry{nullptr};
+    Status table_status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    if (!table_status.ok()) {
+        show_operator_state->error_message_ = Move(table_status.msg_);
+        Error<ExecutorException>(table_status.message());
         return;
     }
-    auto table_collection_entry = static_cast<TableCollectionEntry *>(result.entry_);
+
+    auto table_collection_entry = static_cast<TableCollectionEntry *>(base_table_entry);
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, varchar_type, "index_name", HashSet<ConstraintType>()),
@@ -1162,7 +1165,11 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
     // TODO: Use context to carry runtime information, such as current schema
     Txn *txn = query_context->GetTxn();
 
-    Vector<TableCollectionDetail> table_collections_detail = txn->GetTableCollections(db_name_);
+    Vector<TableCollectionDetail> table_collections_detail;
+    Status status = txn->GetTableCollections(db_name_, table_collections_detail);
+    if (!status.ok()) {
+        Error<ExecutorException>(status.message());
+    }
 
     // Prepare the output data block
     SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
@@ -1346,17 +1353,17 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context) {
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
 
     Txn *txn = query_context->GetTxn();
-    EntryResult result = txn->GetTableByName(db_name_, object_name_);
-    if (result.err_.get() != nullptr) {
-        Error<ExecutorException>(*result.err_);
-    } else {
-        if (result.entry_ != nullptr) {
-            TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
-            ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
-        }
+
+    BaseEntry *base_table_entry{nullptr};
+    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    if (!status.ok()) {
+        Error<ExecutorException>(status.message());
     }
 
-    result = txn->GetViewByName(db_name_, object_name_);
+    TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
+    ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
+
+    EntryResult result = txn->GetViewByName(db_name_, object_name_);
     if (result.err_.get() != nullptr) {
         Error<ExecutorException>(*result.err_);
     }

@@ -23,7 +23,7 @@ import db_meta;
 import db_entry;
 import logger;
 import third_party;
-
+import status;
 import infinity_exception;
 import function_set;
 import table_function;
@@ -114,19 +114,21 @@ EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name,
     return res;
 }
 
-EntryResult NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    catalog->rw_locker_.lock_shared();
+Status NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry) {
 
     DBMeta *db_meta{nullptr};
-    if (catalog->databases_.find(db_name) != catalog->databases_.end()) {
-        db_meta = catalog->databases_[db_name].get();
+    catalog->rw_locker_.lock_shared();
+    auto iter = catalog->databases_.find(db_name);
+    if (iter != catalog->databases_.end()) {
+        db_meta = iter->second.get();
     }
     catalog->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
-        LOG_ERROR(Format("Attempt to get not existed database {}", db_name));
-        return {nullptr, MakeUnique<String>("Attempt to get not existed database")};
+        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to get not existed database {}", db_name));
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
-    return DBMeta::GetEntry(db_meta, txn_id, begin_ts);
+    return DBMeta::GetEntry(db_meta, txn_id, begin_ts, new_db_entry);
 }
 
 void NewCatalog::RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -148,9 +150,10 @@ Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTime
     Vector<DBEntry *> res;
     res.reserve(catalog->databases_.size());
     for (const auto &db_meta : catalog->databases_) {
-        EntryResult entry_result = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts);
-        if (entry_result.Success()) {
-            res.emplace_back(static_cast<DBEntry *>(entry_result.entry_));
+        BaseEntry* base_db_entry{nullptr};
+        Status status = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts, base_db_entry);
+        if(status.ok()) {
+            res.emplace_back(static_cast<DBEntry *>(base_db_entry));
         }
     }
     catalog->rw_locker_.unlock_shared();

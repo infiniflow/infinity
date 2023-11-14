@@ -36,7 +36,7 @@ export struct HashRange {
 export class PhysicalAggregate final : public PhysicalOperator {
 public:
     explicit PhysicalAggregate(u64 id,
-                               SharedPtr<PhysicalOperator> left,
+                               UniquePtr<PhysicalOperator> left,
                                Vector<SharedPtr<BaseExpression>> groups,
                                u64 groupby_index,
                                Vector<SharedPtr<BaseExpression>> aggregates,

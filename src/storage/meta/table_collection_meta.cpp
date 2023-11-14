@@ -29,7 +29,7 @@ import txn_manager;
 import buffer_manager;
 import db_entry;
 import third_party;
-
+import status;
 import infinity_exception;
 
 module table_collection_meta;
@@ -279,39 +279,45 @@ void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 tx
  * @param begin_ts
  * @return EntryResult
  */
-EntryResult TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+Status TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_table_entry) {
     SharedLock<RWMutex> r_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
-        LOG_TRACE("Empty table entry list.");
-        return {nullptr, MakeUnique<String>("Empty table entry list.")};
+        UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     for (const auto &table_entry : table_meta->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("No valid table entry. dummy entry");
-            return {nullptr, MakeUnique<String>("No valid table entry.")};
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
+            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kNotFound, Move(err_msg));
         }
 
         if (table_entry->commit_ts_ < UNCOMMIT_TS) {
             // committed
             if (begin_ts > table_entry->commit_ts_) {
                 if (table_entry->deleted_) {
-                    // LOG_TRACE("Table was dropped.")
-                    return {nullptr, MakeUnique<String>("Table was dropped.")};
+                    UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped.");
+                    LOG_ERROR(*err_msg);
+                    return Status(ErrorCode::kNotFound, Move(err_msg));
                 } else {
-                    return {table_entry.get(), nullptr};
+                    new_table_entry = table_entry.get();
+                    return Status::OK();
                 }
             }
         } else {
             // not committed
             if (txn_id == table_entry->txn_id_) {
                 // same txn
-                return {table_entry.get(), nullptr};
+                new_table_entry = table_entry.get();
+                return Status::OK();
             }
         }
     }
-    LOG_TRACE("No table entry found.");
-    return {nullptr, MakeUnique<String>("No table entry found.")};
+    UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
+    LOG_ERROR(*err_msg);
+    return Status(ErrorCode::kNotFound, Move(err_msg));
 }
 
 SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta) {
