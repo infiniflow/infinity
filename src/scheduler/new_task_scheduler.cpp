@@ -101,7 +101,7 @@ void TaskScheduler::ScheduleTask(FragmentTask *task) {
     if (!initialized_) {
         Error<SchedulerException>("Scheduler isn't initialized");
     }
-    u64 worker_id = (++ cpu_id_count_) % worker_count_;
+    u64 worker_id = task->ProposedCPUID(worker_count_);
     worker_array_[worker_id].queue_->Enqueue(task);
 }
 
@@ -109,7 +109,6 @@ void TaskScheduler::ToReadyQueue(FragmentTask *task) {
     if (!initialized_) {
         Error<SchedulerException>("Scheduler isn't initialized");
     }
-
 }
 
 void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id) {

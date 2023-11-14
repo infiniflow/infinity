@@ -81,6 +81,11 @@ void FragmentTask::OnExecute(i64 worker_id) {
 //    LOG_TRACE(prof.ElapsedToString());
 }
 
+u64 FragmentTask::ProposedCPUID(u64 max_cpu_count) const {
+    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+    return (fragment_context->query_context()->GetTxn()->TxnID() + task_id_) % max_cpu_count;
+}
+
 bool FragmentTask::Ready() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
