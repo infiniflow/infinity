@@ -403,9 +403,13 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     EntryResult res = DBEntry::DropTableCollection(db_entry, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if (res.entry_ == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("TODO: DropTableCollectionFailed");
-        LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kError, Move(err_msg));
+        if(res.err_.get() == nullptr) {
+            return Status::OK();
+        } else {
+//            UniquePtr<String> err_msg = MakeUnique<String>("TODO: DropTableCollectionFailed");
+//            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kError, Move(res.err_));
+        }
     }
 
     drop_table_entry = res.entry_;
