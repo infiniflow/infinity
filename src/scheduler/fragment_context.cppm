@@ -55,7 +55,10 @@ public:
 
     inline void IncreaseTask() { task_n_.fetch_add(1); }
 
-    inline void FlushProfiler(TaskProfiler &&profiler) {
+    inline void FlushProfiler(TaskProfiler &profiler) {
+        if(!query_context_->is_enable_profiling()) {
+            return ;
+        }
         query_context_->FlushProfiler(Move(profiler));
     }
 

@@ -138,7 +138,9 @@ export class TaskProfiler {
 public:
     TaskProfiler(TaskBinding binding, bool enable, SizeT operators_len)
         : enable_(enable), binding_(binding) {
-
+        if(!enable_) {
+            return;
+        }
         timings_.reserve(operators_len);
     }
 

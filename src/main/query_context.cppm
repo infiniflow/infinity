@@ -68,7 +68,7 @@ public:
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
-    [[nodiscard]] inline bool is_enable_profiler() const { return session_ptr_->options()->enable_profiling_; }
+    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->options()->enable_profiling_; }
 
     [[nodiscard]] inline u64 memory_size_limit() const { return memory_size_limit_; }
 
@@ -93,7 +93,7 @@ public:
     void RollbackTxn();
 
     void TryMarkProfiler(const StatementType &type) const {
-        if (is_enable_profiler() && type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
+        if (is_enable_profiling() && type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
             session_ptr_->AppendProfilerRecord(query_metrics_);
         }
     }
