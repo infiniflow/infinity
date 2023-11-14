@@ -43,9 +43,12 @@ import knn_expression;
 import column_expression;
 
 import buffer_manager;
+import buffer_handle;
 import merge_knn;
 import faiss;
 import index_def;
+import ann_ivf_flat;
+import annivfflat_index_data;
 
 module physical_knn_scan;
 
@@ -162,9 +165,49 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_.fetch_add(1); index_idx < knn_scan_shared_data->index_entries_.size()) {
         // with index
         IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
+        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
         switch (index_entry->index_def_entry_->index_def_->method_type_) {
-            case IndexMethod::kIVFFlat:
-            case IndexMethod::kIVFSQ8:
+            case IndexMethod::kIVFFlat: {
+                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+                auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
+                auto metric_type = knn_scan_shared_data->knn_distance_type_;
+                i32 n_probes = 1;
+                auto segment_id = index_entry->segment_entry_->segment_id_;
+                switch (knn_scan_shared_data->knn_distance_type_) {
+                    case KnnDistanceType::kL2: {
+                        AnnIVFFlatL2 ann_ivfflat_query{query,
+                                                       knn_scan_shared_data->query_count_,
+                                                       knn_scan_shared_data->topk_,
+                                                       knn_scan_shared_data->dimension_,
+                                                       knn_scan_shared_data->elem_type_};
+                        ann_ivfflat_query.Begin();
+                        ann_ivfflat_query.Search(index, segment_id, n_probes);
+                        ann_ivfflat_query.End();
+                        auto dists = ann_ivfflat_query.GetDistances();
+                        auto row_ids = ann_ivfflat_query.GetIDs();
+                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        break;
+                    }
+                    case KnnDistanceType::kInnerProduct: {
+                        AnnIVFFlatIP ann_ivfflat_query{query,
+                                                       knn_scan_shared_data->query_count_,
+                                                       knn_scan_shared_data->topk_,
+                                                       knn_scan_shared_data->dimension_,
+                                                       knn_scan_shared_data->elem_type_};
+                        ann_ivfflat_query.Begin();
+                        ann_ivfflat_query.Search(index, segment_id, n_probes);
+                        ann_ivfflat_query.End();
+                        auto dists = ann_ivfflat_query.GetDistances();
+                        auto row_ids = ann_ivfflat_query.GetIDs();
+                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        break;
+                    }
+                }
+                break;
+            }
+            case IndexMethod::kIVFSQ8: {
+                break;
+            }
             case IndexMethod::kHnsw:
             case IndexMethod::kInvalid:
                 break;
