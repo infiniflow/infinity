@@ -139,6 +139,7 @@ void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu
             // Select an available worker to dispatch
             u64 to_use_cpu_id = current_cpu_id;
             ++current_cpu_id;
+            current_cpu_id %= worker_count_;
             worker_array_[to_use_cpu_id].queue_->Enqueue(fragment_task);
         } else {
             // Dispatch to the same worker

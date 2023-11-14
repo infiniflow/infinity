@@ -42,6 +42,11 @@ import block_column_entry;
 import knn_expression;
 import column_expression;
 
+import buffer_manager;
+import merge_knn;
+import faiss;
+import index_def;
+
 module physical_knn_scan;
 
 namespace infinity {
@@ -51,13 +56,24 @@ void PhysicalKnnScan::Init() {}
 void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
     auto elem_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->elem_type_;
+    auto dist_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->knn_distance_type_;
     switch (elem_type) {
         case kElemFloat: {
-            ExecuteInternal<f32>(query_context, knn_scan_operator_state);
-            break;
-        }
-        case kElemInvalid: {
-            Error<ExecutorException>("Invalid element data type");
+            switch (dist_type) {
+                case KnnDistanceType::kL2:
+                case KnnDistanceType::kHamming: {
+                    ExecuteInternal<f32, FaissCMax>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                case KnnDistanceType::kCosine:
+                case KnnDistanceType::kInnerProduct: {
+                    ExecuteInternal<f32, FaissCMin>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                default: {
+                    Error<ExecutorException>("Not implemented");
+                }
+            }
             break;
         }
         default: {
@@ -116,160 +132,83 @@ Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWith
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-template <typename T>
+template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
     auto knn_scan_function_data = operator_state->knn_scan_function_data1_.get();
-    // auto *knn_scan_function_data_ptr = operator_state->knn_scan_function_data_.get();
-    // BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
-    // Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
-    // const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
-    // if (knn_column_ids.size() != 1) {
-    //     Error<ExecutorException>("More than one knn column");
-    // }
+    auto knn_scan_shared_data = knn_scan_function_data->shared_data_.get();
 
-    // SizeT knn_column_id = knn_column_ids[0];
+    auto dist_func = static_cast<KnnDistance1<DataType> *>(knn_scan_function_data->knn_distance_.get());
+    auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
+    auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
 
-    // i64 &block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
-    // u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    // u16 block_id = block_ids->at(block_ids_idx).block_id_;
+    if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_.fetch_add(1);
+        block_column_idx < knn_scan_shared_data->block_column_entries_.size()) {
+        // brute force
+        BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
+        const BlockEntry *block_entry = block_column_entry->block_entry_;
 
-    // BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-    // u16 row_count = current_block_entry->row_count_;
+        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+        ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_column_entry, buffer_mgr);
 
-    // Vector<ColumnBuffer> columns_buffer;
-    // columns_buffer.reserve(current_block_entry->columns_.size());
-    // SizeT column_count = current_block_entry->columns_.size();
-    // for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-    //     columns_buffer.emplace_back(
-    //         BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager()));
-    // }
+        auto data = reinterpret_cast<const DataType *>(column_buffer.GetAll());
+        u16 row_count = block_entry->row_count_;
 
-    // auto knn_flat = static_cast<KnnDistance<T> *>(knn_scan_function_data_ptr->knn_distance_.get());
-    // knn_flat->Search((T *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
+        Vector<DataType> dists = dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_);
+        Vector<RowID> row_ids(row_count);
+        for (u16 i = 0; i < row_count; ++i) {
+            row_ids[i] = RowID(block_entry->segment_entry_->segment_id_, block_entry->block_id_ * DEFAULT_BLOCK_CAPACITY + i);
+        }
+        merge_heap->Search(dists.data(), row_ids.data(), row_count);
+    } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_.fetch_add(1); index_idx < knn_scan_shared_data->index_entries_.size()) {
+        // with index
+        IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
+        switch (index_entry->index_def_entry_->index_def_->method_type_) {
+            case IndexMethod::kIVFFlat:
+            case IndexMethod::kIVFSQ8:
+            case IndexMethod::kHnsw:
+            case IndexMethod::kInvalid:
+                break;
+        }
+        // TODO
+        throw ExecutorException("Not implemented");
+    } else {
+        // all task Complete
+        SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();
+        BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
-    // ++block_ids_idx;
-    // if (block_ids_idx == block_ids->size()) {
-    //     // Last block, Get the result according to the topk row.
-    //     knn_flat->End();
+        i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
+        for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+            DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
+            RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
 
-    //     for (u64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
+            for (i64 top_idx = result_n - 1; top_idx >= 0; --top_idx) {
+                SizeT id = query_idx * knn_scan_shared_data->query_count_ + top_idx;
 
-    //         T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
-    //         RowID *row_id = knn_flat->GetIDByIdx(query_idx);
+                u32 segment_id = row_ids[top_idx].segment_id_;
+                u32 segment_offset = row_ids[top_idx].segment_offset_;
+                u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-    //         u64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
+                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+                if (block_entry == nullptr) {
+                    throw ExecutorException(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                }
 
-    //         for (u64 top_idx = 0; top_idx < result_count; ++top_idx) {
-    //             // Bug here? id = top_idx?
-    //             SizeT id = query_idx * knn_flat->QueryCount() +auto *knn_scan_function_data_ptr = operator_state->knn_scan_function_data_.get();
-    // BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
-    // Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
-    // const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
-    // if (knn_column_ids.size() != 1) {
-    //     Error<ExecutorException>("More than one knn column");
-    // }
+                SizeT column_id = 0;
+                for (; column_id < column_n; ++column_id) {
+                    ColumnBuffer column_buffer =
+                        BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
-    // SizeT knn_column_id = knn_column_ids[0];
-
-    // i64 &block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
-    // u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    // u16 block_id = block_ids->at(block_ids_idx).block_id_;
-
-    // BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-    // u16 row_count = current_block_entry->row_count_;
-
-    // Vector<ColumnBuffer> columns_buffer;
-    // columns_buffer.reserve(current_block_entry->columns_.size());
-    // SizeT column_count = current_block_entry->columns_.size();
-    // for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-    //     columns_buffer.emplace_back(
-    //         BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager()));
-    // }
-
-    // auto knn_flat = static_cast<KnnDistance<T> *>(knn_scan_function_data_ptr->knn_distance_.get());
-    // knn_flat->Search((T *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
-
-    // ++block_ids_idx;
-    // if (block_ids_idx == block_ids->size()) {
-    //     // Last block, Get the result according to the topk row.
-    //     knn_flat->End();
-
-    //     for (u64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
-
-    //         T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
-    //         RowID *row_id = knn_flat->GetIDByIdx(query_idx);
-
-    //         u64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
-
-    //         for (u64 top_idx = 0; top_idx < result_count; ++top_idx) {
-    //             // Bug here? id = top_idx?
-    //             SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
-
-    //             u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-    //             LOG_TRACE(
-    //                 Format("Row offset: {}: {}: {}, distance {}", row_id[id].segment_id_, block_id, row_id[id].segment_offset_, top_distance[id]));
-
-    //             BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
-    //             if (block_entry == nullptr) {
-    //                 Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id));
-    //             }
-
-    //             SizeT column_id = 0;
-    //             for (; column_id < column_count; ++column_id) {
-    //                 ColumnBuffer column_buffer =
-    //                     BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
-
-    //                 const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].segment_offset_, *output_types_->at(column_id));
-    //                 operator_state->data_block_->AppendValueByPtr(column_id, ptr);
-    //             }
-
-    //             operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-    //             operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-    //         }
-
-    //         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-    //             LOG_TRACE(Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
-    //         }
-    //     }
-
-    //     // Last segment, Get the result according to the topk row.
-    //     operator_state->SetComplete();
-    // }
-
-    // operator_state->data_block_->Finalize(); top_idx;
-
-    //             u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-    //             LOG_TRACE(
-    //                 Format("Row offset: {}: {}: {}, distance {}", row_id[id].segment_id_, block_id, row_id[id].segment_offset_, top_distance[id]));
-
-    //             BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
-    //             if (block_entry == nullptr) {
-    //                 Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id));
-    //             }
-
-    //             SizeT column_id = 0;
-    //             for (; column_id < column_count; ++column_id) {
-    //                 ColumnBuffer column_buffer =
-    //                     BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
-
-    //                 const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].segment_offset_, *output_types_->at(column_id));
-    //                 operator_state->data_block_->AppendValueByPtr(column_id, ptr);
-    //             }
-
-    //             operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-    //             operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-    //         }
-
-    //         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-    //             LOG_TRACE(Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
-    //         }
-    //     }
-
-    //     // Last segment, Get the result according to the topk row.
-    //     operator_state->SetComplete();
-    // }
-
-    // operator_state->data_block_->Finalize();
+                    const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
+                    operator_state->data_block_->AppendValueByPtr(column_id, ptr);
+                }
+                operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&result_dists[id]);
+                operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
+            }
+        }
+        operator_state->SetComplete();
+        operator_state->data_block_->Finalize();
+    }
 }
 
 } // namespace infinity

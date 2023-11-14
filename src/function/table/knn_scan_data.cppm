@@ -24,13 +24,16 @@ import index_entry;
 import block_column_entry;
 import merge_knn;
 
+import base_table_ref;
+
 export module knn_scan_data;
 
 namespace infinity {
 
 export class KnnScanSharedData {
 public:
-    KnnScanSharedData(Vector<BlockColumnEntry *> block_column_entries,
+    KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
+                      Vector<BlockColumnEntry *> block_column_entries,
                       Vector<IndexEntry *> index_entries,
                       i64 topk,
                       i64 dimension,
@@ -38,11 +41,13 @@ public:
                       void *query_embedding,
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
-        : block_column_entries_(Move(block_column_entries)), index_entries_(Move(index_entries)), topk_(topk), dimension_(dimension),
-          query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type),
+        : table_ref_(table_ref), block_column_entries_(Move(block_column_entries)), index_entries_(Move(index_entries)), topk_(topk),
+          dimension_(dimension), query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type),
           knn_distance_type_(knn_distance_type) {}
 
 public:
+    const SharedPtr<BaseTableRef> table_ref_{};
+
     const Vector<BlockColumnEntry *> block_column_entries_{};
     const Vector<IndexEntry *> index_entries_{};
 
@@ -57,17 +62,48 @@ public:
     atomic_u64 current_index_idx_{0};
 };
 
+//-------------------------------------------------------------------
+
+export class KnnDistanceBase1 {};
+
+export template <typename DataType>
+class KnnDistance1 : public KnnDistanceBase1 {
+public:
+    KnnDistance1(KnnDistanceType dist_type);
+
+    Vector<DataType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim) {
+        Vector<DataType> res(data_count);
+        for (int i = 0; i < data_count; ++i) {
+            res[i] = dist_func_(query, datas + i * dim, dim);
+        }
+        return res;
+    }
+
+public:
+    using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
+
+    DistFunc dist_func_{};
+};
+
+template <>
+KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type);
+
+//-------------------------------------------------------------------
+
 export class KnnScanFunctionData1 : public TableFunctionData {
 public:
     KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data);
 
 private:
     template <typename DataType>
-    void InitKnnScan();
+    void Init();
 
 public:
     const SharedPtr<KnnScanSharedData> shared_data_;
+
     UniquePtr<MergeKnnBase> merge_knn_base_{};
+
+    UniquePtr<KnnDistanceBase1> knn_distance_{};
 };
 
 } // namespace infinity

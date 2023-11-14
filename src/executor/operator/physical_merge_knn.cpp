@@ -80,6 +80,9 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     }
 
     auto &input_data = *merge_knn_state->input_data_block_;
+    if (!input_data.Finalized()) {
+        return;
+    }
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
@@ -99,10 +102,10 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         auto &output_data = *merge_knn_state->data_block_;
 
         i64 result_n = Min(merge_knn_data.topk_, merge_knn->total_count());
-        for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; query_idx++) {
+        for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
-            for (i64 top_idx = result_n - 1; top_idx >= 0; top_idx--) {
+            for (i64 top_idx = result_n - 1; top_idx >= 0; --top_idx) {
                 u32 segment_id = result_row_ids[top_idx].segment_id_;
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
                 u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;

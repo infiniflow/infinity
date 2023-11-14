@@ -502,7 +502,8 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMat
     }
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
-    auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(Move(block_column_entries),
+    auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                              Move(block_column_entries),
                                                               Move(index_entries),
                                                               topk,
                                                               knn_expr->dimension_,
