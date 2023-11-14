@@ -179,6 +179,8 @@ public:
 
     void StopPhase(QueryPhase phase);
 
+    void Stop();
+
     void Flush(TaskProfiler &&profiler);
 
     i64 ElapsedAt(SizeT index) {

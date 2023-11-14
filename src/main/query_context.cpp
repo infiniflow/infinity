@@ -77,6 +77,7 @@ QueryResult QueryContext::Query(const String &query) {
     parser_->Parse(query, parsed_result.get());
 
     if (parsed_result->IsError()) {
+        query_metrics_->StopPhase(QueryPhase::kParser);
         Error<PlannerException>(parsed_result->error_message_);
     }
 
@@ -143,6 +144,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         this->RollbackTxn();
         query_result.result_table_ = nullptr;
         query_result.status_.Init(ErrorCode::kError, e.what());
+        query_metrics_->Stop();
     }
 //    ProfilerStop();
     return query_result;

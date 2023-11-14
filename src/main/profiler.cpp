@@ -175,6 +175,13 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
     profilers_[EnumInteger(phase)].End();
 }
 
+void QueryProfiler::Stop() {
+    if (current_phase_ == QueryPhase::kInvalid) {
+        return;
+    }
+    profilers_[EnumInteger(current_phase_)].End();
+}
+
 void QueryProfiler::Flush(TaskProfiler &&profiler) {
     if (!enable_) {
         return;
