@@ -29,7 +29,7 @@ namespace infinity {
 
 export class PhysicalSort : public PhysicalOperator {
 public:
-    explicit PhysicalSort(u64 id, SharedPtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
+    explicit PhysicalSort(u64 id, UniquePtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
         : PhysicalOperator(PhysicalOperatorType::kSort, Move(left), nullptr, id), expressions_(Move(expressions)),
           order_by_types_(Move(order_by_types)) {}
 

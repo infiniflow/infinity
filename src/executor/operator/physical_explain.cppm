@@ -27,7 +27,7 @@ namespace infinity {
 
 export class PhysicalExplain final : public PhysicalOperator {
 public:
-    explicit PhysicalExplain(u64 id, ExplainType type, SharedPtr<Vector<SharedPtr<String>>> text_array, SharedPtr<PhysicalOperator> left)
+    explicit PhysicalExplain(u64 id, ExplainType type, SharedPtr<Vector<SharedPtr<String>>> text_array, UniquePtr<PhysicalOperator> left)
         : PhysicalOperator(PhysicalOperatorType::kExplain, Move(left), nullptr, id), explain_type_(type), texts_(Move(text_array)) {}
 
     ~PhysicalExplain() override = default;

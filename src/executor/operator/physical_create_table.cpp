@@ -38,13 +38,13 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
       output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index), table_def_ptr_(Move(table_def_ptr)) {}
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
-                                         const SharedPtr<PhysicalOperator> &input,
+                                         UniquePtr<PhysicalOperator> input,
                                          SharedPtr<Vector<String>> output_names,
                                          SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                          ConflictType conflict_type,
                                          u64 table_index,
                                          u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, input, nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, Move(input), nullptr, id), schema_name_(Move(schema_name)), output_names_(Move(output_names)),
       output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index) {}
 
 void PhysicalCreateTable::Init() {}

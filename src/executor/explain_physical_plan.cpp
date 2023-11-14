@@ -624,9 +624,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
         result->emplace_back(MakeShared<String>(insert_str));
     }
 
-    if (insert_node->left().get() != nullptr && is_recursive) {
+    if (insert_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(insert_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(insert_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -668,9 +668,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node,
         result->emplace_back(MakeShared<String>(expression_str));
     }
 
-    if (project_node->left().get() != nullptr && is_recursive) {
+    if (project_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(project_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(project_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -705,9 +705,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node,
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if (filter_node->left().get() != nullptr && is_recursive) {
+    if (filter_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(filter_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(filter_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -750,9 +750,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if (table_scan_node->left().get() != nullptr && is_recursive) {
+    if (table_scan_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(table_scan_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(table_scan_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -824,7 +824,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if (knn_scan_node->left().get() != nullptr) {
+    if (knn_scan_node->left() != nullptr) {
         Error<PlannerException>("Knn scan node have children nodes.");
     }
 }
@@ -887,9 +887,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
         result->emplace_back(MakeShared<String>(group_by_expression_str));
     }
 
-    if (aggregate_node->left().get() != nullptr && is_recursive) {
+    if (aggregate_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(aggregate_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(aggregate_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -934,9 +934,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vecto
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if (sort_node->left().get() != nullptr && is_recursive) {
+    if (sort_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(sort_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(sort_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -977,9 +977,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vec
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 
-    if (limit_node->left().get() != nullptr && is_recursive) {
+    if (limit_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(limit_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(limit_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -1011,12 +1011,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node
     }
 
     intent_size += 2;
-    if (cross_product_node->left().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(cross_product_node->left().get(), result, is_recursive, intent_size);
+    if (cross_product_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(cross_product_node->left(), result, is_recursive, intent_size);
     }
 
-    if (cross_product_node->right().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(cross_product_node->right().get(), result, is_recursive, intent_size);
+    if (cross_product_node->right() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(cross_product_node->right(), result, is_recursive, intent_size);
     }
 }
 
@@ -1064,12 +1064,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node,
     }
 
     intent_size += 2;
-    if (join_node->left().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(join_node->left().get(), result, is_recursive, intent_size);
+    if (join_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(join_node->left(), result, is_recursive, intent_size);
     }
 
-    if (join_node->right().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(join_node->right().get(), result, is_recursive, intent_size);
+    if (join_node->right() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(join_node->right(), result, is_recursive, intent_size);
     }
 }
 
@@ -1153,9 +1153,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
         }
     }
 
-    if (show_node->left().get() != nullptr && is_recursive) {
+    if (show_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(show_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(show_node->left(), result, is_recursive, intent_size);
     }
 }
 
@@ -1220,8 +1220,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node,
     DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
     header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
     result->emplace_back(MakeShared<String>(header));
-    if (delete_node->left().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(delete_node->left().get(), result, is_recursive, intent_size + 2);
+    if (delete_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(delete_node->left(), result, is_recursive, intent_size + 2);
     }
 }
 
@@ -1240,8 +1240,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
     DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
     header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
     result->emplace_back(MakeShared<String>(header));
-    if (update_node->left().get() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(update_node->left().get(), result, is_recursive, intent_size + 2);
+    if (update_node->left() != nullptr && is_recursive) {
+        ExplainPhysicalPlan::Explain(update_node->left(), result, is_recursive, intent_size + 2);
     }
 }
 
@@ -1303,7 +1303,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
         }
     }
 
-    if (import_node->left().get() != nullptr or import_node->right().get() != nullptr) {
+    if (import_node->left() != nullptr or import_node->right() != nullptr) {
         Error<PlannerException>("IMPORT node have children nodes.");
     }
 }
@@ -1363,7 +1363,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node,
         }
     }
 
-    if (export_node->left().get() != nullptr or export_node->right().get() != nullptr) {
+    if (export_node->left() != nullptr or export_node->right() != nullptr) {
         Error<PlannerException>("EXPORT node have children nodes.");
     }
 }
@@ -1667,9 +1667,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
 
-    if (merge_knn_node->left().get() != nullptr && is_recursive) {
+    if (merge_knn_node->left() != nullptr && is_recursive) {
         intent_size += 2;
-        ExplainPhysicalPlan::Explain(merge_knn_node->left().get(), result, is_recursive, intent_size);
+        ExplainPhysicalPlan::Explain(merge_knn_node->left(), result, is_recursive, intent_size);
     }
 }
 

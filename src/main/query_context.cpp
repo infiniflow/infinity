@@ -118,7 +118,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         // Build physical plan
         query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
-        SharedPtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
+        UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
         query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
 
         query_metrics_->StartPhase(QueryPhase::kPipelineBuild);

@@ -28,7 +28,7 @@ namespace infinity {
 
 export class PhysicalCrossProduct final : public PhysicalOperator {
 public:
-    explicit PhysicalCrossProduct(u64 id, SharedPtr<PhysicalOperator> left, SharedPtr<PhysicalOperator> right)
+    explicit PhysicalCrossProduct(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right)
         : PhysicalOperator(PhysicalOperatorType::kCrossProduct, Move(left), Move(right), id) {}
 
     ~PhysicalCrossProduct() override = default;

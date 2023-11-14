@@ -29,7 +29,7 @@ namespace infinity {
 
 export class PhysicalLimit : public PhysicalOperator {
 public:
-    explicit PhysicalLimit(u64 id, SharedPtr<PhysicalOperator> left, SharedPtr<BaseExpression> limit_expr, SharedPtr<BaseExpression> offset_expr)
+    explicit PhysicalLimit(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<BaseExpression> limit_expr, SharedPtr<BaseExpression> offset_expr)
         : PhysicalOperator(PhysicalOperatorType::kLimit, Move(left), nullptr, id), limit_expr_(Move(limit_expr)),
           offset_expr_(Move(offset_expr)) {}
 

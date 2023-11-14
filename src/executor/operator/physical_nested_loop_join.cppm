@@ -32,8 +32,8 @@ public:
     explicit PhysicalNestedLoopJoin(u64 id,
                                     JoinType join_type,
                                     Vector<SharedPtr<BaseExpression>> conditions,
-                                    SharedPtr<PhysicalOperator> left,
-                                    SharedPtr<PhysicalOperator> right)
+                                    UniquePtr<PhysicalOperator> left,
+                                    UniquePtr<PhysicalOperator> right)
         : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, Move(left), Move(right), id), join_type_(join_type),
           conditions_(Move(conditions)) {}
 
