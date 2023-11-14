@@ -61,7 +61,7 @@ int main() {
     Infinity::LocalInit("/tmp/infinity");
 
     std::cout << ">>> Infinity Benchmark Start <<<" << std::endl;
-    std::cout << "Thread Num: " << thread_num << ", Tims: " << total_times << std::endl;
+    std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
     
     Vector<String> results;
     {

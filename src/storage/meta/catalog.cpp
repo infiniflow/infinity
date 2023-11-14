@@ -115,11 +115,12 @@ EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name,
 }
 
 EntryResult NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    catalog->rw_locker_.lock_shared();
 
     DBMeta *db_meta{nullptr};
-    if (catalog->databases_.find(db_name) != catalog->databases_.end()) {
-        db_meta = catalog->databases_[db_name].get();
+    catalog->rw_locker_.lock_shared();
+    auto iter = catalog->databases_.find(db_name);
+    if (iter != catalog->databases_.end()) {
+        db_meta = iter->second.get();
     }
     catalog->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
