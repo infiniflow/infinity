@@ -94,7 +94,7 @@ private:
     BufferStatus status_{BufferStatus::kNew};
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
-    const UniquePtr<FileWorker> file_worker_{nullptr};
+    const UniquePtr<FileWorker> file_worker_;
 };
 
 } // namespace infinity

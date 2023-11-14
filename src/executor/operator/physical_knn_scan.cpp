@@ -145,8 +145,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
     auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
 
-    if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_.fetch_add(1);
-        block_column_idx < knn_scan_shared_data->block_column_entries_.size()) {
+    SizeT index_task_n = knn_scan_shared_data->index_entries_.size();
+    SizeT brute_task_n = knn_scan_shared_data->block_column_entries_.size();
+
+    if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
         const BlockEntry *block_entry = block_column_entry->block_entry_;
@@ -163,7 +165,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             row_ids[i] = RowID(block_entry->segment_entry_->segment_id_, block_entry->block_id_ * DEFAULT_BLOCK_CAPACITY + i);
         }
         merge_heap->Search(dists.data(), row_ids.data(), row_count);
-    } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_.fetch_add(1); index_idx < knn_scan_shared_data->index_entries_.size()) {
+    } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         // with index
         IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -274,8 +276,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
             }
         }
-        operator_state->SetComplete();
         operator_state->data_block_->Finalize();
+        if (u64 finish_n = knn_scan_shared_data->finish_n_++; finish_n > knn_scan_shared_data->parallel_count_) {
+            operator_state->SetComplete();
+        }
     }
 }
 

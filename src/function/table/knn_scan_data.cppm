@@ -40,10 +40,15 @@ public:
                       i64 query_embedding_count,
                       void *query_embedding,
                       EmbeddingDataType elem_type,
-                      KnnDistanceType knn_distance_type)
+                      KnnDistanceType knn_distance_type,
+                      u64 parallel_count)
         : table_ref_(table_ref), block_column_entries_(Move(block_column_entries)), index_entries_(Move(index_entries)), topk_(topk),
           dimension_(dimension), query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type),
-          knn_distance_type_(knn_distance_type) {}
+          knn_distance_type_(knn_distance_type), parallel_count_(parallel_count) {
+        current_block_idx_.store(0);
+        current_index_idx_.store(0);
+        finish_n_.store(0);
+    }
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
@@ -57,9 +62,11 @@ public:
     void *const query_embedding_;
     const EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
+    const u64 parallel_count_;
 
-    atomic_u64 current_block_idx_{0};
-    atomic_u64 current_index_idx_{0};
+    atomic_u64 current_block_idx_;
+    atomic_u64 current_index_idx_;
+    atomic_u64 finish_n_;
 };
 
 //-------------------------------------------------------------------

@@ -510,7 +510,8 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMat
                                                               1,
                                                               knn_expr->query_embedding_.ptr,
                                                               knn_expr->embedding_data_type_,
-                                                              knn_expr->distance_type_);
+                                                              knn_expr->distance_type_,
+                                                              task_n);
 
     fragment_context->shared_data_ = knn_scan_shared_data;
     return task_n;
