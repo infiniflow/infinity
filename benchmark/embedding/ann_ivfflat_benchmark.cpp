@@ -27,10 +27,10 @@ import annivfflat_index_data;
 import parser;
 import local_file_system;
 
-static const char *sift1m_train = "./test/data/fvecs/sift_learn.fvecs";
-static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
-static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
-static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
+static const char *sift1m_train = "../../../test/data/fvecs/sift_learn.fvecs";
+static const char *sift1m_base = "../../../test/data/fvecs/sift_base.fvecs";
+static const char *sift1m_query = "../../../test/data/fvecs/sift_query.fvecs";
+static const char *sift1m_ground_truth = "../../../test/data/fvecs/sift_groundtruth.ivecs";
 
 using namespace infinity;
 

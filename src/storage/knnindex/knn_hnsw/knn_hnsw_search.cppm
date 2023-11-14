@@ -49,18 +49,8 @@ public:
     void Search(const KnnHnsw<DataType, LabelType> *base) {
         for (i64 i = 0; i < this->query_count_; ++i) {
             auto query = queries_ + i * this->dimension_;
-            auto ep = base->enterpoint_;
-            for (i32 cur_layer = base->max_layer_; cur_layer > 0; --cur_layer) {
-                ep = SearchLayerNearest(ep, query, cur_layer);
-            }
-            auto search_result = SearchLayer(ep, query, 0, Max(this->top_k_, base->ef_));
-            while (search_result.size() > this->top_k_) {
-                search_result.pop();
-            }
-            while (!search_result.empty()) {
-                const auto &[dist, idx] = search_result.top();
-                heap_twin_max_multiple_->add(i, dist, GetLabel(idx));
-                search_result.pop();
+            for (auto res = base->KnnSearch(query, this->top_k_); !res.empty(); res.pop()) {
+                heap_twin_max_multiple_->add(i, res.top().first, res.top().second);
             }
         }
     }
