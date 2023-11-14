@@ -10,6 +10,9 @@ add_subdirectory(parser)
 
 ### Infinity
 
+### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
+add_definitions(-march=native)
+
 file(GLOB_RECURSE
         main_cpp
         CONFIGURE_DEPENDS
