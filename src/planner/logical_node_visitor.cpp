@@ -126,7 +126,7 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
             break;
         }
         default: {
-            LOG_TRACE(Format("Visit logical node: {}", op.name()));
+//            LOG_TRACE(Format("Visit logical node: {}", op.name()));
         }
     }
 }

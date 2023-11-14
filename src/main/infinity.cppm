@@ -18,7 +18,7 @@ export module infinity;
 import stl;
 import config;
 import resource_manager;
-import fragment_scheduler;
+import new_task_scheduler;
 import storage;
 import database;
 import query_result;

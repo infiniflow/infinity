@@ -22,7 +22,7 @@ import stl;
 import logger;
 import config;
 import resource_manager;
-import fragment_scheduler;
+import new_task_scheduler;
 import storage;
 import local_file_system;
 import third_party;
@@ -77,13 +77,13 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
 }
 
 void Infinity::LocalDisconnect() {
-    Printf("To disconnect the database.\n");
+//    Printf("To disconnect the database.\n");
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
@@ -97,7 +97,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
 QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOptions &options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
@@ -111,7 +111,7 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
 QueryResult Infinity::ListDatabases() {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
@@ -123,7 +123,7 @@ QueryResult Infinity::ListDatabases() {
 SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
@@ -139,7 +139,7 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
 QueryResult Infinity::Query(const String &query_text) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     QueryResult result = query_context_ptr->Query(query_text);

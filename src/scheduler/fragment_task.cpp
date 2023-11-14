@@ -36,7 +36,9 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64 worker_id) {
-    LOG_TRACE(Format("Execute fragment task on {}", worker_id));
+//    LOG_TRACE(Format("Execute fragment task on {}", worker_id));
+//    infinity::BaseProfiler prof;
+//    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
 
     // TODO:
@@ -74,6 +76,9 @@ void FragmentTask::OnExecute(i64 worker_id) {
         fragment_context->FlushProfiler(Move(profiler));
         sink_op->Execute(fragment_context->query_context(), sink_state_.get());
     }
+
+//    prof.End();
+//    LOG_TRACE(prof.ElapsedToString());
 }
 
 bool FragmentTask::Ready() const {

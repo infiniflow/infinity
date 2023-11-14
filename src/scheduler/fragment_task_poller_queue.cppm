@@ -16,11 +16,29 @@ module;
 
 import stl;
 import fragment_task;
+import third_party;
 
 export module fragment_task_poller_queue;
 
 namespace infinity {
 
+export class FragmentTaskPollerQueue {
+public:
+    explicit inline FragmentTaskPollerQueue(SizeT capacity = 1024) : queue_(capacity) {}
+
+    void Enqueue(FragmentTask *task_ptr);
+
+    SizeT DequeueBulk(List<FragmentTask *>::iterator& output_queue_iter);
+
+    FragmentTask* Dequeue();
+
+    SizeT Size() const;
+
+protected:
+    BlockingConcurrentQueue<FragmentTask *> queue_;
+};
+
+/*
 export class FragmentTaskPollerQueue {
 public:
     explicit inline FragmentTaskPollerQueue(SizeT capacity = 1024) : capacity_(capacity) {}
@@ -56,5 +74,5 @@ protected:
     List<FragmentTask *> queue_{};
     SizeT capacity_{32};
 };
-
+*/
 } // namespace infinity

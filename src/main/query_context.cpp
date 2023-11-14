@@ -20,7 +20,7 @@ module;
 import stl;
 import session;
 import config;
-import fragment_scheduler;
+import new_task_scheduler;
 import storage;
 import resource_manager;
 import txn;
@@ -52,7 +52,7 @@ QueryContext::QueryContext(SessionBase *session) : session_ptr_(session){};
 QueryContext::~QueryContext() { UnInit(); }
 
 void QueryContext::Init(const Config *global_config_ptr,
-                        FragmentScheduler *scheduler_ptr,
+                        TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr) {
     global_config_ = global_config_ptr;
@@ -97,10 +97,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     try {
         this->CreateTxn();
         this->BeginTxn();
-        LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
-                        session_ptr_->GetTxn()->TxnID(),
-                        session_ptr_->GetTxn()->BeginTS(),
-                        statement->ToString()));
+//        LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+//                        session_ptr_->GetTxn()->TxnID(),
+//                        session_ptr_->GetTxn()->BeginTS(),
+//                        statement->ToString()));
         TryMarkProfiler(statement->type_);
 
         // Build unoptimized logical plan for each SQL statement.

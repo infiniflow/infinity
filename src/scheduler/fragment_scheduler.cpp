@@ -16,6 +16,7 @@ module;
 
 #include <sched.h>
 #include <vector>
+#include <list>
 
 import stl;
 import config;
@@ -176,13 +177,29 @@ void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worke
 }
 
 void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 worker_id) {
+    List<FragmentTask *> input_task_list{1024};
     List<FragmentTask *> local_task_list{};
     Vector<FragmentTask *> local_ready_queue{};
+    local_ready_queue.reserve(1024);
     bool running{true};
     //    LOG_TRACE("Start fragment task poller on CPU: {}", worker_id);
     SizeT spin_count{0};
     while (running) {
-        poller_queue->DequeueBulk(local_task_list);
+        List<FragmentTask *>::iterator input_task_iter = input_task_list.begin();
+        SizeT item_count = poller_queue->DequeueBulk(input_task_iter);
+        if(item_count == 0) {
+            continue;
+        }
+//        FragmentTask *task = poller_queue->Dequeue();
+//        if(task == nullptr) continue;
+//        local_task_list.push_front(task);
+//        LOG_TRACE(Format("Local task list size: {}", item_count));
+        input_task_iter = input_task_list.begin();
+        for(SizeT idx = 0; idx < item_count; ++ idx) {
+            local_task_list.push_back(*input_task_iter++);
+        }
+
+//        local_task_list.insert(local_task_list.begin(), input_task_list.begin(), input_task_iter);
         auto task_iter = local_task_list.begin();
         while (!local_task_list.empty()) {
             FragmentTask *&task_ptr = (*task_iter);

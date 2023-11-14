@@ -143,11 +143,15 @@ public:
     }
 
     void Begin() {
-        task_profiler_.Begin();
+        if(enable_) {
+            task_profiler_.Begin();
+        }
     }
 
     void End() {
-        task_profiler_.End();
+        if(enable_) {
+            task_profiler_.End();
+        }
     }
 
     void StartOperator(const PhysicalOperator *op);
