@@ -184,11 +184,14 @@ void WalManager::SetWalState(TxnTimeStamp max_commit_ts, int64_t wal_size) {
     this->wal_size_ = wal_size;
     mutex2_.unlock();
 }
-void WalManager::GetWalState(TxnTimeStamp &max_commit_ts, int64_t &wal_size) {
+
+int64_t WalManager::GetWalState(TxnTimeStamp &max_commit_ts) {
+    int64_t wal_size{0};
     mutex2_.lock();
     max_commit_ts = this->max_commit_ts_;
     wal_size = this->wal_size_;
     mutex2_.unlock();
+    return wal_size;
 }
 
 // Flush is scheduled regularly. It collects a batch of transactions, sync
@@ -199,7 +202,7 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush mainloop begin");
     while (running_.load()) {
         TxnTimeStamp max_commit_ts = 0;
-        int64_t wal_size = 0;
+
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
@@ -207,7 +210,7 @@ void WalManager::Flush() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-        GetWalState(max_commit_ts, wal_size);
+        int64_t wal_size = GetWalState(max_commit_ts);
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             Assert<StorageException>(!entry->cmds.empty(), Format("WalEntry of txn_id {} commands is empty", entry->txn_id));
@@ -264,8 +267,7 @@ void WalManager::Checkpoint() {
         auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
         int64_t now = seconds_since_epoch.count();
         TxnTimeStamp max_commit_ts;
-        int64_t wal_size;
-        GetWalState(max_commit_ts, wal_size);
+        int64_t wal_size = GetWalState(max_commit_ts);
         bool is_full_checkpoint = false;
         bool is_delta_checkpoint = false;
         if (now - full_ckp_when_ > full_checkpoint_interval_sec_ && wal_size != full_ckp_wal_size_) {
