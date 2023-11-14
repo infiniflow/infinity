@@ -32,7 +32,7 @@ QueryResult Table::CreateIndex(const String &index_name,
                                CreateIndexOptions create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
@@ -55,7 +55,7 @@ QueryResult Table::CreateIndex(const String &index_name,
 QueryResult Table::DropIndex(const String &index_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
@@ -73,7 +73,7 @@ QueryResult Table::DropIndex(const String &index_name) {
 QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
@@ -90,7 +90,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
 QueryResult Table::Import(const String &path, ImportOptions import_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CopyStatement> import_statement = MakeUnique<CopyStatement>();
@@ -111,7 +111,7 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
 QueryResult Table::Delete(ParsedExpr *filter) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<DeleteStatement> delete_statement = MakeUnique<DeleteStatement>();
@@ -125,7 +125,7 @@ QueryResult Table::Delete(ParsedExpr *filter) {
 QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
@@ -145,7 +145,7 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
                           ParsedExpr *limit) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();

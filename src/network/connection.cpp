@@ -81,7 +81,7 @@ void Connection::HandleRequest() {
     // FIXME
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     query_context_ptr->set_current_schema(session_->current_database());

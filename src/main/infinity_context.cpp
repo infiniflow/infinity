@@ -20,7 +20,7 @@ import stl;
 import logger;
 import config;
 import resource_manager;
-import fragment_scheduler;
+import new_task_scheduler;
 import storage;
 
 namespace infinity {
@@ -37,7 +37,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
 
         resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
 
-        fragment_scheduler_ = MakeUnique<FragmentScheduler>(config_.get());
+        task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
@@ -55,7 +55,7 @@ void InfinityContext::UnInit() {
     storage_->UnInit();
     storage_.reset();
 
-    fragment_scheduler_->UnInit();
+    task_scheduler_->UnInit();
 
     resource_manager_.reset();
 

@@ -56,7 +56,7 @@ f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, Sha
 
 int main() {
     SizeT thread_num = 8;
-    SizeT total_times = 800 * 1000;
+    SizeT total_times = 1200 * 1000;
 
     Infinity::LocalInit("/tmp/infinity");
 

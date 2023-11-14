@@ -29,7 +29,7 @@ import fragment_builder;
 import bind_context;
 import logical_node;
 import physical_operator;
-import fragment_scheduler;
+import new_task_scheduler;
 import fragment_context;
 import fragment_task;
 
@@ -57,7 +57,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     SharedPtr<RemoteSession> session_ptr = MakeShared<RemoteSession>();
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());

@@ -32,7 +32,7 @@ QueryResult Database::CreateTable(const String &table_name,
                                   const CreateTableOptions &create_table_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
@@ -48,7 +48,7 @@ QueryResult Database::CreateTable(const String &table_name,
 QueryResult Database::DropTable(const String &table_name, const DropTableOptions &drop_table_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
@@ -63,7 +63,7 @@ QueryResult Database::DropTable(const String &table_name, const DropTableOptions
 QueryResult Database::ListTables() {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
@@ -75,7 +75,7 @@ QueryResult Database::ListTables() {
 QueryResult Database::DescribeTable(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
@@ -87,7 +87,7 @@ QueryResult Database::DescribeTable(const String &db_name) {
 SharedPtr<Table> Database::GetTable(const String &table_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().fragment_scheduler(),
+                            InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();

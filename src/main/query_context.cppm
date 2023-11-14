@@ -19,7 +19,6 @@ import stl;
 import config;
 import session;
 import resource_manager;
-//import fragment_scheduler;
 import profiler;
 import storage;
 import txn;
@@ -36,7 +35,7 @@ namespace infinity {
 class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
-class FragmentScheduler;
+class TaskScheduler;
 
 export class QueryContext {
 
@@ -46,7 +45,7 @@ public:
     ~QueryContext();
 
     void Init(const Config *global_config_ptr,
-              FragmentScheduler *scheduler_ptr,
+              TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr);
 
@@ -103,7 +102,7 @@ public:
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 
-    [[nodiscard]] inline FragmentScheduler *scheduler() const { return scheduler_; }
+    [[nodiscard]] inline TaskScheduler *scheduler() const { return scheduler_; }
 
     [[nodiscard]] inline const Config *global_config() const { return global_config_; }
 
@@ -127,7 +126,7 @@ private:
     SharedPtr<QueryProfiler> query_metrics_;
 
     const Config *global_config_{};
-    FragmentScheduler *scheduler_{};
+    TaskScheduler *scheduler_{};
     Storage *storage_{};
     SessionBase *session_ptr_{};
     ResourceManager *resource_manager_{};
