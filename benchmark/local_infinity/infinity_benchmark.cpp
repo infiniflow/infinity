@@ -18,10 +18,14 @@
 
 import stl;
 import infinity;
-import query_options;
 import database;
+import parser;
 import profiler;
+import local_file_system;
 import third_party;
+
+import query_options;
+import query_result;
 
 using namespace infinity;
 
@@ -37,9 +41,7 @@ f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, Sha
         threads.emplace_back([&]() {
             for (SizeT j = 0; j < shared_size; ++j) {
                 SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-
                 closure(i * shared_size + j, infinity);
-
                 infinity->LocalDisconnect();
             }
         });
@@ -56,72 +58,137 @@ f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, Sha
 
 int main() {
     SizeT thread_num = 8;
-    SizeT total_times = 1200 * 1000;
+    SizeT total_times = 2 * 10 * 1000;
 
-    Infinity::LocalInit("/tmp/infinity");
+    String path = "/tmp/infinity";
+
+    LocalFileSystem fs;
+    if (fs.Exists(path)) {
+        fs.DeleteDirectory(path);
+    }
+    fs.CreateDirectory(path);
+
+    Infinity::LocalInit(path);
 
     std::cout << ">>> Infinity Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Tims: " << total_times << std::endl;
     
     Vector<String> results;
+    // Database
     {
         auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
             auto _ = infinity->GetDatabase("default");
         });
         results.push_back(Format("-> Get Database QPS: {}", total_times / tims_costing_second));
     }
-//    {
-//        CreateDatabaseOptions create_db_opts;
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i) {
-//            auto _ = infinity->CreateDatabase(ToStr(i), create_db_opts);
-//        });
-//        results.push_back(Format("-> Create Database QPS: {}", total_times / tims_costing_second));
-//    }
-//    {
-//        DropDatabaseOptions drop_db_opts;
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i) {
-//            auto _ = infinity->DropDatabase(ToStr(i), drop_db_opts);
-//        });
-//        results.push_back(Format("-> Drop Database QPS: {}", total_times / tims_costing_second));
-//    }
-//    {
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
-//            auto _ = infinity->ListDatabases();
-//        });
-//        results.push_back(Format("-> List Database QPS: {}", total_times / tims_costing_second));
-//    }
-//    {
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i) {
-//            auto _ = infinity->Query(Format("create table t{} (v1 int, v2 int, v3 int)", i));
-//        });
-//        results.push_back(Format("-> Create Table QPS: {}", total_times / tims_costing_second));
-//    }
-    // CRUD
-//    {
-//        // Init Table
-//        SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-//        auto _ = infinity->Query("create table t(v1 int, v2 int, v3 int)");
-//        infinity->LocalDisconnect();
-//    }
-//    {
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
-//            auto _ = infinity->Query(Format("insert into t values ({}, {}, {})", i, i + 1, i + 2));
-//        });
-//        results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
-//    }
-//    {
-//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
-//            auto _ = infinity->Query("select * from t");
-//        });
-//        results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
-//    }
+    {
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+            auto _ = infinity->ListDatabases();
+        });
+        results.push_back(Format("-> List Databases QPS: {}", total_times / tims_costing_second));
+    }
+    {
+        CreateDatabaseOptions create_db_opts;
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+            auto _ = infinity->CreateDatabase(ToStr(i), create_db_opts);
+        });
+        results.push_back(Format("-> Create Database QPS: {}", total_times / tims_costing_second));
+    }
+    {
+        DropDatabaseOptions drop_db_opts;
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+            auto _ = infinity->DropDatabase(ToStr(i), drop_db_opts);
+        });
+        results.push_back(Format("-> Drop Database QPS: {}", total_times / tims_costing_second));
+    }
+    // Table
+    {
+        CreateTableOptions create_table_opts;
+        DropTableOptions drop_table_options;
 
-//    {
-//        auto tims_costing_second = Measurement(1, total_times, [&](SizeT i) {
-//            auto _ = infinity->Query(Format("drop table t{}", i));
-//        });
-//        results.push_back(Format("-> Drop Table QPS: {}", total_times / tims_costing_second));
-//    }
+        SizeT column_count = 2;
+        Vector<ColumnDef *> column_defs;
+        column_defs.reserve(column_count);
+
+        SharedPtr<DataType> col_type = MakeShared<DataType>(LogicalType::kInteger);
+        String col_name_1 = "col1";
+        auto col_def_1 = new ColumnDef(0, col_type, col_name_1, HashSet<ConstraintType>());
+        column_defs.emplace_back(col_def_1);
+
+        col_type = MakeShared<DataType>(LogicalType::kInteger);
+        String col_name_2 = "col2";
+        auto col_def_2 = new ColumnDef(1, col_type, col_name_2, HashSet<ConstraintType>());
+        column_defs.emplace_back(col_def_2);
+
+        {
+            // Init Table
+            SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+            auto _ = infinity->GetDatabase("default")->CreateTable("benchmark_test", column_defs, Vector<TableConstraint *>(), create_table_opts);
+            infinity->LocalDisconnect();
+        }
+        {
+            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                auto _ = infinity->GetDatabase("default")->ListTables();
+            });
+            results.push_back(Format("-> List Tables QPS: {}", total_times / tims_costing_second));
+        }
+        {
+            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test");
+            });
+            results.push_back(Format("-> Get Tables QPS: {}", total_times / tims_costing_second));
+        }
+        {
+            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                auto _ = infinity->GetDatabase("default")->DescribeTable("benchmark_test");
+            });
+            results.push_back(Format("-> Describe Tables QPS: {}", total_times / tims_costing_second));
+        }
+        {
+            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                auto _ = infinity->GetDatabase("default")->CreateTable(ToStr(i), column_defs, Vector<TableConstraint *>(), create_table_opts);
+            });
+            results.push_back(Format("-> Create Table QPS: {}", total_times / tims_costing_second));
+        }
+        {
+            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                auto _ = infinity->GetDatabase("default")->DropTable(ToStr(i), drop_table_options);
+            });
+            results.push_back(Format("-> Drop Table QPS: {}", total_times / tims_costing_second));
+        }
+        {
+            Vector<Pair<ParsedExpr *, ParsedExpr *>> vec_search_exprs;
+            Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
+
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(vec_search_exprs, fts_search_exprs, nullptr, nullptr, nullptr, nullptr);
+                });
+                results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
+            }
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+                    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
+                    values->emplace_back(new Vector<ParsedExpr *>());
+
+                    Vector<String> *columns = new Vector<String>();
+                    columns->emplace_back(col_name_1);
+                    columns->emplace_back(col_name_2);
+
+                    ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+                    value1->integer_value_ = i;
+                    values->at(0)->emplace_back(value1);
+
+                    ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+                    value2->integer_value_ = i;
+                    values->at(0)->emplace_back(value2);
+
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Insert(columns, values);
+                });
+                results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
+            }
+        }
+    }
 
     std::cout << ">>> Infinity Benchmark End <<<" << std::endl;
     for (const auto &item : results) {
