@@ -70,3 +70,8 @@ target_link_libraries(
         faiss
         onnxruntime_mlas
 )
+add_executable(split_data
+        split_data.cpp
+        helper.cpp
+        helper.h
+)

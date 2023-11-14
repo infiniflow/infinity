@@ -401,7 +401,7 @@ int main() {
     size_t nq, d3;
     float *xq = fvecs_read(sift1m_query, &d3, &nq);
     UniquePtr<float> xq_destructor(xq);
-    assert(d == d2 || !"query does not have same dimension as train set");
+    assert(d == d3 || !"query does not have same dimension as train set");
     if (ann_ivfflat_benchmark_verbose) {
         printf("[%.3f s] Loading ground truth for %ld queries\n", ann_benchmark_elapsed() - t0, nq);
     }
