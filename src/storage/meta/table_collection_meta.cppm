@@ -22,7 +22,7 @@ import third_party;
 import table_collection_type;
 import txn_manager;
 import buffer_manager;
-//import db_entry;
+import status;
 
 export module table_collection_meta;
 
@@ -53,7 +53,7 @@ public:
 
     static void DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static EntryResult GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_table_entry);
 
     static SharedPtr<String> ToString(TableCollectionMeta *table_meta);
 

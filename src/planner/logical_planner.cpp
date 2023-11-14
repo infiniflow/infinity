@@ -153,12 +153,13 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
-    EntryResult result = txn->GetTableByName(schema_name, table_name);
-    if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_);
+    BaseEntry* base_table_entry{nullptr};
+    Status status = txn->GetTableByName(schema_name, table_name, base_table_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
 
-    TableCollectionEntry *table_entry = static_cast<TableCollectionEntry *>(result.entry_);
+    TableCollectionEntry *table_entry = static_cast<TableCollectionEntry *>(base_table_entry);
 
     if (table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
         Error<PlannerException>("Currently, collection isn't supported.");
@@ -611,9 +612,11 @@ Status LogicalPlanner::BuildCopy(const CopyStatement *statement, SharedPtr<BindC
 Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_);
+
+    BaseEntry* base_entry{nullptr};
+    Status status = txn->GetTableByName(statement->schema_name_, statement->table_name_, base_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
 
     // Check the file existence
@@ -639,11 +642,12 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    EntryResult result = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (result.entry_ == nullptr) {
-        Error<PlannerException>(*result.err_);
+    BaseEntry* base_entry{nullptr};
+    Status status = txn->GetTableByName(statement->schema_name_, statement->table_name_, base_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
-    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
+    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_entry);
 
     // Check the file existence
     LocalFileSystem fs;
@@ -675,8 +679,9 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            EntryResult result = txn->GetDatabase(use_command_info->db_name());
-            if (result.Success()) {
+            BaseEntry* base_db_entry{nullptr};
+            Status status = txn->GetDatabase(use_command_info->db_name(), base_db_entry);
+            if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
@@ -702,8 +707,9 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
-            EntryResult result = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
-            if (result.Success()) {
+            BaseEntry* base_table_entry{nullptr};
+            Status status = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name(), base_table_entry);
+            if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 

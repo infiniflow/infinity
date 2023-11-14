@@ -73,21 +73,21 @@ public:
 
     EntryResult DropDatabase(const String &db_name, ConflictType conflict_type);
 
-    EntryResult GetDatabase(const String &db_name);
+    Status GetDatabase(const String &db_name, BaseEntry*& new_db_entry);
 
     Vector<DatabaseDetail> ListDatabases();
 
-    Vector<TableCollectionDetail> GetTableCollections(const String &db_name);
+    Status GetTableCollections(const String &db_name, Vector<TableCollectionDetail>& output_table_array);
 
-    EntryResult CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
+    Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type, BaseEntry*& new_table_entry);
 
     Status CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type);
 
-    EntryResult GetTableByName(const String &db_name, const String &table_name);
+    Status GetTableByName(const String &db_name, const String &table_name, BaseEntry*& new_table_entry);
 
     EntryResult CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type);
 
-    EntryResult DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
+    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type, BaseEntry*& drop_table_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -102,9 +102,9 @@ public:
 
     Vector<BaseEntry *> GetViews(const String &db_name);
 
-    UniquePtr<String> Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
+    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
-    UniquePtr<String> Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
+    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
     void GetMetaTableState(MetaTableState *meta_table_state, const String &db_name, const String &table_name, const Vector<ColumnID> &columns);
 
@@ -133,7 +133,7 @@ public:
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    UniquePtr<String> GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
+    Status GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
 private:
     // Txn Manager

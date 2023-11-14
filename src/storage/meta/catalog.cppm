@@ -25,6 +25,7 @@ import table_function;
 import third_party;
 import buffer_manager;
 import profiler;
+import status;
 
 export module new_catalog;
 
@@ -87,7 +88,7 @@ public:
 
     static EntryResult DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static EntryResult GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry);
 
     static void RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr);
 

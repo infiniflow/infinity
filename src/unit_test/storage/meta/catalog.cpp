@@ -31,6 +31,7 @@ import txn_manager;
 import txn;
 import base_entry;
 import new_catalog;
+import status;
 
 class CatalogTest : public BaseTest {
     void SetUp() override {
@@ -77,15 +78,15 @@ TEST_F(CatalogTest, simple_test1) {
     }
 
     {
-        EntryResult res;
-        res = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS());
+        BaseEntry* base_db_entry{nullptr};
+        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
         // should be visible to same txn
-        EXPECT_TRUE(res.Success());
-        EXPECT_EQ(res.entry_, databases["db1"]);
+        EXPECT_TRUE(status1.ok());
+        EXPECT_EQ(base_db_entry, databases["db1"]);
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
-        EXPECT_TRUE(res.Fail());
+        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS(), base_db_entry);
+        EXPECT_TRUE(!status2.ok());
     }
 
     // drop db should be success
@@ -97,13 +98,14 @@ TEST_F(CatalogTest, simple_test1) {
         // remove this entry
         databases.erase("db1");
 
-        res = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS());
+        BaseEntry* base_db_entry{nullptr};
+        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
         // should not be visible to same txn
-        EXPECT_TRUE(res.Fail());
+        EXPECT_TRUE(!status1.ok());
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
-        EXPECT_TRUE(res.Fail());
+        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS(), base_db_entry);
+        EXPECT_TRUE(!status2.ok());
     }
 
     txn1->CommitTxn();
@@ -142,9 +144,10 @@ TEST_F(CatalogTest, simple_test2) {
 
     // should not be visible to txn2
     {
-        EntryResult res;
-        res = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS());
-        EXPECT_TRUE(res.Fail());
+        BaseEntry* base_db_entry{nullptr};
+        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
+        // should not be visible to same txn
+        EXPECT_TRUE(!status1.ok());
     }
 
     txn2->CommitTxn();
@@ -155,9 +158,10 @@ TEST_F(CatalogTest, simple_test2) {
     // should be visible to txn3
     {
         EntryResult res;
-        res = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS());
-        EXPECT_TRUE(res.Success());
-        EXPECT_EQ(res.entry_, databases["db1"]);
+        BaseEntry* base_db_entry{nullptr};
+        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS(), base_db_entry);
+        EXPECT_TRUE(status1.ok());
+        EXPECT_EQ(base_db_entry, databases["db1"]);
 
         res = txn3->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(res.Success());
@@ -167,8 +171,9 @@ TEST_F(CatalogTest, simple_test2) {
         databases.erase("db1");
 
         // should not be visible to other txn
-        res = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS());
-        EXPECT_TRUE(res.Fail());
+        base_db_entry = nullptr;
+        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS(), base_db_entry);
+        EXPECT_TRUE(!status2.ok());
     }
 
     txn3->CommitTxn();
@@ -223,10 +228,11 @@ TEST_F(CatalogTest, concurrent_test) {
             EntryResult res;
             for (int db_id = 0; db_id < 1000; ++db_id) {
                 String db_name = "db" + ToStr(db_id);
-                res = NewCatalog::GetDatabase(catalog, db_name, txn->TxnID(), txn->BeginTS());
-                EXPECT_TRUE(res.Success());
+                BaseEntry* base_entry{nullptr};
+                Status status = NewCatalog::GetDatabase(catalog, db_name, txn->TxnID(), txn->BeginTS(), base_entry);
+                EXPECT_TRUE(status.ok());
                 // only read, don't need lock
-                EXPECT_EQ(res.entry_, databases[db_name]);
+                EXPECT_EQ(base_entry, databases[db_name]);
             }
         };
 
@@ -273,8 +279,9 @@ TEST_F(CatalogTest, concurrent_test) {
         EntryResult res;
         for (int db_id = 0; db_id < 1000; ++db_id) {
             String db_name = "db" + ToStr(db_id);
-            res = NewCatalog::GetDatabase(catalog, db_name, txn7->TxnID(), txn7->BeginTS());
-            EXPECT_TRUE(res.Fail());
+            BaseEntry* base_db_entry{nullptr};
+            Status status = NewCatalog::GetDatabase(catalog, db_name, txn7->TxnID(), txn7->BeginTS(), base_db_entry);
+            EXPECT_TRUE(!status.ok());
         }
     }
 }

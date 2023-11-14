@@ -30,6 +30,7 @@ import default_values;
 import txn_manager;
 import txn;
 import base_entry;
+import status;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {
@@ -101,8 +102,10 @@ TEST_F(TableTxnTest, test1) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status status1 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(status1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn->CommitTxn();
@@ -114,12 +117,16 @@ TEST_F(TableTxnTest, test1) {
     new_txn->BeginTxn();
 
     // Txn2: Create duplicated tbl1, NOT OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(table1_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status2 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_FALSE(status2.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Get db1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_NE(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status3 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(status3.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn->CommitTxn();
@@ -144,24 +151,34 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status status1 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(status1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Get db1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_NE(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status2 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(status2.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Drop tbl1, OK
-    dropped_res = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
-    EXPECT_NE(dropped_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status3 = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError, table_entry);
+    EXPECT_TRUE(status3.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Get db1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_EQ(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status4 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_FALSE(status4.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status5 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(status5.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn->CommitTxn();
@@ -173,12 +190,16 @@ TEST_F(TableTxnTest, test2) {
     new_txn->BeginTxn();
 
     // Txn2: Create duplicated tbl1, NOT OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(table1_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status6 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!status6.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Get db1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_NE(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status7 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(status7.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn->CommitTxn();
@@ -201,8 +222,10 @@ TEST_F(TableTxnTest, test3) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status status1 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(status1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn->CommitTxn();
@@ -214,12 +237,16 @@ TEST_F(TableTxnTest, test3) {
     new_txn->BeginTxn();
 
     // Txn2: Drop tbl1, OK
-    dropped_res = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
-    EXPECT_NE(dropped_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status2 = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError, table_entry);
+    EXPECT_TRUE(status2.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Create tbl1, OK
-    table1_res = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(table1_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status3 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(status3.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn->CommitTxn();
@@ -231,8 +258,10 @@ TEST_F(TableTxnTest, test3) {
     new_txn->BeginTxn();
 
     // Txn3: Get tbl1, OK
-    get_res = new_txn->GetTableByName("db1", "tbl1");
-    EXPECT_NE(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status status4 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(status4.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Commit, OK
     new_txn->CommitTxn();
@@ -265,19 +294,25 @@ TEST_F(TableTxnTest, test4) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Create tbl1, OK
-    create1_res = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create1_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Create tbl1, NOT OK, DB not found
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(create2_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s2 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!s2.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn1->CommitTxn();
 
     // Txn2: Create tbl1, NOT OK, DB not found
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(create2_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s3 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!s3.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn2->CommitTxn();
@@ -318,12 +353,16 @@ TEST_F(TableTxnTest, test5) {
     new_txn3->BeginTxn();
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Create tbl1, NOT OK，W-W Conflict
-    create3_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(create3_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s2 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!s2.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn2->CommitTxn();
@@ -367,12 +406,16 @@ TEST_F(TableTxnTest, test6) {
     new_txn3->BeginTxn();
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Create tbl1, NOT OK，W-W Conflict
-    create3_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(create3_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s2 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!s2.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn3: Commit, OK
     new_txn3->CommitTxn();
@@ -397,8 +440,10 @@ TEST_F(TableTxnTest, test7) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn1->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Commit, OK
     new_txn1->RollbackTxn();
@@ -410,12 +455,16 @@ TEST_F(TableTxnTest, test7) {
     new_txn2->BeginTxn();
 
     // Txn3: Get db1, NOT OK
-    get_res = new_txn2->GetDatabase("db1");
-    EXPECT_EQ(get_res.entry_, nullptr);
+    BaseEntry* db_entry{nullptr};
+    Status s2 = new_txn2->GetDatabase("db1", db_entry);
+    EXPECT_TRUE(!s2.ok());
+    EXPECT_EQ(db_entry, nullptr);
 
     // Txn3: Get tbl1, NOT OK
-    get_res = new_txn2->GetTableByName("db1", "tbl1");
-    EXPECT_EQ(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s3 = new_txn2->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(!s3.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn2->CommitTxn();
@@ -446,8 +495,10 @@ TEST_F(TableTxnTest, test8) {
     new_txn2->BeginTxn();
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn2->RollbackTxn();
@@ -459,12 +510,16 @@ TEST_F(TableTxnTest, test8) {
     new_txn3->BeginTxn();
 
     // Txn3: Get db1, OK
-    get_res = new_txn3->GetDatabase("db1");
-    EXPECT_NE(get_res.entry_, nullptr);
+    BaseEntry* db_entry{nullptr};
+    Status s2 = new_txn3->GetDatabase("db1", db_entry);
+    EXPECT_TRUE(s2.ok());
+    EXPECT_NE(db_entry, nullptr);
 
     // Txn3: Get tbl1, NOT OK
-    get_res = new_txn3->GetTableByName("db1", "tbl1");
-    EXPECT_EQ(get_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s3 = new_txn3->GetTableByName("db1", "tbl1", table_entry);
+    EXPECT_TRUE(!s3.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn3: Commit, OK
     new_txn3->CommitTxn();
@@ -501,8 +556,10 @@ TEST_F(TableTxnTest, test9) {
     new_txn2->BeginTxn();
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Create, OK
     Txn *new_txn3 = txn_mgr->CreateTxn();
@@ -511,15 +568,19 @@ TEST_F(TableTxnTest, test9) {
     new_txn3->BeginTxn();
 
     // Txn3: Create tbl1, NOT OK, WW conflict
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_EQ(create3_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s2 = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(!s2.ok());
+    EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Rollback, OK
     new_txn2->RollbackTxn();
 
     // Txn3: Create tbl1, OK
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create3_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s3 = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s3.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Commit, OK
     new_txn3->CommitTxn();
@@ -562,16 +623,22 @@ TEST_F(TableTxnTest, test10) {
     new_txn3->BeginTxn();
 
     // Txn2: Create tbl1, OK
-    create2_res = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create2_res.entry_, nullptr);
+    BaseEntry* table_entry{nullptr};
+    Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s1.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Drop tbl1, OK
-    dropped1_res = new_txn2->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
-    EXPECT_NE(dropped1_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s2 = new_txn2->DropTableCollectionByName("db1", "tbl1", ConflictType::kError, table_entry);
+    EXPECT_TRUE(s2.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn3: Create tbl1, OK
-    create3_res = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
-    EXPECT_NE(create3_res.entry_, nullptr);
+    table_entry = nullptr;
+    Status s3 = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError, table_entry);
+    EXPECT_TRUE(s3.ok());
+    EXPECT_NE(table_entry, nullptr);
 
     // Txn2: Commit, OK
     new_txn2->CommitTxn();

@@ -30,6 +30,7 @@ import block_index;
 import logger;
 import third_party;
 import infinity_exception;
+import status;
 
 module db_entry;
 
@@ -105,20 +106,23 @@ EntryResult DBEntry::DropTableCollection(DBEntry *db_entry,
     return res;
 }
 
-EntryResult DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Status
+DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry) {
     db_entry->rw_locker_.lock_shared();
 
     TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_name].get();
+    if (db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
+        table_meta = db_entry->tables_[table_collection_name].get();
     }
     db_entry->rw_locker_.unlock_shared();
 
     //    LOG_TRACE("Get a table entry {}", table_name);
     if (table_meta == nullptr) {
-        return {nullptr, MakeUnique<String>("Attempt to get not existed table/collection entry")};
+        UniquePtr<String> err_msg = MakeUnique<String>("No valid db meta.");
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
-    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
+    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts, new_db_entry);
 }
 
 void DBEntry::RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -142,13 +146,12 @@ Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 
     results.reserve(db_entry->tables_.size());
     for (auto &table_collection_meta_pair : db_entry->tables_) {
         TableCollectionMeta *table_collection_meta = table_collection_meta_pair.second.get();
-        EntryResult entry_result = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
-        if (entry_result.entry_ == nullptr) {
-            LOG_WARN(Format("error when get table/collection entry: {}", *entry_result.err_));
+        BaseEntry* table_collection_entry{nullptr};
+        Status status = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts, table_collection_entry);
+        if (!status.ok()) {
+            LOG_WARN(Format("error when get table/collection entry: {}", *status.message()));
         } else {
-            if (entry_result.entry_ != nullptr) {
-                results.emplace_back((TableCollectionEntry *)entry_result.entry_);
-            }
+            results.emplace_back((TableCollectionEntry *)table_collection_entry);
         }
     }
     db_entry->rw_locker_.unlock_shared();
@@ -156,11 +159,9 @@ Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 
     return results;
 }
 
-Vector<TableCollectionDetail> DBEntry::GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts) {
-
+Status DBEntry::GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts, Vector<TableCollectionDetail> &output_table_array) {
     Vector<TableCollectionEntry *> table_collection_entries = DBEntry::TableCollections(db_entry, txn_id, begin_ts);
-    Vector<TableCollectionDetail> results;
-    results.reserve(table_collection_entries.size());
+    output_table_array.reserve(table_collection_entries.size());
     for (TableCollectionEntry *table_collection_entry : table_collection_entries) {
         TableCollectionDetail table_collection_detail;
         table_collection_detail.db_name_ = db_entry->db_name_;
@@ -174,10 +175,9 @@ Vector<TableCollectionDetail> DBEntry::GetTableCollectionsDetail(DBEntry *db_ent
 
         table_collection_detail.segment_count_ = segment_index->SegmentCount();
         table_collection_detail.block_count_ = segment_index->BlockCount();
-        results.emplace_back(table_collection_detail);
+        output_table_array.emplace_back(table_collection_detail);
     }
-
-    return results;
+    return Status::OK();
 }
 
 SharedPtr<String> DBEntry::ToString(DBEntry *db_entry) {

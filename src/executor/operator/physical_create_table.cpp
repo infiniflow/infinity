@@ -22,6 +22,8 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import base_entry;
+import status;
 
 module physical_create_table;
 
@@ -50,11 +52,14 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
 void PhysicalCreateTable::Init() {}
 
 void PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
+
     auto txn = query_context->GetTxn();
-    auto result = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
+
+    BaseEntry* new_table_entry{nullptr};
+    Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_, new_table_entry);
     auto create_table_operator_state = (CreateTableOperatorState *)operator_state;
-    if (result.err_.get() != nullptr) {
-        create_table_operator_state->error_message_ = Move(result.err_);
+    if (!status.ok()) {
+        create_table_operator_state->error_message_ = Move(status.msg_);
     }
     operator_state->SetComplete();
 }

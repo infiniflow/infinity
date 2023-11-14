@@ -19,6 +19,7 @@ import base_entry;
 import txn_manager;
 import buffer_manager;
 import third_party;
+import status;
 
 export module db_meta;
 
@@ -36,7 +37,7 @@ public:
 
     static void DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static EntryResult GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry);
 
     static SharedPtr<String> ToString(DBMeta *db_meta);
 

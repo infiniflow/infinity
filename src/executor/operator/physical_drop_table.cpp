@@ -23,7 +23,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import base_entry;
-
+import status;
 import infinity_exception;
 
 module physical_drop_table;
@@ -35,9 +35,14 @@ void PhysicalDropTable::Init() {}
 void PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
     auto txn = query_context->GetTxn();
-    auto res = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
+
+    BaseEntry* new_table_entry{nullptr};
+    Status status = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_, new_table_entry);
     auto drop_table_operator_state = (DropTableOperatorState *)(operator_state);
-    drop_table_operator_state->error_message_ = Move(res.err_);
+
+    if(!status.ok()) {
+        drop_table_operator_state->error_message_ = Move(status.msg_);
+    }
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
