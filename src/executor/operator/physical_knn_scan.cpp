@@ -49,6 +49,8 @@ import faiss;
 import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
+import buffer_handle;
+import knn_hnsw;
 
 module physical_knn_scan;
 
@@ -166,6 +168,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         // with index
         IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+
         switch (index_entry->index_def_entry_->index_def_->method_type_) {
             case IndexMethod::kIVFFlat: {
                 BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
@@ -205,15 +208,39 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 }
                 break;
             }
-            case IndexMethod::kIVFSQ8: {
+            case IndexMethod::kHnsw: {
+                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+                auto index = static_cast<const KnnHnsw<DataType, u64> *>(index_handle.GetData());
+
+                Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
+                Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
+
+                i64 result_n = -1;
+                for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+                    const DataType *query =
+                        static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
+                    MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                    if (result_n < 0) {
+                        result_n = heap.size();
+                    } else if (result_n != heap.size()) {
+                        throw ExecutorException("Bug");
+                    }
+                    u64 id = 0;
+                    while (!heap.empty()) {
+                        const auto &[dist, row_id] = heap.top();
+                        row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
+                        dists[query_idx * knn_scan_shared_data->topk_ + id] = dist;
+                        ++id;
+                        heap.pop();
+                    }
+                }
+                merge_heap->Search(dists.data(), row_ids.data(), result_n);
                 break;
             }
-            case IndexMethod::kHnsw:
-            case IndexMethod::kInvalid:
-                break;
+            default: {
+                throw ExecutorException("Not implemented");
+            }
         }
-        // TODO
-        throw ExecutorException("Not implemented");
     } else {
         // all task Complete
         SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();

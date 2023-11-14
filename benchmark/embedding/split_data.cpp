@@ -5,15 +5,15 @@
 #include <iostream>
 #include <memory>
 
-static const char *sift1m_train = "../../../test/data/fvecs/sift_learn.fvecs";
-static const char *sift1m_base = "../../../test/data/fvecs/sift_base.fvecs";
-static const char *sift1m_query = "../../../test/data/fvecs/sift_query.fvecs";
-static const char *sift1m_ground_truth = "../../../test/data/fvecs/sift_groundtruth.ivecs";
-static const char *sift1m_base_split_1 = "../../../test/data/fvecs/sift_base_split_1.fvecs";
-static const char *sift1m_base_split_2 = "../../../test/data/fvecs/sift_base_split_2.fvecs";
-static const char *sift1m_base_split_3 = "../../../test/data/fvecs/sift_base_split_3.fvecs";
-static const char *sift1m_base_split_4 = "../../../test/data/fvecs/sift_base_split_4.fvecs";
-static const char *sift1m_base_split_5 = "../../../test/data/fvecs/sift_base_split_5.fvecs";
+static const char *sift1m_train = "./test/data/fvecs/sift_learn.fvecs";
+static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";
+static const char *sift1m_query = "./test/data/fvecs/sift_query.fvecs";
+static const char *sift1m_ground_truth = "./test/data/fvecs/sift_groundtruth.ivecs";
+static const char *sift1m_base_split_1 = "./test/data/fvecs/sift_base_split_1.fvecs";
+static const char *sift1m_base_split_2 = "./test/data/fvecs/sift_base_split_2.fvecs";
+static const char *sift1m_base_split_3 = "./test/data/fvecs/sift_base_split_3.fvecs";
+static const char *sift1m_base_split_4 = "./test/data/fvecs/sift_base_split_4.fvecs";
+static const char *sift1m_base_split_5 = "./test/data/fvecs/sift_base_split_5.fvecs";
 
 constexpr bool create_split_file = false;
 constexpr bool check_split_file = false;
