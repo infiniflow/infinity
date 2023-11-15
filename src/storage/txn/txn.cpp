@@ -529,6 +529,7 @@ void Txn::CommitTxn() {
     // Wait until CommitTxnBottom is done.
     UniqueLock<Mutex> lk(m);
     cv.wait(lk, [this] { return done_bottom_; });
+    txn_mgr_->DestroyTxn(txn_id_);
 }
 
 void Txn::CommitTxnBottom() {
@@ -613,6 +614,7 @@ void Txn::RollbackTxn() {
     }
 
     txn_context_.SetTxnRollbacked();
+    txn_mgr_->DestroyTxn(txn_id_);
 
     LOG_TRACE(Format("Txn: {} is dropped.", txn_id_));
 }
