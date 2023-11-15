@@ -41,7 +41,6 @@ void DBServer::Run() {
 
     InfinityContext::instance().Init(config_path_);
 
-//    grpc_thread_ = Thread([]() { GrpcServiceImpl::Run(); });
     brpc_thread_ = Thread([]() { BrpcServiceImpl::Run(); });
 
     u16 pg_port = InfinityContext::instance().config()->pg_port();
@@ -81,7 +80,6 @@ void DBServer::Shutdown() {
     io_service_.stop();
     initialized = false;
     acceptor_ptr_->close();
-//    grpc_thread_.join();
     brpc_thread_.join();
 
     infinity::InfinityContext::instance().UnInit();

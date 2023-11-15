@@ -233,10 +233,6 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
         iresearch
 #        profiler
 
@@ -361,11 +357,6 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
         iresearch
 #        profiler
         leveldb
