@@ -38,6 +38,8 @@ protected:
 public:
     explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def)
         : FileWorker(file_dir, file_name, 0), index_def_(index_def), column_def_(column_def) {}
+
+    ~IndexFileWorker() override = default;
 };
 
 } // namespace infinity

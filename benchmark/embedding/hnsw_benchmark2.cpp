@@ -6,7 +6,7 @@
 
 import stl;
 import knn_hnsw;
-import dist_func;
+import dist_func_l2;
 import local_file_system;
 
 static const char *sift1m_base = "./test/data/fvecs/sift_base.fvecs";

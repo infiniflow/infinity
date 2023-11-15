@@ -73,6 +73,8 @@ public:
 
     void OnExecute(i64 worker_id);
 
+    inline void SetLastWorkID(i64 worker_id) { last_worker_id_ = worker_id; }
+
     [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
     u64 ProposedCPUID(u64 max_cpu_count) const;
@@ -86,6 +88,8 @@ public:
     [[nodiscard]] TaskBinding TaskBinding() const;
 
     void TryCompleteFragment();
+
+    String PhysOpsToString();
 
 public:
     Atomic<FragmentTaskState> state_{FragmentTaskState::kReady};

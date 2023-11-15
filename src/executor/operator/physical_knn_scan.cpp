@@ -34,6 +34,23 @@ import infinity_exception;
 import table_collection_entry;
 import default_values;
 
+import segment_entry;
+import index_def_meta;
+import index_def_entry;
+import index_entry;
+import block_column_entry;
+import knn_expression;
+import column_expression;
+
+import buffer_manager;
+import merge_knn;
+import faiss;
+import index_def;
+import ann_ivf_flat;
+import annivfflat_index_data;
+import buffer_handle;
+import knn_hnsw;
+
 module physical_knn_scan;
 
 namespace infinity {
@@ -42,14 +59,25 @@ void PhysicalKnnScan::Init() {}
 
 void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
-
-    switch (knn_scan_operator_state->knn_scan_function_data_->elem_type_) {
+    auto elem_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->elem_type_;
+    auto dist_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->knn_distance_type_;
+    switch (elem_type) {
         case kElemFloat: {
-            ExecuteInternal<f32>(query_context, knn_scan_operator_state);
-            break;
-        }
-        case kElemInvalid: {
-            Error<ExecutorException>("Invalid element data type");
+            switch (dist_type) {
+                case KnnDistanceType::kL2:
+                case KnnDistanceType::kHamming: {
+                    ExecuteInternal<f32, FaissCMax>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                case KnnDistanceType::kCosine:
+                case KnnDistanceType::kInnerProduct: {
+                    ExecuteInternal<f32, FaissCMin>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                default: {
+                    Error<ExecutorException>("Not implemented");
+                }
+            }
             break;
         }
         default: {
@@ -66,107 +94,210 @@ BlockIndex *PhysicalKnnScan::GetBlockIndex() const { return base_table_ref_->blo
 
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalKnnScan::PlanBlockEntries(i64 parallel_count) const {
-    BlockIndex *block_index = base_table_ref_->block_index_.get();
+Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
+    u64 txn_id = query_context->GetTxn()->TxnID();
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    u64 all_block_count = block_index->BlockCount();
-    u64 block_per_task = all_block_count / parallel_count;
-    u64 residual = all_block_count % parallel_count;
+    if (knn_expressions_.size() != 1) {
+        Error<SchedulerException>("Currently, we only support one knn column scenario");
+    }
+    KnnExpression *knn_expr = static_cast<KnnExpression *>(knn_expressions_[0].get());
+    ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
+    SizeT knn_column_id = column_expr->binding().column_idx;
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
-    for (u64 task_id = 0, global_block_id = 0, residual_idx = 0; task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
-        for (u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
-            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
+    Vector<BlockColumnEntry *> block_column_entries;
+    Vector<IndexEntry *> index_entries;
+
+    TableCollectionEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    HashMap<u32, Vector<IndexEntry *>> index_entry_map;
+    for (auto &[index_name, index_meta] : table_entry->indexes_) {
+        auto entry_result = IndexDefMeta::GetEntry(index_meta.get(), txn_id, begin_ts);
+        if (entry_result.entry_ == nullptr) {
+            throw StorageException("Cannot find index entry.");
         }
-        if (residual_idx < residual) {
-            result[task_id]->emplace_back(block_index->global_blocks_[global_block_id++]);
-            ++residual_idx;
+        auto index_def_entry = static_cast<IndexDefEntry *>(entry_result.entry_);
+        for (auto &[segment_id, index_entry] : index_def_entry->indexes_) {
+            index_entry_map[segment_id].emplace_back(index_entry.get());
         }
     }
-    return result;
+    BlockIndex *block_index = base_table_ref_->block_index_.get();
+    for (SegmentEntry *segment_entry : block_index->segments_) {
+        if (auto iter = index_entry_map.find(segment_entry->segment_id_); iter != index_entry_map.end()) {
+            index_entries.emplace_back(iter->second[0]);
+        } else {
+            for (auto &block_entry : segment_entry->block_entries_) {
+                BlockColumnEntry *block_column_entry = block_entry->columns_[knn_column_id].get();
+                block_column_entries.emplace_back(block_column_entry);
+            }
+        }
+    }
+    LOG_TRACE(Format("KnnScan: brute force task: {}, index task: {}", block_column_entries.size(), index_entries.size()));
+    return {block_column_entries, index_entries};
 }
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-template <typename T>
+template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
-    auto *knn_scan_function_data_ptr = operator_state->knn_scan_function_data_.get();
-    BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
-    Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
-    const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
-    if (knn_column_ids.size() != 1) {
-        Error<ExecutorException>("More than one knn column");
+    auto knn_scan_function_data = operator_state->knn_scan_function_data1_.get();
+    auto knn_scan_shared_data = knn_scan_function_data->shared_data_.get();
+
+    auto dist_func = static_cast<KnnDistance1<DataType> *>(knn_scan_function_data->knn_distance_.get());
+    auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
+    auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
+
+    SizeT index_task_n = knn_scan_shared_data->index_entries_.size();
+    SizeT brute_task_n = knn_scan_shared_data->block_column_entries_.size();
+
+    if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
+        LOG_TRACE(Format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
+        // brute force
+        BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
+        const BlockEntry *block_entry = block_column_entry->block_entry_;
+
+        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+        ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_column_entry, buffer_mgr);
+
+        auto data = reinterpret_cast<const DataType *>(column_buffer.GetAll());
+        u16 row_count = block_entry->row_count_;
+
+        Vector<DataType> dists = dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_);
+        Vector<RowID> row_ids(row_count);
+        for (u16 i = 0; i < row_count; ++i) {
+            row_ids[i] = RowID(block_entry->segment_entry_->segment_id_, block_entry->block_id_ * DEFAULT_BLOCK_CAPACITY + i);
+        }
+        merge_heap->Search(dists.data(), row_ids.data(), row_count);
+    } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
+        LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
+        // with index
+        IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
+        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+
+        switch (index_entry->index_def_entry_->index_def_->method_type_) {
+            case IndexMethod::kIVFFlat: {
+                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+                auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
+                i32 n_probes = 1;
+                auto segment_id = index_entry->segment_entry_->segment_id_;
+                switch (knn_scan_shared_data->knn_distance_type_) {
+                    case KnnDistanceType::kL2: {
+                        AnnIVFFlatL2 ann_ivfflat_query{query,
+                                                       knn_scan_shared_data->query_count_,
+                                                       knn_scan_shared_data->topk_,
+                                                       knn_scan_shared_data->dimension_,
+                                                       knn_scan_shared_data->elem_type_};
+                        ann_ivfflat_query.Begin();
+                        ann_ivfflat_query.Search(index, segment_id, n_probes);
+                        ann_ivfflat_query.End();
+                        auto dists = ann_ivfflat_query.GetDistances();
+                        auto row_ids = ann_ivfflat_query.GetIDs();
+                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        break;
+                    }
+                    case KnnDistanceType::kInnerProduct: {
+                        AnnIVFFlatIP ann_ivfflat_query{query,
+                                                       knn_scan_shared_data->query_count_,
+                                                       knn_scan_shared_data->topk_,
+                                                       knn_scan_shared_data->dimension_,
+                                                       knn_scan_shared_data->elem_type_};
+                        ann_ivfflat_query.Begin();
+                        ann_ivfflat_query.Search(index, segment_id, n_probes);
+                        ann_ivfflat_query.End();
+                        auto dists = ann_ivfflat_query.GetDistances();
+                        auto row_ids = ann_ivfflat_query.GetIDs();
+                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        break;
+                    }
+                }
+                break;
+            }
+            case IndexMethod::kHnsw: {
+                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+                auto index = static_cast<const KnnHnsw<DataType, u64> *>(index_handle.GetData());
+
+                Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
+                Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
+
+                i64 result_n = -1;
+                for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+                    const DataType *query =
+                        static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
+                    MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                    if (result_n < 0) {
+                        result_n = heap.size();
+                    } else if (result_n != heap.size()) {
+                        throw ExecutorException("Bug");
+                    }
+                    u64 id = 0;
+                    while (!heap.empty()) {
+                        const auto &[dist, row_id] = heap.top();
+                        row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
+                        switch (knn_scan_shared_data->knn_distance_type_) {
+                            case KnnDistanceType::kInvalid: {
+                                throw ExecutorException("Bug");
+                            }
+                            case KnnDistanceType::kL2:
+                            case KnnDistanceType::kHamming: {
+                                dists[query_idx * knn_scan_shared_data->topk_ + id] = +dist;
+                                break;
+                            }
+                            case KnnDistanceType::kCosine:
+                            case KnnDistanceType::kInnerProduct: {
+                                dists[query_idx * knn_scan_shared_data->topk_ + id] = -dist;
+                                break;
+                            }
+                        }
+                        ++id;
+                        heap.pop();
+                    }
+                }
+                merge_heap->Search(dists.data(), row_ids.data(), result_n);
+                break;
+            }
+            default: {
+                throw ExecutorException("Not implemented");
+            }
+        }
     }
+    if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
+        LOG_TRACE(Format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
+        // all task Complete
+        SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();
+        BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
-    SizeT knn_column_id = knn_column_ids[0];
+        i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
+        for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+            DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
+            RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
 
-    i64 &block_ids_idx = knn_scan_function_data_ptr->current_block_ids_idx_;
-    u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    u16 block_id = block_ids->at(block_ids_idx).block_id_;
+            for (i64 top_idx = result_n - 1; top_idx >= 0; --top_idx) {
+                SizeT id = query_idx * knn_scan_shared_data->query_count_ + top_idx;
 
-    BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-    u16 row_count = current_block_entry->row_count_;
+                u32 segment_id = row_ids[top_idx].segment_id_;
+                u32 segment_offset = row_ids[top_idx].segment_offset_;
+                u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-    Vector<ColumnBuffer> columns_buffer;
-    columns_buffer.reserve(current_block_entry->columns_.size());
-    SizeT column_count = current_block_entry->columns_.size();
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        columns_buffer.emplace_back(
-            BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager()));
-    }
-
-    auto knn_flat = static_cast<KnnDistance<T> *>(knn_scan_function_data_ptr->knn_distance_.get());
-    knn_flat->Search((T *)(columns_buffer[knn_column_id].GetAll()), row_count, segment_id, block_id);
-
-    ++block_ids_idx;
-    if (block_ids_idx == block_ids->size()) {
-        // Last block, Get the result according to the topk row.
-        knn_flat->End();
-
-        for (u64 query_idx = 0; query_idx < knn_flat->QueryCount(); ++query_idx) {
-
-            T *top_distance = knn_flat->GetDistanceByIdx(query_idx);
-            RowID *row_id = knn_flat->GetIDByIdx(query_idx);
-
-            u64 result_count = Min(knn_flat->TotalBaseCount(), knn_flat->TopK());
-
-            for (u64 top_idx = 0; top_idx < result_count; ++top_idx) {
-                // Bug here? id = top_idx?
-                SizeT id = query_idx * knn_flat->QueryCount() + top_idx;
-
-                u16 block_id = row_id[id].segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-                LOG_TRACE(
-                    Format("Row offset: {}: {}: {}, distance {}", row_id[id].segment_id_, block_id, row_id[id].segment_offset_, top_distance[id]));
-
-                BlockEntry *block_entry = block_index->GetBlockEntry(row_id[id].segment_id_, block_id);
+                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", row_id[id].segment_id_, block_id));
+                    throw ExecutorException(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 SizeT column_id = 0;
-                for (; column_id < column_count; ++column_id) {
+                for (; column_id < column_n; ++column_id) {
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
-                    const_ptr_t ptr = column_buffer.GetValueAt(row_id[id].segment_offset_, *output_types_->at(column_id));
+                    const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
                     operator_state->data_block_->AppendValueByPtr(column_id, ptr);
                 }
-
-                operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&top_distance[id]);
-                operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_id[id]);
-            }
-
-            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                LOG_TRACE(Format("Output Column ID: {}, Name: {}", base_table_ref_->column_ids_[column_id], output_names_->at(column_id)));
+                operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&result_dists[id]);
+                operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
             }
         }
-
-        // Last segment, Get the result according to the topk row.
+        operator_state->data_block_->Finalize();
         operator_state->SetComplete();
     }
-
-    operator_state->data_block_->Finalize();
 }
 
 } // namespace infinity

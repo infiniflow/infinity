@@ -75,12 +75,12 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperatorState *merge_knn_state) {
     auto &merge_knn_data = *merge_knn_state->merge_knn_function_data_;
-    if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
-        return;
-    }
+    Assert<StorageException>(merge_knn_data.current_parallel_idx_ < merge_knn_data.total_parallel_n_, "Bug");
 
     auto &input_data = *merge_knn_state->input_data_block_;
+    Assert<ExecutorException>(input_data.Finalized(), "data should finalized here.");
 
+    ++merge_knn_data.current_parallel_idx_;
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
@@ -93,16 +93,21 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     SizeT row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
 
-    merge_knn_data.current_parallel_idx_++;
+    // TODO: remove one of the cnt. It is redundant
+    Assert<ExecutorException>(merge_knn_data.current_parallel_idx_ == merge_knn_state->received_data_count_, "Bug");
+    // Assert<ExecutorException>(merge_knn_data.total_parallel_n_ == merge_knn_state->total_data_count_, "Bug");
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
+        merge_knn->End(); // reorder the heap
+
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
         auto &output_data = *merge_knn_state->data_block_;
 
         i64 result_n = Min(merge_knn_data.topk_, merge_knn->total_count());
-        for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; query_idx++) {
+        for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
-            for (i64 top_idx = result_n - 1; top_idx >= 0; top_idx--) {
+            SizeT column_n = 0;
+            for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
                 u32 segment_id = result_row_ids[top_idx].segment_id_;
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
                 u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
@@ -113,7 +118,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 if (block_entry == nullptr) {
                     Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
-
+                column_n = block_entry->columns_.size();
                 SizeT column_id = 0;
                 for (; column_id < column_n; column_id++) {
                     ColumnBuffer column_buffer =
@@ -131,7 +136,6 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         }
         output_data.Finalize();
 
-        merge_knn->End();
         merge_knn_state->SetComplete();
     }
 }

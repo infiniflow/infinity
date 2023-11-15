@@ -72,41 +72,18 @@ void MakeTableScanState(UniquePtr<OperatorState> &operator_state, PhysicalTableS
                                                                                            physical_table_scan->ColumnIDs());
 }
 
-void MakeKnnScanState(UniquePtr<OperatorState> &operator_state, PhysicalKnnScan *physical_knn_scan, FragmentTask *task) {
+void MakeKnnScanState(UniquePtr<OperatorState> &operator_state,
+                      PhysicalKnnScan *physical_knn_scan,
+                      FragmentTask *task,
+                      ParallelMaterializedFragmentCtx *fragment_ctx) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kKnnScan) {
         Error<SchedulerException>("Expect knn scan source state");
     }
-    auto *knn_scan_source_state = static_cast<KnnScanSourceState *>(source_state);
-
-    if (physical_knn_scan->knn_expressions_.size() != 1) {
-        Error<SchedulerException>("Currently, we only support one knn column scenario");
-    }
-    KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_knn_scan->knn_expressions_[0].get());
-    ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
-
-    Vector<SizeT> knn_column_ids = {column_expr->binding().column_idx};
-
-    ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_knn_scan->limit_expression_.get());
-    if (limit_expr == nullptr) {
-        Error<SchedulerException>("No limit in KNN select is not supported now");
-    }
-    i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
     operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
-    knn_scan_op_state_ptr->knn_scan_function_data_ = MakeShared<KnnScanFunctionData>(physical_knn_scan->GetBlockIndex(),
-                                                                                     knn_scan_source_state->global_ids_,
-                                                                                     physical_knn_scan->ColumnIDs(),
-                                                                                     knn_column_ids,
-                                                                                     topk,
-                                                                                     knn_expr->dimension_,
-                                                                                     1,
-                                                                                     knn_expr->query_embedding_.ptr,
-                                                                                     knn_expr->embedding_data_type_,
-                                                                                     knn_expr->distance_type_);
-
-    knn_scan_op_state_ptr->knn_scan_function_data_->Init();
+    knn_scan_op_state_ptr->knn_scan_function_data1_ = MakeUnique<KnnScanFunctionData1>(fragment_ctx->shared_data_, task->TaskID());
 }
 
 void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
@@ -129,7 +106,11 @@ void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKn
         MakeShared<MergeKnnFunctionData>(0, 1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
 }
 
-void MakeTaskState(UniquePtr<OperatorState> &operator_state, SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops, FragmentTask *task) {
+void MakeTaskState(UniquePtr<OperatorState> &operator_state,
+                   SizeT operator_id,
+                   const Vector<PhysicalOperator *> &physical_ops,
+                   FragmentTask *task,
+                   FragmentContext *fragment_ctx) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             Error<SchedulerException>("Invalid physical operator type");
@@ -149,7 +130,8 @@ void MakeTaskState(UniquePtr<OperatorState> &operator_state, SizeT operator_id, 
         }
         case PhysicalOperatorType::kKnnScan: {
             auto physical_knn_scan = static_cast<PhysicalKnnScan *>(physical_ops[operator_id]);
-            MakeKnnScanState(operator_state, physical_knn_scan, task);
+            auto knn_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
+            MakeKnnScanState(operator_state, physical_knn_scan, task, knn_fragment_ctx);
             break;
         }
         case PhysicalOperatorType::kAggregate: {
@@ -397,6 +379,8 @@ void FragmentContext::BuildTask(QueryContext *query_context,
 
     // Set parallel size
     i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
+    // i64 parallel_size = 1;
+
     fragment_context->CreateTasks(parallel_size, operator_count);
 
     Vector<UniquePtr<FragmentTask>> &tasks = fragment_context->Tasks();
@@ -411,7 +395,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             UniquePtr<OperatorState> operator_state = nullptr;
 
             // build the input and output state of each opeartor
-            MakeTaskState(operator_state, operator_id, fragment_operators, task);
+            MakeTaskState(operator_state, operator_id, fragment_operators, task, fragment_context.get());
 
             // Connect the input, output state. Connect fragment to its parent if needed
             if (operator_id == operator_count - 1) {
@@ -505,6 +489,35 @@ PhysicalSink *FragmentContext::GetSinkOperator() const { return fragment_ptr_->G
 
 PhysicalSource *FragmentContext::GetSourceOperator() const { return fragment_ptr_->GetSourceNode(); }
 
+SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMaterializedFragmentCtx *fragment_context, QueryContext *query_context) {
+    auto [block_column_entries, index_entries] = knn_scan_operator->PlanWithIndex(query_context);
+    SizeT task_n = block_column_entries.size() + index_entries.size();
+
+    if (knn_scan_operator->knn_expressions_.size() != 1) {
+        Error<SchedulerException>("Currently, we only support one knn column scenario");
+    }
+    KnnExpression *knn_expr = static_cast<KnnExpression *>(knn_scan_operator->knn_expressions_[0].get());
+
+    ValueExpression *limit_expr = static_cast<ValueExpression *>(knn_scan_operator->limit_expression_.get());
+    if (limit_expr == nullptr) {
+        Error<SchedulerException>("No limit in KNN select is not supported now");
+    }
+    i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
+
+    auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                              Move(block_column_entries),
+                                                              Move(index_entries),
+                                                              topk,
+                                                              knn_expr->dimension_,
+                                                              1,
+                                                              knn_expr->query_embedding_.ptr,
+                                                              knn_expr->embedding_data_type_,
+                                                              knn_expr->distance_type_);
+
+    fragment_context->shared_data_ = knn_scan_shared_data;
+    return task_n;
+}
+
 // Allocate tasks for the fragment and determine the sink and source
 void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     i64 parallel_count = cpu_count;
@@ -520,7 +533,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kKnnScan: {
             auto *knn_scan_operator = static_cast<PhysicalKnnScan *>(first_operator);
-            parallel_count = Min(parallel_count, (i64)(knn_scan_operator->BlockEntryCount()));
+            auto fragment_context = static_cast<ParallelMaterializedFragmentCtx *>(this);
+
+            SizeT task_n = InitKnnScanFragmentContext(knn_scan_operator, fragment_context, query_context_);
+
+            parallel_count = Min(parallel_count, (i64)task_n);
             if (parallel_count == 0) {
                 parallel_count = 1;
             }
@@ -657,9 +674,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
 
             // Partition the hash range to each source state
             auto *knn_scan_operator = (PhysicalKnnScan *)first_operator;
-            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = knn_scan_operator->PlanBlockEntries(parallel_count);
+
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>(blocks_group[task_id]);
+                tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>();
             }
             break;
         }

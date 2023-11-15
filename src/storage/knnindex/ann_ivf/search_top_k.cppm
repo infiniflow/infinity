@@ -14,12 +14,15 @@
 
 module;
 
+#include <functional>
 #include <limits>
 #include <type_traits>
 
 import stl;
 import vector_distance;
 import search_top_1_sgemm;
+import search_top_k_sgemm;
+import heap_twin_operation;
 
 export module search_top_k;
 
@@ -73,6 +76,32 @@ void search_top_1_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, con
         search_top_1_with_sgemm(dimension, nx, x, ny, y, labels);
     } else {
         search_top_1_simple_without_dis<DistType>(dimension, nx, x, ny, y, labels);
+    }
+}
+
+template <typename TypeX, typename TypeY, typename ID, typename DistType>
+void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
+    heap_twin_multiple<std::greater<DistType>, DistType, ID> heap(nx, k, distances, labels);
+    std::fill(distances, distances + nx * k, std::numeric_limits<DistType>::max());
+    for (u32 i = 0; i < nx; ++i) {
+        const DistType *x_i = x + i * dimension;
+        for (u32 j = 0; j < ny; j++) {
+            const DistType *y_j = y + j * dimension;
+            DistType distance = L2Distance<DistType>(x_i, y_j, dimension);
+            heap.add(i, distance, j);
+        }
+    }
+    if (sort_) {
+        heap.sort();
+    }
+}
+
+export template <typename TypeX, typename TypeY, typename ID, typename DistType>
+void search_top_k_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
+    if constexpr (std::is_same_v<DistType, TypeX> && std::is_same_v<DistType, TypeY> && std::is_same_v<DistType, f32>) {
+        search_top_k_with_sgemm(k, dimension, nx, x, ny, y, labels, distances, sort_);
+    } else {
+        search_top_k_simple_with_dis(k, dimension, nx, x, ny, y, labels, distances, sort_);
     }
 }
 

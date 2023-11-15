@@ -26,7 +26,7 @@ constexpr uint32_t INVALID_SEGMENT_OFFSET = std::numeric_limits<uint32_t>::max()
 struct RowID {
     RowID() : segment_id_(INVALID_SEGMENT), segment_offset_(INVALID_SEGMENT_OFFSET) {}
 
-    inline explicit RowID(uint32_t segment_id, uint32_t block_offset) : segment_id_(segment_id), segment_offset_(block_offset) {}
+    inline explicit RowID(uint32_t segment_id, uint32_t segment_offset) : segment_id_(segment_id), segment_offset_(segment_offset) {}
 
     inline explicit RowID(uint64_t row_id) : segment_id_(uint32_t(row_id >> 32)), segment_offset_(uint32_t(0xFFFFFFFF & row_id)) {}
 
@@ -54,6 +54,8 @@ struct RowID {
     inline bool operator!=(uint32_t i) const { return !(segment_id_ == i && segment_offset_ == i); }
 
     [[nodiscard]] std::string ToString() const;
+
+    static inline RowID FromUint64(uint64_t row_id) { return RowID(uint32_t(row_id >> 32), uint32_t(0xFFFFFFFF & row_id)); }
 };
 
 } // namespace infinity
