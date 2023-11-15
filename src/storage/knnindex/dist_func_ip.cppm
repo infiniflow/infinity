@@ -14,6 +14,7 @@ template <typename T>
 concept IPDataType = requires(T data) {
     { data *data } -> std::same_as<T>;
     { data + data } -> std::same_as<T>;
+    { -data } -> std::same_as<T>;
 };
 
 template <typename T>
@@ -26,7 +27,7 @@ static T IPSqr(const T *v1, const T *v2, size_t dim) {
         ++v2;
         res += t * t;
     }
-    return res;
+    return -res;
 }
 
 #if defined(USE_AVX512)
@@ -165,7 +166,7 @@ static float FloatIPSqrSIMD4Ext(const float *pVect1, const float *pVect2, size_t
         sum = _mm_add_ps(sum, _mm_mul_ps(v1, v2));
     }
     _mm_store_ps(TmpRes, sum);
-    return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+    return -(TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3]);
 }
 
 static float FloatIPSqrSIMD4ExtResiduals(const float *pVect1v, const float *pVect2v, size_t qty) {

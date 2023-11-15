@@ -68,9 +68,9 @@ public:
     void MergeFrom(BaseEntry &other);
 
 private:
-    static UniquePtr<IndexFileWorker> CreateFileWorker(IndexDefEntry *index_def_entry, UniquePtr<CreateIndexPara> para);
+    static UniquePtr<IndexFileWorker> CreateFileWorker(IndexDefEntry *index_def_entry, UniquePtr<CreateIndexPara> para, SegmentEntry *segment_entry);
 
-    static String IndexFileName(const String &index_name);
+    static String IndexFileName(const String &index_name, SegmentEntry *segment_entry);
 
 public:
     IndexDefEntry *const index_def_entry_;

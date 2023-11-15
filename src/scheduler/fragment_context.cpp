@@ -378,7 +378,9 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     }
 
     // Set parallel size
-    i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
+    // i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
+    i64 parallel_size = 1;
+
     fragment_context->CreateTasks(parallel_size, operator_count);
 
     Vector<UniquePtr<FragmentTask>> &tasks = fragment_context->Tasks();
@@ -510,8 +512,7 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMat
                                                               1,
                                                               knn_expr->query_embedding_.ptr,
                                                               knn_expr->embedding_data_type_,
-                                                              knn_expr->distance_type_,
-                                                              task_n);
+                                                              knn_expr->distance_type_);
 
     fragment_context->shared_data_ = knn_scan_shared_data;
     return task_n;

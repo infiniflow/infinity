@@ -84,17 +84,15 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     ++merge_knn_data.current_parallel_idx_;
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
-    if (input_data.row_count()) {
-        int column_n = input_data.column_count() - 2;
-        Assert<ExecutorException>(column_n >= 0, "Error. The input data block is invalid");
-        auto &dist_column = *input_data.column_vectors[column_n];
-        auto &row_id_column = *input_data.column_vectors[column_n + 1];
+    int column_n = input_data.column_count() - 2;
+    Assert<ExecutorException>(column_n >= 0, "Error. The input data block is invalid");
+    auto &dist_column = *input_data.column_vectors[column_n];
+    auto &row_id_column = *input_data.column_vectors[column_n + 1];
 
-        auto dists = reinterpret_cast<DataType *>(dist_column.data());
-        auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
-        SizeT row_n = input_data.row_count();
-        merge_knn->Search(dists, row_ids, row_n);
-    }
+    auto dists = reinterpret_cast<DataType *>(dist_column.data());
+    auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
+    SizeT row_n = input_data.row_count();
+    merge_knn->Search(dists, row_ids, row_n);
 
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
         merge_knn->End(); // reorder the heap
@@ -118,7 +116,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 if (block_entry == nullptr) {
                     Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
-                column_n  = block_entry->columns_.size();
+                column_n = block_entry->columns_.size();
                 SizeT column_id = 0;
                 for (; column_id < column_n; column_id++) {
                     ColumnBuffer column_buffer =

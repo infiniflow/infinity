@@ -61,6 +61,7 @@ void FileWorker::WriteToFile(bool to_spill) {
     DeferFn defer_fn([&]() {
         if (!prepare_success) {
             file_handler_->Close();
+            file_handler_ = nullptr;
         }
     });
     WriteToFileImpl(prepare_success);

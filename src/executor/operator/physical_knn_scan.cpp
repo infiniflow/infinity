@@ -149,6 +149,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     SizeT brute_task_n = knn_scan_shared_data->block_column_entries_.size();
 
     if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
+        LOG_TRACE(Format("KnnScan: brute force {}/{}", block_column_idx + 1, brute_task_n));
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
         const BlockEntry *block_entry = block_column_entry->block_entry_;
@@ -166,6 +167,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
         merge_heap->Search(dists.data(), row_ids.data(), row_count);
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
+        LOG_TRACE(Format("KnnScan: index {}/{}", index_idx + 1, index_task_n));
         // with index
         IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -229,7 +231,21 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     while (!heap.empty()) {
                         const auto &[dist, row_id] = heap.top();
                         row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
-                        dists[query_idx * knn_scan_shared_data->topk_ + id] = dist;
+                        switch (knn_scan_shared_data->knn_distance_type_) {
+                            case KnnDistanceType::kInvalid: {
+                                throw ExecutorException("Bug");
+                            }
+                            case KnnDistanceType::kL2:
+                            case KnnDistanceType::kHamming: {
+                                dists[query_idx * knn_scan_shared_data->topk_ + id] = +dist;
+                                break;
+                            }
+                            case KnnDistanceType::kCosine:
+                            case KnnDistanceType::kInnerProduct: {
+                                dists[query_idx * knn_scan_shared_data->topk_ + id] = -dist;
+                                break;
+                            }
+                        }
                         ++id;
                         heap.pop();
                     }
@@ -241,7 +257,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 throw ExecutorException("Not implemented");
             }
         }
-    } else {
+    }
+    if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
+        LOG_TRACE("KnnScan: task finished");
         // all task Complete
         SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
@@ -277,9 +295,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             }
         }
         operator_state->data_block_->Finalize();
-        if (u64 finish_n = knn_scan_shared_data->finish_n_++; finish_n > knn_scan_shared_data->parallel_count_) {
-            operator_state->SetComplete();
-        }
+        operator_state->SetComplete();
     }
 }
 

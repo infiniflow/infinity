@@ -47,6 +47,9 @@ public:
 
     ~BufferObj();
 
+    BufferObj(const BufferObj &) = delete;
+    BufferObj &operator=(const BufferObj &) = delete;
+
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
     BufferHandle Load();

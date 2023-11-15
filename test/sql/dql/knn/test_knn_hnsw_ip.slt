@@ -35,7 +35,7 @@ SELECT c1 FROM test_knn_hnsw_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 
 6
 
 statement ok
-CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = ip);
+CREATE INDEX idx1 ON test_knn_hnsw_ip (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = ip);
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I

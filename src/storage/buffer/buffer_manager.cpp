@@ -42,7 +42,10 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
 
     auto res = buffer_obj.get();
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    buffer_map_[file_path] = Move(buffer_obj);
+    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        throw StorageException(Format("BufferManager::Allocate: file %s already exists.", file_path.c_str()));
+    }
+    buffer_map_.emplace(file_path, Move(buffer_obj));
     return res;
 }
 
