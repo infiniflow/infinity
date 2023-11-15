@@ -187,7 +187,7 @@ void Txn::GetMetaTableState(MetaTableState *meta_table_state, const TableCollect
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
-    UniqueLock<Mutex> lk(m);
+    UniqueLock<Mutex> lk(lock_);
     auto txn_table_iter = txn_tables_store_.find(*table_entry->table_collection_name_);
     if (txn_table_iter != txn_tables_store_.end()) {
         return txn_table_iter->second.get();
@@ -502,9 +502,9 @@ Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
     return Vector<BaseEntry *>();
 }
 
-void Txn::BeginTxn() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
+void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
 
-void Txn::CommitTxn() {
+void Txn::Commit() {
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     // TODO: serializability validation. ASSUMES always valid for now.
@@ -527,12 +527,11 @@ void Txn::CommitTxn() {
     txn_mgr_->PutWalEntry(wal_entry_);
 
     // Wait until CommitTxnBottom is done.
-    UniqueLock<Mutex> lk(m);
-    cv.wait(lk, [this] { return done_bottom_; });
-    txn_mgr_->DestroyTxn(txn_id_);
+    UniqueLock<Mutex> lk(lock_);
+    cond_var_.wait(lk, [this] { return done_bottom_; });
 }
 
-void Txn::CommitTxnBottom() {
+void Txn::CommitBottom() {
 
     // prepare to commit txn local data into table
     for (const auto &name_table_pair : txn_tables_store_) {
@@ -567,16 +566,16 @@ void Txn::CommitTxnBottom() {
     LOG_TRACE(Format("Txn: {} is committed.", txn_id_));
 
     // Notify the top half
-    UniqueLock<Mutex> lk(m);
+    UniqueLock<Mutex> lk(lock_);
     done_bottom_ = true;
-    cv.notify_one();
+    cond_var_.notify_one();
 }
 
-void Txn::CancelCommitTxnBottom() {
+void Txn::CancelCommitBottom() {
     txn_context_.SetTxnRollbacked();
-    UniqueLock<Mutex> lk(m);
+    UniqueLock<Mutex> lk(lock_);
     done_bottom_ = true;
-    cv.notify_one();
+    cond_var_.notify_one();
 }
 
 // Dangerous! only used during replaying wal.
@@ -586,7 +585,7 @@ void Txn::FakeCommit(TxnTimeStamp commit_ts) {
     txn_context_.state_ = TxnState::kCommitted;
 }
 
-void Txn::RollbackTxn() {
+void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
@@ -614,7 +613,6 @@ void Txn::RollbackTxn() {
     }
 
     txn_context_.SetTxnRollbacked();
-    txn_mgr_->DestroyTxn(txn_id_);
 
     LOG_TRACE(Format("Txn: {} is dropped.", txn_id_));
 }

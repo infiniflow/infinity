@@ -109,7 +109,7 @@ TEST_F(TableCollectionEntryTest, test2) {
     Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -151,14 +151,14 @@ TEST_F(TableCollectionEntryTest, test2) {
     EXPECT_NE(base_table_entry, nullptr);
 
     // Txn1: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     {
         // Txn2: Create, OK
         new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
-        new_txn->BeginTxn();
+        new_txn->Begin();
 
         // Txn2: Get db1, OK
         base_table_entry = nullptr;
@@ -195,7 +195,7 @@ TEST_F(TableCollectionEntryTest, test2) {
         new_txn->Append("db1", "tbl1", input_block);
 
         // Txn2: Commit, OK
-        new_txn->CommitTxn();
+        txn_mgr->CommitTxn(new_txn);
     }
 
     {
@@ -203,7 +203,7 @@ TEST_F(TableCollectionEntryTest, test2) {
         new_txn = txn_mgr->CreateTxn();
 
         // Txn2: Begin, OK
-        new_txn->BeginTxn();
+        new_txn->Begin();
 
         {
             // Get column 0 and column 2 from global storage;
@@ -349,7 +349,7 @@ TEST_F(TableCollectionEntryTest, test2) {
 
         {
             // Txn2: Rollback, OK
-            new_txn->RollbackTxn();
+            txn_mgr->RollBackTxn(new_txn);
         }
     }
 
@@ -358,7 +358,7 @@ TEST_F(TableCollectionEntryTest, test2) {
         new_txn = txn_mgr->CreateTxn();
 
         // Txn3: Begin, OK
-        new_txn->BeginTxn();
+        new_txn->Begin();
 
         {
             // Get column 0 and column 2 from global storage;
@@ -408,6 +408,6 @@ TEST_F(TableCollectionEntryTest, test2) {
         }
 
         // Txn3: Commit, OK
-        new_txn->CommitTxn();
+        txn_mgr->CommitTxn(new_txn);
     }
 }
