@@ -29,19 +29,23 @@ class heap_twin_multiple {
     Vector<u32> sizes;
     Compare comp{};
     void down(DistType *distance, ID *id, u32 size, u32 index) {
-        if (index == 0 || index > size || size <= 1) {
+        if (index == 0 || (index << 1) > size) {
             return;
         }
+        DistType tmp_d = distance[index];
+        ID tmp_i = id[index];
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
             if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
                 ++sub;
             }
-            if (!comp(distance[sub], distance[index])) {
+            if (!comp(distance[sub], tmp_d)) {
                 break;
             }
-            std::swap(distance[sub], distance[index]);
-            std::swap(id[sub], id[index]);
+            distance[index] = distance[sub];
+            id[index] = id[sub];
         }
+        distance[index] = tmp_d;
+        id[index] = tmp_i;
     }
 
 public:
@@ -90,6 +94,11 @@ public:
         }
         size = 0;
     }
+    void sort() {
+        for (u64 q_id = 0; q_id < nq; ++q_id) {
+            sort(q_id);
+        }
+    }
 };
 
 // assume that distances have been initialized to std::numeric_limits<DistType>::max() / lowest()
@@ -102,31 +111,24 @@ class heap_twin {
     u32 size{};
     u32 capacity{};
     Compare comp{};
-    void up(u32 index) {
-        while (index > 1) {
-            u32 parent = index >> 1;
-            if (!comp(distance[index], distance[parent])) {
-                break;
-            }
-            std::swap(distance[parent], distance[index]);
-            std::swap(id[parent], id[index]);
-            index = parent;
-        }
-    }
     void down(u32 index) {
-        if (index == 0 || index > size || size <= 1) {
+        if (index == 0 || (index << 1) > size) {
             return;
         }
+        DistType tmp_d = distance[index];
+        ID tmp_i = id[index];
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
             if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
                 ++sub;
             }
-            if (!comp(distance[sub], distance[index])) {
+            if (!comp(distance[sub], tmp_d)) {
                 break;
             }
-            std::swap(distance[sub], distance[index]);
-            std::swap(id[sub], id[index]);
+            distance[index] = distance[sub];
+            id[index] = id[sub];
         }
+        distance[index] = tmp_d;
+        id[index] = tmp_i;
     }
     void construct_heap() {
         for (u32 index = size / 2; index > 0; --index) {

@@ -39,7 +39,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
             Error<ExecutorException>("Invalid element type");
         }
         case kElemFloat: {
-            MergeKnnFunctionData::InitMergeKnn<f32>(query_count, topk, knn_distance_type);
+            MergeKnnFunctionData::InitMergeKnn<f32>(knn_distance_type);
             break;
         }
         default: {
@@ -49,14 +49,14 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
 }
 
 template <typename DataType>
-void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceType knn_distance_type) {
+void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
             Error<ExecutorException>("Invalid knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeShared<MergeKnn<f32, FaissCMax>>(query_count, topk);
+            auto merge_knn_max = MakeShared<MergeKnn<DataType, FaissCMax>>(query_count_, topk_);
             merge_knn_max->Begin();
             merge_knn_base_ = Move(merge_knn_max);
             heap_type_ = MergeKnnHeapType::kMaxHeap;
@@ -64,7 +64,7 @@ void MergeKnnFunctionData::InitMergeKnn(i64 query_count, i64 topk, KnnDistanceTy
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeShared<MergeKnn<f32, FaissCMin>>(query_count, topk);
+            auto merge_knn_min = MakeShared<MergeKnn<DataType, FaissCMin>>(query_count_, topk_);
             merge_knn_min->Begin();
             merge_knn_base_ = Move(merge_knn_min);
             heap_type_ = MergeKnnHeapType::kMinHeap;

@@ -42,7 +42,7 @@ SharedPtr<IndexEntry> IndexEntry::NewIndexEntry(IndexDefEntry *index_def_entry,
                                                 BufferManager *buffer_manager,
                                                 UniquePtr<CreateIndexPara> para) {
     // FIXME: estimate index size.
-    UniquePtr<IndexFileWorker> file_worker = IndexEntry::CreateFileWorker(index_def_entry, Move(para));
+    UniquePtr<IndexFileWorker> file_worker = IndexEntry::CreateFileWorker(index_def_entry, Move(para), segment_entry);
     auto buffer = buffer_manager->Allocate(Move(file_worker));
     auto index_entry = SharedPtr<IndexEntry>(new IndexEntry(index_def_entry, segment_entry, buffer));
     index_entry->min_ts_ = create_ts;
@@ -54,7 +54,7 @@ SharedPtr<IndexEntry> IndexEntry::LoadIndexEntry(IndexDefEntry *index_def_entry,
                                                  SegmentEntry *segment_entry,
                                                  BufferManager *buffer_manager,
                                                  UniquePtr<CreateIndexPara> para) {
-    UniquePtr<IndexFileWorker> file_worker = IndexEntry::CreateFileWorker(index_def_entry, Move(para));
+    UniquePtr<IndexFileWorker> file_worker = IndexEntry::CreateFileWorker(index_def_entry, Move(para), segment_entry);
     auto buffer = buffer_manager->Get(Move(file_worker));
     return SharedPtr<IndexEntry>(new IndexEntry(index_def_entry, segment_entry, buffer));
 }
@@ -124,11 +124,12 @@ void IndexEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-UniquePtr<IndexFileWorker> IndexEntry::CreateFileWorker(IndexDefEntry *index_def_entry, UniquePtr<CreateIndexPara> para) {
+UniquePtr<IndexFileWorker>
+IndexEntry::CreateFileWorker(IndexDefEntry *index_def_entry, UniquePtr<CreateIndexPara> para, SegmentEntry *segment_entry) {
     UniquePtr<IndexFileWorker> file_worker = nullptr;
     auto index_def = para->index_def_;
     auto column_def = para->column_def_;
-    auto file_name = MakeShared<String>(IndexEntry::IndexFileName(*index_def->index_name_));
+    auto file_name = MakeShared<String>(IndexEntry::IndexFileName(*index_def->index_name_, segment_entry));
     switch (index_def->method_type_) {
         case IndexMethod::kIVFFlat: {
             auto create_annivfflat_para = static_cast<CreateAnnIVFFlatPara *>(para.get());
@@ -157,9 +158,14 @@ UniquePtr<IndexFileWorker> IndexEntry::CreateFileWorker(IndexDefEntry *index_def
             NotImplementException("Not implemented.");
         }
     }
+    if (file_worker.get() == nullptr) {
+        throw StorageException("Failed to create index file worker");
+    }
     return file_worker;
 }
 
-String IndexEntry::IndexFileName(const String &index_name) { return Format("{}.idx", index_name); }
+String IndexEntry::IndexFileName(const String &index_name, SegmentEntry *segment_entry) {
+    return Format("seg{}.idx", segment_entry->segment_id_, index_name);
+}
 
 } // namespace infinity

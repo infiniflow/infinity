@@ -22,7 +22,8 @@ import knn_hnsw;
 import hnsw_index_def;
 import parser;
 import index_def;
-import dist_func;
+import dist_func_l2;
+import dist_func_ip;
 
 module hnsw_file_worker;
 
@@ -133,6 +134,7 @@ UniquePtr<SpaceBase<DataType>> HnswFileWorker::GetDistFunc(SizeT dimension) cons
     auto hnsw_index_def = static_cast<HnswIndexDef *>(index_def_.get());
     switch (hnsw_index_def->metric_type_) {
         case MetricType::kMerticInnerProduct: {
+            space = MakeUnique<DistFuncIP<f32>>(dimension);
             break;
         }
         case MetricType::kMerticL2: {

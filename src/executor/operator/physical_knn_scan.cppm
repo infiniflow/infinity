@@ -30,6 +30,9 @@ export module physical_knn_scan;
 
 namespace infinity {
 
+class BlockColumnEntry;
+class IndexEntry;
+
 export class PhysicalKnnScan final : public PhysicalOperator {
 public:
     explicit PhysicalKnnScan(u64 id,
@@ -42,9 +45,8 @@ public:
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index)
         : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)),
-          knn_expressions_(Move(knn_expressions)), limit_expression_(Move(limit_expression)),
-          filter_expression_(Move(filter_expression)), order_by_type_(order_by_type), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
+          knn_expressions_(Move(knn_expressions)), limit_expression_(Move(limit_expression)), filter_expression_(Move(filter_expression)),
+          order_by_type_(order_by_type), output_names_(Move(output_names)), output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 
@@ -64,9 +66,9 @@ public:
 
     Vector<SizeT> &ColumnIDs() const;
 
-    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
-
     SizeT BlockEntryCount() const;
+
+    Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PlanWithIndex(QueryContext *query_context);
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};
@@ -82,7 +84,7 @@ public:
     u64 knn_table_index_{};
 
 private:
-    template <typename T>
+    template <typename DataType, template <typename, typename> typename C>
     void ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state);
 };
 

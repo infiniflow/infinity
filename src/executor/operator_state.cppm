@@ -38,9 +38,7 @@ export struct OperatorState {
     i64 received_data_count_{0};
     i64 total_data_count_{0};
 
-    inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) {
-        prev_op_state_ = prev_op_state;
-    }
+    inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
 
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
@@ -85,14 +83,14 @@ export struct TableScanOperatorState : public OperatorState {
 export struct KnnScanOperatorState : public OperatorState {
     inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 
-    SharedPtr<KnnScanFunctionData> knn_scan_function_data_{};
+    UniquePtr<KnnScanFunctionData1> knn_scan_function_data1_{};
 };
 
 // Merge Knn
 export struct MergeKnnOperatorState : public OperatorState {
     inline explicit MergeKnnOperatorState() : OperatorState(PhysicalOperatorType::kMergeKnn) {}
 
-    DataBlock* input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    DataBlock *input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
     bool input_complete_{false};
     SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
@@ -351,9 +349,7 @@ export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kK
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}
 
-    inline void SetNextOpState(OperatorState *op_state) {
-        next_op_state_ = op_state;
-    }
+    inline void SetNextOpState(OperatorState *op_state) { next_op_state_ = op_state; }
 
     bool complete_{false};
     OperatorState *next_op_state_{};
@@ -396,10 +392,7 @@ export struct TableScanSourceState : public SourceState {
 };
 
 export struct KnnScanSourceState : public SourceState {
-    explicit KnnScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kKnnScan), global_ids_(Move(global_ids)) {}
-
-    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+    explicit KnnScanSourceState() : SourceState(SourceStateType::kKnnScan) {}
 };
 
 export struct EmptySourceState : public SourceState {
