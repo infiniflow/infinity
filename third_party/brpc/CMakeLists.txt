@@ -20,7 +20,6 @@ project(brpc C CXX)
 
 option(WITH_GLOG "With glog" OFF)
 option(WITH_MESALINK "With MesaLink" OFF)
-option(WITH_BORINGSSL "With BoringSSL" OFF)
 option(DEBUG "Print debug logs" OFF)
 option(WITH_DEBUG_SYMBOLS "With debug symbols" ON)
 option(WITH_THRIFT "With thrift framed protocol supported" OFF)
@@ -28,7 +27,7 @@ option(WITH_SNAPPY "With snappy" OFF)
 option(WITH_RDMA "With RDMA" OFF)
 option(BUILD_UNIT_TESTS "Whether to build unit tests" OFF)
 option(BUILD_BRPC_TOOLS "Whether to build brpc tools" ON)
-option(DOWNLOAD_GTEST "Download and build a fresh copy of googletest. Requires Internet access." OFF)
+option(DOWNLOAD_GTEST "Download and build a fresh copy of googletest. Requires Internet access." ON)
 
 # Enable MACOSX_RPATH. Run "cmake --help-policy CMP0042" for policy details.
 if(POLICY CMP0042)
