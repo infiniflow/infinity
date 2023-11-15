@@ -14,9 +14,9 @@
 
 module;
 
+#include <list>
 #include <sched.h>
 #include <vector>
-#include <list>
 
 import stl;
 import config;
@@ -89,7 +89,7 @@ void FragmentScheduler::UnInit() {
     }
 }
 
-void FragmentScheduler::Schedule(const Vector<FragmentTask *>& tasks) {
+void FragmentScheduler::Schedule(const Vector<FragmentTask *> &tasks) {
     //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
     //    if(!children.empty()) {
     //        SchedulerError("Only support one fragment query")
@@ -101,10 +101,10 @@ void FragmentScheduler::Schedule(const Vector<FragmentTask *>& tasks) {
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
 
-
-//    LOG_TRACE(Format("Create {} tasks", tasks.size()));
+    LOG_TRACE(Format("Create {} tasks", tasks.size()));
 
     for (const auto &fragment_task : tasks) {
+        LOG_TRACE(Format("task pointer {}, task id {}", u64(fragment_task), fragment_task->TaskID()));
         ScheduleTask(fragment_task);
     }
 }
@@ -187,19 +187,19 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
     while (running) {
         List<FragmentTask *>::iterator input_task_iter = input_task_list.begin();
         SizeT item_count = poller_queue->DequeueBulk(input_task_iter);
-        if(item_count == 0) {
+        if (item_count == 0) {
             continue;
         }
-//        FragmentTask *task = poller_queue->Dequeue();
-//        if(task == nullptr) continue;
-//        local_task_list.push_front(task);
-//        LOG_TRACE(Format("Local task list size: {}", item_count));
+        //        FragmentTask *task = poller_queue->Dequeue();
+        //        if(task == nullptr) continue;
+        //        local_task_list.push_front(task);
+        //        LOG_TRACE(Format("Local task list size: {}", item_count));
         input_task_iter = input_task_list.begin();
-        for(SizeT idx = 0; idx < item_count; ++ idx) {
+        for (SizeT idx = 0; idx < item_count; ++idx) {
             local_task_list.push_back(*input_task_iter++);
         }
 
-//        local_task_list.insert(local_task_list.begin(), input_task_list.begin(), input_task_iter);
+        //        local_task_list.insert(local_task_list.begin(), input_task_list.begin(), input_task_iter);
         auto task_iter = local_task_list.begin();
         while (!local_task_list.empty()) {
             FragmentTask *&task_ptr = (*task_iter);
@@ -221,8 +221,8 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
             } else {
                 spin_count = 0;
 
-                ready_queue_->EnqueueBulk(local_ready_queue.begin(), local_ready_queue.size());
-                local_ready_queue.clear();
+                // ready_queue_->EnqueueBulk(local_ready_queue.begin(), local_ready_queue.size());
+                // local_ready_queue.clear();
             }
 
             if (spin_count != 0 && spin_count % 32 == 0) {

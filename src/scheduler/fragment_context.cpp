@@ -378,8 +378,8 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     }
 
     // Set parallel size
-    // i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
-    i64 parallel_size = 1;
+    i64 parallel_size = static_cast<i64>(query_context->cpu_number_limit());
+    // i64 parallel_size = 1;
 
     fragment_context->CreateTasks(parallel_size, operator_count);
 

@@ -66,7 +66,7 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
 
 SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
     if (!input->Finalized()) {
-        return nullptr;
+        Error<StorageException>("Input data block is not finalized.");
     }
     auto data_block = DataBlock::Make();
     SizeT capacity = input->row_count();
@@ -77,6 +77,7 @@ SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
         }
         data_block->Init(input, 0, capacity);
         data_block->row_count_ = input->row_count();
+        data_block->finalized = true;
     }
     input->Reset();
     return data_block;

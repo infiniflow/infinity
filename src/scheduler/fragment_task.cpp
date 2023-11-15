@@ -14,6 +14,8 @@
 
 module;
 
+#include <sstream>
+
 import fragment_context;
 import profiler;
 import plan_fragment;
@@ -24,7 +26,8 @@ import physical_source;
 import physical_sink;
 import physical_operator;
 import infinity_exception;
-import query_context;
+import operator_state;
+import physical_operator_type;
 
 module fragment_task;
 
@@ -37,7 +40,7 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64 worker_id) {
-    //    LOG_TRACE(Format("Execute fragment task on {}", worker_id));
+    LOG_TRACE(Format("Execute fragment task on {}, {}", worker_id, this->PhysOpsToString()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -51,7 +54,11 @@ void FragmentTask::OnExecute(i64 worker_id) {
     // For streaming type, we need to run sink each execution
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
-    source_op->Execute(query_context, source_state_.get());
+
+    LOG_TRACE(Format("Start execute source operator {}, {}", worker_id, this->PhysOpsToString()));
+
+    source_op->Execute(fragment_context->query_context(), source_state_.get());
+    LOG_TRACE(Format("End execute source operator"));
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -61,9 +68,11 @@ void FragmentTask::OnExecute(i64 worker_id) {
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
+            LOG_TRACE(Format("Start execute operator {}", op_idx));
             profiler.StartOperator(operator_refs[op_idx]);
-            operator_refs[op_idx]->Execute(query_context, operator_states_[op_idx].get());
+            operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
             profiler.StopOperator(operator_states_[op_idx].get());
+            LOG_TRACE(Format("Finish execute operator {}", op_idx));
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
@@ -77,6 +86,10 @@ void FragmentTask::OnExecute(i64 worker_id) {
         fragment_context->FlushProfiler(profiler);
         sink_op->Execute(query_context, sink_state_.get());
     }
+
+    //    prof.End();
+    //    LOG_TRACE(prof.ElapsedToString());
+    LOG_TRACE(Format("Finish execute fragment task on {}", worker_id));
 }
 
 u64 FragmentTask::ProposedCPUID(u64 max_cpu_count) const {
@@ -109,4 +122,14 @@ void FragmentTask::TryCompleteFragment() {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     fragment_context->FinishTask();
 }
+
+String FragmentTask::PhysOpsToString() {
+    std::stringstream ss;
+
+    for (const UniquePtr<OperatorState> &op : operator_states_) {
+        ss << PhysicalOperatorToString(op->operator_type_) << " ";
+    }
+    return ss.str();
+}
+
 } // namespace infinity

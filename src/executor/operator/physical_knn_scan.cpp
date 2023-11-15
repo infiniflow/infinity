@@ -94,7 +94,7 @@ BlockIndex *PhysicalKnnScan::GetBlockIndex() const { return base_table_ref_->blo
 
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
-Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) {
+Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 

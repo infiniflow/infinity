@@ -78,9 +78,8 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     Assert<StorageException>(merge_knn_data.current_parallel_idx_ < merge_knn_data.total_parallel_n_, "Bug");
 
     auto &input_data = *merge_knn_state->input_data_block_;
-    if (!input_data.Finalized()) {
-        throw ExecutorException("Bug");
-    }
+    Assert<ExecutorException>(input_data.Finalized(), "data should finalized here.");
+
     ++merge_knn_data.current_parallel_idx_;
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 

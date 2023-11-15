@@ -25,6 +25,7 @@ import fragment_data;
 import data_block;
 
 import infinity_exception;
+import logger;
 
 module physical_sink;
 
@@ -284,15 +285,20 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *message_sink_state, OperatorState *task_operator_state) {
+    if(!task_operator_state->Complete()) {
+        LOG_TRACE("Task not completed");
+        return ;
+    }
     switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_operator_state);
             SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-            auto new_data_block = DataBlock::MoveFrom(task_operator_state->data_block_);
-            if (!new_data_block) {
-                break; // last fragment has not finalized the block.
-            }
-            fragment_data->data_block_ = new_data_block;
+            // auto new_data_block = DataBlock::MoveFrom(task_operator_state->data_block_);
+            // auto new_data_block = 
+            // if (!new_data_block) {
+            //     break; // last fragment has not finalized the block.
+            // }
+            fragment_data->data_block_ = knn_output_state->data_block_;
             fragment_data->data_count_ = 1; // TODO:: bug here
             fragment_data->data_idx_ = 1;
             for (const auto &next_fragment_queue : message_sink_state->fragment_data_queues_) {
