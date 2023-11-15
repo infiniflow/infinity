@@ -101,10 +101,8 @@ void FragmentScheduler::Schedule(const Vector<FragmentTask *> &tasks) {
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
 
-    LOG_TRACE(Format("Create {} tasks", tasks.size()));
 
     for (const auto &fragment_task : tasks) {
-        LOG_TRACE(Format("task pointer {}, task id {}", u64(fragment_task), fragment_task->TaskID()));
         ScheduleTask(fragment_task);
     }
 }
@@ -119,7 +117,6 @@ void FragmentScheduler::ScheduleTask(FragmentTask *task) {
 void FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id) {
     FragmentTask *fragment_task{nullptr};
     bool running{true};
-    //    LOG_TRACE("Start fragment task coordinator on CPU: {}", cpu_id);
     while (running) {
         ready_queue->Dequeue(fragment_task);
         if (fragment_task == nullptr) {
@@ -146,13 +143,11 @@ void FragmentScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64
             DispatchTask(fragment_task->LastWorkerID(), fragment_task);
         }
     }
-    //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", cpu_id);
 }
 
 void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     FragmentTask *fragment_task{nullptr};
     bool running{true};
-    //    LOG_TRACE("Start fragment task worker on CPU: {}", worker_id);
     while (running) {
         task_queue->Dequeue(fragment_task);
         if (fragment_task == nullptr) {
@@ -173,7 +168,6 @@ void FragmentScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worke
             fragment_task->TryCompleteFragment();
         }
     }
-    //    LOG_TRACE("Stop fragment task coordinator on CPU: {}", worker_id);
 }
 
 void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 worker_id) {
@@ -182,7 +176,6 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
     Vector<FragmentTask *> local_ready_queue{};
     local_ready_queue.reserve(1024);
     bool running{true};
-    //    LOG_TRACE("Start fragment task poller on CPU: {}", worker_id);
     SizeT spin_count{0};
     while (running) {
         List<FragmentTask *>::iterator input_task_iter = input_task_list.begin();
@@ -190,10 +183,7 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
         if (item_count == 0) {
             continue;
         }
-        //        FragmentTask *task = poller_queue->Dequeue();
-        //        if(task == nullptr) continue;
-        //        local_task_list.push_front(task);
-        //        LOG_TRACE(Format("Local task list size: {}", item_count));
+
         input_task_iter = input_task_list.begin();
         for (SizeT idx = 0; idx < item_count; ++idx) {
             local_task_list.push_back(*input_task_iter++);
@@ -237,7 +227,6 @@ void FragmentScheduler::PollerLoop(FragmentTaskPollerQueue *poller_queue, i64 wo
             }
         }
     }
-    //    LOG_TRACE("Stop fragment task poller task coordinator on CPU: {}", worker_id);
 }
 
 void FragmentScheduler::SubmitTask(FragmentTask *fragment_task) { poller_queue_->Enqueue(fragment_task); }

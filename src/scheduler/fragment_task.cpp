@@ -28,6 +28,7 @@ import physical_operator;
 import infinity_exception;
 import operator_state;
 import physical_operator_type;
+import query_context;
 
 module fragment_task;
 
@@ -40,7 +41,6 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64 worker_id) {
-    LOG_TRACE(Format("Execute fragment task on {}, {}", worker_id, this->PhysOpsToString()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -55,10 +55,7 @@ void FragmentTask::OnExecute(i64 worker_id) {
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
 
-    LOG_TRACE(Format("Start execute source operator {}, {}", worker_id, this->PhysOpsToString()));
-
     source_op->Execute(fragment_context->query_context(), source_state_.get());
-    LOG_TRACE(Format("End execute source operator"));
 
     Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -68,11 +65,9 @@ void FragmentTask::OnExecute(i64 worker_id) {
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
-            LOG_TRACE(Format("Start execute operator {}", op_idx));
             profiler.StartOperator(operator_refs[op_idx]);
             operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
             profiler.StopOperator(operator_states_[op_idx].get());
-            LOG_TRACE(Format("Finish execute operator {}", op_idx));
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
@@ -88,8 +83,6 @@ void FragmentTask::OnExecute(i64 worker_id) {
     }
 
     //    prof.End();
-    //    LOG_TRACE(prof.ElapsedToString());
-    LOG_TRACE(Format("Finish execute fragment task on {}", worker_id));
 }
 
 u64 FragmentTask::ProposedCPUID(u64 max_cpu_count) const {

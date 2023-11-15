@@ -293,11 +293,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *message_si
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_operator_state);
             SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-            // auto new_data_block = DataBlock::MoveFrom(task_operator_state->data_block_);
-            // auto new_data_block = 
-            // if (!new_data_block) {
-            //     break; // last fragment has not finalized the block.
-            // }
+
             fragment_data->data_block_ = knn_output_state->data_block_;
             fragment_data->data_count_ = 1; // TODO:: bug here
             fragment_data->data_idx_ = 1;
