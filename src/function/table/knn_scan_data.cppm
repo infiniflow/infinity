@@ -92,7 +92,7 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type);
 
 export class KnnScanFunctionData1 : public TableFunctionData {
 public:
-    KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data);
+    KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data, u32 current_parallel_idx);
 
 private:
     template <typename DataType>
@@ -100,9 +100,9 @@ private:
 
 public:
     const SharedPtr<KnnScanSharedData> shared_data_;
+    const u32 task_id_;
 
     UniquePtr<MergeKnnBase> merge_knn_base_{};
-
     UniquePtr<KnnDistanceBase1> knn_distance_{};
 };
 

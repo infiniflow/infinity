@@ -79,7 +79,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
-        return;
+        throw ExecutorException("Bug");
     }
     ++merge_knn_data.current_parallel_idx_;
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
@@ -94,6 +94,9 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     SizeT row_n = input_data.row_count();
     merge_knn->Search(dists, row_ids, row_n);
 
+    // TODO: remove one of the cnt. It is redundant
+    Assert<ExecutorException>(merge_knn_data.current_parallel_idx_ == merge_knn_state->received_data_count_, "Bug");
+    // Assert<ExecutorException>(merge_knn_data.total_parallel_n_ == merge_knn_state->total_data_count_, "Bug");
     if (merge_knn_data.current_parallel_idx_ == merge_knn_data.total_parallel_n_) {
         merge_knn->End(); // reorder the heap
 

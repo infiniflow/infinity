@@ -58,7 +58,8 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 // --------------------------------------------
 
-KnnScanFunctionData1::KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data) : shared_data_(shared_data) {
+KnnScanFunctionData1::KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data, u32 current_parallel_idx)
+    : shared_data_(shared_data), task_id_(current_parallel_idx) {
     switch (shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
             Init<f32>();

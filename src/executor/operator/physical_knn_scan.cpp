@@ -131,6 +131,7 @@ Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWith
             }
         }
     }
+    LOG_TRACE(Format("KnnScan: brute force task: {}, index task: {}", block_column_entries.size(), index_entries.size()));
     return {block_column_entries, index_entries};
 }
 
@@ -149,7 +150,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     SizeT brute_task_n = knn_scan_shared_data->block_column_entries_.size();
 
     if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
-        LOG_TRACE(Format("KnnScan: brute force {}/{}", block_column_idx + 1, brute_task_n));
+        LOG_TRACE(Format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
         const BlockEntry *block_entry = block_column_entry->block_entry_;
@@ -167,7 +168,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
         merge_heap->Search(dists.data(), row_ids.data(), row_count);
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
-        LOG_TRACE(Format("KnnScan: index {}/{}", index_idx + 1, index_task_n));
+        LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
         IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -259,7 +260,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
     }
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
-        LOG_TRACE("KnnScan: task finished");
+        LOG_TRACE(Format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
         // all task Complete
         SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();

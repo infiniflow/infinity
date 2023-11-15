@@ -83,7 +83,7 @@ void MakeKnnScanState(UniquePtr<OperatorState> &operator_state,
 
     operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
-    knn_scan_op_state_ptr->knn_scan_function_data1_ = MakeUnique<KnnScanFunctionData1>(fragment_ctx->shared_data_);
+    knn_scan_op_state_ptr->knn_scan_function_data1_ = MakeUnique<KnnScanFunctionData1>(fragment_ctx->shared_data_, task->TaskID());
 }
 
 void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {

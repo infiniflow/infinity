@@ -13,7 +13,7 @@ CREATE TABLE test_knn_l2(c1 INT, c2 EMBEDDING(FLOAT, 4));
 statement ok
 COPY test_knn_l2 FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
-# mertic l2 will order ascendingly. The query will return row 4, 3, 1
+# mertic l2 will order ascendingly. The query will return row 4, 3, 2
 query I
 SELECT c1 FROM test_knn_l2 ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2') LIMIT 3;
 ----

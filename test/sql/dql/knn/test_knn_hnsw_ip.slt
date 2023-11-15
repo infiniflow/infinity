@@ -34,10 +34,12 @@ SELECT c1 FROM test_knn_hnsw_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 
 8
 6
 
+# create hnsw index on existing 2 segments
 statement ok
 CREATE INDEX idx1 ON test_knn_hnsw_ip (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = ip);
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
+# select with 2 index segment
 query I
 SELECT c1 FROM test_knn_hnsw_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 3;
 ----
@@ -45,11 +47,12 @@ SELECT c1 FROM test_knn_hnsw_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 
 8
 6
 
-# copy to create another new block
+# copy to create another new block with no index
 statement ok
 COPY test_knn_hnsw_ip FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
 
 # the query will return row 4 from block 1, 2 and 3
+# select with 2 index segment and 1 non-index segment
 query I
 SELECT c1 FROM test_knn_hnsw_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 3;
 ----

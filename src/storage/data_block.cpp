@@ -65,6 +65,9 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
 }
 
 SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
+    if (!input->Finalized()) {
+        return nullptr;
+    }
     auto data_block = DataBlock::Make();
     SizeT capacity = input->row_count();
     if (capacity) {
