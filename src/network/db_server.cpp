@@ -42,8 +42,7 @@ void DBServer::Run() {
     InfinityContext::instance().Init(config_path_);
 
 //    grpc_thread_ = Thread([]() { GrpcServiceImpl::Run(); });
-//    brpc_thread_ = Thread([]() { BrpcServiceImpl::Run(); });
-    BrpcServiceImpl::Run();
+    brpc_thread_ = Thread([]() { BrpcServiceImpl::Run(); });
 
     u16 pg_port = InfinityContext::instance().config()->pg_port();
     const String &listen_address_ref = InfinityContext::instance().config()->listen_address();

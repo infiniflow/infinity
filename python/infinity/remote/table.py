@@ -31,7 +31,7 @@ class RemoteTable(Table, ABC):
                 proto_index_para.para_value = str(value)
                 index_para_list_to_use.append(proto_index_para)
 
-        self._conn.client.create_index(db_name=self._db_name,
+        return self._conn.client.create_index(db_name=self._db_name,
                                        table_name=self._table_name,
                                        index_name=index_name,
                                        column_names=column_names,
@@ -40,7 +40,7 @@ class RemoteTable(Table, ABC):
                                        options=None)
 
     def drop_index(self, index_name: str):
-        self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
+        return self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
                                      index_name=index_name)
 
     def insert(self, data: list[dict[str, Union[str, int, float]]]):
@@ -73,11 +73,12 @@ class RemoteTable(Table, ABC):
             fields.append(field)
 
         # print(db_name, table_name, column_names, fields)
-        self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names, fields=fields)
+        return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
+                                        fields=fields)
 
     def import_data(self, file_path: str, options=None):
 
-        self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
+        return self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
                                       import_options=options)
 
     def delete(self, condition):
@@ -100,6 +101,8 @@ class RemoteTable(Table, ABC):
         # process select_list
         global covered_column_vector, where_expr
         select_list: list[infinity_pb2.ParsedExpr] = []
+        group_by_list: list[infinity_pb2.ParsedExpr] = []
+
 
         for column in query.columns:
             column_expr = infinity_pb2.ColumnExpr()
@@ -136,7 +139,7 @@ class RemoteTable(Table, ABC):
                                        table_name=self._table_name,
                                        select_list=select_list,
                                        where_expr=where_expr,
-                                       group_by_list=None,
+                                       group_by_list=group_by_list,
                                        limit_expr=limit_expr,
                                        offset_expr=offset_expr,
                                        search_expr=None)

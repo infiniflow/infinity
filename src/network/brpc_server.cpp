@@ -9,6 +9,7 @@ import infinity_exception;
 import data_block;
 import value;
 import column_vector;
+import logger;
 
 namespace infinity {
 
@@ -16,9 +17,13 @@ void infinity::BrpcServiceImpl::Connect(google::protobuf::RpcController *cntl_ba
                                         const infinity_proto::Empty *request,
                                         infinity_proto::CommonResponse *response,
                                         google::protobuf::Closure *done) {
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
     auto infinity = Infinity::RemoteConnect();
     if (infinity == nullptr) {
         response->set_success(false);
+        LOG(ERROR) << "Connect failed";
         response->set_error_msg("Connect failed");
     } else {
         infinity_session_map_mutex_.lock();
@@ -29,23 +34,400 @@ void infinity::BrpcServiceImpl::Connect(google::protobuf::RpcController *cntl_ba
     }
 }
 
+void BrpcServiceImpl::DisConnect(google::protobuf::RpcController *cntl_base,
+                                 const infinity_proto::DisConnectRequest *request,
+                                 infinity_proto::CommonResponse *response,
+                                 google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    if (infinity == nullptr) {
+        response->set_success(false);
+        LOG(ERROR) << "Disconnect failed";
+        response->set_error_msg("Disconnect failed");
+    } else {
+        auto session_id = infinity->GetSessionId();
+        infinity->RemoteDisconnect();
+        infinity_session_map_mutex_.lock();
+        infinity_session_map_.erase(session_id);
+        infinity_session_map_mutex_.unlock();
+        response->set_success(true);
+    }
+}
+
+void BrpcServiceImpl::CreateDatabase(google::protobuf::RpcController *cntl_base,
+                                     const infinity_proto::CreateDatabaseRequest *request,
+                                     infinity_proto::CommonResponse *response,
+                                     google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->CreateDatabase(request->db_name(), (const CreateDatabaseOptions &)request->options());
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::DropDatabase(google::protobuf::RpcController *cntl_base,
+                                   const infinity_proto::DropDatabaseRequest *request,
+                                   infinity_proto::CommonResponse *response,
+                                   google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->DropDatabase(request->db_name(), (const DropDatabaseOptions &)request->options());
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::ListDatabase(google::protobuf::RpcController *cntl_base,
+                                   const infinity_proto::ListDatabaseRequest *request,
+                                   infinity_proto::ListDatabaseResponse *response,
+                                   google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto result = infinity->ListDatabases();
+
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+
+        for (int i = 0; i < row_count; ++i) {
+            Value value = data_block->GetValue(0, i);
+            if (value.value_.varchar.IsInlined()) {
+                String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                response->add_db_name(prefix);
+            } else {
+                String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                response->add_db_name(whole_str);
+            }
+        }
+
+        response->set_success(true);
+    } else {
+        LOG(ERROR) << result.ErrorMsg();
+        response->set_success(false);
+        response->set_error_msg(result.ErrorMsg());
+    }
+}
+
+void BrpcServiceImpl::DescribeDatabase(google::protobuf::RpcController *cntl_base,
+                                       const infinity_proto::DescribeDatabaseRequest *request,
+                                       infinity_proto::DescribeDatabaseResponse *response,
+                                       google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    Error<NotImplementException>("Not implement DescribeDatabase", __FILE_NAME__, __LINE__);
+}
+
+void BrpcServiceImpl::GetDatabase(google::protobuf::RpcController *cntl_base,
+                                  const infinity_proto::GetDatabaseRequest *request,
+                                  infinity_proto::CommonResponse *response,
+                                  google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    if (database != nullptr) {
+        response->set_success(true);
+    } else {
+        LOG(ERROR) << "Database not found";
+        response->set_success(false);
+        response->set_error_msg("Database not found");
+    }
+}
+
+void BrpcServiceImpl::CreateTable(google::protobuf::RpcController *cntl_base,
+                                  const infinity_proto::CreateTableRequest *request,
+                                  infinity_proto::CommonResponse *response,
+                                  google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    Vector<ColumnDef *> column_defs;
+    for (auto &proto_column_def : request->column_defs()) {
+        auto column_def = GetColumnDefFromProto(proto_column_def);
+        column_defs.emplace_back(column_def);
+    }
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    CreateTableOptions create_table_opts;
+    auto result = database->CreateTable(request->table_name(), column_defs, Vector<TableConstraint *>(), create_table_opts);
+
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::DropTable(google::protobuf::RpcController *cntl_base,
+                                const infinity_proto::DropTableRequest *request,
+                                infinity_proto::CommonResponse *response,
+                                google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto result = database->DropTable(request->table_name(), (const DropTableOptions &)request->options());
+
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::ListTable(google::protobuf::RpcController *cntl_base,
+                                const infinity_proto::ListTableRequest *request,
+                                infinity_proto::ListTableResponse *response,
+                                google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto result = database->ListTables();
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+
+        auto row_count = data_block->row_count();
+        for (int i = 0; i < row_count; ++i) {
+            Value value = data_block->GetValue(1, i);
+            if (value.value_.varchar.IsInlined()) {
+                String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                response->add_table_name(prefix);
+            } else {
+                String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                response->add_table_name(whole_str);
+            }
+        }
+
+        response->set_success(true);
+
+    } else {
+        LOG(ERROR) << result.ErrorMsg();
+        response->set_success(false);
+        response->set_error_msg(result.ErrorMsg());
+    }
+}
+
+void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
+                                  const infinity_proto::CreateIndexRequest *request,
+                                  infinity_proto::CommonResponse *response,
+                                  google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto table = database->GetTable(request->table_name());
+    auto column_names = new Vector<String>();
+
+    column_names->reserve(request->column_names_size());
+    for (auto &column_name : request->column_names()) {
+        column_names->emplace_back(column_name);
+    }
+
+    const String &method_type = request->method_type();
+    auto *index_para_list = new Vector<InitParameter *>();
+
+    for (auto &index_para : request->index_para_list()) {
+        auto init_parameter = new InitParameter();
+        init_parameter->para_name_ = index_para.para_name();
+        init_parameter->para_value_ = index_para.para_value();
+        index_para_list->emplace_back(init_parameter);
+    }
+
+    auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_para_list, (CreateIndexOptions &)request->options());
+
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::DropIndex(google::protobuf::RpcController *cntl_base,
+                                const infinity_proto::DropIndexRequest *request,
+                                infinity_proto::CommonResponse *response,
+                                google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto table = database->GetTable(request->table_name());
+    auto result = table->DropIndex(request->index_name());
+
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::Search(google::protobuf::RpcController *cntl_base,
+                             const infinity_proto::SelectStatement *request,
+                             infinity_proto::SelectResponse *response,
+                             google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto table = database->GetTable(request->table_name());
+    Vector<ParsedExpr *> *output_columns;
+    output_columns = new Vector<ParsedExpr *>();
+    output_columns->reserve(request->select_list_size());
+
+    for (auto &expr : request->select_list()) {
+        auto parsed_expr = GetColumnExprFromProto(expr.column_expr());
+        output_columns->emplace_back(parsed_expr);
+    }
+
+    Vector<Pair<ParsedExpr *, ParsedExpr *>> vector_expr{};
+
+    Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
+
+    ParsedExpr *filter = GetParsedExprFromProto(request->where_expr());
+
+    // TODO:
+    //    ParsedExpr *offset;
+    //    offset = new ParsedExpr();
+    //    ParsedExpr *limit;
+    //    limit = new ConstantExpr (0);
+
+    auto result = table->Search(vector_expr, fts_expr, filter, output_columns, nullptr, nullptr);
+
+    if (result.IsOk()) {
+        auto data_block_count = result.result_table_->DataBlockCount();
+        auto column_count = result.result_table_->ColumnCount();
+
+        Vector<SharedPtr<ColumnVector>> all_column_vectors;
+        all_column_vectors.reserve(column_count);
+        SizeT all_row_count = 0;
+        for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
+            auto data_block = result.result_table_->GetDataBlockById(block_idx);
+            auto row_count = data_block->row_count();
+            all_row_count += row_count;
+
+            for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+                auto column_vector = data_block->column_vectors[col_index];
+
+                if (block_idx == 0) {
+                    all_column_vectors.emplace_back(column_vector);
+                } else {
+                    all_column_vectors[col_index]->AppendWith(*column_vector.get());
+                }
+            }
+        }
+
+        for (auto &column_vector : all_column_vectors) {
+            auto size = column_vector->data_type()->Size() * all_row_count;
+            char *dst = new char[size];
+            memcpy(dst, column_vector->data(), size);
+
+            infinity_proto::ColumnField columnField;
+            columnField.set_column_vector(dst, size);
+            columnField.set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+            response->add_column_fields()->CopyFrom(columnField);
+        }
+
+        auto table_def = result.result_table_->definition_ptr_;
+
+        for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+            auto column_def = table_def->columns()[col_index];
+            infinity_proto::ColumnDef proto_column_def;
+            proto_column_def.set_id(column_def->id());
+            proto_column_def.set_name(column_def->name());
+            infinity_proto::DataType proto_data_type;
+            proto_column_def.set_allocated_column_type(DataTypeToProtoDataType(column_def->type()));
+            response->add_column_defs()->CopyFrom(proto_column_def);
+        }
+
+        response->set_success(true);
+    } else {
+        LOG(ERROR) << result.ErrorMsg();
+        response->set_success(false);
+        response->set_error_msg(result.ErrorMsg());
+    }
+}
+
+void BrpcServiceImpl::Import(google::protobuf::RpcController *cntl_base,
+                             const infinity_proto::ImportRequest *request,
+                             infinity_proto::CommonResponse *response,
+                             google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto table = database->GetTable(request->table_name());
+    auto result = table->Import(request->file_path(), (const ImportOptions &)request->import_options());
+
+    ProcessResult(result, response);
+}
+
+void BrpcServiceImpl::Insert(google::protobuf::RpcController *cntl_base,
+                             const infinity_proto::InsertRequest *request,
+                             infinity_proto::CommonResponse *response,
+                             google::protobuf::Closure *done) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller *cntl = SetUpController(cntl_base);
+
+    auto infinity = GetInfinityBySessionID(request->session_id());
+    auto database = infinity->GetDatabase(request->db_name());
+    auto table = database->GetTable(request->table_name());
+    auto columns = new Vector<String>();
+    columns->reserve(request->column_names().size());
+
+    for (auto &column : request->column_names()) {
+        columns->emplace_back(column);
+    }
+
+    auto values = new Vector<Vector<ParsedExpr *> *>();
+    values->reserve(request->fields().size());
+
+    for (auto &value : request->fields()) {
+        auto value_list = new Vector<ParsedExpr *>();
+        value_list->reserve(value.parse_exprs_size());
+        for (auto &expr : value.parse_exprs()) {
+            auto parsed_expr = GetConstantFromProto(expr.constant_expr().literal_type(), expr.constant_expr());
+            value_list->emplace_back(parsed_expr);
+        }
+        values->emplace_back(value_list);
+    }
+
+    auto result = table->Insert(columns, values);
+
+    ProcessResult(result, response);
+}
+
 void BrpcServiceImpl::Run() {
 
     brpc::Server server;
 
     BrpcServiceImpl service;
-    if (server.AddService(&service,
-                          brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
+    if (server.AddService(&service, brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
         std::cout << "Fail to add service" << std::endl;
     }
 
+    // Start the server.
     brpc::ServerOptions options;
-    options.idle_timeout_sec = -1;
-    if (server.Start(50051, &options) != 0) {
-        std::cout << "Fail to start EchoServer" << std::endl;
+    options.idle_timeout_sec = 2;
+    options.num_threads = 4;
+    if (server.Start("0.0.0.0:50051", &options) != 0) {
+        LOG(ERROR) << "Failed to start server";
     }
+
+    // Wait until Ctrl-C is pressed, then Stop() and Join() the server.
+    LOG(INFO) << "0.0.0.0:50051 Start BRPC";
     server.RunUntilAskedToQuit();
-    std::cout << "BRPC server listening on " << "0.0.0.0:50051" << std::endl;
 }
 
 ColumnDef *BrpcServiceImpl::GetColumnDefFromProto(const infinity_proto::ColumnDef &column_def) {
@@ -91,42 +473,42 @@ infinity_proto::ColumnType BrpcServiceImpl::DataTypeToProtoColumnType(const Shar
 infinity_proto::DataType *BrpcServiceImpl::DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
     switch (data_type->type()) {
         case LogicalType::kBoolean: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::Boolean);
             return data_type_proto;
         }
         case LogicalType::kTinyInt: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::TinyInt);
             return data_type_proto;
         }
         case LogicalType::kSmallInt: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::SmallInt);
             return data_type_proto;
         }
         case LogicalType::kInteger: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::Integer);
             return data_type_proto;
         }
         case LogicalType::kBigInt: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::BigInt);
             return data_type_proto;
         }
         case LogicalType::kFloat: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::Float);
             return data_type_proto;
         }
         case LogicalType::kDouble: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             data_type_proto->set_logic_type(infinity_proto::Double);
             return data_type_proto;
         }
         case LogicalType::kVarchar: {
-            infinity_proto::DataType *data_type_proto = new infinity_proto::DataType();
+            auto *data_type_proto = new infinity_proto::DataType();
             infinity_proto::VarcharType varchar_type;
             auto varchar_info = static_cast<VarcharInfo *>(data_type->type_info().get());
             varchar_type.set_width(varchar_info->dimension());
@@ -194,6 +576,7 @@ ConstraintType BrpcServiceImpl::GetConstraintTypeFromProto(const infinity_proto:
             Error<TypeException>("Invalid constraint type", __FILE_NAME__, __LINE__);
     }
 }
+
 EmbeddingDataType BrpcServiceImpl::GetEmbeddingDataTypeFromProto(const infinity_proto::ElementType &type) {
     switch (type) {
         case infinity_proto::kElemBit:
@@ -214,6 +597,7 @@ EmbeddingDataType BrpcServiceImpl::GetEmbeddingDataTypeFromProto(const infinity_
             Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
     }
 }
+
 ConstantExpr *BrpcServiceImpl::GetConstantFromProto(const infinity_proto::ConstantExpr_LiteralType &literal_type,
                                                     const infinity_proto::ConstantExpr &expr) {
     switch (literal_type) {
@@ -261,6 +645,7 @@ ConstantExpr *BrpcServiceImpl::GetConstantFromProto(const infinity_proto::Consta
             Error<TypeException>("Invalid constant type", __FILE_NAME__, __LINE__);
     }
 }
+
 ColumnExpr *BrpcServiceImpl::GetColumnExprFromProto(const infinity_proto::ColumnExpr &column_expr) {
     auto parsed_expr = new ColumnExpr();
 
@@ -306,6 +691,22 @@ SharedPtr<Infinity> BrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
         Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
     }
     return it->second;
+}
+
+brpc::Controller *BrpcServiceImpl::SetUpController(google::protobuf::RpcController *cntl_base) {
+    auto *cntl = static_cast<brpc::Controller *>(cntl_base);
+    cntl->set_response_compress_type(brpc::COMPRESS_TYPE_GZIP);
+    return cntl;
+}
+
+void BrpcServiceImpl::ProcessResult(const QueryResult &result, infinity_proto::CommonResponse *response) {
+    if (result.IsOk()) {
+        response->set_success(true);
+    } else {
+        LOG(ERROR) << result.ErrorMsg();
+        response->set_success(false);
+        response->set_error_msg(result.ErrorMsg());
+    }
 }
 
 } // namespace infinity
