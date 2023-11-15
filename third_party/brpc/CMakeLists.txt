@@ -469,7 +469,7 @@ set(SOURCES
     ${JSON2PB_SOURCES}
     ${MCPACK2PB_SOURCES}
     ${BRPC_SOURCES}
-    ${THRIFT_SOURCES}
+#    ${THRIFT_SOURCES}
     )
 
 add_subdirectory(src)
