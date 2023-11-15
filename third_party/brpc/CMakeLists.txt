@@ -478,10 +478,6 @@ if(BUILD_UNIT_TESTS)
     add_subdirectory(test)
 endif()
 
-if(BUILD_BRPC_TOOLS)
-    add_subdirectory(tools)
-endif()
-
 file(COPY ${CMAKE_CURRENT_BINARY_DIR}/brpc/
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/output/include/brpc/
         FILES_MATCHING
