@@ -28,8 +28,13 @@ InsertStatement::~InsertStatement() {
     }
 
     if (values_ != nullptr) {
-        for (auto &value_ptr : *values_) {
-            delete value_ptr;
+        for(auto& value_array: *values_) {
+            for(auto& value_ptr: *value_array) {
+                delete value_ptr;
+                value_ptr = nullptr;
+            }
+            delete value_array;
+            value_array = nullptr;
         }
         delete values_;
         values_ = nullptr;
