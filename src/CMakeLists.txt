@@ -10,6 +10,9 @@ add_subdirectory(parser)
 
 ### Infinity
 
+### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
+add_definitions(-march=native)
+
 file(GLOB_RECURSE
         main_cpp
         CONFIGURE_DEPENDS
@@ -46,19 +49,19 @@ file(GLOB_RECURSE
         network/*.cppm
 )
 
-#file(GLOB_RECURSE
-#        network_h
-#        CONFIGURE_DEPENDS
-#        network/*.h
-#)
+file(GLOB_RECURSE
+        network_h
+        CONFIGURE_DEPENDS
+        network/*.h
+)
 #
 #
-#file(GLOB_RECURSE
-#        grpc_cpp
-#        CONFIGURE_DEPENDS
-#        network/*.cpp
-#        network/*.cc
-#)
+file(GLOB_RECURSE
+        brpc_cpp
+        CONFIGURE_DEPENDS
+        network/*.cpp
+        network/*.cc
+)
 
 file(GLOB_RECURSE
         function_cpp
@@ -157,9 +160,7 @@ file(GLOB_RECURSE
 #)
 
 add_library(infinity_core
-#        ${main_cpp}
         ${infinity_cpp}
-        ${network_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -167,7 +168,6 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
-#        ${grpc_cpp}
 )
 
 target_sources(infinity_core
@@ -175,7 +175,6 @@ target_sources(infinity_core
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${main_cppm}
         ${infinity_cppm}
-        ${network_cppm}
         ${common_cppm}
         ${planner_cppm}
         ${scheduler_cppm}
@@ -184,7 +183,6 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
-#        ${std_cppm}
 )
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -209,11 +207,20 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/brpc/src")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 add_executable(infinity
         ${main_cpp}
+        ${network_cpp}
+        ${brpc_cpp}
+)
+
+target_sources(infinity
+        PUBLIC
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+        ${network_cppm}
 )
 
 target_link_libraries(infinity
@@ -226,17 +233,19 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
-
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
         iresearch
 #        profiler
+
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 ### unit test
 
@@ -322,6 +331,7 @@ add_executable(unit_test
 
         ${infinity_cpp}
         ${network_cpp}
+        ${brpc_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -347,19 +357,21 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
         iresearch
 #        profiler
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
 )
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
+        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -375,5 +387,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fai
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
+target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
