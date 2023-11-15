@@ -77,7 +77,7 @@ public:
 
 private:
     void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    void GetWalState(TxnTimeStamp &max_commit_ts, i64 &wal_size);
+    i64 GetWalState(TxnTimeStamp &max_commit_ts);
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);
@@ -98,36 +98,36 @@ public:
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.
-    String wal_path_;
-    Storage *storage_;
+    String wal_path_{};
+    Storage *storage_{};
 
     // WalManager state
-    Atomic<bool> running_;
-    Thread flush_thread_;
-    Thread checkpoint_thread_;
+    Atomic<bool> running_{};
+    Thread flush_thread_{};
+    Thread checkpoint_thread_{};
 
     // TxnManager and Flush thread access following members
-    Mutex mutex_;
-    Deque<SharedPtr<WalEntry>> que_;
+    Mutex mutex_{};
+    Deque<SharedPtr<WalEntry>> que_{};
 
     // Only Flush thread access following members
-    Deque<SharedPtr<WalEntry>> que2_;
-    StdOfStream ofs_;
+    Deque<SharedPtr<WalEntry>> que2_{};
+    StdOfStream ofs_{};
 
     // Flush and Checkpoint threads access following members
-    Mutex mutex2_;
-    TxnTimeStamp max_commit_ts_;
-    i64 wal_size_;
+    Mutex mutex2_{};
+    TxnTimeStamp max_commit_ts_{};
+    i64 wal_size_{};
 
     // Only Checkpoint thread access following members
     TxnTimeStamp ckp_commit_ts_{};
     TxnTimeStamp full_ckp_commit_ts_{};
-    i64 full_ckp_wal_size_;
-    i64 full_ckp_when_;
-    i64 delta_ckp_wal_size_;
-    i64 delta_ckp_when_;
+    i64 full_ckp_wal_size_{};
+    i64 full_ckp_when_{};
+    i64 delta_ckp_wal_size_{};
+    i64 delta_ckp_when_{};
 
-    Vector<String> wal_list_;
+    Vector<String> wal_list_{};
 };
 
 } // namespace infinity
