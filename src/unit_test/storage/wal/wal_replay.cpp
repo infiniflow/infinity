@@ -65,34 +65,34 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->CreateTxn();
-        txn->BeginTxn();
+        txn->Begin();
         txn->CreateDatabase("db1", ConflictType::kIgnore);
-        txn->CommitTxn();
+        txn_mgr->CommitTxn(txn);
 
         auto *txn2 = txn_mgr->CreateTxn();
-        txn2->BeginTxn();
+        txn2->Begin();
         txn2->CreateDatabase("db2", ConflictType::kIgnore);
-        txn2->CommitTxn();
+        txn_mgr->CommitTxn(txn2);
 
         auto *txn3 = txn_mgr->CreateTxn();
-        txn3->BeginTxn();
+        txn3->Begin();
         txn3->CreateDatabase("db3", ConflictType::kIgnore);
-        txn3->CommitTxn();
+        txn_mgr->CommitTxn(txn3);
 
         auto *txn4 = txn_mgr->CreateTxn();
-        txn4->BeginTxn();
+        txn4->Begin();
         txn4->CreateDatabase("db4", ConflictType::kIgnore);
-        txn4->CommitTxn();
+        txn_mgr->CommitTxn(txn4);
 
         auto *txn5 = txn_mgr->CreateTxn();
-        txn5->BeginTxn();
+        txn5->Begin();
         txn5->Checkpoint(txn3->CommitTS(), true);
-        txn5->CommitTxn();
+        txn_mgr->CommitTxn(txn5);
 
         auto *txn6 = txn_mgr->CreateTxn();
-        txn6->BeginTxn();
+        txn6->Begin();
         txn6->CreateDatabase("db5", ConflictType::kIgnore);
-        txn6->CommitTxn();
+        txn_mgr->CommitTxn(txn6);
 
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -109,11 +109,11 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         auto *txn = txn_mgr->CreateTxn();
-        txn->BeginTxn();
+        txn->Begin();
         auto result = txn->DropDatabase("db4", ConflictType::kInvalid);
         EXPECT_EQ(result.err_, nullptr);
         EXPECT_NE(result.entry_, nullptr);
-        txn->CommitTxn();
+        txn_mgr->CommitTxn(txn);
 
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -160,49 +160,49 @@ TEST_F(WalReplayTest, WalReplayTables) {
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
 
         auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
         auto *txn2 = txn_mgr->CreateTxn();
-        txn2->BeginTxn();
+        txn2->Begin();
 
         BaseEntry* base_table2_entry{nullptr};
         Status status2 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore, base_table2_entry);
         EXPECT_TRUE(status2.ok());
         EXPECT_NE(base_table2_entry, nullptr);
-        txn2->CommitTxn();
+        txn_mgr->CommitTxn(txn2);
 
         {
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->DropTableCollectionByName("default", "tbl2", ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
-            txn3->BeginTxn();
+            txn3->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn3->CommitTxn();
+            txn_mgr->CommitTxn(txn3);
         }
         {
             auto *txn6 = txn_mgr->CreateTxn();
-            txn6->BeginTxn();
+            txn6->Begin();
             txn6->Checkpoint(txn2->CommitTS(), true);
-            txn6->CommitTxn();
+            txn_mgr->CommitTxn(txn6);
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -221,21 +221,21 @@ TEST_F(WalReplayTest, WalReplayTables) {
         {
             auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->DropTableCollectionByName("default", "tbl3", ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -284,32 +284,32 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
-            txn3->BeginTxn();
+            txn3->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn3->CommitTxn();
+            txn_mgr->CommitTxn(txn3);
         }
         {
             auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl4"), columns);
             auto *txn4 = txn_mgr->CreateTxn();
-            txn4->BeginTxn();
+            txn4->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn4->CreateTable("default", Move(tbl4_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn4->CommitTxn();
+            txn_mgr->CommitTxn(txn4);
         }
         {
             auto *txn5 = txn_mgr->CreateTxn();
@@ -336,15 +336,15 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             }
             input_block->Finalize();
             EXPECT_EQ(input_block->Finalized(), true);
-            txn5->BeginTxn();
+            txn5->Begin();
             txn5->Append("default", "tbl4", input_block);
-            txn5->CommitTxn();
+            txn_mgr->CommitTxn(txn5);
         }
         {
             auto *txn6 = txn_mgr->CreateTxn();
-            txn6->BeginTxn();
+            txn6->Begin();
             txn6->Checkpoint(3, true);
-            txn6->CommitTxn();
+            txn_mgr->CommitTxn(txn6);
         }
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -376,16 +376,16 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         {
             auto tbl5_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl5"), columns);
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl5_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             Vector<ColumnID> column_ids{0, 1, 2};
             UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
 
@@ -481,46 +481,46 @@ TEST_F(WalReplayTest, WalReplayImport) {
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
         auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
         auto *txn2 = txn_mgr->CreateTxn();
-        txn2->BeginTxn();
+        txn2->Begin();
         BaseEntry* base_table_entry{nullptr};
         Status status = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore, base_table_entry);
         EXPECT_TRUE(status.ok());
         EXPECT_NE(base_table_entry, nullptr);
-        txn2->CommitTxn();
+        txn_mgr->CommitTxn(txn2);
 
         TxnTimeStamp tx4_commit_ts = txn2->CommitTS();
         {
             auto txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             txn->Checkpoint(tx4_commit_ts, true);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
         {
             auto *txn = txn_mgr->CreateTxn();
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
 
-            txn->BeginTxn();
+            txn->Begin();
             BaseEntry* base_table_entry{nullptr};
             Status status = txn->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore, base_table_entry);
             EXPECT_TRUE(status.ok());
             EXPECT_NE(base_table_entry, nullptr);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
         {
             auto txn4 = txn_mgr->CreateTxn();
-            txn4->BeginTxn();
+            txn4->Begin();
 
             TableCollectionEntry *table_collection_entry = nullptr;
             auto table_collection_entry_result = txn4->GetTableEntry("default", "tbl1", table_collection_entry);
@@ -592,7 +592,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             auto txn_store = txn4->GetTxnTableStore(table_collection_entry);
             PhysicalImport::SaveSegmentData(txn_store, segment_entry);
-            txn4->CommitTxn();
+            txn_mgr->CommitTxn(txn4);
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -613,7 +613,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
         {
             auto txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             Vector<ColumnID> column_ids{0, 1, 2};
             TableCollectionEntry *table_collection_entry = nullptr;
             txn->GetTableEntry("default", "tbl1", table_collection_entry);
@@ -646,7 +646,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             f64 *col2_ptr = (f64 *)(col2_obj.GetValueAt(0, *col2_type));
             EXPECT_EQ(col2_ptr[0], (f64)(3) + 0.33f);
 
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();

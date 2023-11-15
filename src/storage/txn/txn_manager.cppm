@@ -42,8 +42,6 @@ public:
 
     Txn *CreateTxn();
 
-    void DestroyTxn(u64 txn_id);
-
     Txn *GetTxn(u64 txn_id);
 
     TxnState GetTxnState(u64 txn_id);
@@ -65,6 +63,10 @@ public:
     void Stop();
 
     bool Stopped();
+
+    void CommitTxn(Txn* txn);
+
+    void RollBackTxn(Txn* txn);
 
 private:
     u64 GetNewTxnID();

@@ -144,7 +144,7 @@ void WalManager::Stop() {
         auto wal_entry = que_.front();
         Txn *txn = txn_mgr->GetTxn(wal_entry->txn_id);
         if (txn != nullptr) {
-            txn->CancelCommitTxnBottom();
+            txn->CancelCommitBottom();
         }
     }
     que_.clear();
@@ -237,7 +237,7 @@ void WalManager::Flush() {
             // Commit sequentially so they get visible in the same order with wal.
             Txn *txn = txn_mgr->GetTxn(entry->txn_id);
             if (txn != nullptr) {
-                txn->CommitTxnBottom();
+                txn->CommitBottom();
             }
         }
         que2_.clear();
@@ -285,13 +285,13 @@ void WalManager::Checkpoint() {
         try {
             txn_mgr = storage_->txn_manager();
             txn = txn_mgr->CreateTxn();
-            txn->BeginTxn();
+            txn->Begin();
             LOG_INFO(Format("created transaction for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
                             txn->TxnID(),
                             txn->BeginTS(),
                             max_commit_ts));
             txn->Checkpoint(max_commit_ts, is_full_checkpoint);
-            txn->CommitTxn();
+            txn_mgr->CommitTxn(txn);
 
             ckp_commit_ts_ = max_commit_ts;
             delta_ckp_when_ = now;

@@ -61,11 +61,11 @@ TEST_F(CatalogTest, simple_test1) {
 
     // start txn1
     auto *txn1 = txn_mgr->CreateTxn();
-    txn1->BeginTxn();
+    txn1->Begin();
 
     // start txn2
     auto *txn2 = txn_mgr->CreateTxn();
-    txn2->BeginTxn();
+    txn2->Begin();
     HashMap<String, BaseEntry *> databases;
 
     // create db in empty catalog should be success
@@ -108,8 +108,8 @@ TEST_F(CatalogTest, simple_test1) {
         EXPECT_TRUE(!status2.ok());
     }
 
-    txn1->CommitTxn();
-    txn2->CommitTxn();
+    txn_mgr->CommitTxn(txn1);
+    txn_mgr->CommitTxn(txn2);
 }
 
 // txn1: create db1, commit.
@@ -123,11 +123,11 @@ TEST_F(CatalogTest, simple_test2) {
 
     // start txn1
     auto *txn1 = txn_mgr->CreateTxn();
-    txn1->BeginTxn();
+    txn1->Begin();
 
     // start txn2
     auto *txn2 = txn_mgr->CreateTxn();
-    txn2->BeginTxn();
+    txn2->Begin();
 
     HashMap<String, BaseEntry *> databases;
 
@@ -140,7 +140,7 @@ TEST_F(CatalogTest, simple_test2) {
         databases["db1"] = res.entry_;
     }
 
-    txn1->CommitTxn();
+    txn_mgr->CommitTxn(txn1);
 
     // should not be visible to txn2
     {
@@ -150,10 +150,10 @@ TEST_F(CatalogTest, simple_test2) {
         EXPECT_TRUE(!status1.ok());
     }
 
-    txn2->CommitTxn();
+    txn_mgr->CommitTxn(txn2);
 
     auto *txn3 = txn_mgr->CreateTxn();
-    txn3->BeginTxn();
+    txn3->Begin();
 
     // should be visible to txn3
     {
@@ -176,7 +176,7 @@ TEST_F(CatalogTest, simple_test2) {
         EXPECT_TRUE(!status2.ok());
     }
 
-    txn3->CommitTxn();
+    txn_mgr->CommitTxn(txn3);
 }
 
 TEST_F(CatalogTest, concurrent_test) {
@@ -188,9 +188,9 @@ TEST_F(CatalogTest, concurrent_test) {
     for (int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2
         auto *txn1 = txn_mgr->CreateTxn();
-        txn1->BeginTxn();
+        txn1->Begin();
         auto *txn2 = txn_mgr->CreateTxn();
-        txn2->BeginTxn();
+        txn2->Begin();
 
         // lock protect databases
         std::mutex lock;
@@ -215,14 +215,14 @@ TEST_F(CatalogTest, concurrent_test) {
         write_thread1.join();
         write_thread2.join();
 
-        txn1->CommitTxn();
-        txn2->CommitTxn();
+        txn_mgr->CommitTxn(txn1);
+        txn_mgr->CommitTxn(txn2);
 
         // start txn3 && txn4
         auto *txn3 = txn_mgr->CreateTxn();
-        txn3->BeginTxn();
+        txn3->Begin();
         auto *txn4 = txn_mgr->CreateTxn();
-        txn4->BeginTxn();
+        txn4->Begin();
 
         auto read_routine = [&](Txn *txn) {
             EntryResult res;
@@ -241,14 +241,14 @@ TEST_F(CatalogTest, concurrent_test) {
         read_thread1.join();
         read_thread2.join();
 
-        txn3->CommitTxn();
-        txn4->CommitTxn();
+        txn_mgr->CommitTxn(txn3);
+        txn_mgr->CommitTxn(txn4);
 
         // start txn5 && txn6
         auto *txn5 = txn_mgr->CreateTxn();
-        txn5->BeginTxn();
+        txn5->Begin();
         auto *txn6 = txn_mgr->CreateTxn();
-        txn6->BeginTxn();
+        txn6->Begin();
 
         auto drop_routine = [&](int start, Txn *txn) {
             EntryResult res;
@@ -268,12 +268,12 @@ TEST_F(CatalogTest, concurrent_test) {
         drop_thread1.join();
         drop_thread2.join();
 
-        txn5->CommitTxn();
-        txn6->CommitTxn();
+        txn_mgr->CommitTxn(txn5);
+        txn_mgr->CommitTxn(txn6);
 
         // start txn7
         auto *txn7 = txn_mgr->CreateTxn();
-        txn7->BeginTxn();
+        txn7->Begin();
 
         // check all has been dropped
         EntryResult res;

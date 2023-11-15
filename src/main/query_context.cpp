@@ -157,15 +157,17 @@ void QueryContext::CreateTxn() {
     }
 }
 
-void QueryContext::BeginTxn() { session_ptr_->GetTxn()->BeginTxn(); }
+void QueryContext::BeginTxn() { session_ptr_->GetTxn()->Begin(); }
 
 void QueryContext::CommitTxn() {
-    session_ptr_->GetTxn()->CommitTxn();
+    Txn* txn = session_ptr_->GetTxn();
+    storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
 }
 
 void QueryContext::RollbackTxn() {
-    session_ptr_->GetTxn()->RollbackTxn();
+    Txn* txn = session_ptr_->GetTxn();
+    storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
 }
 

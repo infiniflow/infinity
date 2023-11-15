@@ -57,17 +57,15 @@ export class Txn {
 public:
     explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
 
-    void BeginTxn();
+    void Begin();
 
-    void CommitTxn();
+    void Commit();
 
-    void CommitTxnBottom();
+    void CommitBottom();
 
-    void CancelCommitTxnBottom();
+    void CancelCommitBottom();
 
-    void RollbackTxn();
-
-    void RollbackTxn(TxnTimeStamp abort_ts);
+    void Rollback();
 
     EntryResult CreateDatabase(const String &db_name, ConflictType conflict_type);
 
@@ -157,14 +155,14 @@ private:
     HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 
     // Handled database
-    String db_name_;
+    String db_name_{};
 
     // WalEntry
     SharedPtr<WalEntry> wal_entry_;
 
     // WalManager notify the  commit bottom half is done
-    Mutex m;
-    CondVar cv;
+    Mutex lock_{};
+    CondVar cond_var_{};
     bool done_bottom_{false};
 };
 

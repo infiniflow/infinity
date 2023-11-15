@@ -47,12 +47,6 @@ Txn *TxnManager::CreateTxn() {
     return res;
 }
 
-void TxnManager::DestroyTxn(u64 txn_id) {
-    rw_locker_.lock();
-    txn_map_.erase(txn_id);
-    rw_locker_.unlock();
-}
-
 Txn *TxnManager::GetTxn(u64 txn_id) {
     rw_locker_.lock_shared();
     Txn *res = txn_map_[txn_id].get();
@@ -131,7 +125,7 @@ void TxnManager::Stop() {
         // remove and notify the wal manager condition variable
         auto txn = GetTxn(it->first);
         if (txn != nullptr) {
-            txn->CancelCommitTxnBottom();
+            txn->CancelCommitBottom();
         }
         ++it;
     }
@@ -140,5 +134,19 @@ void TxnManager::Stop() {
 }
 
 bool TxnManager::Stopped() { return !is_running_.load(); }
+
+void TxnManager::CommitTxn(Txn* txn) {
+    txn->Commit();
+    rw_locker_.lock();
+    txn_map_.erase(txn->TxnID());
+    rw_locker_.unlock();
+}
+
+void TxnManager::RollBackTxn(Txn* txn) {
+    txn->Rollback();
+    rw_locker_.lock();
+    txn_map_.erase(txn->TxnID());
+    rw_locker_.unlock();
+}
 
 } // namespace infinity
