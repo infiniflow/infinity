@@ -119,9 +119,9 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
 void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
     EntryResult create_res;
     Txn *new_txn = txn_mgr->CreateTxn();
-    new_txn->BeginTxn();
+    new_txn->Begin();
     create_res = new_txn->CreateDatabase("default", ConflictType::kError);
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
     if (create_res.err_ != nullptr) {
         Error<StorageException>(*create_res.err_);
     }

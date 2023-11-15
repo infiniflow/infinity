@@ -150,7 +150,7 @@ public:
         active_trans_.erase(txn_id);
         txn->lsn = lsn;
         txn->Commit();
-        logger->info("TxnManager::CommitTxn done for transaction {}", txn_id);
+        logger->info("TxnManager::Commit done for transaction {}", txn_id);
     }
 
 private:

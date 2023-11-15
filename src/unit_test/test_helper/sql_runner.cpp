@@ -110,4 +110,5 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->CommitTxn();
     return query_result.result_table_;
 }
+
 } // namespace infinity

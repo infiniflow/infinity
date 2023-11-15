@@ -63,7 +63,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(create_res.entry_, nullptr);
 
     // Txn1: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn1: Create db1, OK
     create_res = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -75,7 +75,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(create_res.entry_, base_entry);
 
     // Txn1: Commit OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
     EXPECT_NE(create_res.entry_, nullptr);
     EXPECT_EQ(create_res.entry_->Committed(), true);
 
@@ -83,7 +83,7 @@ TEST_F(DBTxnTest, test1) {
     new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn2: Get db1, OK
     base_entry = nullptr;
@@ -99,13 +99,13 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_NE(drop_db_res.entry_, create_res.entry_);
 
     // Txn2: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn3: Get db1, NOT OK
     base_entry = nullptr;
@@ -118,7 +118,7 @@ TEST_F(DBTxnTest, test1) {
     EXPECT_EQ(drop_db_res.entry_, nullptr);
 
     // Txn3: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 }
 
 TEST_F(DBTxnTest, test20) {
@@ -131,20 +131,20 @@ TEST_F(DBTxnTest, test20) {
     Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn2: Get db1, OK
     BaseEntry* base_entry{nullptr};
@@ -167,13 +167,13 @@ TEST_F(DBTxnTest, test20) {
     EXPECT_NE(base_entry, nullptr);
 
     // Txn2: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn3: Get db1, OK
     base_entry = nullptr;
@@ -186,7 +186,7 @@ TEST_F(DBTxnTest, test20) {
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 }
 
 TEST_F(DBTxnTest, test2) {
@@ -199,7 +199,7 @@ TEST_F(DBTxnTest, test2) {
     Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
@@ -221,13 +221,13 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(base_entry, nullptr);
 
     // Txn1: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn2: Get db1, OK
     base_entry = nullptr;
@@ -246,13 +246,13 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(base_entry, create1_res.entry_);
 
     // Txn2: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn3: Get db1, OK
     base_entry = nullptr;
@@ -265,7 +265,7 @@ TEST_F(DBTxnTest, test2) {
     EXPECT_EQ(create3_res.entry_, nullptr);
 
     // Txn3: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 }
 
 // ----------+------------+---------------+-------------------+----------------------+-----------+->
@@ -285,10 +285,10 @@ TEST_F(DBTxnTest, test3) {
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
     // Txn1: Begin, OK
-    new_txn1->BeginTxn();
+    new_txn1->Begin();
 
     // Txn2: Begin, OK
-    new_txn2->BeginTxn();
+    new_txn2->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
@@ -300,10 +300,10 @@ TEST_F(DBTxnTest, test3) {
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn1->CommitTxn();
+    txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Commit, OK
-    new_txn2->CommitTxn();
+    txn_mgr->CommitTxn(new_txn2);
 }
 
 // ----------+------------+---------------+-------------------+----------------------+-----------+->
@@ -321,9 +321,9 @@ TEST_F(DBTxnTest, test4) {
 
     EntryResult create1_res, create2_res, dropped_res, get_res;
     // Txn2: Begin, OK
-    new_txn2->BeginTxn();
+    new_txn2->Begin();
     // Txn1: Begin, OK
-    new_txn1->BeginTxn();
+    new_txn1->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
@@ -331,14 +331,14 @@ TEST_F(DBTxnTest, test4) {
     EXPECT_NE(create1_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn1->CommitTxn();
+    txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create db1, NOT OK
     create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
-    new_txn2->CommitTxn();
+    txn_mgr->CommitTxn(new_txn2);
 }
 
 TEST_F(DBTxnTest, test5) {
@@ -350,19 +350,19 @@ TEST_F(DBTxnTest, test5) {
 
     EntryResult create_res, get_res;
     // Txn1: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn1: Create db1, OK
     create_res = new_txn->CreateDatabase("db1", ConflictType::kError);
 
     // Txn1: Rollback, OK
-    new_txn->RollbackTxn();
+    txn_mgr->RollBackTxn(new_txn);
 
     // Txn2: Create, OK
     new_txn = txn_mgr->CreateTxn();
 
     // Txn2: Begin, OK
-    new_txn->BeginTxn();
+    new_txn->Begin();
 
     // Txn2: Get db1, NOT OK
     BaseEntry* base_entry{nullptr};
@@ -371,7 +371,7 @@ TEST_F(DBTxnTest, test5) {
     EXPECT_EQ(base_entry, nullptr);
 
     // Txn2: Commit, OK
-    new_txn->CommitTxn();
+    txn_mgr->CommitTxn(new_txn);
 }
 
 // ----------+------------+---------------+-------------------+----------------------+-----------+----------------+--->
@@ -391,10 +391,10 @@ TEST_F(DBTxnTest, test6) {
     EntryResult create1_res, create2_res, dropped_res, get_res;
 
     // Txn1: Begin, OK
-    new_txn1->BeginTxn();
+    new_txn1->Begin();
 
     // Txn2: Begin, OK
-    new_txn2->BeginTxn();
+    new_txn2->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
@@ -406,20 +406,20 @@ TEST_F(DBTxnTest, test6) {
     EXPECT_EQ(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn1->RollbackTxn();
+    txn_mgr->RollBackTxn(new_txn1);
 
     // Txn2: Create db1, NOT OK, WW-conflict
     create2_res = new_txn2->CreateDatabase("db1", ConflictType::kError);
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn2: Commit, OK
-    new_txn2->CommitTxn();
+    txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
     Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
-    new_txn3->BeginTxn();
+    new_txn3->Begin();
 
     // Txn3: Get db1, OK
     BaseEntry* base_entry{nullptr};
@@ -428,7 +428,7 @@ TEST_F(DBTxnTest, test6) {
     EXPECT_NE(base_entry, nullptr);
 
     // Txn3: Commit, OK
-    new_txn3->CommitTxn();
+    txn_mgr->CommitTxn(new_txn3);
 }
 
 // ----------+------------+---------------+-------------------+----------------------+-----------+-------+---------+--->
@@ -448,10 +448,10 @@ TEST_F(DBTxnTest, test7) {
     EntryResult create1_res, create2_res, dropped1_res, get_res;
 
     // Txn1: Begin, OK
-    new_txn1->BeginTxn();
+    new_txn1->Begin();
 
     // Txn2: Begin, OK
-    new_txn2->BeginTxn();
+    new_txn2->Begin();
 
     // Txn1: Create db1, OK
     create1_res = new_txn1->CreateDatabase("db1", ConflictType::kError);
@@ -471,16 +471,16 @@ TEST_F(DBTxnTest, test7) {
     EXPECT_NE(create2_res.entry_, nullptr);
 
     // Txn1: Commit, OK
-    new_txn1->RollbackTxn();
+    txn_mgr->RollBackTxn(new_txn1);
 
     // Txn2: Commit, OK
-    new_txn2->CommitTxn();
+    txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
     Txn *new_txn3 = txn_mgr->CreateTxn();
 
     // Txn3: Begin, OK
-    new_txn3->BeginTxn();
+    new_txn3->Begin();
 
     // Txn3: Get db1, OK
     BaseEntry* base_entry{nullptr};
@@ -489,5 +489,5 @@ TEST_F(DBTxnTest, test7) {
     EXPECT_NE(base_entry, nullptr);
 
     // Txn3: Commit, OK
-    new_txn3->CommitTxn();
+    txn_mgr->CommitTxn(new_txn3);
 }
