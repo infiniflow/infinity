@@ -32,7 +32,7 @@ DataFileWorker::~DataFileWorker() {
 }
 
 void DataFileWorker::AllocateInMemory() {
-    if (data_) {
+    if (data_ != nullptr) {
         Error<StorageException>("Data is already allocated.");
     }
     Assert<StorageException>(buffer_size_ > 0, "Bug.");
