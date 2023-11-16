@@ -42,6 +42,7 @@ struct SegmentInfo {
   bool operator==(const SegmentInfo&) const = default;
 
   std::string name;            // FIXME(gnusi): move to SegmentMeta
+  doc_id_t base_doc{};
   uint64_t docs_count{};       // Total number of documents in a segment
   uint64_t live_docs_count{};  // Total number of live documents in a segment
   uint64_t version{};

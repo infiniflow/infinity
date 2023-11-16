@@ -288,7 +288,7 @@ class IndexWriter : private util::noncopyable {
   class Document : private util::noncopyable {
    public:
     Document(SegmentContext& segment, segment_writer::DocContext doc,
-             QueryContext* query = nullptr);
+             doc_id_t doc_id, QueryContext* query = nullptr);
 
     Document(Document&&) = default;
     Document& operator=(Document&&) = delete;
@@ -307,7 +307,7 @@ class IndexWriter : private util::noncopyable {
     // Return true, if field was successfully inserted
     template<Action action, typename Field>
     bool Insert(Field&& field) const {
-      return writer_.insert<action>(std::forward<Field>(field));
+      return writer_.insert<action>(std::forward<Field>(field), doc_id_);
     }
 
     // Inserts the specified field (denoted by the pointer) into the
@@ -318,7 +318,7 @@ class IndexWriter : private util::noncopyable {
     // Return true, if field was successfully inserted
     template<Action action, typename Field>
     bool Insert(Field* field) const {
-      return writer_.insert<action>(*field);
+      return writer_.insert<action>(*field, doc_id_);
     }
 
     // Inserts the specified range of fields, denoted by the [begin;end)
@@ -337,6 +337,7 @@ class IndexWriter : private util::noncopyable {
     }
 
    private:
+    doc_id_t doc_id_ = {};
     segment_writer& writer_;
     QueryContext* query_;
   };
@@ -363,9 +364,9 @@ class IndexWriter : private util::noncopyable {
     //
     // The changes are not visible until commit()
     // Transaction should be valid
-    Document Insert(bool disable_flush = false) {
-      UpdateSegment(disable_flush);
-      return {*active_.Segment(), segment_writer::DocContext{queries_}};
+    Document Insert(doc_id_t doc_id = 0, bool disable_flush = false) {
+      UpdateSegment(disable_flush, doc_id);
+      return {*active_.Segment(), segment_writer::DocContext{queries_}, doc_id};
     }
 
     // Marks all documents matching the filter for removal.
@@ -395,7 +396,8 @@ class IndexWriter : private util::noncopyable {
     // Note that filter must be valid until commit()
     // Transaction should be valid
     template<typename Filter>
-    Document Replace(Filter&& filter, bool disable_flush = false) {
+    Document Replace(Filter&& filter, doc_id_t doc_id = 0,
+                     bool disable_flush = false) {
       UpdateSegment(disable_flush);
       auto& segment = *active_.Segment();
       auto& query = segment.queries_.emplace_back(
@@ -404,7 +406,7 @@ class IndexWriter : private util::noncopyable {
       return {
         segment,
         segment_writer::DocContext{++queries_, segment.queries_.size() - 1},
-        &query};
+        doc_id, &query};
     }
 
     // Revert all pending document modifications and release resources
@@ -452,7 +454,7 @@ class IndexWriter : private util::noncopyable {
     // refresh segment if required (guarded by FlushContext::context_mutex_)
     // is is thread-safe to use ctx_/segment_ while holding 'flush_context_ptr'
     // since active 'flush_context' will not change and hence no reload required
-    void UpdateSegment(bool disable_flush);
+    void UpdateSegment(bool disable_flush, doc_id_t base_doc = 0);
 
     IndexWriter* writer_{nullptr};
     // the segment_context used for storing changes (lazy-initialized)
@@ -931,6 +933,8 @@ class IndexWriter : private util::noncopyable {
 
   // Return next segment identifier
   uint64_t NextSegmentId() noexcept;
+  // Return base doc of next segment
+  doc_id_t BaseDocOfNextSegment() noexcept;
   // Return current segment identifier
   uint64_t CurrentSegmentId() const noexcept;
   // Initialize new index meta
@@ -975,6 +979,7 @@ class IndexWriter : private util::noncopyable {
   // number of segments currently in use by the writer
   std::atomic_size_t segments_active_{0};
   std::atomic_uint64_t seg_counter_;  // segment counter
+  doc_id_t segment_base_doc_{1};      // base doc of next segment
   // current modification/update tick
   std::atomic_uint64_t tick_{writer_limits::kMinTick + 1};
   uint64_t committed_tick_{writer_limits::kMinTick};

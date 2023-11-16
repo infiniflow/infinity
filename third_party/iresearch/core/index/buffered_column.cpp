@@ -25,7 +25,6 @@
 #include "index/comparer.hpp"
 #include "shared.hpp"
 #include "utils/type_limits.hpp"
-
 namespace irs {
 
 bool BufferedColumn::FlushSparsePrimary(DocMap& docmap, column_output& writer,
@@ -124,14 +123,12 @@ void BufferedColumn::FlushAlreadySorted(column_output& writer) {
 bool BufferedColumn::FlushDense(column_output& writer, DocMapView docmap,
                                 BufferedValues& buffer) {
   IRS_ASSERT(!docmap.empty());
-
   const size_t total = docmap.size() - 1;  // -1 for the first element
   const size_t size = index_.size();
 
   if (!UseDenseSort(size, total)) {
     return false;
   }
-
   buffer.clear();
   buffer.resize(total);
   for (const auto& old_value : index_) {
@@ -157,7 +154,6 @@ bool BufferedColumn::FlushDense(column_output& writer, DocMapView docmap,
 
 void BufferedColumn::FlushSparse(column_output& writer, DocMapView docmap) {
   IRS_ASSERT(!docmap.empty());
-
   for (auto& value : index_) {
     value.key = docmap[value.key];
   }
