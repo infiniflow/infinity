@@ -1,2 +1,0 @@
-install:
-  - gradle -Prelease=true -p lib/java/ clean install
