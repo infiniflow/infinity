@@ -40,7 +40,7 @@ namespace infinity {
 
 class ThriftServer {
 public:
-    ThriftServer();
+//    ThriftServer() = default;
 
 //    ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory>& processor_factory,
 //                 const std::shared_ptr<apache::thrift::transport::TServerTransport>& server_transport,
@@ -50,12 +50,40 @@ public:
 //                 = std::shared_ptr<apache::thrift::concurrency::ThreadFactory>(
 //                     new apache::thrift::concurrency::ThreadFactory(false)));
 
+    void Init();
+
     void Start();
 
     void Shutdown();
 
 private:
-    TThreadedServer server;
+    std::unique_ptr<TThreadedServer> server{nullptr};
+//    std::unique_ptr<TServer> server{nullptr};
+//    std::shared_ptr<apache::thrift::server::TServer> server;
+};
+
+class ThriftPoolServer {
+public:
+    ThriftPoolServer() = default;
+
+    //    ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory>& processor_factory,
+    //                 const std::shared_ptr<apache::thrift::transport::TServerTransport>& server_transport,
+    //                 const std::shared_ptr<apache::thrift::transport::TTransportFactory>& transport_factory,
+    //                 const std::shared_ptr<apache::thrift::protocol::TProtocolFactory>& protocol_factory,
+    //                 const std::shared_ptr<apache::thrift::concurrency::ThreadFactory>& thread_factory
+    //                 = std::shared_ptr<apache::thrift::concurrency::ThreadFactory>(
+    //                     new apache::thrift::concurrency::ThreadFactory(false)));
+
+    void Init();
+
+    void Start();
+
+    void Shutdown();
+
+private:
+    //    std::unique_ptr<TThreadedServer> server{nullptr};
+    std::unique_ptr<TServer> server{nullptr};
+    //    std::shared_ptr<apache::thrift::server::TServer> server;
 };
 
 }

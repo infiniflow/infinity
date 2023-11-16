@@ -120,29 +120,66 @@ import logger;
 
 namespace infinity {
 
-ThriftServer::ThriftServer()
-    : server(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
-             std::make_shared<TServerSocket>(9090), // port
-             std::make_shared<TBufferedTransportFactory>(),
-             std::make_shared<TBinaryProtocolFactory>()) {
-    LOG_TRACE("ThriftServer::ThriftServer()");
+// ThriftServer::ThriftServer()
+//     : server(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
+//              std::make_shared<TServerSocket>(9909), // port
+//              std::make_shared<TBufferedTransportFactory>(),
+//              std::make_shared<TBinaryProtocolFactory>()) {
+////    LOG_TRACE("ThriftServer::ThriftServer()");
+//}
+
+// ThriftServer::ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory> &processor_factory,
+//                            const std::shared_ptr<apache::thrift::transport::TServerTransport> &server_transport,
+//                            const std::shared_ptr<apache::thrift::transport::TTransportFactory> &transport_factory,
+//                            const std::shared_ptr<apache::thrift::protocol::TProtocolFactory> &protocol_factory,
+//                            const std::shared_ptr<apache::thrift::concurrency::ThreadFactory> &thread_factory)
+//     : server(processor_factory, server_transport, transport_factory, protocol_factory, thread_factory) {}
+
+void ThriftServer::Init() {
+
+    //    std::shared_ptr<TProcessor> testProcessor(new ThriftTestProcessor(testHandler));
+
+    server.reset(new TThreadedServer(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
+                                     std::make_shared<TServerSocket>(9090), // port
+                                     std::make_shared<TBufferedTransportFactory>(),
+                                     std::make_shared<TBinaryProtocolFactory>()));
 }
 
-//ThriftServer::ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory> &processor_factory,
-//                           const std::shared_ptr<apache::thrift::transport::TServerTransport> &server_transport,
-//                           const std::shared_ptr<apache::thrift::transport::TTransportFactory> &transport_factory,
-//                           const std::shared_ptr<apache::thrift::protocol::TProtocolFactory> &protocol_factory,
-//                           const std::shared_ptr<apache::thrift::concurrency::ThreadFactory> &thread_factory)
-//    : server(processor_factory, server_transport, transport_factory, protocol_factory, thread_factory) {}
-
 void ThriftServer::Start() {
-    LOG_TRACE("ThriftServer::Start()");
-    server.serve();
+    //    LOG_TRACE("ThriftServer::Start()");
+    server->serve();
 }
 
 void ThriftServer::Shutdown() {
-    server.stop();
-    LOG_TRACE("ThriftServer::Shutdown()");
+    server->stop();
+    //    LOG_TRACE("ThriftServer::Shutdown()");
+}
+
+void ThriftPoolServer::Init() {
+
+    //    std::shared_ptr<TProcessor> testProcessor(new ThriftTestProcessor(testHandler));
+
+    std::shared_ptr<ThreadFactory> threadFactory = std::shared_ptr<ThreadFactory>(new ThreadFactory());
+
+    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(10);
+    threadManager->threadFactory(threadFactory);
+    threadManager->start();
+
+    server.reset(new TThreadPoolServer(std::shared_ptr<CalculatorProcessor>(),
+                                       std::make_shared<TServerSocket>(9090),
+                                       std::make_shared<TBufferedTransportFactory>(),
+                                       std::make_shared<TBinaryProtocolFactory>(),
+                                       threadManager));
+}
+
+void ThriftPoolServer::Start() {
+    //    LOG_TRACE("ThriftServer::Start()");
+    server->serve();
+}
+
+void ThriftPoolServer::Shutdown() {
+    server->stop();
+    //    LOG_TRACE("ThriftServer::Shutdown()");
 }
 
 } // namespace infinity
