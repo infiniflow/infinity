@@ -391,16 +391,17 @@ GrpcServiceImpl::Insert(grpc::ServerContext *context, const infinity_proto::Inse
     }
 }
 
-void GrpcServiceImpl::Run() {
+void GrpcServiceImpl::Run(SharedPtr<grpc::Server>& server_ptr) {
     // Grpc service starts immediately
     std::string server_address("0.0.0.0:50051");
     GrpcServiceImpl service;
     grpc::ServerBuilder builder;
     builder.RegisterService(&service);
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
+//    std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
+    server_ptr = builder.BuildAndStart();
     std::cout << "GRPC server listening on " << server_address << std::endl;
-    server->Wait();
+    server_ptr->Wait();
 }
 
 void GrpcServiceImpl::Shutdown() {

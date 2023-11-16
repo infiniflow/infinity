@@ -53,12 +53,12 @@ file(GLOB_RECURSE
 #)
 #
 #
-#file(GLOB_RECURSE
-#        grpc_cpp
-#        CONFIGURE_DEPENDS
-#        network/*.cpp
-#        network/*.cc
-#)
+file(GLOB_RECURSE
+        grpc_cpp
+        CONFIGURE_DEPENDS
+        network/*.cpp
+        network/*.cc
+)
 
 file(GLOB_RECURSE
         function_cpp
@@ -159,7 +159,6 @@ file(GLOB_RECURSE
 add_library(infinity_core
 #        ${main_cpp}
         ${infinity_cpp}
-        ${network_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -167,7 +166,6 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
-#        ${grpc_cpp}
 )
 
 target_sources(infinity_core
@@ -175,7 +173,6 @@ target_sources(infinity_core
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${main_cppm}
         ${infinity_cppm}
-        ${network_cppm}
         ${common_cppm}
         ${planner_cppm}
         ${scheduler_cppm}
@@ -214,6 +211,14 @@ target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -m
 
 add_executable(infinity
         ${main_cpp}
+        ${network_cpp}
+        ${grpc_cpp}
+)
+
+target_sources(infinity
+        PUBLIC
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+        ${network_cppm}
 )
 
 target_link_libraries(infinity
@@ -227,11 +232,11 @@ target_link_libraries(infinity
         newpfor
         openfst
 
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
+        protobuf
+        grpc
+        grpc++
+        gpr
+        absl_synchronization
         iresearch
 #        profiler
 )

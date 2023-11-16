@@ -12,8 +12,6 @@
 #include "infinity.pb.h"
 
 import stl;
-import singleton;
-import boost;
 import infinity;
 import database;
 import table;
@@ -59,7 +57,7 @@ public:
     Insert(grpc::ServerContext *context, const infinity_proto::InsertRequest *request, infinity_proto::CommonResponse *response) override;
 
 public:
-    static void Run();
+    static void Run(SharedPtr<grpc::Server>& server_ptr);
     void Shutdown();
 
 private:

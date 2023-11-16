@@ -18,8 +18,15 @@ import stl;
 import singleton;
 import boost;
 import connection;
+//import gprc;
 
 export module db_server;
+
+namespace grpc_impl {
+
+class Server;
+
+}
 
 namespace infinity {
 
@@ -45,7 +52,8 @@ private:
     AsioIOService io_service_{};
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
-//    Thread grpc_thread_{};
+    Thread grpc_thread_{};
+    SharedPtr<grpc_impl::Server> grpc_server_{nullptr};
 };
 
 }
