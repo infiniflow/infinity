@@ -53,7 +53,7 @@ private:
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
     Thread grpc_thread_{};
-    SharedPtr<grpc_impl::Server> grpc_server_{nullptr};
+    UniquePtr<grpc_impl::Server>* grpc_server_{nullptr};
 };
 
 }

@@ -57,7 +57,7 @@ public:
     Insert(grpc::ServerContext *context, const infinity_proto::InsertRequest *request, infinity_proto::CommonResponse *response) override;
 
 public:
-    static void Run(SharedPtr<grpc::Server>& server_ptr);
+    static void Run(UniquePtr<grpc::Server>& server_ptr);
     void Shutdown();
 
 private:

@@ -391,7 +391,7 @@ GrpcServiceImpl::Insert(grpc::ServerContext *context, const infinity_proto::Inse
     }
 }
 
-void GrpcServiceImpl::Run(SharedPtr<grpc::Server>& server_ptr) {
+void GrpcServiceImpl::Run(UniquePtr<grpc::Server>& server_ptr) {
     // Grpc service starts immediately
     std::string server_address("0.0.0.0:50051");
     GrpcServiceImpl service;
