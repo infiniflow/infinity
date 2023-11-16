@@ -1,0 +1,14 @@
+[project]
+name = "infinity"
+version = "0.0.1"
+dependencies = [
+    "sqlglot==11.7.1",
+    "grpcio-tools>=1.42.0"
+]
+description = "infinity"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
