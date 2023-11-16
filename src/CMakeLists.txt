@@ -365,6 +365,7 @@ target_link_libraries(unit_test
         brpc-static
         gflags
         crypto
+        libleveldb.a
 )
 
 target_sources(unit_test

@@ -190,6 +190,8 @@ export using IResearchAnalyzer = irs::analysis::analyzer;
 export using IResearchJiebaAnalyzer = irs::analysis::jieba_analyzer;
 export using IResearchSegmentationAnalyzer = irs::analysis::segmentation_token_stream;
 export using IResearchIndexWriter = irs::IndexWriter;
+export using IResearchIndexReader = irs::IndexReader;
+export using IResearchSubReader = irs::SubReader;
 export inline void IResearchWriteString(DataOutput &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
 export inline void IResearchWriteZVlong(DataOutput &out, int64_t v) { return irs::write_zvlong(out, v); }
 
