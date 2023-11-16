@@ -1477,11 +1477,9 @@ ConsolidationResult IndexWriter::Consolidate(
     if (pending_state_.Valid()) {
       // check that we haven't added to reader cache already absent readers
       // only if we have different index meta
-      std::cout << "consolidate 1 " << std::endl;
       if (committed_reader != current_committed_reader) {
         auto begin = current_committed_reader->begin();
         auto end = current_committed_reader->end();
-        std::cout << "consolidate 2 " << std::endl;
         // pointers are different so check by name
         for (const auto* candidate : candidates) {
           if (end == std::find_if(
@@ -1525,7 +1523,6 @@ ConsolidationResult IndexWriter::Consolidate(
     } else if (committed_reader == current_committed_reader) {
       // before new transaction was started:
       // no commits happened in since consolidation was started
-      std::cout << "consolidate 3 " << std::endl;
       auto ctx = GetFlushContext();
       // lock due to context modification
       std::lock_guard ctx_lock{ctx->pending_.Mutex()};

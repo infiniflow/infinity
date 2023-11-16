@@ -24,9 +24,13 @@
 #include "index_utils.hpp"
 
 #include <cmath>
+#include <iostream>
+#include <map>
+#include <memory>
 #include <set>
 
 #include "formats/format_utils.hpp"
+#include "priority_queue.hpp"
 
 namespace {
 
@@ -184,77 +188,6 @@ double_t consolidation_score(const ConsolidationCandidate& consolidation,
 
 namespace irs::index_utils {
 
-ConsolidationPolicy MakePolicy(const ConsolidateBytes& options) {
-  return [options](Consolidation& candidates, const IndexReader& reader,
-                   const ConsolidatingSegments& consolidating_segments) {
-    const auto byte_threshold = options.threshold;
-    size_t all_segment_bytes_size = 0;
-    const auto segment_count = reader.size();
-
-    for (auto& segment : reader) {
-      all_segment_bytes_size += segment.Meta().byte_size;
-    }
-
-    const auto threshold = std::clamp(byte_threshold, 0.f, 1.f);
-    const auto threshold_bytes_avg =
-      (static_cast<float>(all_segment_bytes_size) / segment_count) * threshold;
-
-    // merge segment if: {threshold} > segment_bytes / (all_segment_bytes /
-    // #segments)
-    for (auto& segment : reader) {
-      if (consolidating_segments.contains(segment.Meta().name)) {
-        continue;
-      }
-      const auto segment_bytes_size = segment.Meta().byte_size;
-      if (threshold_bytes_avg >= segment_bytes_size) {
-        candidates.emplace_back(&segment);
-      }
-    }
-  };
-}
-
-ConsolidationPolicy MakePolicy(const ConsolidateBytesAccum& options) {
-  return [options](Consolidation& candidates, const IndexReader& reader,
-                   const ConsolidatingSegments& consolidating_segments) {
-    auto byte_threshold = options.threshold;
-    size_t all_segment_bytes_size = 0;
-    std::vector<std::pair<size_t, const SubReader*>> segments;
-    segments.reserve(reader.size());
-
-    for (auto& segment : reader) {
-      if (consolidating_segments.contains(segment.Meta().name)) {
-        continue;  // segment is already under consolidation
-      }
-      segments.emplace_back(SizeWithoutRemovals(segment.Meta()), &segment);
-      all_segment_bytes_size += segments.back().first;
-    }
-
-    size_t cumulative_size = 0;
-    const auto threshold_size =
-      all_segment_bytes_size * std::clamp(byte_threshold, 0.f, 1.f);
-    struct {
-      bool operator()(const std::pair<size_t, const SubReader*>& lhs,
-                      const std::pair<size_t, const SubReader*>& rhs) const {
-        return lhs.first < rhs.first;
-      }
-    } segments_less;
-
-    // prefer to consolidate smaller segments
-    std::sort(segments.begin(), segments.end(), segments_less);
-
-    // merge segment if: {threshold} >= (segment_bytes +
-    // sum_of_merge_candidate_segment_bytes) / all_segment_bytes
-    for (auto& entry : segments) {
-      const auto segment_bytes_size = entry.first;
-
-      if (cumulative_size + segment_bytes_size <= threshold_size) {
-        cumulative_size += segment_bytes_size;
-        candidates.emplace_back(entry.second);
-      }
-    }
-  };
-}
-
 ConsolidationPolicy MakePolicy(const ConsolidateCount& options) {
   return [options](Consolidation& candidates, const IndexReader& reader,
                    const ConsolidatingSegments&) {
@@ -263,53 +196,324 @@ ConsolidationPolicy MakePolicy(const ConsolidateCount& options) {
          i < count; ++i) {
       candidates.emplace_back(&reader[i]);
     }
+    std::sort(candidates.begin(), candidates.end(),
+              [](const SubReader*& a, const SubReader*& b) {
+                return a->Meta().base_doc < b->Meta().base_doc;
+              });
   };
 }
 
-ConsolidationPolicy MakePolicy(const ConsolidateDocsFill& options) {
-  return [options](Consolidation& candidates, const IndexReader& reader,
-                   const ConsolidatingSegments& consolidating_segments) {
-    auto fill_threshold = options.threshold;
-    auto threshold = std::clamp(fill_threshold, 0.f, 1.f);
+struct MergeBarrelEntry {
+  MergeBarrelEntry(const irs::SubReader& reader)
+    : reader{&reader}, meta{&reader.Meta()} {}
 
+  MergeBarrelEntry(const MergeBarrelEntry& other)
+    : reader{other.reader}, meta{other.meta} {}
+
+  size_t NumDocs() { return meta->docs_count; }
+
+  doc_id_t BaseDocID() { return meta->base_doc; }
+
+  const irs::SubReader* reader;
+  const irs::SegmentInfo* meta;
+  friend class MergeBarrelQueue;
+};
+
+class MergeBarrelQueue : public irs::PriorityQueue<MergeBarrelEntry*> {
+ public:
+  MergeBarrelQueue(size_t max_size) { Initialize(max_size, true); }
+  ~MergeBarrelQueue() {}
+
+ private:
+  bool LessThan(MergeBarrelEntry* o1, MergeBarrelEntry* o2) {
+    return o1->NumDocs() > o2->NumDocs();
+  }
+};
+#define MAXLEVEL 30
+#define COLLISION_FACTOR_FOR_LEVEL_1 3
+
+struct BTPolicy {
+  BTPolicy();
+
+  struct BTLayer {
+    BTLayer(size_t l, size_t level_size, size_t max_size)
+      : level_(l), level_size_(level_size) {
+      entry_queue_ = new MergeBarrelQueue(max_size);
+    }
+
+    ~BTLayer() {
+      delete entry_queue_;
+      entry_queue_ = NULL;
+    }
+
+    void Add(MergeBarrelEntry* entry) { entry_queue_->Put(entry); }
+
+    std::pair<doc_id_t, doc_id_t> GetBaseDocIDRange() const {
+      const size_t count = entry_queue_->Size();
+      if (count == 0) return std::make_pair(-1, -1);
+
+      doc_id_t base_min, base_max;
+      base_min = base_max = entry_queue_->Get(0)->BaseDocID();
+      for (size_t i = 1; i < count; ++i) {
+        doc_id_t base = entry_queue_->Get(i)->BaseDocID();
+        if (base < base_min)
+          base_min = base;
+        else if (base > base_max)
+          base_max = base;
+      }
+
+      return std::make_pair(base_min, base_max);
+    }
+
+    size_t level_;
+    size_t level_size_;
+    MergeBarrelQueue* entry_queue_;
+  };
+
+  void AddBarrel(const irs::SubReader& reader, Consolidation& candidates);
+
+  size_t GetLevel(size_t level_size);
+
+  void TriggerMerge(BTLayer* p_level, Consolidation& candidates);
+
+  size_t GetC(size_t level);
+
+  BTLayer* CombineLayer(BTLayer* layer1, BTLayer* layer2) const;
+
+  constexpr static size_t MAX_LAYER_SIZE = 100;
+  std::map<size_t, size_t> cmap_;
+  std::map<size_t, BTLayer*> nodes_map_;
+};
+
+BTPolicy::BTPolicy() {
+  for (size_t i = 0; i < MAXLEVEL; i++) cmap_[i] = COLLISION_FACTOR_FOR_LEVEL_1;
+}
+
+size_t BTPolicy::GetC(size_t level) { return cmap_[level]; }
+
+void BTPolicy::AddBarrel(const irs::SubReader& reader,
+                         Consolidation& candidates) {
+  MergeBarrelEntry* entry = new MergeBarrelEntry(reader);
+  size_t level_size = entry->NumDocs();
+  size_t level = GetLevel(level_size);
+  size_t nC = GetC(level);
+  BTLayer* p_level = NULL;
+  std::map<size_t, BTLayer*>::iterator iter = nodes_map_.find(level);
+  if (iter != nodes_map_.end()) {
+    p_level = iter->second;
+    p_level->level_size_ += level_size;
+    p_level->Add(entry);
+    if (p_level->entry_queue_->Size() >= nC) TriggerMerge(p_level, candidates);
+  } else {
+    p_level = new BTLayer(level, level_size, MAX_LAYER_SIZE);
+    p_level->Add(entry);
+    nodes_map_.insert(std::make_pair(level, p_level));
+  }
+}
+
+void BTPolicy::TriggerMerge(BTLayer* p_level, Consolidation& candidates) {
+  BTLayer* level1 = p_level;
+  std::map<size_t, BTLayer*>::iterator iter2;
+
+  // if it would trigger another merge event in upper level,
+  // combine them directly
+  size_t newLevel = GetLevel(level1->level_size_);
+  while (newLevel > level1->level_ &&
+         (iter2 = nodes_map_.find(newLevel)) != nodes_map_.end()) {
+    BTLayer* pLevel2 = iter2->second;
+    if ((int)pLevel2->entry_queue_->Size() + 1 < GetC(newLevel)) break;
+
+    level1 = CombineLayer(level1, pLevel2);
+    newLevel = GetLevel(level1->level_size_);
+  }
+
+  // iterate barrels in other layer, merge them if within the base doc id range
+  std::pair<doc_id_t, doc_id_t> range1 = level1->GetBaseDocIDRange();
+  for (iter2 = nodes_map_.begin(); iter2 != nodes_map_.end(); ++iter2) {
+    // ignore current level
+    if (iter2->second == level1) continue;
+
+    // check the base doc id of other layer
+    BTLayer* pLevel2 = iter2->second;
+    const size_t count = (int)pLevel2->entry_queue_->Size();
+    bool combine_layer = false;
+    for (size_t i = 0; i < count; ++i) {
+      doc_id_t base_doc = pLevel2->entry_queue_->Get(i)->BaseDocID();
+      // equal is used in case of some barrel is empty
+      if ((base_doc >= range1.first) && (base_doc <= range1.second)) {
+        combine_layer = true;
+        break;
+      }
+    }
+    if (combine_layer) {
+      level1 = CombineLayer(level1, pLevel2);
+      range1 = level1->GetBaseDocIDRange();
+    }
+  }
+
+  // merge and clear the level
+  if (level1->entry_queue_->Size() > 0) {
+    level1->level_size_ = 0;
+    size_t count = level1->entry_queue_->Size();
+    for (size_t i = 0; i < count; ++i) {
+      MergeBarrelEntry* entry = level1->entry_queue_->Get(i);
+      candidates.push_back(entry->reader);
+    }
+  }
+}
+
+size_t BTPolicy::GetLevel(size_t level_size) {
+  if (level_size <= 0) return 0;
+
+  size_t level = 0;
+  size_t max_size = 1;
+  for (; level < MAXLEVEL; ++level) {
+    max_size *= 3;
+    if (level_size < max_size) break;
+  }
+  return level;
+}
+
+BTPolicy::BTLayer* BTPolicy::CombineLayer(BTLayer* layer1,
+                                          BTLayer* layer2) const {
+  assert(layer1 != layer2 && layer1->level_ != layer2->level_);
+
+  BTLayer* lower = layer1;
+  BTLayer* higher = layer2;
+  if (lower->level_ > higher->level_) std::swap(lower, higher);
+
+  // copy elements to upper level
+  while (lower->entry_queue_->Size() > 0)
+    higher->entry_queue_->Put(lower->entry_queue_->Pop());
+
+  higher->level_size_ += lower->level_size_;
+  lower->level_size_ = 0;
+
+  return higher;
+}
+
+struct NaivePolicy {
+  void AddSegment(const irs::SubReader& reader);
+
+  void GetCandidates(Consolidation& candidates);
+
+  std::vector<MergeBarrelEntry> entries_;
+};
+void NaivePolicy::AddSegment(const irs::SubReader& reader) {
+  entries_.emplace_back(reader);
+}
+
+constexpr static size_t MAX_MERGE_ONE_TIME = 3;
+void NaivePolicy::GetCandidates(Consolidation& candidates) {
+  std::sort(entries_.begin(), entries_.end(),
+            [](const MergeBarrelEntry& a, const MergeBarrelEntry& b) {
+              return a.meta->base_doc < b.meta->base_doc;
+            });
+  doc_id_t min_count = std::numeric_limits<doc_id_t>::max();
+  for (size_t i = 0; i < entries_.size(); ++i) {
+    if (entries_[i].meta->docs_count < min_count) {
+      min_count = entries_[i].meta->docs_count;
+    }
+  }
+  int index = 0;
+  for (; index < entries_.size(); ++index) {
+    if (entries_[index].meta->docs_count == min_count) {
+      break;
+    }
+  }
+  int forward_iter = index;
+  int backward_iter = index;
+  while (candidates.size() < MAX_MERGE_ONE_TIME) {
+    if (forward_iter == entries_.size()) {
+      if (backward_iter >= 0) {
+        candidates.push_back(entries_[backward_iter].reader);
+        backward_iter--;
+      } else
+        break;
+    } else {
+      if (backward_iter >= 0) {
+        if (entries_[forward_iter].meta->docs_count <
+            entries_[backward_iter].meta->docs_count) {
+          candidates.push_back(entries_[forward_iter].reader);
+          forward_iter++;
+        } else {
+          candidates.push_back(entries_[backward_iter].reader);
+          backward_iter--;
+        }
+      } else {
+        candidates.push_back(entries_[forward_iter].reader);
+        forward_iter++;
+      }
+    }
+  }
+}
+
+ConsolidationPolicy MakePolicy(const ConsolidateByOrder& options) {
+  return [](Consolidation& candidates, const IndexReader& reader,
+            const ConsolidatingSegments& consolidating_segments) {
     // merge segment if: {threshold} >= #segment_docs{valid} /
     // (#segment_docs{valid} + #segment_docs{removed})
+    std::vector<doc_id_t> base_docs;
+    std::cout << "all segments: " << std::endl;
     for (auto& segment : reader) {
       auto& meta = segment.Meta();
-      if (consolidating_segments.contains(meta.name)) {
+      base_docs.push_back(meta.base_doc);
+      std::cout << "seg " << meta.name << " base " << meta.base_doc
+                << " num_doc " << meta.docs_count << " ";
+    }
+    std::cout << std::endl;
+    if (base_docs.empty() || base_docs.size() == 1) return;
+    std::sort(base_docs.begin(), base_docs.end());
+    Consolidation candidates_by_size;
+    // ConsolidateTier inner_options;
+    // ConsolidationPolicy policy = MakePolicy(inner_options);
+    // policy(candidates_by_size, reader, consolidating_segments);
+
+    // BTPolicy policy;
+    // for (auto& segment : reader) {
+    //   policy.AddBarrel(segment, candidates_by_size);
+    //   if (!candidates_by_size.empty()) break;
+    // }
+    NaivePolicy policy;
+    for (auto& segment : reader) {
+      policy.AddSegment(segment);
+    }
+    policy.GetCandidates(candidates_by_size);
+    if (candidates_by_size.empty() || candidates_by_size.size() == 1) return;
+    std::sort(candidates_by_size.begin(), candidates_by_size.end(),
+              [](const SubReader*& a, const SubReader*& b) {
+                return a->Meta().base_doc < b->Meta().base_doc;
+              });
+    std::cout << "initial candidates: " << std::endl;
+    for (size_t i = 0; i < candidates_by_size.size(); ++i) {
+      std::cout << "seg " << candidates_by_size[i]->Meta().name << " base "
+                << candidates_by_size[i]->Meta().base_doc << " num_doc "
+                << candidates_by_size[i]->Meta().docs_count << " ";
+    }
+    std::cout << std::endl;
+    auto pre_it = std::lower_bound(base_docs.begin(), base_docs.end(),
+                                   candidates_by_size[0]->Meta().base_doc);
+    auto pre_index = std::distance(base_docs.begin(), pre_it);
+    candidates.push_back(candidates_by_size[0]);
+    for (size_t i = 1; i < candidates_by_size.size(); ++i) {
+      auto it = std::lower_bound(base_docs.begin(), base_docs.end(),
+                                 candidates_by_size[i]->Meta().base_doc);
+      auto index = std::distance(base_docs.begin(), it);
+      if (index - pre_index > 1) {
+        pre_index = index;
         continue;
       }
-      if (!meta.live_docs_count  // if no valid doc_ids left in segment
-          || meta.docs_count * threshold >= meta.live_docs_count) {
-        candidates.emplace_back(&segment);
-      }
+      pre_index = index;
+      candidates.push_back(candidates_by_size[i]);
     }
-  };
-}
 
-ConsolidationPolicy MakePolicy(const ConsolidateDocsLive& options) {
-  return [options](Consolidation& candidates, const IndexReader& meta,
-                   const ConsolidatingSegments& consolidating_segments) {
-    const auto docs_threshold = options.threshold;
-    const auto all_segment_docs_count = meta.live_docs_count();
-    const auto segment_count = meta.size();
-
-    const auto threshold = std::clamp(docs_threshold, 0.f, 1.f);
-    const auto threshold_docs_avg =
-      (static_cast<float>(all_segment_docs_count) / segment_count) * threshold;
-
-    // merge segment if: {threshold} >= segment_docs{valid} /
-    // (all_segment_docs{valid} / #segments)
-    for (auto& segment : meta) {
-      auto& info = segment.Meta();
-      if (consolidating_segments.contains(info.name)) {
-        continue;
-      }
-      if (!info.live_docs_count  // if no valid doc_ids left in segment
-          || threshold_docs_avg >= info.live_docs_count) {
-        candidates.emplace_back(&segment);
-      }
+    std::cout << "candidates: " << std::endl;
+    for (size_t i = 0; i < candidates.size(); ++i) {
+      std::cout << "seg " << candidates[i]->Meta().name << " base "
+                << candidates[i]->Meta().base_doc << " num_doc "
+                << candidates[i]->Meta().docs_count << " ";
     }
+    std::cout << std::endl;
   };
 }
 
