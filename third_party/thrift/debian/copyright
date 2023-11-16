@@ -1,0 +1,92 @@
+This package was debianized by Thrift Developer's <dev@thrift.apache.org>.
+
+
+This package and the Debian packaging is licensed under the Apache License,
+see `/usr/share/common-licenses/Apache-2.0'.
+
+The following information was copied from Apache Thrift LICENSE file.
+
+--------------------------------------------------
+SOFTWARE DISTRIBUTED WITH THRIFT:
+
+The Apache Thrift software includes a number of subcomponents with
+separate copyright notices and license terms. Your use of the source
+code for the these subcomponents is subject to the terms and
+conditions of the following licenses.
+
+--------------------------------------------------
+Portions of the following files are licensed under the MIT License:
+
+  lib/erl/Makefile.am
+
+Please see doc/licenses/otp-base-license.txt for the full terms of this license.
+
+
+--------------------------------------------------
+The following files contain some portions of code contributed under
+the Thrift Software License (see doc/licenses/old-thrift-license.txt), and relicensed
+under the Apache 2.0 License:
+
+  compiler/cpp/Makefile.am
+  compiler/cpp/src/thrift/generate/t_cpp_generator.cc
+  compiler/cpp/src/thrift/generate/t_netstd_generator.cc
+  compiler/cpp/src/thrift/generate/t_erl_generator.cc
+  compiler/cpp/src/thrift/generate/t_hs_generator.cc
+  compiler/cpp/src/thrift/generate/t_java_generator.cc
+  compiler/cpp/src/thrift/generate/t_ocaml_generator.cc
+  compiler/cpp/src/thrift/generate/t_perl_generator.cc
+  compiler/cpp/src/thrift/generate/t_php_generator.cc
+  compiler/cpp/src/thrift/generate/t_py_generator.cc
+  compiler/cpp/src/thrift/generate/t_rb_generator.cc
+  compiler/cpp/src/thrift/generate/t_st_generator.cc
+  compiler/cpp/src/thrift/generate/t_xsd_generator.cc
+  compiler/cpp/src/thrift/main.cc
+  compiler/cpp/src/thrift/parse/t_field.h
+  compiler/cpp/src/thrift/parse/t_program.h
+  compiler/cpp/src/thrift/platform.h
+  compiler/cpp/src/thrift/thriftl.ll
+  compiler/cpp/src/thrift/thrifty.yy
+  lib/netstd/Thrift/Protocol/TBinaryProtocol.cs
+  lib/netstd/Thrift/Protocol/Entities/TField.cs
+  lib/netstd/Thrift/Protocol/Entities/TList.cs
+  lib/netstd/Thrift/Protocol/Entities/TMap.cs
+  lib/netstd/Thrift/Protocol/Entities/TMessage.cs
+  lib/netstd/Thrift/Protocol/Entities/TMessageType.cs
+  lib/netstd/Thrift/Protocol/TProtocol.cs
+  lib/netstd/Thrift/Protocol/TProtocolException.cs
+  lib/netstd/Thrift/Protocol/TProtocolFactory.cs
+  lib/netstd/Thrift/Protocol/Utilities/TProtocolUtil.cs
+  lib/netstd/Thrift/Protocol/Entities/TSet.cs
+  lib/netstd/Thrift/Protocol/Entities/TStruct.cs
+  lib/netstd/Thrift/Protocol/Entities/TType.cs
+  lib/netstd/Thrift/Server/TServer.cs
+  lib/netstd/Thrift/Server/TSimpleAsyncServer.cs
+  lib/netstd/Thrift/Server/TThreadPoolAsyncServer.cs
+  lib/netstd/Thrift/TApplicationException.cs
+  lib/netstd/Thrift/Thrift.csproj
+  lib/netstd/Thrift.sln
+  lib/netstd/Thrift/Transport/Server/TServerSocketTransport.cs
+  lib/netstd/Thrift/Transport/Server/TServerTransport.cs
+  lib/netstd/Thrift/Transport/Client/TSocketTransport.cs
+  lib/netstd/Thrift/Transport/Client/TStreamTransport.cs
+  lib/netstd/Thrift/Transport/TTransport.cs
+  lib/netstd/Thrift/Transport/TTransportException.cs
+  lib/netstd/Thrift/Transport/TTransportFactory.cs
+  lib/netstd/Tests/Thrift.PublicInterfaces.Compile.Tests/Properties/AssemblyInfo.cs
+  lib/netstd/Tests/Thrift.PublicInterfaces.Compile.Tests/Thrift.PublicInterfaces.Compile.Tests.csproj
+  lib/rb/lib/thrift.rb
+  lib/st/README.md
+  lib/st/thrift.st
+  lib/cpp/test/OptionalRequiredTest.cpp
+  test/OptionalRequiredTest.thrift
+  test/ThriftTest.thrift
+  test/v0.16/ThriftTest.thrift
+
+--------------------------------------------------
+For the aclocal/ax_boost_base.m4 and contrib/fb303/aclocal/ax_boost_base.m4 components:
+
+#   Copyright (c) 2007 Thomas Porschberg <thomas@randspringer.de>
+#
+#   Copying and distribution of this file, with or without
+#   modification, are permitted in any medium without royalty provided
+#   the copyright notice and this notice are preserved.

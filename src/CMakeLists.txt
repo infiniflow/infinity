@@ -238,11 +238,14 @@ target_link_libraries(infinity
         gpr
         absl_synchronization
         iresearch
+
+        thrift
 #        profiler
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-
+target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 ### unit test
 
 file(GLOB_RECURSE

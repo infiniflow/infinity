@@ -1,0 +1,186 @@
+﻿<!--
+ Licensed to the Apache Software Foundation (ASF) under one
+ or more contributor license agreements. See the NOTICE file
+ distributed with this work for additional information
+ regarding copyright ownership. The ASF licenses this file
+ to you under the Apache License, Version 2.0 (the
+ "License"); you may not use this file except in compliance
+ with the License. You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing,
+ software distributed under the License is distributed on an
+ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ KIND, either express or implied. See the License for the
+ specific language governing permissions and limitations
+ under the License.
+-->
+	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{6BD327A5-7688-4263-B6A8-B15207CF4EC5}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="..\..\tutorial\delphi\DelphiServer\DelphiServer.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="..\..\tutorial\delphi\DelphiClient\DelphiClient.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\keywords\ReservedKeywords.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\client.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\server.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\multiplexed\Multiplex.Test.Client.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\multiplexed\Multiplex.Test.Server.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\skip\skiptest_version1.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\skip\skiptest_version2.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\serializer\SerializerData.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\serializer\TestSerializer.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="test\typeregistry\TestTypeRegistry.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="DelphiServer">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiServer\DelphiServer.dproj"/>
+		</Target>
+		<Target Name="DelphiServer:Clean">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiServer\DelphiServer.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="DelphiServer:Make">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiServer\DelphiServer.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="DelphiClient">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiClient\DelphiClient.dproj"/>
+		</Target>
+		<Target Name="DelphiClient:Clean">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiClient\DelphiClient.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="DelphiClient:Make">
+			<MSBuild Projects="..\..\tutorial\delphi\DelphiClient\DelphiClient.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="ReservedKeywords">
+			<MSBuild Projects="test\keywords\ReservedKeywords.dproj"/>
+		</Target>
+		<Target Name="ReservedKeywords:Clean">
+			<MSBuild Projects="test\keywords\ReservedKeywords.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="ReservedKeywords:Make">
+			<MSBuild Projects="test\keywords\ReservedKeywords.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="client">
+			<MSBuild Projects="test\client.dproj"/>
+		</Target>
+		<Target Name="client:Clean">
+			<MSBuild Projects="test\client.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="client:Make">
+			<MSBuild Projects="test\client.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="server">
+			<MSBuild Projects="test\server.dproj"/>
+		</Target>
+		<Target Name="server:Clean">
+			<MSBuild Projects="test\server.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="server:Make">
+			<MSBuild Projects="test\server.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Multiplex_Test_Client">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Client.dproj"/>
+		</Target>
+		<Target Name="Multiplex_Test_Client:Clean">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Client.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="Multiplex_Test_Client:Make">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Client.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Multiplex_Test_Server">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Server.dproj"/>
+		</Target>
+		<Target Name="Multiplex_Test_Server:Clean">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Server.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="Multiplex_Test_Server:Make">
+			<MSBuild Projects="test\multiplexed\Multiplex.Test.Server.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="skiptest_version1">
+			<MSBuild Projects="test\skip\skiptest_version1.dproj"/>
+		</Target>
+		<Target Name="skiptest_version1:Clean">
+			<MSBuild Projects="test\skip\skiptest_version1.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="skiptest_version1:Make">
+			<MSBuild Projects="test\skip\skiptest_version1.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="skiptest_version2">
+			<MSBuild Projects="test\skip\skiptest_version2.dproj"/>
+		</Target>
+		<Target Name="skiptest_version2:Clean">
+			<MSBuild Projects="test\skip\skiptest_version2.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="skiptest_version2:Make">
+			<MSBuild Projects="test\skip\skiptest_version2.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="SerializerData">
+			<MSBuild Projects="test\serializer\SerializerData.dproj"/>
+		</Target>
+		<Target Name="SerializerData:Clean">
+			<MSBuild Projects="test\serializer\SerializerData.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="SerializerData:Make">
+			<MSBuild Projects="test\serializer\SerializerData.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="TestSerializer">
+			<MSBuild Projects="test\serializer\TestSerializer.dproj"/>
+		</Target>
+		<Target Name="TestSerializer:Clean">
+			<MSBuild Projects="test\serializer\TestSerializer.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="TestSerializer:Make">
+			<MSBuild Projects="test\serializer\TestSerializer.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="TestTypeRegistry">
+			<MSBuild Projects="test\typeregistry\TestTypeRegistry.dproj"/>
+		</Target>
+		<Target Name="TestTypeRegistry:Clean">
+			<MSBuild Projects="test\typeregistry\TestTypeRegistry.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="TestTypeRegistry:Make">
+			<MSBuild Projects="test\typeregistry\TestTypeRegistry.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="DelphiServer;DelphiClient;ReservedKeywords;client;server;Multiplex_Test_Client;Multiplex_Test_Server;skiptest_version1;skiptest_version2;SerializerData;TestSerializer;TestTypeRegistry"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="DelphiServer:Clean;DelphiClient:Clean;ReservedKeywords:Clean;client:Clean;server:Clean;Multiplex_Test_Client:Clean;Multiplex_Test_Server:Clean;skiptest_version1:Clean;skiptest_version2:Clean;SerializerData:Clean;TestSerializer:Clean;TestTypeRegistry:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="DelphiServer:Make;DelphiClient:Make;ReservedKeywords:Make;client:Make;server:Make;Multiplex_Test_Client:Make;Multiplex_Test_Server:Make;skiptest_version1:Make;skiptest_version2:Make;SerializerData:Make;TestSerializer:Make;TestTypeRegistry:Make"/>
+		</Target>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
+	</Project>

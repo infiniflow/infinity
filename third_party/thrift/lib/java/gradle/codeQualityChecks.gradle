@@ -1,0 +1,48 @@
+
+// =================================================================
+// Configure the Gradle code quality plugins here.
+//
+
+dependencies {
+    spotbugs configurations.spotbugsPlugins.dependencies
+    spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.12.0'
+}
+
+// see https://spotbugs-gradle-plugin.netlify.app/com/github/spotbugs/snom/spotbugsextension
+spotbugs {
+    ignoreFailures = true
+    toolVersion = '4.5.3'
+    effort = 'max'
+    reportLevel = 'low'
+    excludeFilter = file('code_quality_tools/findbugs-filter.xml')
+}
+
+// see https://spotbugs-gradle-plugin.netlify.app/com/github/spotbugs/snom/spotbugstask
+spotbugsMain {
+    reports {
+        text.enabled = false
+        html.enabled = true
+        xml.enabled = false
+    }
+}
+
+pmd {
+    ignoreFailures = true
+    toolVersion = '6.0.0'
+    sourceSets = [ sourceSets.main ]
+    ruleSets = [ 'java-basic' ]
+}
+
+tasks.withType(Pmd) {
+    reports {
+        html.required = true
+        xml.required = false
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat()
+    }
+}

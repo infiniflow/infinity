@@ -34,6 +34,8 @@ export struct StartupParameter {
     SharedPtr<String> config_path{};
 };
 
+class ThriftServer;
+
 export class DBServer {
 public:
     void Init(const StartupParameter& parameter);
@@ -53,7 +55,9 @@ private:
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
     Thread grpc_thread_{};
+    Thread thrift_thread_{};
     UniquePtr<grpc_impl::Server>* grpc_server_{nullptr};
+    SharedPtr<ThriftServer> thrift_server_{nullptr};
 };
 
 }

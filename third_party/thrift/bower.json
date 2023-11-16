@@ -1,0 +1,15 @@
+{
+  "name": "thrift",
+  "version": "0.19.0",
+  "homepage": "https://github.com/apache/thrift.git",
+  "authors": [
+    "Apache Thrift <dev@thrift.apache.org>"
+  ],
+  "description": "Apache Thrift",
+  "main": "lib/js/src/thrift.js",
+  "keywords": [
+    "thrift"
+  ],
+  "license": "Apache v2",
+  "ignore": []
+}

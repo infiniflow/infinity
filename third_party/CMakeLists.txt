@@ -81,3 +81,6 @@ add_subdirectory(openfst)
 ################################################################################
 
 add_subdirectory(iresearch)
+
+
+add_subdirectory(thrift)

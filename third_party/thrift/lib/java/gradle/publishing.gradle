@@ -1,0 +1,105 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements. See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership. The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Following Gradle best practices to keep build logic organized
+
+// ----------------------------------------------------------------------------
+// Installation subtasks, not used currently, we use "make install/fast"
+task installDist(type: Copy, group: 'Install') {
+    description = "Copy Thrift JAR and dependencies into $installPath location"
+
+    destinationDir = file(installPath)
+
+    from jar
+    from configurations.implementation
+}
+
+task installJavadoc(type: Copy, group: 'Install', dependsOn: javadoc) {
+    description = "Install Thrift JavaDoc into $installJavadocPath location"
+
+    destinationDir = file(installJavadocPath)
+
+    from javadoc.destinationDir
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+// skip shadow jar from publishing. Workaround for https://github.com/johnrengelman/shadow/issues/651
+components.java.withVariantsFromConfiguration(configurations.shadowRuntimeElements) {
+    skip()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = "libthrift"
+            from components.java
+            pom {
+                name = 'Apache Thrift'
+                description = 'Thrift is a software framework for scalable cross-language services development.'
+                url = 'http://thrift.apache.org'
+                licenses {
+                    license {
+                        name = 'The Apache Software License, Version 2.0'
+                        url = "${project.license}"
+                        distribution = 'repo'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'dev'
+                        name = 'Apache Thrift Developers'
+                        email = 'dev@thrift.apache.org'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/apache/thrift'
+                    connection = 'scm:git:https://github.com/apache/thrift.git'
+                    developerConnection = 'scm:git:git@github.com:apache/thrift.git'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            url = mavenRepositoryUrl
+            if (project.hasProperty("mavenUser") && project.hasProperty("mavenPassword")) {
+                credentials {
+                    username = mavenUser
+                    password = mavenPassword
+                }
+            }
+        }
+    }
+}
+
+// Signing configuration, optional, only when release and publish is activated
+signing {
+    required { !version.endsWith("SNAPSHOT") && gradle.taskGraph.hasTask("publish") }
+    sign publishing.publications.mavenJava
+}
+
+javadoc {
+    if(JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
+}
