@@ -67,7 +67,8 @@ bool lazy_bitset_iterator::refill(const word_t** begin, const word_t** end) {
     return false;
   }
 
-  const size_t bits = segment_->docs_count() + irs::doc_limits::min();
+  // const size_t bits = segment_->docs_count() + irs::doc_limits::min();
+  const size_t bits = segment_->docs_count() + segment_->Meta().base_doc;
   const size_t words = bitset::bits_to_words(bits);
   set_ = std::make_unique<word_t[]>(words);
   std::memset(set_.get(), 0, sizeof(word_t) * words);

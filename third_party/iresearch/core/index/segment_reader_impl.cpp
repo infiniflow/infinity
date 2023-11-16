@@ -36,8 +36,8 @@ namespace {
 
 class AllIterator : public doc_iterator {
  public:
-  explicit AllIterator(doc_id_t docs_count) noexcept
-    : max_doc_{doc_limits::min() + docs_count - 1} {}
+  explicit AllIterator(doc_id_t docs_count, doc_id_t base_doc) noexcept
+    : max_doc_{base_doc + docs_count - 1} {}
 
   bool next() noexcept final {
     if (doc_.value < max_doc_) {
@@ -274,7 +274,7 @@ column_iterator::ptr SegmentReaderImpl::columns() const {
 doc_iterator::ptr SegmentReaderImpl::docs_iterator() const {
   if (docs_mask_.empty()) {
     return memory::make_managed<AllIterator>(
-      static_cast<doc_id_t>(info_.docs_count));
+      static_cast<doc_id_t>(info_.docs_count), Meta().base_doc);
   }
 
   // the implementation generates doc_ids sequentially

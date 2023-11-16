@@ -88,26 +88,26 @@ class segment_writer : public ColumnProvider, util::noncopyable {
   doc_id_t begin(DocContext ctx);
 
   template<Action action, typename Field>
-  bool insert(Field&& field) {
+  bool insert(Field&& field, doc_id_t doc_id = 0) {
     if (IRS_LIKELY(valid_)) {
       if constexpr (Action::INDEX == action) {
-        return index(std::forward<Field>(field));
+        return index(std::forward<Field>(field), doc_id);
       }
 
       if constexpr (Action::STORE == action) {
-        return store(std::forward<Field>(field));
+        return store(std::forward<Field>(field), doc_id);
       }
 
       if constexpr (Action::STORE_SORTED == action) {
-        return store_sorted(std::forward<Field>(field));
+        return store_sorted(std::forward<Field>(field), doc_id);
       }
 
       if constexpr ((Action::INDEX | Action::STORE) == action) {
-        return index_and_store<false>(std::forward<Field>(field));
+        return index_and_store<false>(std::forward<Field>(field), doc_id);
       }
 
       if constexpr ((Action::INDEX | Action::STORE_SORTED) == action) {
-        return index_and_store<true>(std::forward<Field>(field));
+        return index_and_store<true>(std::forward<Field>(field), doc_id);
       }
 
       IRS_ASSERT(false);  // unsupported action
@@ -289,32 +289,32 @@ class segment_writer : public ColumnProvider, util::noncopyable {
   }
 
   template<typename Field>
-  bool store(Field&& field) {
+  bool store(Field&& field, doc_id_t doc_id) {
     REGISTER_TIMER_DETAILED();
 
     const hashed_string_view field_name{
       static_cast<std::string_view>(field.name())};
 
     // user should check return of begin() != eof()
-    IRS_ASSERT(LastDocId() < doc_limits::eof());
-    const auto doc_id = LastDocId();
+    // IRS_ASSERT(LastDocId() < doc_limits::eof());
+    // const auto doc_id = LastDocId();
 
     return store(field_name, doc_id, field);
   }
 
   template<typename Field>
-  bool store_sorted(Field&& field) {
+  bool store_sorted(Field&& field, doc_id_t doc_id) {
     REGISTER_TIMER_DETAILED();
 
     // user should check return of begin() != eof()
-    IRS_ASSERT(LastDocId() < doc_limits::eof());
-    const auto doc_id = LastDocId();
+    // IRS_ASSERT(LastDocId() < doc_limits::eof());
+    // const auto doc_id = LastDocId();
 
     return store_sorted(doc_id, field);
   }
 
   template<typename Field>
-  bool index(Field&& field) {
+  bool index(Field&& field, doc_id_t doc_id) {
     REGISTER_TIMER_DETAILED();
 
     const hashed_string_view field_name{
@@ -325,14 +325,14 @@ class segment_writer : public ColumnProvider, util::noncopyable {
     const IndexFeatures index_features = field.index_features();
 
     // user should check return of begin() != eof()
-    IRS_ASSERT(LastDocId() < doc_limits::eof());
-    const auto doc_id = LastDocId();
+    // IRS_ASSERT(LastDocId() < doc_limits::eof());
+    // const auto doc_id = LastDocId();
 
     return index(field_name, doc_id, index_features, features, tokens);
   }
 
   template<bool Sorted, typename Field>
-  bool index_and_store(Field&& field) {
+  bool index_and_store(Field&& field, doc_id_t doc_id) {
     REGISTER_TIMER_DETAILED();
 
     const hashed_string_view field_name{
@@ -343,8 +343,8 @@ class segment_writer : public ColumnProvider, util::noncopyable {
     const IndexFeatures index_features = field.index_features();
 
     // user should check return of begin() != eof()
-    IRS_ASSERT(LastDocId() < doc_limits::eof());
-    const auto doc_id = LastDocId();
+    // IRS_ASSERT(LastDocId() < doc_limits::eof());
+    // const auto doc_id = LastDocId();
 
     if (IRS_UNLIKELY(
           !index(field_name, doc_id, index_features, features, tokens))) {
@@ -390,6 +390,7 @@ class segment_writer : public ColumnProvider, util::noncopyable {
   stored_columns columns_;
   std::vector<const field_data*> doc_;  // document fields
   std::string seg_name_;
+  doc_id_t base_doc_;
   field_writer::ptr field_writer_;
   const ColumnInfoProvider* column_info_;
   columnstore_writer::ptr col_writer_;

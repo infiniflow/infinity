@@ -3224,7 +3224,8 @@ class field_reader final : public irs::field_reader {
       }
 
       if (const auto& meta = it.meta(); meta.docs_count == 1) {
-        docs.front() = doc_limits::min() + meta.e_single_doc;
+        // docs.front() = doc_limits::min() + meta.e_single_doc;
+        docs.front() = meta.e_single_doc;
         return 1;
       }
 
