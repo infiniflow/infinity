@@ -23,6 +23,8 @@
 
 #include "index/segment_writer.hpp"
 
+#include <iostream>
+
 #include "analysis/token_attributes.hpp"
 #include "analysis/token_stream.hpp"
 #include "index_meta.hpp"
@@ -33,7 +35,6 @@
 #include "utils/lz4compression.hpp"
 #include "utils/timer_utils.hpp"
 #include "utils/type_limits.hpp"
-
 namespace irs {
 namespace {
 
@@ -312,7 +313,10 @@ void segment_writer::reset(const SegmentMeta& meta) {
   reset();
 
   seg_name_ = meta.name;
-
+  base_doc_ = meta.base_doc;
+  std::cout << "seg writer reset "
+            << "seg_name " << seg_name_ << " base doc " << base_doc_
+            << std::endl;
   if (!field_writer_) {
     field_writer_ = meta.codec->get_field_writer(
       false, docs_context_.get_allocator().ResourceManager());

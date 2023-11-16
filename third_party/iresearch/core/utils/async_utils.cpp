@@ -30,12 +30,11 @@
 #include "utils/misc.hpp"
 #include "utils/std.hpp"
 
-#include "utils/rst/strings/str_cat.h"
+#include <absl/strings/str_cat.h>
 
 using namespace std::chrono_literals;
 
-namespace irs {
-namespace async_utils {
+namespace irs::async_utils {
 
 void busywait_mutex::lock() noexcept {
   while (!try_lock()) {
@@ -55,340 +54,94 @@ void busywait_mutex::unlock() noexcept {
   locked_.store(false, std::memory_order_release);
 }
 
-template<bool UsePriority>
-thread_pool<UsePriority>::thread_pool(
-  size_t max_threads /*= 0*/, size_t max_idle /*= 0*/,
-  basic_string_view<native_char_t> worker_name /*= ""*/)
-  : shared_state_(std::make_shared<shared_state>()),
-    max_idle_(max_idle),
-    max_threads_(max_threads),
-    worker_name_(worker_name) {}
-
-template<bool UsePriority>
-thread_pool<UsePriority>::~thread_pool() {
-  try {
-    stop(true);
-  } catch (...) {
-  }
-}
-
-template<bool UsePriority>
-size_t thread_pool<UsePriority>::max_idle() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return max_idle_;
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::max_idle(size_t value) {
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{state.lock};
-
-    max_idle_ = value;
-  }
-
-  state.cond.notify_all();  // wake any idle threads if they need termination
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::max_idle_delta(int delta) {
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{state.lock};
-    auto max_idle = max_idle_ + delta;
-
-    if (delta > 0 && max_idle < max_idle_) {
-      max_idle_ = std::numeric_limits<size_t>::max();
-    } else if (delta < 0 && max_idle > max_idle_) {
-      max_idle_ = std::numeric_limits<size_t>::min();
-    } else {
-      max_idle_ = max_idle;
-    }
-  }
-
-  state.cond.notify_all();  // wake any idle threads if they need termination
-}
-
-template<bool UsePriority>
-size_t thread_pool<UsePriority>::max_threads() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return max_threads_;
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::max_threads(size_t value) {
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{shared_state_->lock};
-
-    max_threads_ = value;
-
-    if (State::ABORT != state.state.load()) {
-      maybe_spawn_worker();
-    }
-  }
-
-  state.cond.notify_all();  // wake any idle threads if they need termination
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::max_threads_delta(int delta) {
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{state.lock};
-    auto max_threads = max_threads_ + delta;
-
-    if (delta > 0 && max_threads < max_threads_) {
-      max_threads_ = std::numeric_limits<size_t>::max();
-    } else if (delta < 0 && max_threads > max_threads_) {
-      max_threads_ = std::numeric_limits<size_t>::min();
-    } else {
-      max_threads_ = max_threads;
-    }
-
-    if (State::ABORT != state.state.load()) {
-      maybe_spawn_worker();
-    }
-  }
-
-  state.cond.notify_all();  // wake any idle threads if they need termination
-}
-
-template<bool UsePriority>
-bool thread_pool<UsePriority>::run(thread_pool<UsePriority>::func_t&& fn,
-                                   clock_t::duration delay /*=0*/) {
-  if (!fn) {
-    return false;
-  }
-
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{state.lock};
-
-    if (State::RUN != state.state.load()) {
-      return false;  // pool not active
-    }
-    if constexpr (UsePriority) {
-      queue_.emplace(std::move(fn), clock_t::now() + delay);
-    } else {
-      queue_.emplace(std::move(fn));
-    }
-
-    try {
-      maybe_spawn_worker();
-    } catch (...) {
-      if (0 == threads_.load()) {
-        // failed to spawn a thread to execute a task
-        queue_.pop();
-        throw;
+template<bool UseDelay>
+ThreadPool<UseDelay>::ThreadPool(size_t threads, basic_string_view<Char> name)
+  : name_{name} {
+  threads_.reserve(threads);
+  for (size_t i = 0; i != threads; ++i) {
+    threads_.emplace_back([&] {
+      if (!name_.empty()) {
+        set_thread_name(name_.c_str());
       }
-    }
+      Work();
+    });
   }
+}
 
-  state.cond.notify_one();
-
+template<bool UseDelay>
+bool ThreadPool<UseDelay>::run(Func&& fn, Clock::duration delay) {
+  IRS_ASSERT(fn);
+  if constexpr (UseDelay) {
+    auto at = Clock::now() + delay;
+    std::unique_lock lock{m_};
+    if (WasStop()) {
+      return false;
+    }
+    tasks_.emplace(std::move(fn), at);
+    // TODO We can skip notify when new element is more delayed than min
+  } else {
+    std::unique_lock lock{m_};
+    if (WasStop()) {
+      return false;
+    }
+    tasks_.push(std::move(fn));
+  }
+  cv_.notify_one();
   return true;
 }
 
-template<bool UsePriority>
-void thread_pool<UsePriority>::stop(bool skip_pending /*= false*/) {
-  shared_state_->state.store(skip_pending ? State::ABORT : State::FINISH);
-
-  decltype(queue_) empty;
-  {
-    std::unique_lock lock{shared_state_->lock};
-
-    // wait for all threads to terminate
-    while (threads_.load()) {
-      shared_state_->cond.notify_all();  // wake all threads
-      shared_state_->cond.wait_for(lock, 50ms);
-    }
-
-    queue_.swap(empty);
+template<bool UseDelay>
+void ThreadPool<UseDelay>::stop(bool skip_pending) noexcept {
+  std::unique_lock lock{m_};
+  if (skip_pending) {
+    tasks_ = decltype(tasks_){};
   }
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::limits(size_t max_threads, size_t max_idle) {
-  auto& state = *shared_state_;
-
-  {
-    std::lock_guard lock{state.lock};
-
-    max_threads_ = max_threads;
-    max_idle_ = max_idle;
-
-    if (State::ABORT != state.state.load()) {
-      maybe_spawn_worker();
-    }
+  if (WasStop()) {
+    return;
   }
-
-  state.cond.notify_all();  // wake any idle threads if they need termination
-}
-
-template<bool UsePriority>
-bool thread_pool<UsePriority>::maybe_spawn_worker() {
-  IRS_ASSERT(!shared_state_->lock.try_lock());  // lock must be held
-
-  // create extra thread if all threads are busy and can grow pool
-  const size_t pool_size = threads_.load();
-
-  if (!queue_.empty() && active_ == pool_size && pool_size < max_threads_) {
-    std::thread worker(&thread_pool::worker, this, shared_state_);
-    worker.detach();
-
-    threads_.fetch_add(1);
-
-    return true;
+  state_ |= 1;
+  lock.unlock();
+  cv_.notify_all();
+  for (auto& t : threads_) {
+    t.join();
   }
-
-  return false;
+  threads_ = decltype(threads_){};
 }
 
-template<bool UsePriority>
-std::pair<size_t, size_t> thread_pool<UsePriority>::limits() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return {max_threads_, max_idle_};
-}
-
-template<bool UsePriority>
-std::tuple<size_t, size_t, size_t> thread_pool<UsePriority>::stats() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return {active_, queue_.size(), threads_.load()};
-}
-
-template<bool UsePriority>
-size_t thread_pool<UsePriority>::tasks_active() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return active_;
-}
-
-template<bool UsePriority>
-size_t thread_pool<UsePriority>::tasks_pending() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return queue_.size();
-}
-
-template<bool UsePriority>
-size_t thread_pool<UsePriority>::threads() const {
-  std::lock_guard lock{shared_state_->lock};
-
-  return threads_.load();
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::worker(
-  std::shared_ptr<shared_state> shared_state) noexcept {
-  // hold a reference to 'shared_state_' ensure state is still alive
-  if (!worker_name_.empty()) {
-    set_thread_name(worker_name_.c_str());
-  }
-
-  {
-    std::unique_lock lock{shared_state->lock, std::defer_lock};
-
-    try {
-      worker_impl(lock, shared_state);
-    } catch (...) {
-      // NOOP
-    }
-
-    threads_.fetch_sub(1);
-  }
-
-  if (State::RUN != shared_state->state.load()) {
-    shared_state->cond.notify_all();  // wake up thread_pool::stop(...)
-  }
-}
-
-template<bool UsePriority>
-void thread_pool<UsePriority>::worker_impl(
-  std::unique_lock<std::mutex>& lock,
-  std::shared_ptr<shared_state> shared_state) {
-  auto& state = shared_state->state;
-
-  lock.lock();
-
-  while (State::ABORT != state.load() && threads_.load() <= max_threads_) {
-    IRS_ASSERT(lock.owns_lock());
-    if (!queue_.empty()) {
-      auto& top = next();
-      bool proceed = true;
-      if constexpr (UsePriority) {
-        if (top.at > clock_t::now()) {
-          proceed = false;
+template<bool UseDelay>
+void ThreadPool<UseDelay>::Work() {
+  std::unique_lock lock{m_};
+  while (true) {
+    while (!tasks_.empty()) {
+      Func fn;
+      if constexpr (UseDelay) {
+        auto& top = tasks_.top();
+        if (top.at > Clock::now()) {
+          cv_.wait_until(lock, top.at);
+          continue;
         }
-      }
-      if (proceed) {
-        func_t fn = std::move(func(top));
-        queue_.pop();
-        ++active_;
-        Finally decrement = [this]() noexcept { --active_; };
-        // if have more tasks but no idle thread and can grow pool
-        try {
-          maybe_spawn_worker();
-        } catch (const std::bad_alloc&) {
-          fprintf(stderr, "Failed to allocate memory while spawning a worker");
-        } catch (const std::exception& e) {
-          IRS_LOG_ERROR(
-            rst::StrCat({"Failed to grow pool, error '", e.what(), "'"}));
-        } catch (...) {
-          IRS_LOG_ERROR("Failed to grow pool");
-        }
-
-        lock.unlock();
-        try {
-          fn();
-        } catch (const std::bad_alloc&) {
-          fprintf(stderr, "Failed to allocate memory while executing task");
-        } catch (const std::exception& e) {
-          IRS_LOG_ERROR(
-            rst::StrCat({"Failed to execute task, error '", e.what(), "'"}));
-        } catch (...) {
-          IRS_LOG_ERROR("Failed to execute task");
-        }
-        fn = nullptr;
-        lock.lock();
-        continue;
-      }
-    }
-    IRS_ASSERT(active_ <= threads_.load());
-
-    if (const auto idle = threads_.load() - active_;
-        (idle <= max_idle_ || (!queue_.empty() && threads_.load() == 1))) {
-      if (const auto run_state = state.load();
-          !queue_.empty() && State::ABORT != run_state) {
-        IRS_ASSERT(UsePriority);
-        if constexpr (UsePriority) {
-          const auto at = queue_.top().at;  // queue_ might be modified
-          shared_state->cond.wait_until(lock, at);
-        }
-      } else if (State::RUN == run_state) {
-        IRS_ASSERT(queue_.empty());
-        shared_state->cond.wait(lock);
+        fn = std::move(const_cast<Func&>(top.fn));
       } else {
-        IRS_ASSERT(State::RUN != run_state);
-        return;  // termination requested
+        fn = std::move(tasks_.front());
       }
-    } else {
-      return;  // too many idle threads
+      tasks_.pop();
+      state_ += 2;
+      lock.unlock();
+      try {
+        fn();
+      } catch (...) {
+      }
+      lock.lock();
+      state_ -= 2;
     }
+    if (WasStop()) {
+      return;
+    }
+    cv_.wait(lock);
   }
 }
 
-template class thread_pool<true>;
-template class thread_pool<false>;
+template class ThreadPool<true>;
+template class ThreadPool<false>;
 
-}  // namespace async_utils
-}  // namespace irs
+}  // namespace irs::async_utils

@@ -29,7 +29,8 @@ namespace irs {
 AllIterator::AllIterator(const SubReader& reader, const byte_type* query_stats,
                          const Scorers& order, uint64_t docs_count,
                          score_t boost)
-  : max_doc_{doc_id_t(doc_limits::min() + docs_count - 1)} {
+  //: max_doc_{doc_id_t(doc_limits::min() + docs_count - 1)} {
+  : max_doc_{doc_id_t(reader.Meta().base_doc + docs_count - 1)} {
   std::get<cost>(attrs_).reset(max_doc_);
 
   if (!order.empty()) {

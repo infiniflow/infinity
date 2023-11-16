@@ -1542,13 +1542,14 @@ bool MergeWriter::FlushUnsorted(TrackingDirectory& dir, SegmentMeta& segment,
     const auto docs_count = reader.docs_count();
 
     if (reader.live_docs_count() == docs_count) {  // segment has no deletes
-      const auto reader_base = base_id - doc_limits::min();
+      // const auto reader_base = base_id - doc_limits::min();
       IRS_ASSERT(static_cast<uint64_t>(base_id) + docs_count <
                  std::numeric_limits<doc_id_t>::max());
       base_id += static_cast<doc_id_t>(docs_count);
 
-      reader_ctx.doc_map = [reader_base](doc_id_t doc) noexcept {
-        return reader_base + doc;
+      reader_ctx.doc_map = [](doc_id_t doc) noexcept {
+        // return reader_base + doc;
+        return doc;
       };
     } else {  // segment has some deleted docs
       auto& doc_id_map = reader_ctx.doc_id_map;

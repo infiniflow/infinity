@@ -22,8 +22,8 @@
 
 #include "formats_10.hpp"
 
+#include <iostream>
 #include <limits>
-
 extern "C" {
 #include <simdbitpacking.h>
 }
@@ -375,7 +375,8 @@ class postings_writer_base : public irs::postings_writer {
   }
 
   FieldStats end_field() noexcept final {
-    const auto count = docs_.count();
+    // const auto count = docs_.count();
+    const auto count = docs_.size();
     IRS_ASSERT(count < doc_limits::eof());
     return {.wand_mask = writers_mask_,
             .docs_count = static_cast<doc_id_t>(count)};
@@ -468,7 +469,8 @@ class postings_writer_base : public irs::postings_writer {
 
   SkipWriter skip_;
   version10::term_meta last_state_;  // Last final term state
-  bitset docs_;                      // Set of all processed documents
+  // bitset docs_;                      // Set of all processed documents
+  std::vector<doc_id_t> docs_;       // Set of all processed documents
   index_output::ptr doc_out_;        // Postings (doc + freq)
   index_output::ptr pos_out_;        // Positions
   index_output::ptr pay_out_;        // Payload (pay + offs)
@@ -579,7 +581,8 @@ void postings_writer_base::prepare(index_output& out,
   columns_ = state.columns;
 
   // Prepare documents bitset
-  docs_.reset(doc_limits::min() + state.doc_count);
+  // docs_.reset(doc_limits::min() + state.doc_count);
+  docs_.reserve(state.doc_count);
 }
 
 void postings_writer_base::encode(data_output& out,
@@ -683,7 +686,8 @@ void postings_writer_base::EndTerm(version10::term_meta& meta) {
   };
 
   if (1 == meta.docs_count) {
-    meta.e_single_doc = doc_.docs[0] - doc_limits::min();
+    // meta.e_single_doc = doc_.docs[0] - doc_limits::min();
+    meta.e_single_doc = doc_.docs[0];
   } else {
     // write remaining documents using
     // variable length encoding
@@ -886,7 +890,8 @@ void postings_writer<FormatTraits>::BeginDocument() {
       }
     }
 
-    docs_.set(id);
+    //docs_.set(id);
+    docs_.push_back(id);
 
     // First position offsets now is format dependent
     pos_.last = FormatTraits::pos_min();
@@ -1893,7 +1898,8 @@ void single_doc_iterator<IteratorTraits, FieldTraits>::prepare(
   IRS_ASSERT(meta.docs_count == 1);
 
   const auto& term_state = static_cast<const version10::term_meta&>(meta);
-  next_ = doc_limits::min() + term_state.e_single_doc;
+  // next_ = doc_limits::min() + term_state.e_single_doc;
+  next_ = term_state.e_single_doc;
   std::get<cost>(attrs_).reset(1);  // estimate iterator
 
   if constexpr (IteratorTraits::frequency()) {
@@ -3129,6 +3135,9 @@ void SegmentMetaWriter::write(directory& dir, std::string& meta_file,
 
   format_utils::write_header(*out, FORMAT_NAME, version_);
   write_string(*out, meta.name);
+  out->write_vint(meta.base_doc);
+  std::cout << "write seg " << meta.name << " base doc " << meta.base_doc
+            << std::endl;
   out->write_vlong(meta.version);
   out->write_vlong(meta.live_docs_count);
   out->write_vlong(meta.docs_count -
@@ -3175,6 +3184,7 @@ void SegmentMetaReader::read(const directory& dir, SegmentMeta& meta,
     SegmentMetaWriter::FORMAT_MAX);
 
   auto name = read_string<std::string>(*in);
+  const auto base_doc = in->read_vint();
   const auto segment_version = in->read_vlong();
   const auto live_docs_count = in->read_vlong();
   const auto docs_count = in->read_vlong() + live_docs_count;
@@ -3219,6 +3229,7 @@ void SegmentMetaReader::read(const directory& dir, SegmentMeta& meta,
   // ...........................................................................
 
   meta.name = std::move(name);
+  meta.base_doc = base_doc;
   meta.version = segment_version;
   meta.column_store = flags & SegmentMetaWriter::HAS_COLUMN_STORE;
   meta.docs_count = docs_count;
@@ -3226,6 +3237,8 @@ void SegmentMetaReader::read(const directory& dir, SegmentMeta& meta,
   meta.sort = sort;
   meta.byte_size = size;
   meta.files = std::move(files);
+  std::cout << "read seg " << meta.name << " base doc " << meta.base_doc
+            << std::endl;
 }
 
 class DocumentMaskWriter : public document_mask_writer {
@@ -3730,7 +3743,8 @@ void bit_union(index_input& doc_in, doc_id_t docs_count, uint32_t (&docs)[N],
   constexpr auto BITS{bits_required<std::remove_pointer_t<decltype(set)>>()};
   size_t num_blocks = docs_count / FieldTraits::block_size();
 
-  doc_id_t doc = doc_limits::min();
+  // doc_id_t doc = doc_limits::min();
+  doc_id_t doc = 0;
   while (num_blocks--) {
     FieldTraits::read_block(doc_in, enc_buf, docs);
     if constexpr (FieldTraits::frequency()) {
@@ -3806,7 +3820,8 @@ size_t postings_reader<FormatTraits>::bit_union(
 
       count += term_state.docs_count;
     } else {
-      const doc_id_t doc = doc_limits::min() + term_state.e_single_doc;
+      // const doc_id_t doc = doc_limits::min() + term_state.e_single_doc;
+      const doc_id_t doc = term_state.e_single_doc;
       irs::set_bit(set[doc / BITS], doc % BITS);
 
       ++count;

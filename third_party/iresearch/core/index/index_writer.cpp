@@ -24,6 +24,7 @@
 #include "index_writer.hpp"
 
 #include <cstdint>
+#include <iostream>
 
 #include "formats/format_utils.hpp"
 #include "index/comparer.hpp"
@@ -36,10 +37,9 @@
 #include "utils/compression.hpp"
 #include "utils/directory_utils.hpp"
 #include "utils/index_utils.hpp"
+#include "utils/rst/strings/str_cat.h"
 #include "utils/timer_utils.hpp"
 #include "utils/type_limits.hpp"
-
-#include "utils/rst/strings/str_cat.h"
 
 namespace irs {
 namespace {
@@ -694,9 +694,9 @@ IndexWriter::ActiveSegmentContext& IndexWriter::ActiveSegmentContext::operator=(
 }
 
 IndexWriter::Document::Document(SegmentContext& segment,
-                                segment_writer::DocContext doc,
+                                segment_writer::DocContext doc, doc_id_t doc_id,
                                 QueryContext* query)
-  : writer_{*segment.writer_}, query_{query} {
+  : doc_id_{doc_id}, writer_{*segment.writer_}, query_{query} {
   IRS_ASSERT(segment.writer_ != nullptr);
   writer_.begin(doc);  // ensure Reset() will be noexcept
   segment.buffered_docs_.store(writer_.buffered_docs(),
@@ -758,7 +758,8 @@ void IndexWriter::Transaction::Abort() noexcept {
   IRS_ASSERT(active_.Segment() == nullptr);
 }
 
-void IndexWriter::Transaction::UpdateSegment(bool disable_flush) {
+void IndexWriter::Transaction::UpdateSegment(bool disable_flush,
+                                             doc_id_t base_doc) {
   IRS_ASSERT(Valid());
   while (active_.Segment() == nullptr) {  // lazy init
     active_ = writer_->GetSegmentContext();
@@ -790,6 +791,7 @@ void IndexWriter::Transaction::UpdateSegment(bool disable_flush) {
       throw;
     }
   }
+  writer_->segment_base_doc_ = base_doc;
   segment.Prepare();
 }
 
@@ -1332,6 +1334,10 @@ uint64_t IndexWriter::NextSegmentId() noexcept {
   return seg_counter_.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
+doc_id_t IndexWriter::BaseDocOfNextSegment() noexcept {
+  return segment_base_doc_;
+}
+
 uint64_t IndexWriter::CurrentSegmentId() const noexcept {
   return seg_counter_.load(std::memory_order_relaxed);
 }
@@ -1375,6 +1381,7 @@ ConsolidationResult IndexWriter::Consolidate(
         IRS_ASSERT(candidate != nullptr);
         if (!HasRemovals(candidate->Meta())) {
           // no removals, nothing to consolidate
+          std::cout << "no removals. nothing to consolidate" << std::endl;
           return {0, ConsolidationError::OK};
         }
       }
@@ -1434,6 +1441,11 @@ ConsolidationResult IndexWriter::Consolidate(
   consolidation_segment.meta.version = 0;    // Reset version for new segment
   // Increment active meta
   consolidation_segment.meta.name = file_name(NextSegmentId());
+  // candidates[0] should have the smallest base_doc
+  consolidation_segment.meta.base_doc = candidates[0]->Meta().base_doc;
+
+  std::cout << "start consolidate: consolidation_segment.name "
+            << consolidation_segment.meta.name << std::endl;
 
   RefTrackingDirectory dir{dir_};  // Track references for new segment
 
@@ -1465,10 +1477,11 @@ ConsolidationResult IndexWriter::Consolidate(
     if (pending_state_.Valid()) {
       // check that we haven't added to reader cache already absent readers
       // only if we have different index meta
+      std::cout << "consolidate 1 " << std::endl;
       if (committed_reader != current_committed_reader) {
         auto begin = current_committed_reader->begin();
         auto end = current_committed_reader->end();
-
+        std::cout << "consolidate 2 " << std::endl;
         // pointers are different so check by name
         for (const auto* candidate : candidates) {
           if (end == std::find_if(
@@ -1512,7 +1525,7 @@ ConsolidationResult IndexWriter::Consolidate(
     } else if (committed_reader == current_committed_reader) {
       // before new transaction was started:
       // no commits happened in since consolidation was started
-
+      std::cout << "consolidate 3 " << std::endl;
       auto ctx = GetFlushContext();
       // lock due to context modification
       std::lock_guard ctx_lock{ctx->pending_.Mutex()};
@@ -1555,7 +1568,7 @@ ConsolidationResult IndexWriter::Consolidate(
     } else {
       // before new transaction was started:
       // there was a commit(s) since consolidation was started,
-
+      std::cout << "consolidate 4 " << std::endl;
       auto ctx = GetFlushContext();
       // lock due to context modification
       std::lock_guard ctx_lock{ctx->pending_.Mutex()};
@@ -1773,18 +1786,17 @@ IndexWriter::ActiveSegmentContext IndexWriter::GetSegmentContext() try {
     }
   }
 
-  const auto options = GetSegmentWriterOptions(false);
-
-  // should allocate a new segment_context from the pool
+  const auto options = GetSegmentWriterOptions(
+    false);  // should allocate a new segment_context from the pool
   std::shared_ptr<SegmentContext> segment_ctx = segment_writer_pool_.emplace(
     dir_,
     [this] {
       SegmentMeta meta{.codec = codec_};
       meta.name = file_name(NextSegmentId());
+      meta.base_doc = BaseDocOfNextSegment();
       return meta;
     },
     options);
-
   // recreate writer if it reserved more memory than allowed by current limits
   if (auto segment_memory_max = segment_limits_.segment_memory_max.load();
       segment_memory_max < segment_ctx->writer_->memory_reserved()) {
@@ -1844,7 +1856,6 @@ IndexWriter::PendingContext IndexWriter::PrepareFlush(const CommitInfo& info) {
   IndexMeta pending_meta;
   std::vector<PartialSync> partial_sync;
   std::vector<SegmentReader> readers;
-
   auto& dir = *ctx->dir_;
   const auto& committed_reader = *committed_reader_;
   const auto& committed_meta = committed_reader.Meta();
@@ -2142,13 +2153,14 @@ IndexWriter::PendingContext IndexWriter::PrepareFlush(const CommitInfo& info) {
     // process all segments that have been seen by the current flush_context
     for (const auto& segment : ctx->segments_) {
       IRS_ASSERT(segment != nullptr);
-
       // was updated after flush
       IRS_ASSERT(segment->committed_buffered_docs_ == 0);
       IRS_ASSERT(segment->committed_flushed_docs_ ==
                  segment->flushed_docs_.size());
       // process individually each flushed SegmentMeta from the SegmentContext
       for (auto& flushed : segment->flushed_) {
+        std::cout << "flushed seg " << flushed.meta.name << " base "
+                  << flushed.meta.base_doc << std::endl;
         IRS_ASSERT(flushed.GetDocsBegin() < flushed.GetDocsEnd());
         const auto flushed_first_tick =
           segment->flushed_docs_[flushed.GetDocsBegin()].tick;
@@ -2354,7 +2366,6 @@ void IndexWriter::ApplyFlush(PendingContext&& context) {
 
 bool IndexWriter::Start(const CommitInfo& info) {
   IRS_ASSERT(!commit_lock_.try_lock());  // already locked
-
   REGISTER_TIMER_DETAILED();
 
   if (pending_state_.Valid()) {

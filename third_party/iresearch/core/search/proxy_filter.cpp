@@ -40,7 +40,8 @@ class lazy_filter_bitset : private util::noncopyable {
   lazy_filter_bitset(const ExecutionContext& ctx,
                      const filter::prepared& filter)
     : manager_{ctx.memory} {
-    const size_t bits = ctx.segment.docs_count() + doc_limits::min();
+    // const size_t bits = ctx.segment.docs_count() + doc_limits::min();
+    const size_t bits = ctx.segment.docs_count() + ctx.segment.Meta().base_doc;
     words_ = bitset::bits_to_words(bits);
 
     auto bytes = sizeof(*this) + sizeof(word_t) * words_;
