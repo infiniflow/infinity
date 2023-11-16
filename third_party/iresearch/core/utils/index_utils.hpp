@@ -27,23 +27,6 @@
 
 namespace irs::index_utils {
 
-// merge segment if:
-//   {threshold} > segment_bytes / (all_segment_bytes / #segments)
-struct ConsolidateBytes {
-  float threshold = 0;
-};
-
-ConsolidationPolicy MakePolicy(const ConsolidateBytes& options);
-
-// merge segment if:
-//   {threshold} >= (segment_bytes + sum_of_merge_candidate_segment_bytes) /
-//   all_segment_bytes
-struct ConsolidateBytesAccum {
-  float threshold = 0;
-};
-
-ConsolidationPolicy MakePolicy(const ConsolidateBytesAccum& options);
-
 // merge first {threshold} segments
 struct ConsolidateCount {
   size_t threshold = std::numeric_limits<size_t>::max();
@@ -51,22 +34,11 @@ struct ConsolidateCount {
 
 ConsolidationPolicy MakePolicy(const ConsolidateCount& options);
 
-// merge segment if:
-//   {threshold} >= segment_docs{valid} / (all_segment_docs{valid} / #segments)
-struct ConsolidateDocsLive {
+struct ConsolidateByOrder {
   float threshold = 0;
 };
 
-ConsolidationPolicy MakePolicy(const ConsolidateDocsLive& options);
-
-// merge segment if:
-//   {threshold} > #segment_docs{valid} / (#segment_docs{valid} +
-//   #segment_docs{removed})
-struct ConsolidateDocsFill {
-  float threshold = 0;
-};
-
-ConsolidationPolicy MakePolicy(const ConsolidateDocsFill& options);
+ConsolidationPolicy MakePolicy(const ConsolidateByOrder& options);
 
 struct ConsolidateTier {
   // minimum allowed number of segments to consolidate at once
