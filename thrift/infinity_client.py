@@ -24,7 +24,7 @@ import glob
 
 sys.path.append('gen-py')
 from tutorial import Calculator
-from tutorial.ttypes import InvalidOperation, Operation, Work, CommonResponse, CommonRequest, CreateDatabaseRequest
+from tutorial.ttypes import *
 
 from thrift import Thrift
 from thrift.transport import TSocket
@@ -93,12 +93,89 @@ def main():
     res = client.CreateDatabase(req)
     print(res)
 
+
+
     # Close!
     transport.close()
 
 
+from sqlglot import condition, expressions as exp
+
+
+def binary_exp_to_paser_exp(binary_expr_key) -> str:
+    if binary_expr_key == "eq":
+        return "="
+    elif binary_expr_key == "gt":
+        return ">"
+    elif binary_expr_key == "lt":
+        return "<"
+    elif binary_expr_key == "gte":
+        return ">="
+    elif binary_expr_key == "lte":
+        return "<="
+    elif binary_expr_key == "neq":
+        return "!="
+    elif binary_expr_key == "and":
+        return "and"
+    elif binary_expr_key == "or":
+        return "or"
+    else:
+        raise Exception(f"unknown binary expression: {binary_expr_key}")
+
+
+def traverse_conditions(cons) -> ParsedExpr:
+    if isinstance(cons, exp.Binary):
+        parsed_expr = ParsedExpr()
+        function_expr = FunctionExpr()
+        function_expr.function_name = binary_exp_to_paser_exp(
+            cons.key)  # key is the function name cover to >, <, =, and, or, etc.
+
+        arguments = []
+        for value in cons.hashable_args:
+            expr = traverse_conditions(value)
+            arguments.append(expr)
+        function_expr.arguments = arguments
+        parsed_expr.type = function_expr
+
+        return parsed_expr
+
+    elif isinstance(cons, exp.Column):
+        parsed_expr = ParsedExpr()
+        column_expr = ColumnExpr()
+        column_name = [cons.alias_or_name]
+        column_expr.column_name = column_name
+
+        parsed_expr.type = column_expr
+        return parsed_expr
+
+    elif isinstance(cons, exp.Literal):
+        parsed_expr = ParsedExpr()
+        constant_expr = ConstantExpr()
+
+        if cons.is_int:
+            constant_expr.literal_type = LiteralType.kInt64
+            constant_expr.i64_value = int(cons.output_name)
+        elif cons.is_number:
+            constant_expr.literal_type = LiteralType.kDouble
+            constant_expr.f64_value = float(cons.output_name)
+        else:
+            raise Exception(f"unknown literal type: {cons}")
+
+        parsed_expr.type = constant_expr
+        return parsed_expr
+
+    elif isinstance(cons, exp.Paren):
+        for value in cons.hashable_args:
+            traverse_conditions(value)
+    else:
+        raise Exception(f"unknown condition: {cons}")
+
 if __name__ == '__main__':
     try:
         main()
+
+        print(traverse_conditions(condition("c1>1 and c2<2 or c3=3.3")))
+
+
     except Thrift.TException as tx:
         print('%s' % tx.message)
