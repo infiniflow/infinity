@@ -208,27 +208,26 @@ struct DropDatabaseRequest {
     3:  Option option,
 }
 
-// struct CreateTableRequest {
-//     1:  string db_name,
-//     2:  string table_name,
-//     3:  list<ColumnDef> column_defs = [],
-//     6:  i64 session_id,
-//     7:  Option option,
-// }
+struct ColumnDef {
+    // 1:  i32 id,
+    // 2:  string name,
+    // 3:  DataType data_type,
+    // 4:  Constraint constraint = [],
+}
+
+struct CreateTableRequest {
+    1:  string db_name,
+    2:  string table_name,
+    3:  list<ColumnDef> column_defs,
+    6:  i64 session_id,
+    7:  Option option,
+}
 
 // enum Constraint {
 //     PrimaryKey,
 //     NotNull,
 //     Null,
 //     Unique,
-// }
-
-
-// struct ColumnDef {
-//     1:  i32 id,
-//     2:  string name,
-//     3:  DataType data_type,
-//     4:  Constraint constraint = [],
 // }
 
 // struct DataType {

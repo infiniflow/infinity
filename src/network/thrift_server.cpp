@@ -126,18 +126,18 @@ public:
 //        // Your implementation goes here
 //        printf("Disconnect\n");
 //    }
-//
-//
+
+
 //
 //    void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) {
 //        // Your implementation goes here
 //        printf("DropDatabase\n");
 //    }
 //
-//    void CreateTable(CommonResponse& _return, const CreateTableRequest& request) {
-//        // Your implementation goes here
-//        printf("CreateTable\n");
-//    }
+    void CreateTable(CommonResponse& _return, const CreateTableRequest& request) {
+        // Your implementation goes here
+        printf("CreateTable\n");
+    }
 //
 //    void DropTable(CommonResponse& _return, const DropTableRequest& request) {
 //        // Your implementation goes here
