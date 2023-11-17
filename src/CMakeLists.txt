@@ -234,6 +234,8 @@ target_link_libraries(infinity
         newpfor
         openfst
         iresearch
+        lz4
+        atomic
 #        profiler
 
         leveldb
@@ -358,6 +360,8 @@ target_link_libraries(unit_test
         newpfor
         openfst
         iresearch
+        lz4
+        atomic
 #        profiler
         leveldb
         protobuf
@@ -365,7 +369,6 @@ target_link_libraries(unit_test
         brpc-static
         gflags
         crypto
-        libleveldb.a
 )
 
 target_sources(unit_test

@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -44,16 +58,16 @@ export struct StringField : public IndexField {
     }
 
     bool Write(DataOutput &out) const override {
-        IResearchWriteString(out, f_.c_str(), f_.length());
+        IRSWriteString(out, f_.c_str(), f_.length());
         return true;
     }
 };
 
 export struct TextField : public IndexField {
     String f_;
-    mutable IResearchAnalyzer::ptr stream_;
+    mutable IRSAnalyzer::ptr stream_;
 
-    TextField(const StringView &n, IndexFeatures index_features, const Features &flags, IResearchAnalyzer::ptr stream)
+    TextField(const StringView &n, IndexFeatures index_features, const Features &flags, IRSAnalyzer::ptr stream)
         : IndexField(n, index_features, flags), stream_(Move(stream)) {}
 
     TokenStream &GetTokens() const override {
@@ -62,7 +76,7 @@ export struct TextField : public IndexField {
     }
 
     bool Write(DataOutput &out) const override {
-        IResearchWriteString(out, f_.c_str(), f_.length());
+        IRSWriteString(out, f_.c_str(), f_.length());
         return true;
     }
 };
@@ -81,7 +95,7 @@ export struct NumericField : public IndexField {
     }
 
     bool Write(DataOutput &out) const override {
-        IResearchWriteZVlong(out, value_);
+        IRSWriteZVlong(out, value_);
         return true;
     }
 };
