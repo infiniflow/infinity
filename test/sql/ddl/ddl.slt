@@ -6,7 +6,7 @@ statement ok
 CREATE TABLE ddl1 (i INTEGER);
 
 statement ok
-CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
 
 statement ok
 CREATE TABLE ddl3 (i INTEGER);
@@ -26,7 +26,7 @@ statement error
 CREATE TABLE ddl1 (i INTEGER);
 
 statement error
-CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR(255), age INTEGER);
+CREATE TABLE ddl2 (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
 
 statement ok
 DROP TABLE ddl1;
