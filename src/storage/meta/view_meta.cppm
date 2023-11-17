@@ -33,7 +33,7 @@ public:
     explicit ViewMeta(SharedPtr<String> name, DBEntry *db_entry) : view_name_(Move(name)), db_entry_(db_entry) {}
 
 public:
-    static EntryResult CreateNewEntry(ViewMeta *table_meta,
+    static Status CreateNewEntry(ViewMeta *table_meta,
                                       const SharedPtr<String> &view_name,
                                       const Vector<SharedPtr<ColumnDef>> &columns,
                                       u64 txn_id,
