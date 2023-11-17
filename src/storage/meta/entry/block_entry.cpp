@@ -89,7 +89,7 @@ void BlockVersion::LoadFromFile(const String &version_path) {
 void BlockVersion::SaveToFile(const String &version_path) {
     int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     exp_size += sizeof(int32_t) + deleted_.size() * sizeof(TxnTimeStamp);
-    Vector<char> buf(exp_size);
+    Vector<char> buf(exp_size, 0);
     char *ptr = buf.data();
     WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
     WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
