@@ -521,8 +521,8 @@ infinity_proto::DataType *BrpcServiceImpl::DataTypeToProtoDataType(const SharedP
         case LogicalType::kVarchar: {
             auto *data_type_proto = new infinity_proto::DataType();
             infinity_proto::VarcharType varchar_type;
-            auto varchar_info = static_cast<VarcharInfo *>(data_type->type_info().get());
-            varchar_type.set_width(varchar_info->dimension());
+            // FIXME
+            varchar_type.set_width(0);
             data_type_proto->set_logic_type(infinity_proto::Varchar);
             data_type_proto->set_allocated_varchar_type(&varchar_type);
             return data_type_proto;

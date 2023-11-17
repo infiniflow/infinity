@@ -128,7 +128,7 @@ TEST_F(SQLParserTest, good_test2) {
                            "                 t polygon, "
                            "                 u circle, "
                            "                 v char(10), "
-                           "                 w varchar(100), "
+                           "                 w varchar, "
                            "                 x decimal, "
                            "                 y decimal(10), "
                            "                 z decimal(14, 12), "
@@ -355,7 +355,7 @@ TEST_F(SQLParserTest, good_test2) {
             {
                 auto &column_def = create_table_info->column_defs_[22];
                 EXPECT_EQ(column_def->name_, "w");
-                DataType column_type(LogicalType::kVarchar, VarcharInfo::Make(100));
+                DataType column_type(LogicalType::kVarchar);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
