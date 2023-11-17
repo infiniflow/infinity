@@ -24,16 +24,16 @@ namespace {
 
 infinity::DBServer db_server;
 infinity::Thread thrift_thread;
-infinity::ThriftServer thrift_server;
-infinity::ThriftPoolServer thrift_pool_server;
+infinity::ThreadedThriftServer threaded_thrift_server;
+infinity::PoolThriftServer pool_thrift_server;
 
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-            thrift_server.Shutdown();
-//            thrift_pool_server.Shutdown();
+//            threaded_thrift_server.Shutdown();
+            pool_thrift_server.Shutdown();
             thrift_thread.join();
             db_server.Shutdown();
             break;
@@ -111,11 +111,11 @@ auto main(int argc, char **argv) -> int {
 
     db_server.Init(parameters);
     RegisterSignal();
-    thrift_server.Init();
-//    thrift_pool_server.Init();
+//    threaded_thrift_server.Init();
+    pool_thrift_server.Init();
     thrift_thread = infinity::Thread([&]() {
-        thrift_server.Start();
-//        thrift_pool_server.Start();
+//        threaded_thrift_server.Start();
+        pool_thrift_server.Start();
     });
     db_server.Run();
     //    while(1) ;

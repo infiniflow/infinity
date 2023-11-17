@@ -14,20 +14,20 @@
 
 #pragma once
 
-//#include <thrift/concurrency/ThreadManager.h>
-//#include <thrift/concurrency/ThreadFactory.h>
-//#include <thrift/protocol/TBinaryProtocol.h>
-//#include <thrift/server/TSimpleServer.h>
-//#include <thrift/server/TThreadPoolServer.h>
+// #include <thrift/concurrency/ThreadManager.h>
+// #include <thrift/concurrency/ThreadFactory.h>
+// #include <thrift/protocol/TBinaryProtocol.h>
+// #include <thrift/server/TSimpleServer.h>
+// #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
-//#include <thrift/transport/TServerSocket.h>
-//#include <thrift/transport/TSocket.h>
-//#include <thrift/transport/TTransportUtils.h>
-//#include <thrift/TToString.h>
+// #include <thrift/transport/TServerSocket.h>
+// #include <thrift/transport/TSocket.h>
+// #include <thrift/transport/TTransportUtils.h>
+// #include <thrift/TToString.h>
 
 #include <iostream>
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 using namespace std;
 using namespace apache::thrift;
@@ -38,54 +38,55 @@ using namespace apache::thrift::server;
 
 namespace infinity {
 
+enum class ThriftServerType {
+    kThreaded,
+    kThreadPool,
+};
+
 class ThriftServer {
 public:
-//    ThriftServer() = default;
+    explicit ThriftServer(ThriftServerType type) : server_type_(type) {}
+    virtual ~ThriftServer() = default;
 
-//    ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory>& processor_factory,
-//                 const std::shared_ptr<apache::thrift::transport::TServerTransport>& server_transport,
-//                 const std::shared_ptr<apache::thrift::transport::TTransportFactory>& transport_factory,
-//                 const std::shared_ptr<apache::thrift::protocol::TProtocolFactory>& protocol_factory,
-//                 const std::shared_ptr<apache::thrift::concurrency::ThreadFactory>& thread_factory
-//                 = std::shared_ptr<apache::thrift::concurrency::ThreadFactory>(
-//                     new apache::thrift::concurrency::ThreadFactory(false)));
+    virtual void Init() = 0;
+    virtual void Start() = 0;
+    virtual void Shutdown() = 0;
+    [[nodiscard]] ThriftServerType server_type() const { return server_type_; }
 
-    void Init();
+private:
+    ThriftServerType server_type_{ThriftServerType::kThreaded};
+};
 
-    void Start();
+class ThreadedThriftServer final : public ThriftServer {
+public:
+    ThreadedThriftServer() : ThriftServer(ThriftServerType::kThreaded) {}
+    ~ThreadedThriftServer() final = default;
 
-    void Shutdown();
+    void Init() final;
+
+    void Start() final;
+
+    void Shutdown() final;
 
 private:
     std::unique_ptr<TThreadedServer> server{nullptr};
-//    std::unique_ptr<TServer> server{nullptr};
-//    std::shared_ptr<apache::thrift::server::TServer> server;
-};
-
-class ThriftPoolServer {
-public:
-    ThriftPoolServer() = default;
-
-    //    ThriftServer(const std::shared_ptr<apache::thrift::TProcessorFactory>& processor_factory,
-    //                 const std::shared_ptr<apache::thrift::transport::TServerTransport>& server_transport,
-    //                 const std::shared_ptr<apache::thrift::transport::TTransportFactory>& transport_factory,
-    //                 const std::shared_ptr<apache::thrift::protocol::TProtocolFactory>& protocol_factory,
-    //                 const std::shared_ptr<apache::thrift::concurrency::ThreadFactory>& thread_factory
-    //                 = std::shared_ptr<apache::thrift::concurrency::ThreadFactory>(
-    //                     new apache::thrift::concurrency::ThreadFactory(false)));
-
-    void Init();
-
-    void Start();
-
-    void Shutdown();
-
-private:
-    //    std::unique_ptr<TThreadedServer> server{nullptr};
-    std::unique_ptr<TServer> server{nullptr};
+    //    std::unique_ptr<TServer> server{nullptr};
     //    std::shared_ptr<apache::thrift::server::TServer> server;
 };
 
-}
+class PoolThriftServer final : public ThriftServer {
+public:
+    PoolThriftServer() : ThriftServer(ThriftServerType::kThreadPool) {}
+    ~PoolThriftServer() final = default;
 
+    void Init() final;
 
+    void Start() final;
+
+    void Shutdown() final;
+
+private:
+    std::unique_ptr<TServer> server{nullptr};
+};
+
+} // namespace infinity
