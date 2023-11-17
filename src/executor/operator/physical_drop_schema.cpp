@@ -23,6 +23,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import base_entry;
+import status;
 
 import infinity_exception;
 
@@ -35,9 +36,10 @@ void PhysicalDropSchema::Init() {}
 void PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
     auto txn = query_context->GetTxn();
-    auto res = txn->DropDatabase(*schema_name_, conflict_type_);
+    BaseEntry* base_entry{};
+    Status status = txn->DropDatabase(*schema_name_, conflict_type_, base_entry);
     auto drop_database_operator_state = (DropDatabaseOperatorState *)(operator_state);
-    drop_database_operator_state->error_message_ = Move(res.err_);
+    drop_database_operator_state->error_message_ = Move(status.msg_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

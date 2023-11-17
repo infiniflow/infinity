@@ -146,11 +146,13 @@ Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
     return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
-EntryResult TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Status TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
     if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
-        return IndexDefMeta::GetEntry(iter->second.get(), txn_id, begin_ts);
+        return IndexDefMeta::GetEntry(iter->second.get(), txn_id, begin_ts, base_entry);
     }
-    return {.entry_ = nullptr, .err_ = MakeUnique<String>("Cannot find index def")};
+    UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
+    LOG_ERROR(*err_msg);
+    return Status(ErrorCode::kNotFound, Move(err_msg));
 }
 
 void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {

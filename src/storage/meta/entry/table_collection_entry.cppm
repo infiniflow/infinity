@@ -67,7 +67,7 @@ public:
                             TxnManager *txn_mgr,
                             BaseEntry *&new_index_entry);
 
-    static EntryResult GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&index_entry);
 
     static void RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
@@ -131,13 +131,13 @@ public:
 
     TableCollectionMeta *table_collection_meta_{};
 
-    // from data table
+    // From data table
     SizeT row_count_{};
     HashMap<u32, SharedPtr<SegmentEntry>> segments_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
-    //
+    // Index definition
     HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
 };
 

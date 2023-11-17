@@ -22,6 +22,8 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import base_entry;
+import status;
 
 module physical_create_schema;
 
@@ -31,9 +33,10 @@ void PhysicalCreateSchema::Init() {}
 
 void PhysicalCreateSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
-    auto result = txn->CreateDatabase(*schema_name_, conflict_type_);
+    BaseEntry* base_entry{};
+    Status status = txn->CreateDatabase(*schema_name_, conflict_type_, base_entry);
     auto create_database_operator_state = (CreateDatabaseOperatorState *)(operator_state);
-    create_database_operator_state->error_message_ = Move(result.err_);
+    create_database_operator_state->error_message_ = Move(status.msg_);
     operator_state->SetComplete();
 }
 

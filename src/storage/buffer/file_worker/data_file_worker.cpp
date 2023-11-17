@@ -36,7 +36,7 @@ void DataFileWorker::AllocateInMemory() {
         Error<StorageException>("Data is already allocated.");
     }
     Assert<StorageException>(buffer_size_ > 0, "Bug.");
-    data_ = reinterpret_cast<void *>(new char[buffer_size_]);
+    data_ = reinterpret_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
@@ -106,7 +106,7 @@ void DataFileWorker::ReadFromFileImpl() {
     }
 
     // file body
-    data_ = reinterpret_cast<void *>(new char[buffer_size_]);
+    data_ = reinterpret_cast<void *>(new char[buffer_size_]{});
     nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != buffer_size_) {
         Error<StorageException>(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));

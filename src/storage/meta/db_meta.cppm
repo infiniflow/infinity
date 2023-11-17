@@ -31,13 +31,13 @@ public:
 
 public:
     // Reserved
-    static EntryResult CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static Status CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
 
-    static EntryResult DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static Status DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
 
     static void DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static Status GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry);
+    static Status GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
 
     static SharedPtr<String> ToString(DBMeta *db_meta);
 
