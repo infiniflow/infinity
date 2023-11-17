@@ -30,6 +30,8 @@ export struct ViewSegment {
     IRSSubReader *segment_;
 };
 
+class IRSAsync;
+class MaintenanceState;
 export class IRSDataStore {
 public:
     explicit IRSDataStore(const String &directory);
@@ -47,6 +49,8 @@ public:
     };
     using DataSnapshotPtr = SharedPtr<IRSDataStore::DataSnapshot>;
 
+    IRSIndexWriter::ptr GetWriter() { return index_writer_; }
+
     auto const &GetDirectoryReader() const { return snapshot_->reader_; }
 
     void StoreSnapshot(DataSnapshotPtr snapshot);
@@ -55,7 +59,11 @@ public:
 
     void Commit();
 
-    void Optimize();
+    void ScheduleCommit();
+
+    void ScheduleConsolidation();
+
+    void ScheduleOptimize();
 
     void BatchInsert(SharedPtr<DataBlock> data_block);
 
@@ -69,6 +77,8 @@ private:
     IRSIndexWriter::Transaction recovery_txn_;
     Mutex commit_mutex_;
     DataSnapshotPtr snapshot_;
+    UniquePtr<IRSAsync> async_;
+    SharedPtr<MaintenanceState> maintenance_state_;
 };
 
 export class ViewSnapshot : public IRSIndexReader {

@@ -15,6 +15,8 @@
 module;
 
 #include <atomic>
+#include <chrono>
+#include <ctpl_stl.h>
 #include <filesystem>
 
 #include "formats/formats.hpp"
@@ -23,6 +25,7 @@ module;
 #include "utils/index_utils.hpp"
 
 import stl;
+import logger;
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
@@ -32,7 +35,77 @@ import column_vector;
 module iresearch_datastore;
 
 namespace infinity {
+
+class IRSAsync {
+public:
+    ~IRSAsync() { Stop(); }
+
+    void Stop() noexcept {
+        try {
+            pool_0_.stop(true);
+        } catch (...) {
+        }
+        try {
+            pool_1_.stop(true);
+        } catch (...) {
+        }
+    }
+
+    template <typename T>
+    void Queue(SizeT id, T &&fn);
+
+private:
+    ThreadPool pool_0_{1};
+    ThreadPool pool_1_{1};
+};
+
+template <typename T>
+void IRSAsync::Queue(SizeT id, T &&fn) {
+    if (0 == id)
+        pool_0_.push(Move(fn));
+    else if (1 == id)
+        pool_1_.push(Move(fn));
+}
+
+struct MaintenanceState {
+    atomic_u32 pending_commits_{0};
+    atomic_u32 pending_consolidations_{0};
+};
+
+struct Task {
+    SharedPtr<MaintenanceState> state_;
+    SharedPtr<IRSDataStore> store_;
+};
+
+struct ConsolidationTask : Task {
+    void operator()(int id) const;
+    bool optimize_{false};
+    std::chrono::milliseconds consolidation_interval_{};
+};
+
+void ConsolidationTask::operator()(int id) const {
+    state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
+    if (optimize_) {
+        store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
+        store_->GetWriter()->Commit();
+    } else {
+        store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateByOrder()));
+    }
+}
+
+struct CommitTask : Task {
+    void operator()(int id) const;
+    std::chrono::milliseconds commit_interval_{};
+};
+
+void CommitTask::operator()(int id) const {
+    state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
+    store_->GetWriter()->Commit();
+}
+
 IRSDataStore::IRSDataStore(const String &directory) : directory_(directory), path_{Path(directory_)} {
+    async_ = MakeUnique<IRSAsync>();
+    maintenance_state_ = MakeShared<MaintenanceState>();
     std::error_code ec;
     bool path_exists = std::filesystem::exists(path_);
     if (!path_exists) {
@@ -67,6 +140,29 @@ void IRSDataStore::Commit() {
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
     StoreSnapshot(data);
+}
+
+void IRSDataStore::ScheduleCommit() {
+    CommitTask task;
+    task.state_ = maintenance_state_;
+    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
+    async_->Queue<CommitTask>(0, Move(task));
+}
+
+void IRSDataStore::ScheduleConsolidation() {
+    ConsolidationTask task;
+    task.state_ = maintenance_state_;
+    task.optimize_ = false;
+    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
+    async_->Queue<ConsolidationTask>(0, Move(task));
+}
+
+void IRSDataStore::ScheduleOptimize() {
+    ConsolidationTask task;
+    task.state_ = maintenance_state_;
+    task.optimize_ = true;
+    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
+    async_->Queue<ConsolidationTask>(0, Move(task));
 }
 
 void IRSDataStore::BatchInsert(SharedPtr<DataBlock> data_block) {
