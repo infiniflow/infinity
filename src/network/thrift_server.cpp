@@ -96,7 +96,7 @@ public:
 
     }
 
-    void Connect(tutorial::CommonResponse &_return, const tutorial::CommonRequest &req) override {
+    void Connect(tutorial::CommonResponse &_return) override {
         auto infinity = infinity::Infinity::RemoteConnect();
         if (infinity == nullptr) {
             _return.success = false;
@@ -110,6 +110,94 @@ public:
         }
     }
 
+    void Disconnect(CommonResponse& _return, const CommonRequest& request) {
+        // Your implementation goes here
+        printf("Disconnect\n");
+    }
+
+
+
+    void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) {
+        // Your implementation goes here
+        printf("DropDatabase\n");
+    }
+
+//    void Disconnect(CommonResponse& _return, const CommonRequest& request) {
+//        // Your implementation goes here
+//        printf("Disconnect\n");
+//    }
+//
+//
+//
+//    void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) {
+//        // Your implementation goes here
+//        printf("DropDatabase\n");
+//    }
+//
+//    void CreateTable(CommonResponse& _return, const CreateTableRequest& request) {
+//        // Your implementation goes here
+//        printf("CreateTable\n");
+//    }
+//
+//    void DropTable(CommonResponse& _return, const DropTableRequest& request) {
+//        // Your implementation goes here
+//        printf("DropTable\n");
+//    }
+//
+//    void Insert(CommonResponse& _return, const InsertRequest& request) {
+//        // Your implementation goes here
+//        printf("Insert\n");
+//    }
+//
+//    void Import(CommonResponse& _return, const ImportRequest& request) {
+//        // Your implementation goes here
+//        printf("Import\n");
+//    }
+//
+//    void Select(SelectResponse& _return, const SelectRequest& request) {
+//        // Your implementation goes here
+//        printf("Select\n");
+//    }
+//
+//    void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) {
+//        // Your implementation goes here
+//        printf("ListDatabase\n");
+//    }
+//
+//    void ListTable(ListTableResponse& _return, const ListTableRequest& request) {
+//        // Your implementation goes here
+//        printf("ListTable\n");
+//    }
+//
+//    void DescribeDatabase(DescribeDatabaseResponse& _return, const DescribeDatabaseRequest& request) {
+//        // Your implementation goes here
+//        printf("DescribeDatabase\n");
+//    }
+//
+//    void DescribeTable(DescribeTableResponse& _return, const DescribeTableRequest& request) {
+//        // Your implementation goes here
+//        printf("DescribeTable\n");
+//    }
+//
+//    void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) {
+//        // Your implementation goes here
+//        printf("GetDatabase\n");
+//    }
+//
+//    void GetTable(CommonResponse& _return, const GetTableRequest& request) {
+//        // Your implementation goes here
+//        printf("GetTable\n");
+//    }
+//
+//    void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) {
+//        // Your implementation goes here
+//        printf("CreateIndex\n");
+//    }
+//
+//    void DropIndex(CommonResponse& _return, const DropIndexRequest& request) {
+//        // Your implementation goes here
+//        printf("DropIndex\n");
+//    }
 protected:
     map<int32_t, SharedStruct> log;
     std::mutex infinity_session_map_mutex_{};

@@ -44,8 +44,10 @@ class CalculatorIf : virtual public  ::shared::SharedServiceIf {
    * must be void.
    */
   virtual void zip() = 0;
-  virtual void Connect(CommonResponse& _return, const CommonRequest& req) = 0;
-  virtual void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& req) = 0;
+  virtual void Connect(CommonResponse& _return) = 0;
+  virtual void Disconnect(CommonResponse& _return, const CommonRequest& request) = 0;
+  virtual void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) = 0;
+  virtual void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) = 0;
 };
 
 class CalculatorIfFactory : virtual public  ::shared::SharedServiceIfFactory {
@@ -89,10 +91,16 @@ class CalculatorNull : virtual public CalculatorIf , virtual public  ::shared::S
   void zip() override {
     return;
   }
-  void Connect(CommonResponse& /* _return */, const CommonRequest& /* req */) override {
+  void Connect(CommonResponse& /* _return */) override {
     return;
   }
-  void CreateDatabase(CommonResponse& /* _return */, const CreateDatabaseRequest& /* req */) override {
+  void Disconnect(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
+    return;
+  }
+  void CreateDatabase(CommonResponse& /* _return */, const CreateDatabaseRequest& /* request */) override {
+    return;
+  }
+  void DropDatabase(CommonResponse& /* _return */, const DropDatabaseRequest& /* request */) override {
     return;
   }
 };
@@ -443,10 +451,6 @@ class Calculator_zip_pargs {
 
 };
 
-typedef struct _Calculator_Connect_args__isset {
-  _Calculator_Connect_args__isset() : req(false) {}
-  bool req :1;
-} _Calculator_Connect_args__isset;
 
 class Calculator_Connect_args {
  public:
@@ -457,16 +461,9 @@ class Calculator_Connect_args {
   }
 
   virtual ~Calculator_Connect_args() noexcept;
-  CommonRequest req;
 
-  _Calculator_Connect_args__isset __isset;
-
-  void __set_req(const CommonRequest& val);
-
-  bool operator == (const Calculator_Connect_args & rhs) const
+  bool operator == (const Calculator_Connect_args & /* rhs */) const
   {
-    if (!(req == rhs.req))
-      return false;
     return true;
   }
   bool operator != (const Calculator_Connect_args &rhs) const {
@@ -486,7 +483,6 @@ class Calculator_Connect_pargs {
 
 
   virtual ~Calculator_Connect_pargs() noexcept;
-  const CommonRequest* req;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
@@ -547,9 +543,113 @@ class Calculator_Connect_presult {
 
 };
 
+typedef struct _Calculator_Disconnect_args__isset {
+  _Calculator_Disconnect_args__isset() : request(false) {}
+  bool request :1;
+} _Calculator_Disconnect_args__isset;
+
+class Calculator_Disconnect_args {
+ public:
+
+  Calculator_Disconnect_args(const Calculator_Disconnect_args&) noexcept;
+  Calculator_Disconnect_args& operator=(const Calculator_Disconnect_args&) noexcept;
+  Calculator_Disconnect_args() noexcept {
+  }
+
+  virtual ~Calculator_Disconnect_args() noexcept;
+  CommonRequest request;
+
+  _Calculator_Disconnect_args__isset __isset;
+
+  void __set_request(const CommonRequest& val);
+
+  bool operator == (const Calculator_Disconnect_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const Calculator_Disconnect_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Calculator_Disconnect_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Calculator_Disconnect_pargs {
+ public:
+
+
+  virtual ~Calculator_Disconnect_pargs() noexcept;
+  const CommonRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Calculator_Disconnect_result__isset {
+  _Calculator_Disconnect_result__isset() : success(false) {}
+  bool success :1;
+} _Calculator_Disconnect_result__isset;
+
+class Calculator_Disconnect_result {
+ public:
+
+  Calculator_Disconnect_result(const Calculator_Disconnect_result&);
+  Calculator_Disconnect_result& operator=(const Calculator_Disconnect_result&);
+  Calculator_Disconnect_result() noexcept {
+  }
+
+  virtual ~Calculator_Disconnect_result() noexcept;
+  CommonResponse success;
+
+  _Calculator_Disconnect_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const Calculator_Disconnect_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Calculator_Disconnect_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Calculator_Disconnect_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Calculator_Disconnect_presult__isset {
+  _Calculator_Disconnect_presult__isset() : success(false) {}
+  bool success :1;
+} _Calculator_Disconnect_presult__isset;
+
+class Calculator_Disconnect_presult {
+ public:
+
+
+  virtual ~Calculator_Disconnect_presult() noexcept;
+  CommonResponse* success;
+
+  _Calculator_Disconnect_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _Calculator_CreateDatabase_args__isset {
-  _Calculator_CreateDatabase_args__isset() : req(false) {}
-  bool req :1;
+  _Calculator_CreateDatabase_args__isset() : request(false) {}
+  bool request :1;
 } _Calculator_CreateDatabase_args__isset;
 
 class Calculator_CreateDatabase_args {
@@ -561,15 +661,15 @@ class Calculator_CreateDatabase_args {
   }
 
   virtual ~Calculator_CreateDatabase_args() noexcept;
-  CreateDatabaseRequest req;
+  CreateDatabaseRequest request;
 
   _Calculator_CreateDatabase_args__isset __isset;
 
-  void __set_req(const CreateDatabaseRequest& val);
+  void __set_request(const CreateDatabaseRequest& val);
 
   bool operator == (const Calculator_CreateDatabase_args & rhs) const
   {
-    if (!(req == rhs.req))
+    if (!(request == rhs.request))
       return false;
     return true;
   }
@@ -590,7 +690,7 @@ class Calculator_CreateDatabase_pargs {
 
 
   virtual ~Calculator_CreateDatabase_pargs() noexcept;
-  const CreateDatabaseRequest* req;
+  const CreateDatabaseRequest* request;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
@@ -651,6 +751,110 @@ class Calculator_CreateDatabase_presult {
 
 };
 
+typedef struct _Calculator_DropDatabase_args__isset {
+  _Calculator_DropDatabase_args__isset() : request(false) {}
+  bool request :1;
+} _Calculator_DropDatabase_args__isset;
+
+class Calculator_DropDatabase_args {
+ public:
+
+  Calculator_DropDatabase_args(const Calculator_DropDatabase_args&);
+  Calculator_DropDatabase_args& operator=(const Calculator_DropDatabase_args&);
+  Calculator_DropDatabase_args() noexcept {
+  }
+
+  virtual ~Calculator_DropDatabase_args() noexcept;
+  DropDatabaseRequest request;
+
+  _Calculator_DropDatabase_args__isset __isset;
+
+  void __set_request(const DropDatabaseRequest& val);
+
+  bool operator == (const Calculator_DropDatabase_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const Calculator_DropDatabase_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Calculator_DropDatabase_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class Calculator_DropDatabase_pargs {
+ public:
+
+
+  virtual ~Calculator_DropDatabase_pargs() noexcept;
+  const DropDatabaseRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Calculator_DropDatabase_result__isset {
+  _Calculator_DropDatabase_result__isset() : success(false) {}
+  bool success :1;
+} _Calculator_DropDatabase_result__isset;
+
+class Calculator_DropDatabase_result {
+ public:
+
+  Calculator_DropDatabase_result(const Calculator_DropDatabase_result&);
+  Calculator_DropDatabase_result& operator=(const Calculator_DropDatabase_result&);
+  Calculator_DropDatabase_result() noexcept {
+  }
+
+  virtual ~Calculator_DropDatabase_result() noexcept;
+  CommonResponse success;
+
+  _Calculator_DropDatabase_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const Calculator_DropDatabase_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const Calculator_DropDatabase_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Calculator_DropDatabase_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _Calculator_DropDatabase_presult__isset {
+  _Calculator_DropDatabase_presult__isset() : success(false) {}
+  bool success :1;
+} _Calculator_DropDatabase_presult__isset;
+
+class Calculator_DropDatabase_presult {
+ public:
+
+
+  virtual ~Calculator_DropDatabase_presult() noexcept;
+  CommonResponse* success;
+
+  _Calculator_DropDatabase_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class CalculatorClient : virtual public CalculatorIf, public  ::shared::SharedServiceClient {
  public:
   CalculatorClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) :
@@ -684,12 +888,18 @@ class CalculatorClient : virtual public CalculatorIf, public  ::shared::SharedSe
    */
   void zip() override;
   void send_zip();
-  void Connect(CommonResponse& _return, const CommonRequest& req) override;
-  void send_Connect(const CommonRequest& req);
+  void Connect(CommonResponse& _return) override;
+  void send_Connect();
   void recv_Connect(CommonResponse& _return);
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& req) override;
-  void send_CreateDatabase(const CreateDatabaseRequest& req);
+  void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
+  void send_Disconnect(const CommonRequest& request);
+  void recv_Disconnect(CommonResponse& _return);
+  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override;
+  void send_CreateDatabase(const CreateDatabaseRequest& request);
   void recv_CreateDatabase(CommonResponse& _return);
+  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override;
+  void send_DropDatabase(const DropDatabaseRequest& request);
+  void recv_DropDatabase(CommonResponse& _return);
 };
 
 class CalculatorProcessor : public  ::shared::SharedServiceProcessor {
@@ -705,7 +915,9 @@ class CalculatorProcessor : public  ::shared::SharedServiceProcessor {
   void process_calculate(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_zip(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Connect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Disconnect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_CreateDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_DropDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   CalculatorProcessor(::std::shared_ptr<CalculatorIf> iface) :
      ::shared::SharedServiceProcessor(iface),
@@ -715,7 +927,9 @@ class CalculatorProcessor : public  ::shared::SharedServiceProcessor {
     processMap_["calculate"] = &CalculatorProcessor::process_calculate;
     processMap_["zip"] = &CalculatorProcessor::process_zip;
     processMap_["Connect"] = &CalculatorProcessor::process_Connect;
+    processMap_["Disconnect"] = &CalculatorProcessor::process_Disconnect;
     processMap_["CreateDatabase"] = &CalculatorProcessor::process_CreateDatabase;
+    processMap_["DropDatabase"] = &CalculatorProcessor::process_DropDatabase;
   }
 
   virtual ~CalculatorProcessor() {}
@@ -796,23 +1010,43 @@ class CalculatorMultiface : virtual public CalculatorIf, public  ::shared::Share
     ifaces_[i]->zip();
   }
 
-  void Connect(CommonResponse& _return, const CommonRequest& req) override {
+  void Connect(CommonResponse& _return) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Connect(_return, req);
+      ifaces_[i]->Connect(_return);
     }
-    ifaces_[i]->Connect(_return, req);
+    ifaces_[i]->Connect(_return);
     return;
   }
 
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& req) override {
+  void Disconnect(CommonResponse& _return, const CommonRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->CreateDatabase(_return, req);
+      ifaces_[i]->Disconnect(_return, request);
     }
-    ifaces_[i]->CreateDatabase(_return, req);
+    ifaces_[i]->Disconnect(_return, request);
+    return;
+  }
+
+  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->CreateDatabase(_return, request);
+    }
+    ifaces_[i]->CreateDatabase(_return, request);
+    return;
+  }
+
+  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->DropDatabase(_return, request);
+    }
+    ifaces_[i]->DropDatabase(_return, request);
     return;
   }
 
@@ -854,12 +1088,18 @@ class CalculatorConcurrentClient : virtual public CalculatorIf, public  ::shared
    */
   void zip() override;
   void send_zip();
-  void Connect(CommonResponse& _return, const CommonRequest& req) override;
-  int32_t send_Connect(const CommonRequest& req);
+  void Connect(CommonResponse& _return) override;
+  int32_t send_Connect();
   void recv_Connect(CommonResponse& _return, const int32_t seqid);
-  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& req) override;
-  int32_t send_CreateDatabase(const CreateDatabaseRequest& req);
+  void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
+  int32_t send_Disconnect(const CommonRequest& request);
+  void recv_Disconnect(CommonResponse& _return, const int32_t seqid);
+  void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) override;
+  int32_t send_CreateDatabase(const CreateDatabaseRequest& request);
   void recv_CreateDatabase(CommonResponse& _return, const int32_t seqid);
+  void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) override;
+  int32_t send_DropDatabase(const DropDatabaseRequest& request);
+  void recv_DropDatabase(CommonResponse& _return, const int32_t seqid);
 };
 
 #ifdef _MSC_VER

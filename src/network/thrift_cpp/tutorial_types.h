@@ -55,6 +55,8 @@ class Option;
 
 class CreateDatabaseRequest;
 
+class DropDatabaseRequest;
+
 class CommonResponse;
 
 class CommonRequest;
@@ -285,6 +287,62 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
 void swap(CreateDatabaseRequest &a, CreateDatabaseRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const CreateDatabaseRequest& obj);
+
+typedef struct _DropDatabaseRequest__isset {
+  _DropDatabaseRequest__isset() : db_name(false), session_id(false), option(false) {}
+  bool db_name :1;
+  bool session_id :1;
+  bool option :1;
+} _DropDatabaseRequest__isset;
+
+class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DropDatabaseRequest(const DropDatabaseRequest&);
+  DropDatabaseRequest& operator=(const DropDatabaseRequest&);
+  DropDatabaseRequest() noexcept
+                      : db_name(),
+                        session_id(0) {
+  }
+
+  virtual ~DropDatabaseRequest() noexcept;
+  std::string db_name;
+  int64_t session_id;
+  Option option;
+
+  _DropDatabaseRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  void __set_option(const Option& val);
+
+  bool operator == (const DropDatabaseRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(option == rhs.option))
+      return false;
+    return true;
+  }
+  bool operator != (const DropDatabaseRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DropDatabaseRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DropDatabaseRequest &a, DropDatabaseRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DropDatabaseRequest& obj);
 
 typedef struct _CommonResponse__isset {
   _CommonResponse__isset() : success(false), error_msg(false), session_id(false) {}
