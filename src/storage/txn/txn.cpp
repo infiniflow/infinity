@@ -321,9 +321,13 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
                                             new_table_entry);
 
     if (new_table_entry == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
-        LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kError, Move(err_msg));
+        if(status.ok()) {
+            UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
+            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kError, Move(err_msg));
+        } else {
+            return status;
+        }
     }
 
     if (new_table_entry->entry_type_ != EntryType::kTable) {
