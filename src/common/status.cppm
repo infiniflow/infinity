@@ -33,7 +33,7 @@ export enum class ErrorCode : long {
     kServiceUnavailable,
     kWWConflict,
     kDuplicate,
-
+    kUndefined,
 };
 
 export class Status {
@@ -50,9 +50,9 @@ public:
 
     Status(Status &&s) noexcept;
 
-    [[nodiscard]] Status &operator=(Status &s) noexcept;
+    Status &operator=(Status &s) noexcept;
 
-    [[nodiscard]] Status &operator=(Status &&s) noexcept;
+    Status &operator=(Status &&s) noexcept;
 
     const Status &operator=(const Status &s) noexcept = delete;
 

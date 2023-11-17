@@ -1078,11 +1078,13 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     output_block_ptr->Init(column_types);
 
     for (const auto &[index_name, index_def_meta] : table_collection_entry->indexes_) {
-        auto entry = IndexDefMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS());
-        if (entry.Fail()) {
+        BaseEntry* base_entry{nullptr};
+        Status status = IndexDefMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS(), base_entry);
+        if (!status.ok()) {
+            // Index isn't found.
             continue;
         }
-        auto index_def_entry = static_cast<IndexDefEntry *>(entry.entry_);
+        auto index_def_entry = static_cast<IndexDefEntry *>(base_entry);
         auto index_def = index_def_entry->index_def_.get();
         SizeT column_id = 0;
         {
@@ -1363,12 +1365,13 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
     TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
 
-    EntryResult result = txn->GetViewByName(db_name_, object_name_);
-    if (result.err_.get() != nullptr) {
-        Error<ExecutorException>(*result.err_);
+    BaseEntry* base_entry{nullptr};
+    status = txn->GetViewByName(db_name_, object_name_, base_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
 
-    ViewEntry *view_entry = static_cast<ViewEntry *>(result.entry_);
+    ViewEntry *view_entry = static_cast<ViewEntry *>(base_entry);
 
     ExecuteShowViewDetail(query_context, view_entry->column_types(), view_entry->column_names());
 

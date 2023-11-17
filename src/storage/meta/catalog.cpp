@@ -57,7 +57,8 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::CreateDatabase instead
-EntryResult NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Status
+NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
 
     // Check if there is db_meta with the db_name
     catalog->rw_locker_.lock_shared();
@@ -85,16 +86,15 @@ EntryResult NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_nam
     }
 
     LOG_TRACE(Format("Add new database entry: {}", db_name));
-    EntryResult res = DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry);
 }
 
 // do not only use this method to drop database
 // it will not record database in transaction, so when you commit transaction
 // it will lost operation
 // use Txn::DropDatabase instead
-EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Status
+NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
 
     catalog->rw_locker_.lock_shared();
 
@@ -104,17 +104,16 @@ EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name,
     }
     catalog->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
-        LOG_TRACE(Format("Attempt to drop not existed database entry {}", db_name));
-        return {nullptr, MakeUnique<String>("Attempt to drop not existed database entry")};
+        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed database entry {}", db_name));
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     LOG_TRACE(Format("Drop a database entry {}", db_name));
-    EntryResult res = DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry);
 }
 
-Status NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry) {
+Status NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry) {
 
     DBMeta *db_meta{nullptr};
     catalog->rw_locker_.lock_shared();
@@ -150,9 +149,9 @@ Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTime
     Vector<DBEntry *> res;
     res.reserve(catalog->databases_.size());
     for (const auto &db_meta : catalog->databases_) {
-        BaseEntry* base_db_entry{nullptr};
+        BaseEntry *base_db_entry{nullptr};
         Status status = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts, base_db_entry);
-        if(status.ok()) {
+        if (status.ok()) {
             res.emplace_back(static_cast<DBEntry *>(base_db_entry));
         }
     }

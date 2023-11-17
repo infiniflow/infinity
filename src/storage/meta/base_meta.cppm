@@ -17,6 +17,7 @@ module;
 import stl;
 import base_entry;
 import parser;
+import status;
 
 export module base_meta;
 
@@ -33,7 +34,7 @@ public:
 
     static void DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static EntryResult GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry);
 
 protected:
     enum EntryStatus : u8 {
