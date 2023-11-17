@@ -186,12 +186,19 @@ export using TokenStream = irs::token_stream;
 export using StringTokenStream = irs::string_token_stream;
 export using NumericTokenStream = irs::numeric_token_stream;
 export using DataOutput = irs::data_output;
-export using IResearchAnalyzer = irs::analysis::analyzer;
-export using IResearchJiebaAnalyzer = irs::analysis::jieba_analyzer;
-export using IResearchSegmentationAnalyzer = irs::analysis::segmentation_token_stream;
-export using IResearchIndexWriter = irs::IndexWriter;
-export inline void IResearchWriteString(DataOutput &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
-export inline void IResearchWriteZVlong(DataOutput &out, int64_t v) { return irs::write_zvlong(out, v); }
+export using IRSAnalyzer = irs::analysis::analyzer;
+export using IRSJiebaAnalyzer = irs::analysis::jieba_analyzer;
+export using IRSSegmentationAnalyzer = irs::analysis::segmentation_token_stream;
+export using IRSIndexWriter = irs::IndexWriter;
+export using IRSIndexReader = irs::IndexReader;
+export using IRSDirectory = irs::directory;
+export using IRSDirectoryReader = irs::DirectoryReader;
+export using IRSSubReader = irs::SubReader;
+export using IRSIndexWriterOptions = irs::IndexWriterOptions;
+export using IRSIndexReaderOptions = irs::IndexReaderOptions;
+export using OpenMode = irs::OpenMode;
+export inline void IRSWriteString(DataOutput &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
+export inline void IRSWriteZVlong(DataOutput &out, int64_t v) { return irs::write_zvlong(out, v); }
 
 export template <class T>
 using HashDefaultHash = phmap::priv::hash_default_hash<T>;
