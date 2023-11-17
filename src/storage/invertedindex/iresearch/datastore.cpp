@@ -73,18 +73,42 @@ struct MaintenanceState {
 };
 
 struct Task {
+    IRSAsync *async_{nullptr};
     SharedPtr<MaintenanceState> state_;
     SharedPtr<IRSDataStore> store_;
 };
 
 struct ConsolidationTask : Task {
-    void operator()(int id) const;
+    ConsolidationTask() {}
+
+    ConsolidationTask(const ConsolidationTask &other) {
+        state_ = other.state_;
+        store_ = other.store_;
+        async_ = other.async_;
+        consolidation_interval_ = other.consolidation_interval_;
+    }
+
+    void operator()(int id);
+
     bool optimize_{false};
+
     std::chrono::milliseconds consolidation_interval_{};
 };
 
-void ConsolidationTask::operator()(int id) const {
+void ConsolidationTask::operator()(int id) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
+    if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
+        // reschedule
+        for (auto count = state_->pending_consolidations_.load(MemoryOrderAcquire); count < 1;) {
+            if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
+                ConsolidationTask task(*this);
+                async_->Queue(0, Move(task));
+                break;
+            }
+        }
+    }
+
     if (optimize_) {
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
         store_->GetWriter()->Commit();
@@ -94,13 +118,37 @@ void ConsolidationTask::operator()(int id) const {
 }
 
 struct CommitTask : Task {
-    void operator()(int id) const;
-    std::chrono::milliseconds commit_interval_{};
+    CommitTask() {}
+
+    CommitTask(const CommitTask &other) {
+        state_ = other.state_;
+        store_ = other.store_;
+        async_ = other.async_;
+        commit_interval_ = other.commit_interval_;
+    }
+
+    void operator()(int id);
+
+    void Finalize();
+
+    std::chrono::milliseconds commit_interval_{0};
 };
 
-void CommitTask::operator()(int id) const {
+void CommitTask::operator()(int id) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(commit_interval_));
     state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
-    store_->GetWriter()->Commit();
+    Finalize();
+    store_->Commit();
+}
+
+void CommitTask::Finalize() {
+    constexpr size_t kMaxPendingConsolidations = 3;
+    CommitTask task(*this);
+    state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
+    async_->Queue(0, Move(task));
+    if (state_->pending_consolidations_.load(MemoryOrderRelease) < kMaxPendingConsolidations) {
+        store_->ScheduleConsolidation();
+    }
 }
 
 IRSDataStore::IRSDataStore(const String &directory) : directory_(directory), path_{Path(directory_)} {
@@ -131,12 +179,13 @@ IRSDataStore::IRSDataStore(const String &directory) : directory_(directory), pat
     StoreSnapshot(data);
 }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), std::memory_order_release); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
 
-IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, std::memory_order_acquire); }
+IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, MemoryOrderAcquire); }
 
 void IRSDataStore::Commit() {
     UniqueLock<Mutex> lk(commit_mutex_);
+    index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
     StoreSnapshot(data);
@@ -145,6 +194,7 @@ void IRSDataStore::Commit() {
 void IRSDataStore::ScheduleCommit() {
     CommitTask task;
     task.state_ = maintenance_state_;
+    task.async_ = async_.get();
     maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
     async_->Queue<CommitTask>(0, Move(task));
 }
@@ -152,8 +202,9 @@ void IRSDataStore::ScheduleCommit() {
 void IRSDataStore::ScheduleConsolidation() {
     ConsolidationTask task;
     task.state_ = maintenance_state_;
+    task.async_ = async_.get();
     task.optimize_ = false;
-    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
+    maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
     async_->Queue<ConsolidationTask>(0, Move(task));
 }
 
@@ -161,7 +212,7 @@ void IRSDataStore::ScheduleOptimize() {
     ConsolidationTask task;
     task.state_ = maintenance_state_;
     task.optimize_ = true;
-    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
+    maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
     async_->Queue<ConsolidationTask>(0, Move(task));
 }
 
