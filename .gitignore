@@ -89,9 +89,15 @@ benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
 
 #proto
-python/infinity/infinity_pb2.py
-python/infinity/infinity_pb2_grpc.py
+python/infinity/remote/infinity_pb2.py
+python/infinity/remote/infinity_pb2_grpc.py
 src/network/infinity.grpc.pb.cc
 src/network/infinity.grpc.pb.h
 src/network/infinity.pb.cc
 src/network/infinity.pb.h
+
+#python sdk
+python/build
+python/dist
+python/infinity.egg-info
+python/.idea
