@@ -67,36 +67,36 @@ public:
 
     void Rollback();
 
-    EntryResult CreateDatabase(const String &db_name, ConflictType conflict_type);
+    Status CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& db_entry);
 
-    EntryResult DropDatabase(const String &db_name, ConflictType conflict_type);
+    Status DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& db_entry);
 
-    Status GetDatabase(const String &db_name, BaseEntry*& new_db_entry);
+    Status GetDatabase(const String &db_name, BaseEntry *&new_db_entry);
 
     Vector<DatabaseDetail> ListDatabases();
 
-    Status GetTableCollections(const String &db_name, Vector<TableCollectionDetail>& output_table_array);
+    Status GetTableCollections(const String &db_name, Vector<TableCollectionDetail> &output_table_array);
 
-    Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type, BaseEntry*& new_table_entry);
+    Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type, BaseEntry *&new_table_entry);
 
     Status CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type);
 
-    Status GetTableByName(const String &db_name, const String &table_name, BaseEntry*& new_table_entry);
+    Status GetTableByName(const String &db_name, const String &table_name, BaseEntry *&new_table_entry);
 
-    EntryResult CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type);
+    Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
-    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type, BaseEntry*& drop_table_entry);
+    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type, BaseEntry *&drop_table_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
-    EntryResult GetCollectionByName(const String &db_name, const String &table_name);
+    Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     // Fixme: view definition should be given
-    EntryResult CreateView(const String &db_name, const String &view_name, ConflictType conflict_type);
+    Status CreateView(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);
 
-    EntryResult DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type);
+    Status DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);
 
-    EntryResult GetViewByName(const String &db_name, const String &view_name);
+    Status GetViewByName(const String &db_name, const String &view_name, BaseEntry *&view_entry);
 
     Vector<BaseEntry *> GetViews(const String &db_name);
 

@@ -479,6 +479,7 @@ infinity_proto::ColumnType BrpcServiceImpl::DataTypeToProtoColumnType(const Shar
         default:
             Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
     }
+    return infinity_proto::ColumnType::kColumnInvalid;
 }
 
 infinity_proto::DataType *BrpcServiceImpl::DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
@@ -539,6 +540,7 @@ infinity_proto::DataType *BrpcServiceImpl::DataTypeToProtoDataType(const SharedP
         default:
             Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
     }
+    return nullptr;
 }
 
 SharedPtr<DataType> BrpcServiceImpl::GetColumnTypeFromProto(const infinity_proto::DataType &type) {
@@ -571,6 +573,7 @@ SharedPtr<DataType> BrpcServiceImpl::GetColumnTypeFromProto(const infinity_proto
         default:
             Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
     }
+    return nullptr;
 }
 
 ConstraintType BrpcServiceImpl::GetConstraintTypeFromProto(const infinity_proto::Constraint &constraint) {
@@ -684,16 +687,15 @@ FunctionExpr *BrpcServiceImpl::GetFunctionExprFromProto(const infinity_proto::Fu
 }
 
 ParsedExpr *BrpcServiceImpl::GetParsedExprFromProto(const infinity_proto::ParsedExpr &expr) {
+    ParsedExpr *parsed_expr{nullptr};
     if (expr.has_column_expr()) {
-        auto parsed_expr = GetColumnExprFromProto(expr.column_expr());
-        return parsed_expr;
+        parsed_expr = GetColumnExprFromProto(expr.column_expr());
     } else if (expr.has_constant_expr()) {
-        auto parsed_expr = GetConstantFromProto(expr.constant_expr().literal_type(), expr.constant_expr());
-        return parsed_expr;
+        parsed_expr = GetConstantFromProto(expr.constant_expr().literal_type(), expr.constant_expr());
     } else if (expr.has_function_expr()) {
-        auto parsed_expr = GetFunctionExprFromProto(expr.function_expr());
-        return parsed_expr;
+        parsed_expr = GetFunctionExprFromProto(expr.function_expr());
     }
+    return parsed_expr;
 }
 
 SharedPtr<Infinity> BrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {

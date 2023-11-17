@@ -39,6 +39,7 @@ import index_def_meta;
 import index_def_entry;
 import index_entry;
 import block_column_entry;
+import base_entry;
 import knn_expression;
 import column_expression;
 
@@ -111,11 +112,12 @@ Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWith
     TableCollectionEntry *table_entry = base_table_ref_->table_entry_ptr_;
     HashMap<u32, Vector<IndexEntry *>> index_entry_map;
     for (auto &[index_name, index_meta] : table_entry->indexes_) {
-        auto entry_result = IndexDefMeta::GetEntry(index_meta.get(), txn_id, begin_ts);
-        if (entry_result.entry_ == nullptr) {
-            throw StorageException("Cannot find index entry.");
+        BaseEntry *base_entry{nullptr};
+        auto status = IndexDefMeta::GetEntry(index_meta.get(), txn_id, begin_ts, base_entry);
+        if (!status.ok()) {
+            Error<StorageException>("Cannot find index entry.");
         }
-        auto index_def_entry = static_cast<IndexDefEntry *>(entry_result.entry_);
+        auto index_def_entry = static_cast<IndexDefEntry *>(base_entry);
         for (auto &[segment_id, index_entry] : index_def_entry->indexes_) {
             index_entry_map[segment_id].emplace_back(index_entry.get());
         }
@@ -208,6 +210,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
                         break;
                     }
+                    default: {
+                        Error<ExecutorException>("Not implemented");
+                    }
                 }
                 break;
             }
@@ -255,7 +260,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 break;
             }
             default: {
-                throw ExecutorException("Not implemented");
+                Error<ExecutorException>("Not implemented");
             }
         }
     }

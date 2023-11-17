@@ -25,6 +25,7 @@ import txn_state;
 import logger;
 import parser;
 import third_party;
+import status;
 
 module base_meta;
 
@@ -98,30 +99,35 @@ void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
     meta->entry_list_.erase(removed_iter, meta->entry_list_.end());
 }
 
-EntryResult BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts) {
+Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
     SharedLock<RWMutex> r_locker(meta->rw_locker_);
     for (const auto &entry : meta->entry_list_) {
         if (entry->entry_type_ == EntryType::kDummy) {
-            LOG_TRACE("No valid entry");
-            return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid entry")};
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kNotFound, Move(err_msg));
         }
 
         if (entry->commit_ts_ < UNCOMMIT_TS) {
             // committed
             if (begin_ts > entry->commit_ts_) {
                 if (entry->deleted_) {
-                    LOG_TRACE("No valid entry");
-                    return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid entry")};
+                    UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                    LOG_ERROR(*err_msg);
+                    return Status(ErrorCode::kNotFound, Move(err_msg));
                 } else {
-                    return {.entry_ = entry.get(), .err_ = nullptr};
+                    base_entry = entry.get();
+                    return Status::OK();
                 }
             }
         } else if (txn_id == entry->txn_id_) {
             // same txn
-            return {.entry_ = entry.get(), .err_ = nullptr};
+            base_entry = entry.get();
+            return Status::OK();
         }
     }
-    LOG_TRACE("No valid entry");
-    return {.entry_ = nullptr, .err_ = MakeUnique<String>("No valid entry")};
+    UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+    LOG_ERROR(*err_msg);
+    return Status(ErrorCode::kNotFound, Move(err_msg));
 }
 } // namespace infinity

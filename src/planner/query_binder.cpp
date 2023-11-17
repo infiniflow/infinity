@@ -405,12 +405,13 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
 }
 
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
-    EntryResult result = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_);
-    if (result.err_.get() != nullptr) {
-        Error<PlannerException>(*result.err_);
+    BaseEntry* base_view_entry{nullptr};
+    Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
+    if (!status.ok()) {
+        Error<PlannerException>(status.message());
     }
 
-    ViewEntry *view_entry = static_cast<ViewEntry *>(result.entry_);
+    ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);
 
     // Build view scan operator
     Assert<PlannerException>(!(this->bind_context_ptr_->IsViewBound(from_table->table_name_)),

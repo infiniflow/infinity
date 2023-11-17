@@ -32,8 +32,7 @@ module db_meta;
 
 namespace infinity {
 
-EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    DBEntry *res = nullptr;
+Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
 
     //    rw_locker_.lock();
@@ -45,19 +44,19 @@ EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp beg
 
         // Insert the new db entry
         UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-        res = db_entry.get();
+        res_entry = db_entry.get();
         db_meta->entry_list_.emplace_front(Move(db_entry));
 
         LOG_TRACE("New database entry is added.");
-        return {res, nullptr};
+        return Status::OK();
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry *header_base_entry = db_meta->entry_list_.front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-            res = db_entry.get();
+            res_entry = db_entry.get();
             db_meta->entry_list_.emplace_front(Move(db_entry));
-            return {res, nullptr};
+            return Status::OK();
         }
 
         DBEntry *header_db_entry = (DBEntry *)header_base_entry;
@@ -66,18 +65,21 @@ EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp beg
                 if (header_db_entry->deleted_) {
                     // No conflict
                     UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-                    res = db_entry.get();
+                    res_entry = db_entry.get();
                     db_meta->entry_list_.emplace_front(Move(db_entry));
-                    return {res, nullptr};
+                    return Status::OK();
                 } else {
                     // Duplicated database
-                    LOG_ERROR(Format("Duplicated database name: {}.", *db_meta->db_name_));
-                    return {nullptr, MakeUnique<String>("Duplicated database.")};
+                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *db_meta->db_name_));
+                    LOG_ERROR(*err_msg);
+                    return Status(ErrorCode::kDuplicate, Move(err_msg));
                 }
             } else {
                 // Write-Write conflict
-                LOG_TRACE(Format("Write-write conflict: There is a committed database which is later than current transaction."));
-                return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+                UniquePtr<String> err_msg =
+                    MakeUnique<String>(Format("Write-write conflict: There is a committed database which is later than current transaction."));
+                LOG_ERROR(*err_msg);
+                return Status(ErrorCode::kWWConflict, Move(err_msg));
             }
         } else {
 
@@ -90,25 +92,27 @@ EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp beg
                         // Same txn
                         if (header_db_entry->deleted_) {
                             UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-                            res = db_entry.get();
+                            res_entry = db_entry.get();
                             db_meta->entry_list_.emplace_front(Move(db_entry));
-                            return {res, nullptr};
+                            return Status::OK();
                         } else {
-                            LOG_TRACE("Create a duplicated name database.");
-                            return {nullptr, MakeUnique<String>("Create a duplicated name database.")};
+                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *db_meta->db_name_));
+                            LOG_ERROR(*err_msg);
+                            return Status(ErrorCode::kDuplicate, Move(err_msg));
                         }
                     } else {
-                        LOG_TRACE("Write-write conflict: There is a uncommitted transaction.");
-                        return {nullptr, MakeUnique<String>("Write-write conflict: There is a uncommitted transaction.")};
+                        UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is a uncommitted transaction."));
+                        LOG_ERROR(*err_msg);
+                        return Status(ErrorCode::kWWConflict, Move(err_msg));
                     }
                 }
                 case TxnState::kCommitting:
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
-                    LOG_TRACE("Write-write conflict: There is a committing/committed database which is later than current transaction.");
-                    return {nullptr,
-                            MakeUnique<String>(
-                                "Write-write conflict: There is a committing/committed database which is later than current transaction.")};
+                    UniquePtr<String> err_msg = MakeUnique<String>(
+                        Format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
+                    LOG_ERROR(*err_msg);
+                    return Status(ErrorCode::kWWConflict, Move(err_msg));
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -117,32 +121,33 @@ EntryResult DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp beg
 
                     // Append new one
                     UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-                    res = db_entry.get();
+                    res_entry = db_entry.get();
                     db_meta->entry_list_.emplace_front(Move(db_entry));
-                    return {res, nullptr};
+                    return Status::OK();
                 }
                 default: {
-                    LOG_TRACE("Invalid db entry txn state");
-                    return {nullptr, MakeUnique<String>("Invalid db entry txn state.")};
+                    UniquePtr<String> err_msg = MakeUnique<String>("Invalid db entry txn state");
+                    LOG_ERROR(*err_msg);
+                    return Status(ErrorCode::kUndefined, Move(err_msg));
                 }
             }
         }
     }
 }
 
-EntryResult DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    DBEntry *res = nullptr;
+Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
-        LOG_TRACE("Empty db entry list.");
-        return {nullptr, MakeUnique<String>("Empty db entry list.")};
+        UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     BaseEntry *header_base_entry = db_meta->entry_list_.front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
-        //            rw_locker_.unlock();
-        LOG_TRACE("No valid db entry.");
-        return {nullptr, MakeUnique<String>("No valid db entry.")};
+        UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     DBEntry *header_db_entry = (DBEntry *)header_base_entry;
@@ -150,33 +155,38 @@ EntryResult DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin
         if (begin_ts > header_db_entry->commit_ts_) {
             // No conflict
             if (header_db_entry->deleted_) {
-                LOG_TRACE("DB is dropped before.");
-                return {nullptr, MakeUnique<String>("DB is dropped before.")};
+                UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
+                LOG_TRACE(*err_msg);
+                return Status(ErrorCode::kNotFound, Move(err_msg));
             }
 
             UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts);
-            res = db_entry.get();
-            res->deleted_ = true;
+            res_entry = db_entry.get();
+            res_entry->deleted_ = true;
             db_meta->entry_list_.emplace_front(Move(db_entry));
 
-            return {res, nullptr};
+            return Status::OK();
         } else {
             // Write-Write conflict
-            LOG_TRACE("Write-write conflict: There is a committed database which is later than current transaction.");
-            return {nullptr, MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.")};
+            UniquePtr<String> err_msg =
+                MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.");
+            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kWWConflict, Move(err_msg));
         }
     } else {
         // Uncommitted, check if the same txn
         if (txn_id == header_db_entry->txn_id_) {
             // Same txn, remove the header db entry
-            res = header_db_entry;
+            res_entry = header_db_entry;
             db_meta->entry_list_.erase(db_meta->entry_list_.begin());
 
-            return {res, nullptr};
+            return Status::OK();
         } else {
             // Not same txn, issue WW conflict
-            LOG_TRACE("Write-write conflict: There is another uncommitted db entry.");
-            return {nullptr, MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.")};
+            UniquePtr<String> err_msg =
+                    MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.");
+            LOG_ERROR(*err_msg);
+            return Status(ErrorCode::kWWConflict, Move(err_msg));
         }
     }
 }
@@ -194,7 +204,7 @@ void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
     db_meta->entry_list_.erase(removed_iter, db_meta->entry_list_.end());
 }
 
-Status DBMeta::GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry) {
+Status DBMeta::GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry) {
     SharedLock<RWMutex> r_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
