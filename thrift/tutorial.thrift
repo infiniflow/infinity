@@ -63,7 +63,7 @@ include "shared.thrift"
  * target languages.
  */
 
-namespace cl tutorial
+
 namespace cpp tutorial
 namespace d tutorial
 namespace dart tutorial
@@ -145,7 +145,11 @@ service Calculator extends shared.SharedService {
     * a request and does not listen for any response at all. Oneway methods
     * must be void.
     */
-   oneway void zip()
+   oneway void zip(),
+
+   CommonResponse Connect(1:CommonRequest req),
+
+   CommonResponse CreateDatabase(1:CreateDatabaseRequest req)
 
 }
 
@@ -155,3 +159,24 @@ service Calculator extends shared.SharedService {
  * in folders with names gen-<language>. The generated code isn't too scary
  * to look at. It even has pretty indentation.
  */
+
+struct Option {
+
+}
+
+struct CreateDatabaseRequest {
+     1:  string db_name,
+     2:  i64 session_id,
+     3:  Option option,
+}
+
+struct CommonResponse {
+    1:  bool success,
+    2:  string error_msg,
+    3:  i64 session_id,
+}
+
+struct CommonRequest {
+    1:  i64 session_id,
+}
+

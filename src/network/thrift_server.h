@@ -29,6 +29,13 @@
 #include <sstream>
 #include <stdexcept>
 
+import stl;
+import infinity;
+import database;
+import table;
+import parser;
+import query_options;
+
 using namespace std;
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

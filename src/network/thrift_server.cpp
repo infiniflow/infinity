@@ -26,6 +26,7 @@
 #include <thrift/transport/TTransportUtils.h>
 
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 
@@ -91,8 +92,28 @@ public:
 
     void zip() override { cout << "zip()" << endl; }
 
+    void CreateDatabase(tutorial::CommonResponse &_return, const tutorial::CreateDatabaseRequest &req) override {
+
+    }
+
+    void Connect(tutorial::CommonResponse &_return, const tutorial::CommonRequest &req) override {
+        auto infinity = infinity::Infinity::RemoteConnect();
+        if (infinity == nullptr) {
+            _return.success = false;
+            _return.error_msg = "error";
+        } else {
+            infinity_session_map_mutex_.lock();
+            infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
+            infinity_session_map_mutex_.unlock();
+            _return.success = true;
+            _return.error_msg = "success";
+        }
+    }
+
 protected:
     map<int32_t, SharedStruct> log;
+    std::mutex infinity_session_map_mutex_{};
+    std::unordered_map<infinity::u64, infinity::SharedPtr<infinity::Infinity>> infinity_session_map_{};
 };
 
 /*
