@@ -2048,6 +2048,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         case kVarchar: {
             size += sizeof(i32);
 
+            // FIME: on `Finalize` phase, the column vector size can be settled.
             VarcharT *base_dst_ptr = (VarcharT *)(this->data_ptr_);
             for (SizeT idx = 0; idx < this->tail_index_; idx++) {
                 VarcharT &val_ref = base_dst_ptr[idx];
@@ -2100,6 +2101,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
             ptr += this->tail_index_ * this->data_type_size_;
             break;
         }
+            // FIXME: Move Varchar on here
         default:
             // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
@@ -2144,6 +2146,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
             ptr += tail_index * data_type_size;
             break;
         }
+            // FIXME: Move Varchar on here
         default:
             // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
             Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
