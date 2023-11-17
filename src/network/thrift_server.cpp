@@ -120,49 +120,35 @@ import logger;
 
 namespace infinity {
 
-void ThreadedThriftServer::Init() {
+void ThreadedThriftServer::Init(int32_t port_no) {
 
-    server.reset(new TThreadedServer(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
-                                     std::make_shared<TServerSocket>(9090), // port
-                                     std::make_shared<TBufferedTransportFactory>(),
-                                     std::make_shared<TBinaryProtocolFactory>()));
+    server = std::make_unique<TThreadedServer>(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
+                                               std::make_shared<TServerSocket>(port_no), // port
+                                               std::make_shared<TBufferedTransportFactory>(),
+                                               std::make_shared<TBinaryProtocolFactory>());
 }
 
-void ThreadedThriftServer::Start() {
-    //    LOG_TRACE("ThriftServer::Start()");
-    server->serve();
-}
+void ThreadedThriftServer::Start() { server->serve(); }
 
-void ThreadedThriftServer::Shutdown() {
-    server->stop();
-    std::cout << "Shutdown threaded thrift server" << std::endl;
-    //    LOG_TRACE("ThriftServer::Shutdown()");
-}
+void ThreadedThriftServer::Shutdown() { server->stop(); }
 
-void PoolThriftServer::Init() {
+void PoolThriftServer::Init(int32_t port_no, int32_t pool_size) {
 
-    std::shared_ptr<ThreadFactory> threadFactory = std::shared_ptr<ThreadFactory>(new ThreadFactory());
+    std::shared_ptr<ThreadFactory> threadFactory = std::make_shared<ThreadFactory>();
 
-    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(10);
+    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    server.reset(new TThreadPoolServer(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
-                                       std::make_shared<TServerSocket>(9090),
-                                       std::make_shared<TBufferedTransportFactory>(),
-                                       std::make_shared<TBinaryProtocolFactory>(),
-                                       threadManager));
+    server = std::make_unique<TThreadPoolServer>(std::make_shared<CalculatorProcessorFactory>(std::make_shared<CalculatorCloneFactory>()),
+                                                 std::make_shared<TServerSocket>(port_no),
+                                                 std::make_shared<TBufferedTransportFactory>(),
+                                                 std::make_shared<TBinaryProtocolFactory>(),
+                                                 threadManager);
 }
 
-void PoolThriftServer::Start() {
-    //    LOG_TRACE("ThriftServer::Start()");
-    server->serve();
-}
+void PoolThriftServer::Start() { server->serve(); }
 
-void PoolThriftServer::Shutdown() {
-    server->stop();
-    std::cout << "Shutdown pool thrift server" << std::endl;
-    //    LOG_TRACE("ThriftServer::Shutdown()");
-}
+void PoolThriftServer::Shutdown() { server->stop(); }
 
 } // namespace infinity

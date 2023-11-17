@@ -23,8 +23,11 @@ import db_server;
 namespace {
 
 infinity::DBServer db_server;
-infinity::Thread thrift_thread;
+
+infinity::Thread threaded_thrift_thread;
 infinity::ThreadedThriftServer threaded_thrift_server;
+
+infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
@@ -32,9 +35,12 @@ void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-//            threaded_thrift_server.Shutdown();
+            threaded_thrift_server.Shutdown();
+            threaded_thrift_thread.join();
+
             pool_thrift_server.Shutdown();
-            thrift_thread.join();
+            pool_thrift_thread.join();
+
             db_server.Shutdown();
             break;
         }
@@ -111,15 +117,13 @@ auto main(int argc, char **argv) -> int {
 
     db_server.Init(parameters);
     RegisterSignal();
-//    threaded_thrift_server.Init();
-    pool_thrift_server.Init();
-    thrift_thread = infinity::Thread([&]() {
-//        threaded_thrift_server.Start();
-        pool_thrift_server.Start();
-    });
+
+    threaded_thrift_server.Init(9080);
+    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+
+    pool_thrift_server.Init(9090, 16);
+    pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
     db_server.Run();
-    //    while(1) ;
-    //    thrift_server.Start();
 
     return 0;
 }
