@@ -51,7 +51,7 @@ SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
 
     SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count);
-    for (SizeT col_idx; col_idx < column_count; ++col_idx) {
+    for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
         const auto &column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
