@@ -53,7 +53,7 @@ public:
 
 private:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
-    size_t dimension_;
+    size_t dimension_{};
 };
 
 } // namespace infinity
