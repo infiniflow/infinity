@@ -18,7 +18,6 @@
 #include "spdlog/fmt/fmt.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
-#include "type/info/varchar_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
 #include <charconv>
@@ -177,9 +176,6 @@ int32_t DataType::GetSizeInBytes() const {
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
                 break;
-            case LogicalType::kVarchar:
-                size += sizeof(int32_t);
-                break;
             default:
                 ParserError(fmt::format("Unexpected type {} here.", int(this->type_)));
         }
@@ -224,16 +220,6 @@ void DataType::WriteAdv(char *&ptr) const {
             WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
             break;
         }
-        case LogicalType::kVarchar: {
-            int32_t capacity = MAX_VARCHAR_SIZE_INTERNAL;
-            if (this->type_info_ != nullptr) {
-                const VarcharInfo *varchar_info = dynamic_cast<VarcharInfo *>(this->type_info_.get());
-                if (varchar_info != nullptr)
-                    capacity = varchar_info->dimension();
-            }
-            WriteBufAdv<int32_t>(ptr, capacity);
-            break;
-        }
         default:
             // There's no type_info for other types
             break;
@@ -264,11 +250,6 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
             type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
-            break;
-        }
-        case LogicalType::kVarchar: {
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
-            type_info = VarcharInfo::Make(dimension);
             break;
         }
         default:
@@ -313,10 +294,6 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             }
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
-                break;
-            }
-            case LogicalType::kVarchar: {
-                type_info = VarcharInfo::Make(type_info_json["dimension"]);
                 break;
             }
             default:
