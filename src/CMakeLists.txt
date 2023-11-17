@@ -46,13 +46,6 @@ file(GLOB_RECURSE
         network/*.cppm
 )
 
-#file(GLOB_RECURSE
-#        network_h
-#        CONFIGURE_DEPENDS
-#        network/*.h
-#)
-#
-#
 file(GLOB_RECURSE
         grpc_cpp
         CONFIGURE_DEPENDS
@@ -212,7 +205,7 @@ target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -m
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
-        ${grpc_cpp}
+#        ${grpc_cpp}
 )
 
 target_sources(infinity
@@ -232,12 +225,12 @@ target_link_libraries(infinity
         newpfor
         openfst
 
-        protobuf
-        grpc
-        grpc++
-        gpr
-        absl_synchronization
-        iresearch
+#        protobuf
+#        grpc
+#        grpc++
+#        gpr
+#        absl_synchronization
+#        iresearch
 
         thrift
 #        profiler
@@ -337,8 +330,7 @@ add_executable(unit_test
         ${function_cpp}
         ${common_cpp}
         ${executor_cpp}
-        ${network_cpp}
-        ${grpc_cpp}
+#        ${grpc_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -357,11 +349,11 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
-        protobuf
-        grpc
-        grpc++
-        gpr
-        absl_synchronization
+#        protobuf
+#        grpc
+#        grpc++
+#        gpr
+#        absl_synchronization
         iresearch
 #        profiler
         thrift

@@ -97,4 +97,4 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 add_subdirectory(benchmark)
 
 #message("Compiling protobuf")
-execute_process(COMMAND ./generate_proto.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/proto)
+#execute_process(COMMAND ./generate_proto.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/proto)
