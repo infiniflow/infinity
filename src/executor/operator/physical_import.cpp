@@ -55,7 +55,6 @@ import segment_entry;
 import zsv;
 #include "statement/statement_common.h"
 #include "type/info/embedding_info.h"
-#include "type/info/varchar_info.h"
 
 module physical_import;
 
@@ -346,11 +345,6 @@ void PhysicalImport::CSVRowHandler(void *context) {
         auto column_type = block_column_entry->column_type_.get();
         SizeT dst_offset = write_row * column_type->Size();
         if (column_type->type() == kVarchar) {
-            auto varchar_info = dynamic_cast<VarcharInfo *>(column_type->type_info().get());
-            if (varchar_info->dimension() < str_view.size()) {
-                Error<ExecutorException>("Varchar data size exceeds dimension.");
-            }
-
             AppendVarcharData(block_column_entry, str_view, dst_offset);
         } else if (column_type->type() == kEmbedding) {
             Vector<StringView> res;

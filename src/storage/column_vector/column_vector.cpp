@@ -2045,8 +2045,21 @@ i32 ColumnVector::GetSizeInBytes() const {
             size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
             break;
         }
+        case kVarchar: {
+            size += sizeof(i32);
+
+            VarcharT *base_dst_ptr = (VarcharT *)(this->data_ptr_);
+            for (SizeT idx = 0; idx < this->tail_index_; idx++) {
+                VarcharT &val_ref = base_dst_ptr[idx];
+                if (!val_ref.IsInlined()) {
+                    size += VarcharT::PREFIX_LENGTH;
+                }
+                size += val_ref.length;
+            }
+            break;
+        }
         default:
-            // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
+            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
             Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
     }
     size += this->nulls_ptr_->GetSizeInBytes();

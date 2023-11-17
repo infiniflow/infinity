@@ -24,7 +24,6 @@
 #include "type/info/bitmap_info.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
-#include "type/info/varchar_info.h"
 #include <unordered_set>
 
 namespace infinity {
