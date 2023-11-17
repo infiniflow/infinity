@@ -40,20 +40,22 @@ public:
     }
 
 public:
-    static EntryResult CreateTableCollection(DBEntry *db_entry,
-                                             TableCollectionType table_collection_type,
-                                             const SharedPtr<String> &table_collection_name,
-                                             const Vector<SharedPtr<ColumnDef>> &columns,
-                                             u64 txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             TxnManager *txn_mgr);
+    static Status CreateTableCollection(DBEntry *db_entry,
+                                        TableCollectionType table_collection_type,
+                                        const SharedPtr<String> &table_collection_name,
+                                        const Vector<SharedPtr<ColumnDef>> &columns,
+                                        u64 txn_id,
+                                        TxnTimeStamp begin_ts,
+                                        TxnManager *txn_mgr,
+                                        BaseEntry *&base_entry);
 
-    static EntryResult DropTableCollection(DBEntry *db_entry,
-                                           const String &table_collection_name,
-                                           ConflictType conflict_type,
-                                           u64 txn_id,
-                                           TxnTimeStamp begin_ts,
-                                           TxnManager *txn_mgr);
+    static Status DropTableCollection(DBEntry *db_entry,
+                                      const String &table_collection_name,
+                                      ConflictType conflict_type,
+                                      u64 txn_id,
+                                      TxnTimeStamp begin_ts,
+                                      TxnManager *txn_mgr,
+                                      BaseEntry *&base_entry);
 
     static Status
     GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);

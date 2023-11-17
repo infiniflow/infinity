@@ -199,7 +199,7 @@ TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
 
-Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& base_entry) {
+Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&base_entry) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -225,7 +225,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, Ba
     return Status::OK();
 }
 
-Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& base_entry) {
+Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&base_entry) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -311,25 +311,25 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
 
     DBEntry *db_entry = (DBEntry *)base_db_entry;
 
-    EntryResult res = DBEntry::CreateTableCollection(db_entry,
-                                                     TableCollectionType::kTableEntry,
-                                                     table_def->table_name(),
-                                                     table_def->columns(),
-                                                     txn_id_,
-                                                     begin_ts,
-                                                     txn_mgr_);
+    status = DBEntry::CreateTableCollection(db_entry,
+                                            TableCollectionType::kTableEntry,
+                                            table_def->table_name(),
+                                            table_def->columns(),
+                                            txn_id_,
+                                            begin_ts,
+                                            txn_mgr_,
+                                            new_table_entry);
 
-    if (res.entry_ == nullptr) {
+    if (new_table_entry == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
         LOG_ERROR(*err_msg);
         return Status(ErrorCode::kError, Move(err_msg));
     }
 
-    if (res.entry_->entry_type_ != EntryType::kTable) {
+    if (new_table_entry->entry_type_ != EntryType::kTable) {
         Error<TransactionException>("Entry type should be table entry.");
     }
 
-    new_table_entry = res.entry_;
     auto *table_entry = static_cast<TableCollectionEntry *>(new_table_entry);
     txn_tables_.insert(table_entry);
     wal_entry_->cmds.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
@@ -397,19 +397,12 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     DBEntry *db_entry = (DBEntry *)base_db_entry;
 
-    EntryResult res = DBEntry::DropTableCollection(db_entry, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    status = DBEntry::DropTableCollection(db_entry, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_, drop_table_entry);
 
-    if (res.entry_ == nullptr) {
-        if (res.err_.get() == nullptr) {
-            return Status::OK();
-        } else {
-            //            UniquePtr<String> err_msg = MakeUnique<String>("TODO: DropTableCollectionFailed");
-            //            LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kError, Move(res.err_));
-        }
+    if (drop_table_entry == nullptr) {
+        return status;
     }
 
-    drop_table_entry = res.entry_;
     TableCollectionEntry *dropped_table_entry = static_cast<TableCollectionEntry *>(drop_table_entry);
 
     if (txn_tables_.contains(dropped_table_entry)) {

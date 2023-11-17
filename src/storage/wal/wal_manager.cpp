@@ -598,17 +598,20 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_i
         Error<StorageException>("Wal Replay: Get database failed");
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-    auto result = DBEntry::CreateTableCollection(db_entry,
+
+    BaseEntry* base_table_entry{nullptr};
+    status = DBEntry::CreateTableCollection(db_entry,
                                                  TableCollectionType::kTableEntry,
                                                  cmd.table_def->table_name(),
                                                  cmd.table_def->columns(),
                                                  txn_id,
                                                  commit_ts,
-                                                 storage_->txn_manager());
-    if (!result.Success()) {
-        Error<StorageException>("Wal Replay: Create table failed" + result.ToString());
+                                                 storage_->txn_manager(),
+                                                 base_table_entry);
+    if (!status.ok()) {
+        Error<StorageException>("Wal Replay: Create table failed" + *status.msg_);
     }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(result.entry_);
+    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     table_entry->Commit(commit_ts);
 }
 
@@ -628,11 +631,13 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i
         Error<StorageException>("Wal Replay: Get database failed");
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-    auto result = DBEntry::DropTableCollection(db_entry, cmd.table_name, ConflictType::kReplace, txn_id, commit_ts, nullptr);
-    if (!result.Success()) {
+
+    BaseEntry* base_table_entry{nullptr};
+    status = DBEntry::DropTableCollection(db_entry, cmd.table_name, ConflictType::kReplace, txn_id, commit_ts, nullptr, base_table_entry);
+    if (!status.ok()) {
         Error<StorageException>("Wal Replay: Drop table failed");
     }
-    result.entry_->Commit(commit_ts);
+    base_table_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts) {

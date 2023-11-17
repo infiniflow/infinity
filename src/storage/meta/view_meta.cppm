@@ -17,6 +17,8 @@ module;
 import stl;
 import base_entry;
 import parser;
+import base_entry;
+import status;
 
 export module view_meta;
 
@@ -38,11 +40,11 @@ public:
                                       TxnTimeStamp begin_ts,
                                       TxnManager *txn_mgr);
 
-    static EntryResult DropNewEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
+    static Status DropNewEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
 
     static void DeleteNewEntry(ViewMeta *table_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static EntryResult GetEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static Status GetEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<String> ToString(ViewMeta *table_meta);
 
