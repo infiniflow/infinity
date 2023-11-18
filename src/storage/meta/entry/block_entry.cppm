@@ -38,7 +38,8 @@ export struct BlockVersion {
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
 
-    Vector<Pair<TxnTimeStamp, i32>> created_{};
+    Vector<Pair<TxnTimeStamp, i64>> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+                                                // risk to write uninitialized buffer.
     Vector<TxnTimeStamp> deleted_{};
 };
 
@@ -84,10 +85,14 @@ public:
     // Get visible range of the BlockEntry since the given row number for a txn
     static Pair<u16, u16> VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin = 0);
 
-    static u16
-    AppendData(BlockEntry *block_entry, Txn *txn_ptr, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
+    static u16 AppendData(BlockEntry *block_entry,
+                          Txn *txn_ptr,
+                          DataBlock *input_data_block,
+                          u16 input_block_offset,
+                          u16 append_rows,
+                          BufferManager *buffer_mgr);
 
-    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID>& rows);
+    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows);
 
     static void CommitAppend(BlockEntry *block_entry, Txn *txn_ptr);
 

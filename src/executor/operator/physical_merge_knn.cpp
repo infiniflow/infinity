@@ -42,7 +42,7 @@ void PhysicalMergeKnn::Init() {}
 void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);
     if (merge_knn_op_state->input_complete_) {
-        LOG_TRACE("PhysicalMergeKnn::Execute complete");
+        LOG_TRACE("PhysicalMergeKnn::Input is complete");
     }
 
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;

@@ -25,6 +25,7 @@ import knn_scan_data;
 import table_def;
 import parser;
 import merge_knn_data;
+import blocking_queue;
 
 export module operator_state;
 
@@ -313,7 +314,7 @@ export struct QueueSinkState : public SinkState {
     inline explicit QueueSinkState() : SinkState(SinkStateType::kQueue) {}
 
     Vector<SharedPtr<DataBlock>> data_block_array_{};
-    Vector<FragmentDataQueue *> fragment_data_queues_;
+    Vector<BlockingQueue<SharedPtr<FragmentData>> *> fragment_data_queues_;
 };
 
 export struct MaterializeSinkState : public SinkState {
@@ -367,7 +368,7 @@ export struct QueueSourceState : public SourceState {
 
     void PushData(DataBlock *input_data_block);
 
-    FragmentDataQueue source_queue_;
+    BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
 
     SharedPtr<FragmentData> current_fragment_data_{};
 };
@@ -381,7 +382,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    FragmentDataQueue source_queue_;
+    BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {

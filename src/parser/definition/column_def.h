@@ -40,17 +40,11 @@ std::string ConstrainTypeToString(ConstraintType type);
 class TableElement {
 public:
     explicit TableElement(TableElementType type) : type_(type) {}
-
     virtual ~TableElement() = default;
-
-    TableElementType type_;
+    TableElementType type_{TableElementType::kColumn};
 };
 
 struct ColumnType {
-    //
-    //    explicit
-    //    ColumnType(LogicalType logical_type) : logical_type_(logical_type) {}
-
     LogicalType logical_type_;
     int64_t width;
     int64_t precision;
@@ -94,7 +88,7 @@ public:
 
 public:
     int64_t id_{-1};
-    std::shared_ptr<DataType> column_type_;
+    std::shared_ptr<DataType> column_type_{};
     std::string name_{};
     std::unordered_set<ConstraintType> constraints_{};
 };

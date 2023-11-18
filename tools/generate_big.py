@@ -27,7 +27,7 @@ def generate_test_varchar(
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} ( c1 int, c2 varchar({}));\n".format(table_name, dim)
+            "CREATE TABLE {} ( c1 int, c2 varchar);\n".format(table_name)
         )
         slt_file.write("\n")
 
