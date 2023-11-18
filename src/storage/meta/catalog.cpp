@@ -64,19 +64,19 @@ Status
 NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
 
     // Check if there is db_meta with the db_name
-    catalog->rw_locker_.lock_shared();
-
     DBMeta *db_meta{nullptr};
-    if (catalog->databases_.find(db_name) != catalog->databases_.end()) {
-        db_meta = catalog->databases_[db_name].get();
-    }
-    catalog->rw_locker_.unlock_shared();
 
-    // no db_meta
-    if (db_meta == nullptr) {
-        // Create new db meta
+    catalog->rw_locker_.lock_shared();
+    auto db_iter = catalog->databases_.find(db_name);
+    if (db_iter != catalog->databases_.end()) {
+        // Find the db
+        db_meta = db_iter->second.get();
+        catalog->rw_locker_.unlock_shared();
+    } else {
+        catalog->rw_locker_.unlock_shared();
+
         LOG_TRACE(Format("Create new database: {}", db_name));
-        // db current dir is same level as catalog
+        // Not find the db and create new db meta
         Path catalog_path(*catalog->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
@@ -84,7 +84,12 @@ NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_i
         db_meta = new_db_meta.get();
 
         catalog->rw_locker_.lock();
-        catalog->databases_[db_name] = Move(new_db_meta);
+        auto db_iter = catalog->databases_.find(db_name);
+        if(db_iter == catalog->databases_.end()) {
+            catalog->databases_[db_name] = Move(new_db_meta);
+        } else {
+            db_meta = db_iter->second.get();
+        }
         catalog->rw_locker_.unlock();
     }
 
@@ -94,7 +99,7 @@ NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_i
 
 // do not only use this method to drop database
 // it will not record database in transaction, so when you commit transaction
-// it will lost operation
+// it will lose operation
 // use Txn::DropDatabase instead
 Status
 NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {

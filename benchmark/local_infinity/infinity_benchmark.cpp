@@ -29,7 +29,9 @@ import query_result;
 
 using namespace infinity;
 
-f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, SharedPtr<Infinity>)>& closure) {
+constexpr u64 second_unit = 1000 * 1000 * 1000;
+
+double Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, SharedPtr<Infinity>, std::thread::id)>& closure) {
     infinity::BaseProfiler profiler;
     Vector<std::thread> threads;
     threads.reserve(thread_num);
@@ -39,9 +41,11 @@ f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, Sha
     SizeT shared_size = times / thread_num;
     for (SizeT i = 0; i < thread_num; ++i) {
         threads.emplace_back([&]() {
+            std::thread::id thread_id = std::this_thread::get_id();
+            std::cout << ">>> Thread ID: <<<" << thread_id << std::endl;
             for (SizeT j = 0; j < shared_size; ++j) {
                 SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-                closure(i * shared_size + j, infinity);
+                closure(i * shared_size + j, infinity, thread_id);
                 infinity->LocalDisconnect();
             }
         });
@@ -53,12 +57,12 @@ f32 Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, Sha
     }
     profiler.End();
 
-    return static_cast<float>(profiler.Elapsed()) / (1000 * 1000 * 1000);
+    return static_cast<double>(profiler.Elapsed()) / second_unit;
 }
 
 int main() {
-    SizeT thread_num = 8;
-    SizeT total_times = 2 * 10 * 1000;
+    SizeT thread_num = 1;
+    SizeT total_times = 120 * 10;
 
     String path = "/tmp/infinity";
 
@@ -76,24 +80,25 @@ int main() {
     Vector<String> results;
     // Database
     {
-        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
             auto _ = infinity->GetDatabase("default");
         });
         results.push_back(Format("-> Get Database QPS: {}", total_times / tims_costing_second));
     }
     {
-        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
             auto _ = infinity->ListDatabases();
         });
         results.push_back(Format("-> List Databases QPS: {}", total_times / tims_costing_second));
     }
     {
         CreateDatabaseOptions create_db_opts;
-        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
+        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
             auto _ = infinity->CreateDatabase(ToStr(i), create_db_opts);
         });
         results.push_back(Format("-> Create Database QPS: {}", total_times / tims_costing_second));
     }
+#if 0
     {
         DropDatabaseOptions drop_db_opts;
         auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity) {
@@ -189,7 +194,7 @@ int main() {
             }
         }
     }
-
+#endif
     std::cout << ">>> Infinity Benchmark End <<<" << std::endl;
     for (const auto &item : results) {
         std::cout << item << std::endl;
