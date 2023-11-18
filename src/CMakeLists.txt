@@ -330,8 +330,6 @@ add_executable(unit_test
         ${ut_function_cpp}
 
         ${infinity_cpp}
-        ${network_cpp}
-        ${brpc_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -359,19 +357,18 @@ target_link_libraries(unit_test
         openfst
         iresearch
 #        profiler
-        leveldb
-        protobuf
-        ssl
-        brpc-static
-        gflags
-        crypto
+#        leveldb
+#        protobuf
+#        ssl
+#        brpc-static
+#        gflags
+#        crypto
 )
 
 target_sources(unit_test
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${ut_dependent_cppm}
-        ${network_cppm}
 )
 
 target_include_directories(unit_test PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

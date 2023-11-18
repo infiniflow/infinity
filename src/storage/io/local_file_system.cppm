@@ -64,7 +64,7 @@ public:
     // return true if successfully created directory
     bool CreateDirectoryNoExp(const String &path);
 
-    void DeleteDirectory(const String &path) final;
+    u64 DeleteDirectory(const String &path) final;
 
     Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) final;
 

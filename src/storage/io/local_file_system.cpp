@@ -197,17 +197,14 @@ void LocalFileSystem::CreateDirectory(const String &path) {
     }
 }
 
-void LocalFileSystem::DeleteDirectory(const String &path) {
+u64 LocalFileSystem::DeleteDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
-    bool is_deleted = std::filesystem::remove(p, error_code);
-    if (error_code.value() == 0) {
-        if (!is_deleted) {
-            Error<StorageException>(Format("Can't delete directory: {}, {}", path, strerror(errno)));
-        }
-    } else {
+    u64 removed_count = std::filesystem::remove_all(p, error_code);
+    if (error_code.value() != 0) {
         Error<StorageException>(Format("Delete directory {} exception: {}", path, error_code.message()));
     }
+    return removed_count;
 }
 
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
