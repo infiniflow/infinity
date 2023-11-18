@@ -191,6 +191,11 @@ Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, 
     }
 }
 
+void DBMeta::AddEntry(DBMeta* db_meta, UniquePtr<BaseEntry> db_entry) {
+    UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
+    db_meta->entry_list_.emplace_front(Move(db_entry));
+}
+
 void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {

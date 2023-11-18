@@ -45,13 +45,30 @@ public:
 
     static UniquePtr<DBMeta> Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr);
 
+    // Used in initialization phase
+    static void AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry);
+
     void MergeFrom(DBMeta &other);
 
-public:
-    RWMutex rw_locker_{};
+    SharedPtr<String> db_name() const {
+        return db_name_;
+    }
+
+    SharedPtr<String> data_dir() const {
+        return data_dir_;
+    }
+
+    // Thread-unsafe
+    List<UniquePtr<BaseEntry>>& entry_list() {
+        return entry_list_;
+    }
+
+private:
+
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
+    RWMutex rw_locker_{};
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};
 };

@@ -46,10 +46,13 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
         Path parent_path = catalog_path.parent_path();
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, 0, 0);
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
         db_entry->commit_ts_ = 0;
-        db_meta->entry_list_.emplace_front(Move(db_entry));
+        DBMeta::AddEntry(db_meta.get(), Move(db_entry));
+
+        this->rw_locker_.lock();
         this->databases_["default"] = Move(db_meta);
+        this->rw_locker_.unlock();
     }
 }
 
@@ -236,7 +239,7 @@ Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool
 
 void NewCatalog::CheckCatalog() {
     for (auto &[db_name, db_meta] : this->databases_) {
-        for (auto &base_entry : db_meta->entry_list_) {
+        for (auto &base_entry : db_meta->entry_list()) {
             if (base_entry->entry_type_ == EntryType::kDummy) {
                 continue;
             }
@@ -311,7 +314,7 @@ void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-            catalog->databases_.emplace(*db_meta->db_name_, Move(db_meta));
+            catalog->databases_.emplace(*db_meta->db_name(), Move(db_meta));
         }
     }
 }
