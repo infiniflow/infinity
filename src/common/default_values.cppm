@@ -66,6 +66,8 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
+
+    constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;
