@@ -47,46 +47,42 @@ Status DBEntry::CreateTableCollection(DBEntry *db_entry,
     const String &table_name = *table_collection_name;
 
     // Check if there is table_meta with the table_name
-    db_entry->rw_locker_.lock_shared();
-
     TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_name].get();
-    }
-    db_entry->rw_locker_.unlock_shared();
+    db_entry->rw_locker_.lock_shared();
+    auto table_iter = db_entry->tables_.find(table_name);
+    if (table_iter != db_entry->tables_.end()) {
+        table_meta = table_iter->second.get();
+        db_entry->rw_locker_.unlock_shared();
 
-    // no table_meta
-    if (table_meta == nullptr) {
-        // Create new db meta
+        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_));
+
+    } else {
+        db_entry->rw_locker_.unlock_shared();
+
         LOG_TRACE(Format("Create new table/collection: {}", table_name));
         UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry->db_entry_dir_, table_collection_name, db_entry);
         table_meta = new_table_meta.get();
 
         db_entry->rw_locker_.lock();
-        db_entry->tables_[table_name] = Move(new_table_meta);
+        auto table_iter2 = db_entry->tables_.find(table_name);
+        if (table_iter2 != db_entry->tables_.end()) {
+            table_meta = table_iter2->second.get();
+        } else {
+            db_entry->tables_[table_name] = Move(new_table_meta);
+        }
         db_entry->rw_locker_.unlock();
 
         LOG_TRACE(Format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *db_entry->db_entry_dir_));
-
-        return TableCollectionMeta::CreateNewEntry(table_meta,
-                                                   table_collection_type,
-                                                   table_collection_name,
-                                                   columns,
-                                                   txn_id,
-                                                   begin_ts,
-                                                   txn_mgr,
-                                                   base_entry);
-    } else {
-        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_));
-        return TableCollectionMeta::CreateNewEntry(table_meta,
-                                                   table_collection_type,
-                                                   table_collection_name,
-                                                   columns,
-                                                   txn_id,
-                                                   begin_ts,
-                                                   txn_mgr,
-                                                   base_entry);
     }
+
+    return TableCollectionMeta::CreateNewEntry(table_meta,
+                                               table_collection_type,
+                                               table_collection_name,
+                                               columns,
+                                               txn_id,
+                                               begin_ts,
+                                               txn_mgr,
+                                               base_entry);
 }
 
 Status DBEntry::DropTableCollection(DBEntry *db_entry,

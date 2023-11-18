@@ -84,11 +84,11 @@ NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_i
         db_meta = new_db_meta.get();
 
         catalog->rw_locker_.lock();
-        auto db_iter = catalog->databases_.find(db_name);
-        if(db_iter == catalog->databases_.end()) {
+        auto db_iter2 = catalog->databases_.find(db_name);
+        if(db_iter2 == catalog->databases_.end()) {
             catalog->databases_[db_name] = Move(new_db_meta);
         } else {
-            db_meta = db_iter->second.get();
+            db_meta = db_iter2->second.get();
         }
         catalog->rw_locker_.unlock();
     }
