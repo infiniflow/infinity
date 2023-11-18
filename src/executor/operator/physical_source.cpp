@@ -62,7 +62,7 @@ bool PhysicalSource::ReadyToExec(SourceState *source_state) {
     bool result = true;
     if (source_state->state_type_ == SourceStateType::kQueue) {
         QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);
-        result = queue_source_state->source_queue_.ApproxSize() > 0;
+        result = queue_source_state->source_queue_.Size() > 0;
     }
     return result;
 }

@@ -33,13 +33,6 @@ public:
         empty_cv_.notify_one();
     }
 
-    void Enqueue(const T& task) {
-        UniqueLock<Mutex> lock(queue_mutex_);
-        full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
-        queue_.push_back(Move(task));
-        empty_cv_.notify_one();
-    }
-
     void Enqueue(T&& task) {
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
@@ -57,7 +50,8 @@ public:
     void Dequeue(T& task) {
         UniqueLock<Mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
-        task = queue_.pop_front();
+        task = queue_.front();
+        queue_.pop_front();
         full_cv_.notify_one();
     }
 
