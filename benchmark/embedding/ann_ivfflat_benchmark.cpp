@@ -108,7 +108,7 @@ void benchmark_faiss_ivfflatl2(double t0,
     index.verbose = true;
     {
         if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Training on %ld vectors, with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+            printf("[%.3f s] Training on %ld vectors, with %zu centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
         }
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
@@ -171,7 +171,7 @@ void benchmark_faiss_ivfflatip(double t0,
     index.verbose = true;
     {
         if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Training on %ld vectors , with %d centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
+            printf("[%.3f s] Training on %ld vectors , with %zu centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
         }
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
