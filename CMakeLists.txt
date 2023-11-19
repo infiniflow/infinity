@@ -30,6 +30,9 @@ string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_S
 if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
+
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-read-modules-implicitly")
+
 else ()
     message(FATAL_ERROR, "Please use clang version 17.0 and above")
 endif ()
@@ -53,15 +56,6 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    #    set(CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations")
-    set(CMAKE_CXX_FLAGS "-Wno-read-modules-implicitly")
-    #    set(CMAKE_CXX_FLAGS_DEBUG "-Wno-unused-variable -Wno-unused-result -Wno-read-modules-implicitly")
-    # set (CMAKE_CXX_FLAGS "-Wno-error=deprecated-declarations -Wno-deprecated-declarations -ftime-trace" )
-else ()
-    message(FATAL_ERROR "Please, use Clang. Current compiler is ${CMAKE_CXX_COMPILER_ID}!")
-endif ()
-
 if (NOT CMAKE_BUILD_TYPE)
     if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
         set(default_build_type "RelWithDebInfo")
@@ -73,6 +67,13 @@ if (NOT CMAKE_BUILD_TYPE)
             "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif ()
 
+#TODO: Check if build type is debug
+#if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+#endif ()
+
+MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
+
 #add_definitions(-march=native)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
     add_definitions(-mevex512)
@@ -80,7 +81,6 @@ endif ()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
-# set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
 

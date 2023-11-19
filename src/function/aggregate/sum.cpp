@@ -54,7 +54,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(TinyIntT); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
 };
 
 template <>
@@ -70,7 +70,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(SmallIntT); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
 };
 
 template <>
@@ -86,7 +86,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(IntegerT); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
 };
 
 template <>
@@ -102,7 +102,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(BigIntT); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
 };
 
 template <>
@@ -118,7 +118,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(FloatT); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(DoubleT); }
 };
 
 template <>

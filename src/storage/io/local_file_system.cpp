@@ -191,7 +191,7 @@ bool LocalFileSystem::CreateDirectoryNoExp(const String &path) {
 void LocalFileSystem::CreateDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
-    bool is_success = std::filesystem::create_directories(p, error_code);
+    std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
         Error<StorageException>(Format("{} create exception: {}", path, strerror(errno)));
     }

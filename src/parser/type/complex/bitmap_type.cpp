@@ -26,7 +26,7 @@ BitmapType::BitmapType(const BitmapType &other) : count(other.count) {
     memcpy((char *)ptr, (char *)(other.ptr), unit_count * UNIT_BYTES);
 }
 
-BitmapType::BitmapType(BitmapType &&other) noexcept : count(other.count), ptr(other.ptr) {
+BitmapType::BitmapType(BitmapType &&other) noexcept : ptr(other.ptr), count(other.count) {
     other.ptr = nullptr;
     other.count = 0;
 }

@@ -64,7 +64,7 @@ public:
 
     bool Stopped();
 
-    void CommitTxn(Txn* txn);
+    TxnTimeStamp CommitTxn(Txn* txn);
 
     void RollBackTxn(Txn* txn);
 

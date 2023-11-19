@@ -103,14 +103,14 @@ struct OperatorInformation {
         return *this;
     }
 
+    String name_ {};
+
     i64 start_ {};
     i64 end_ {};
     i64 elapsed_{};
     u16 input_rows_ {};
-    u16 output_rows_ {};
     i32 output_data_size_ {};
-
-    String name_ {};
+    u16 output_rows_ {};
 };
 
 export struct TaskBinding {
@@ -137,7 +137,7 @@ class OperatorState;
 export class TaskProfiler {
 public:
     TaskProfiler(TaskBinding binding, bool enable, SizeT operators_len)
-        : enable_(enable), binding_(binding) {
+        : binding_(binding), enable_(enable){
         if(!enable_) {
             return;
         }

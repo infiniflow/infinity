@@ -288,7 +288,7 @@ bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id != other.txn_id || this->commit_ts != other.commit_ts || this->cmds.size() != other.cmds.size()) {
         return false;
     }
-    for (i32 i = 0; i < this->cmds.size(); i++) {
+    for (u32 i = 0; i < this->cmds.size(); i++) {
         const SharedPtr<WalCmd> &cmd1 = this->cmds[i];
         const SharedPtr<WalCmd> &cmd2 = other.cmds[i];
         if (cmd1.get() == nullptr || cmd2.get() == nullptr || (*cmd1).operator!=(*cmd2)) {

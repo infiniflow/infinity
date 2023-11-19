@@ -32,7 +32,6 @@ import database;
 import infinity_context;
 import session;
 import query_context;
-import database_object;
 import parser;
 
 namespace infinity {

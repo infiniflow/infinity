@@ -21,7 +21,7 @@ public:
     ~test() { std::cout << "DTOR" << std::endl; }
 };
 
-auto main(int argc, char *argv[]) -> int {
+auto main() -> int {
     using namespace infinity;
     std::vector<std::string> inputs;
     inputs.emplace_back("create collection c1;");

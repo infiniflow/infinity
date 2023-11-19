@@ -68,8 +68,8 @@ public:
 
 public:
     RWMutex rw_locker_{};
-    SharedPtr<String> table_collection_name_{};
     SharedPtr<String> db_entry_dir_{};
+    SharedPtr<String> table_collection_name_{};
 
     DBEntry *db_entry_{};
 

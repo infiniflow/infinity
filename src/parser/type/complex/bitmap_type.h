@@ -28,8 +28,8 @@ public:
     static inline uint64_t UnitCount(uint64_t bit_count) { return (bit_count + (UNIT_BITS - 1)) / UNIT_BITS; }
 
 public:
-    uint64_t count{0}; // bit count of the bitmap
     uint64_t *ptr{nullptr};
+    uint64_t count{0}; // bit count of the bitmap
 
 public:
     BitmapType() = default;

@@ -1758,33 +1758,43 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
 match_expr : MATCH '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->SetFields($3);
+    free($3);
     match_expr->matching_text_ = std::string($5);
+    free($5);
     $$ = match_expr;
 }
 | MATCH '(' STRING ',' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
     match_expr->SetFields($3);
+    free($3);
     match_expr->matching_text_ = std::move(std::string($5));
+    free($5);
     match_expr->SetOptions($7);
+    free($7);
     $$ = match_expr;
 }
 
 query_expr : QUERY '(' STRING ')' {
     infinity::QueryExpr* query_expr = new infinity::QueryExpr();
     query_expr->query_text_ = std::move(std::string($3));
+    free($3);
     $$ = query_expr;
 }
 | QUERY '(' STRING ',' STRING ')' {
     infinity::QueryExpr* query_expr = new infinity::QueryExpr();
-    query_expr->query_text_ = std::move(std::string($3));
+    query_expr->query_text_ = std::string($3);
+    free($3);
     query_expr->SetOptions($5);
+    free($5);
     $$ = query_expr;
 }
 
 fusion_expr : FUSION '(' STRING ',' STRING ')' {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
     fusion_expr->method_ = std::move(std::string($3));
+    free($3);
     fusion_expr->SetOptions($5);
+    free($5);
     $$ = fusion_expr;
 }
 

@@ -142,9 +142,9 @@ inline PathT NullValue() {
 
 template <>
 inline PolygonT NullValue() {
-    ptr_t ptr{};
-    u64 point_count{0}; // 65535 point are the max point count
-    BoxT bounding_box{};
+//    ptr_t ptr{};
+//    u64 point_count{0}; // 65535 point are the max point count
+//    BoxT bounding_box{};
     PolygonT polygon;
     polygon.ptr = ptr_inf;
     polygon.point_count = u64_inf;

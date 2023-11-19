@@ -59,7 +59,7 @@ bool TableDef::operator==(const TableDef &other) const {
         this->column_name2id_.size() != other.column_name2id_.size()) {
         return false;
     }
-    for (i32 i = 0; i < this->columns_.size(); i++) {
+    for (u32 i = 0; i < this->columns_.size(); i++) {
         // Compare each column
         const ColumnDef &cd1 = *(this->columns_[i]);
         const ColumnDef &cd2 = *(other.columns_[i]);
@@ -76,7 +76,7 @@ bool TableDef::operator==(const TableDef &other) const {
         }
         Set<ConstraintType>::iterator it1 = constraints1.begin();
         Set<ConstraintType>::iterator it2 = constraints2.begin();
-        for (i32 j = 0; j < constraints1.size(); j++) {
+        for (u32 j = 0; j < constraints1.size(); j++) {
             if (*it1 != *it2) {
                 return false;
             }
@@ -94,15 +94,13 @@ i32 TableDef::GetSizeInBytes() const {
     size += sizeof(i32) + schema_name_->length();
     size += sizeof(i32) + table_name_->length();
     size += sizeof(i32);
-    for (i32 i = 0; i < columns_.size(); i++) {
+    for (u32 i = 0; i < columns_.size(); i++) {
         const ColumnDef &cd = *columns_[i];
         size += sizeof(i64); // id_
         size += cd.column_type_->GetSizeInBytes();
         size += sizeof(i32) + cd.name_.length();
         size += sizeof(i32);
-        for (const auto &cons : cd.constraints_) {
-            size += sizeof(ConstraintType);
-        }
+        size += cd.constraints_.size() * sizeof(ConstraintType);
     }
     return size;
 }

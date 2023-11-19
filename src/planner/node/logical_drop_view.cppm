@@ -47,8 +47,8 @@ public:
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
 private:
-    SharedPtr<String> view_name_{};
     SharedPtr<String> schema_name_{};
+    SharedPtr<String> view_name_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
