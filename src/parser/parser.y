@@ -598,6 +598,7 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     }
     create_index_info->method_type_ = $10;
     free($10);
+    delete $3;
 
     create_index_info->index_para_list_ = $11;
     $$->create_info_ = create_index_info;
@@ -1648,6 +1649,7 @@ operand: '(' expr ')' {
 
 knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
+    $$ = knn_expr;
 
     // KNN search column
     knn_expr->column_expr_ = $3;
@@ -1663,6 +1665,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
     } else if(strcmp($9, "hamming") == 0) {
         knn_expr->distance_type_ = infinity::KnnDistanceType::kHamming;
     } else {
+        free($7);
+        free($9);
+        delete $5;
+        delete $$;
         yyerror(&yyloc, scanner, result, "Invalid knn distance type");
         YYERROR;
     }
@@ -1677,7 +1683,9 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
         }
-
+        free($7);
+        free($9);
+        delete $5;
     } else if(strcmp($7, "tinyint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
@@ -1686,6 +1694,9 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((char*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
         }
+        free($7);
+        free($9);
+        delete $5;
     } else if(strcmp($7, "smallint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt16;
@@ -1694,6 +1705,9 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((short int*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
         }
+        free($7);
+        free($9);
+        delete $5;
     } else if(strcmp($7, "integer") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt32;
@@ -1702,6 +1716,9 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         for(long i = 0; i < knn_expr->dimension_; ++ i) {
             ((int*)knn_expr->embedding_data_ptr_)[i] = $5->long_array_[i];
         }
+        free($7);
+        free($9);
+        delete $5;
 
     } else if(strcmp($7, "bigint") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
@@ -1709,6 +1726,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         knn_expr->embedding_data_ptr_ = new long[knn_expr->dimension_];
 
         memcpy(knn_expr->embedding_data_ptr_, (void*)$5->long_array_.data(), knn_expr->dimension_ * sizeof(long));
+        free($7);
+        free($9);
+        delete $5;
+
     } else if(strcmp($7, "bit") == 0 and knn_expr->distance_type_ == infinity::KnnDistanceType::kHamming) {
         knn_expr->dimension_ = $5->long_array_.size();
         if(knn_expr->dimension_ % 8 == 0) {
@@ -1726,13 +1747,24 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
                     } else if($5->long_array_[i * 8 + bit_idx] == 0) {
                         embedding_unit <<= 0;
                     } else {
+                        free($7);
+                        free($9);
+                        delete $5;
+                        delete $$;
                         yyerror(&yyloc, scanner, result, "Invalid bit embedding type data");
                         YYERROR;
                     }
                 }
                 ((char*)knn_expr->embedding_data_ptr_)[i] = embedding_unit;
             }
+            free($7);
+            free($9);
+            delete $5;
         } else {
+            free($7);
+            free($9);
+            delete $5;
+            delete $$;
             yyerror(&yyloc, scanner, result, "KNN data type is bit which length should be aligned with 8");
             YYERROR;
         }
@@ -1743,16 +1775,17 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         knn_expr->embedding_data_ptr_ = new double[knn_expr->dimension_];
 
         memcpy(knn_expr->embedding_data_ptr_, (void*)$5->double_array_.data(), knn_expr->dimension_ * sizeof(double));
+        free($7);
+        free($9);
+        delete $5;
     } else {
+        free($7);
+        free($9);
+        delete $5;
+        delete $$;
         yyerror(&yyloc, scanner, result, "Invalid knn data type");
         YYERROR;
     }
-
-    free($7);
-    free($9);
-    delete $5;
-
-    $$ = knn_expr;
 }
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
@@ -2010,6 +2043,7 @@ function_expr : IDENTIFIER '(' ')' {
         func_expr->func_name_ = "extract_second";
         func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     } else {
+        delete func_expr;
         yyerror(&yyloc, scanner, result, "Invalid column expression format");
         YYERROR;
     }

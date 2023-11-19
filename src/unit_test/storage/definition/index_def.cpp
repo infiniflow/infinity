@@ -33,6 +33,9 @@ TEST_F(IndexDefTest, ivfflat_readwrite) {
 
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"), columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
+    for(auto parameter: parameters) {
+        delete parameter;
+    }
 
     int32_t exp_size = index_def->GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));
@@ -62,6 +65,10 @@ TEST_F(IndexDefTest, hnsw_readwrite) {
 
     auto index_def = HnswIndexDef::Make(MakeShared<String>("idx1"), columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
+
+    for(auto parameter: parameters) {
+        delete parameter;
+    }
 
     int32_t exp_size = index_def->GetSizeInBytes();
     Vector<char> buf(exp_size, char(0));

@@ -36,7 +36,7 @@ public:
 
     explicit BaseMixedType(MixedValueType value_type) : type(value_type) {}
 
-    MixedValueType type;
+    MixedValueType type{MixedValueType::kInvalid};
 };
 
 } // namespace infinity
