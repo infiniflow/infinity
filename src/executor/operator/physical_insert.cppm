@@ -51,8 +51,8 @@ public:
 
 private:
     TableCollectionEntry *table_collection_entry_{};
-    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
     u64 table_index_{};
+    Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

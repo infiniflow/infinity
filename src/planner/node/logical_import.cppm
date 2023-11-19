@@ -28,10 +28,14 @@ class TableCollectionEntry;
 
 export class LogicalImport : public LogicalNode {
 public:
-    explicit inline
-    LogicalImport(u64 node_id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type)
-        : LogicalNode(node_id, LogicalNodeType::kImport), table_collection_entry_(table_collection_entry), file_path_(Move(file_path)),
-          header_(header), delimiter_(delimiter), file_type_(type) {}
+    explicit inline LogicalImport(u64 node_id,
+                                  TableCollectionEntry *table_collection_entry,
+                                  String file_path,
+                                  bool header,
+                                  char delimiter,
+                                  CopyFileType type)
+        : LogicalNode(node_id, LogicalNodeType::kImport), table_collection_entry_(table_collection_entry), file_type_(type),
+          file_path_(Move(file_path)), header_(header), delimiter_(delimiter) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

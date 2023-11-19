@@ -53,12 +53,12 @@ public:
     [[nodiscard]] char delimiter() const { return delimiter_; }
 
 private:
-    CopyFileType file_type_{CopyFileType::kCSV};
-    String file_path_{};
-    String table_name_{};
     String schema_name_{"default"};
+    String table_name_{};
+    String file_path_{};
     bool header_{false};
     char delimiter_{','};
+    CopyFileType file_type_{CopyFileType::kCSV};
 };
 
 } // namespace infinity

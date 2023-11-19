@@ -24,7 +24,7 @@ namespace infinity {
 //concept POD = IsTrivial<T> && IsStandLayout<T>;
 
 export template <typename T>
-inline i32 GetSizeInBytes(const T &value) {
+inline i32 GetSizeInBytes(const T &) {
     static_assert(IsStandLayout<T>, "T must be POD");
     return sizeof(T);
 }

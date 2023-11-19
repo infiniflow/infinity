@@ -25,7 +25,7 @@ namespace infinity {
 
 export struct HeapChunk {
 public:
-    inline explicit HeapChunk(u64 capacity) : capacity_(capacity), current_offset_(0), object_count_(0) {
+    inline explicit HeapChunk(u64 capacity) : current_offset_(0), capacity_(capacity), object_count_(0) {
         GlobalResourceUsage::IncrObjectCount();
         ptr_ = Allocator::allocate(capacity);
     }

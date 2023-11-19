@@ -59,12 +59,11 @@ public:
     [[nodiscard]] LogicalNodeType operator_type() const { return operator_type_; }
 
 protected:
+    u64 node_id_{};
     LogicalNodeType operator_type_ = LogicalNodeType::kInvalid;
 
     SharedPtr<LogicalNode> left_node_{};
     SharedPtr<LogicalNode> right_node_{};
-    u64 node_id_{};
-
 public:
     template <class TARGET>
     TARGET &Cast() {

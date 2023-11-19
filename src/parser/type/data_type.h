@@ -176,7 +176,7 @@ std::string DataType::TypeToString() {
 }
 
 template <typename T>
-T DataType::StringToValue(const std::string_view &str_view) {
+T DataType::StringToValue(const std::string_view &) {
     ParserError("Unexpected data type.");
     return T();
 }

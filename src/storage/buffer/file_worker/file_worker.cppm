@@ -65,9 +65,9 @@ private:
     String ChooseFileDir(bool spill) const { return spill ? Format("{}/{}", *temp_dir_, *file_dir_) : *file_dir_; }
 
 public:
-    const SizeT buffer_size_{};
-    const SharedPtr<String> file_name_{};
     const SharedPtr<String> file_dir_{};
+    const SharedPtr<String> file_name_{};
+    const SizeT buffer_size_{};
 
 protected:
     void *data_{nullptr};

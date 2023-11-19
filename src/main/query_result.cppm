@@ -16,7 +16,6 @@ export module query_result;
 
 import stl;
 import data_table;
-import database_object;
 import status;
 import logical_node_type;
 

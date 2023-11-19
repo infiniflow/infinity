@@ -28,8 +28,8 @@ BetweenExpression::BetweenExpression(const SharedPtr<BaseExpression> &value,
                                      const SharedPtr<BaseExpression> &lower_bound,
                                      bool upper_inclusive,
                                      bool lower_inclusive)
-    : BaseExpression(ExpressionType::kBetween, {lower_bound, value, upper_bound}), upper_inclusive_(upper_inclusive),
-      lower_inclusive_(lower_inclusive) {}
+    : BaseExpression(ExpressionType::kBetween, {lower_bound, value, upper_bound}), lower_inclusive_(lower_inclusive),
+      upper_inclusive_(upper_inclusive) {}
 
 String BetweenExpression::ToString() const {
     std::stringstream ss;

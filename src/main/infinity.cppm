@@ -25,7 +25,6 @@ import query_result;
 import query_options;
 import infinity_context;
 import session;
-import database_object;
 
 namespace infinity {
 
