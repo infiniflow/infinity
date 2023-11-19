@@ -67,6 +67,13 @@ if (NOT CMAKE_BUILD_TYPE)
             "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif ()
 
+#TODO: Check if build type is debug
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+endif ()
+
+MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
+
 #add_definitions(-march=native)
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "18.0")
     add_definitions(-mevex512)
@@ -74,7 +81,6 @@ endif ()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
-# set(DEFAULT_LIB_DIRS $ENV{HOME}/local /opt/local /usr/local /usr)
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
 
