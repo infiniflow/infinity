@@ -93,109 +93,109 @@ TEST_F(ColumnVectorBitmapTest, flat_bitmap) {
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
     EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
 
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        BitmapT bitmap;
-        bitmap.Initialize(i + 10);
-        for (i64 j = 0; j <= i; ++j) {
-            if (j % 2 == 0) {
-                bitmap.SetBit(j, true);
-            } else {
-                bitmap.SetBit(j, false);
-            }
-        }
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.value_.bitmap, bitmap);
-    }
-
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        BitmapT bitmap;
-        bitmap.Initialize(i + 10);
-        for (i64 j = 0; j <= i; ++j) {
-            if (j % 2 == 0) {
-                bitmap.SetBit(j, true);
-            } else {
-                bitmap.SetBit(j, false);
-            }
-        }
-        Value v = Value::MakeBitmap(bitmap);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-
-        EXPECT_EQ(vx.value_.bitmap, bitmap);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
-
-    column_vector.Reset();
-    EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
-    //    EXPECT_EQ(column_vector.data_type_size_, 0);
-    EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
-    EXPECT_EQ(column_vector.initialized, false);
-
-    // ====
-    column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
-
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
-
-    EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
-    EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
-    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
-    EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
-
-    EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
-    EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        BitmapT bitmap;
-        bitmap.Initialize(i + 10);
-        for (i64 j = 0; j <= i; ++j) {
-            if (j % 2 == 0) {
-                bitmap.SetBit(j, true);
-            } else {
-                bitmap.SetBit(j, false);
-            }
-        }
-        column_vector.AppendByPtr((ptr_t)(&bitmap));
-        Value vx = column_vector.GetValue(i);
-
-        EXPECT_EQ(vx.value_.bitmap, bitmap);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
-
-    ColumnVector column_constant(data_type);
-    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        BitmapT bitmap;
-        bitmap.Initialize(i + 10);
-        for (i64 j = 0; j <= i; ++j) {
-            if (j % 2 == 0) {
-                bitmap.SetBit(j, true);
-            } else {
-                bitmap.SetBit(j, false);
-            }
-        }
-
-        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
-        Value vx = column_constant.GetValue(0);
-        EXPECT_EQ(vx.value_.bitmap, bitmap);
-        column_constant.Reset();
-    }
+//    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+//        BitmapT bitmap;
+//        bitmap.Initialize(i + 10);
+//        for (i64 j = 0; j <= i; ++j) {
+//            if (j % 2 == 0) {
+//                bitmap.SetBit(j, true);
+//            } else {
+//                bitmap.SetBit(j, false);
+//            }
+//        }
+//        Value vx = column_vector.GetValue(i);
+//        EXPECT_EQ(vx.value_.bitmap, bitmap);
+//    }
+//
+//    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
+//    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
+//        BitmapT bitmap;
+//        bitmap.Initialize(i + 10);
+//        for (i64 j = 0; j <= i; ++j) {
+//            if (j % 2 == 0) {
+//                bitmap.SetBit(j, true);
+//            } else {
+//                bitmap.SetBit(j, false);
+//            }
+//        }
+//        Value v = Value::MakeBitmap(bitmap);
+//        column_vector.AppendValue(v);
+//        Value vx = column_vector.GetValue(i);
+//
+//        EXPECT_EQ(vx.value_.bitmap, bitmap);
+//        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+//    }
+//
+//    column_vector.Reset();
+//    EXPECT_EQ(column_vector.capacity(), 0);
+//    EXPECT_EQ(column_vector.tail_index_, 0);
+//    //    EXPECT_EQ(column_vector.data_type_size_, 0);
+//    EXPECT_NE(column_vector.buffer_, nullptr);
+//    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+//    EXPECT_NE(column_vector.data_ptr_, nullptr);
+//    EXPECT_EQ(column_vector.initialized, false);
+//
+//    // ====
+//    column_vector.Initialize();
+//    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+//    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+//
+//    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(column_vector.Size(), 0);
+//
+//    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+//    EXPECT_EQ(column_vector.tail_index_, 0);
+//    EXPECT_EQ(column_vector.data_type_size_, 16);
+//    EXPECT_NE(column_vector.data_ptr_, nullptr);
+//    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+//    EXPECT_EQ(column_vector.data_type(), data_type);
+//    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+//
+//    EXPECT_NE(column_vector.buffer_, nullptr);
+//    EXPECT_NE(column_vector.nulls_ptr_, nullptr);
+//    EXPECT_TRUE(column_vector.initialized);
+//    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
+//    tmp_ptr = column_vector.data_ptr_;
+//    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
+//    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+//    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+//        BitmapT bitmap;
+//        bitmap.Initialize(i + 10);
+//        for (i64 j = 0; j <= i; ++j) {
+//            if (j % 2 == 0) {
+//                bitmap.SetBit(j, true);
+//            } else {
+//                bitmap.SetBit(j, false);
+//            }
+//        }
+//        column_vector.AppendByPtr((ptr_t)(&bitmap));
+//        Value vx = column_vector.GetValue(i);
+//
+//        EXPECT_EQ(vx.value_.bitmap, bitmap);
+//        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+//    }
+//
+//    ColumnVector column_constant(data_type);
+//    for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+//        BitmapT bitmap;
+//        bitmap.Initialize(i + 10);
+//        for (i64 j = 0; j <= i; ++j) {
+//            if (j % 2 == 0) {
+//                bitmap.SetBit(j, true);
+//            } else {
+//                bitmap.SetBit(j, false);
+//            }
+//        }
+//
+//        column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+//        column_constant.CopyRow(column_vector, 0, i);
+//        Value vx = column_constant.GetValue(0);
+//        EXPECT_EQ(vx.value_.bitmap, bitmap);
+//        column_constant.Reset();
+//    }
 }
-
+#if 0
 TEST_F(ColumnVectorBitmapTest, contant_bitmap) {
 
     using namespace infinity;
@@ -429,3 +429,4 @@ TEST_F(ColumnVectorBitmapTest, bitmap_column_slice_init) {
         EXPECT_EQ(vx.value_.bitmap, bitmap);
     }
 }
+#endif

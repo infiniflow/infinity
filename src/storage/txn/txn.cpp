@@ -507,7 +507,7 @@ Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
 
 void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
 
-void Txn::Commit() {
+TxnTimeStamp Txn::Commit() {
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
     txn_context_.SetTxnCommitting(commit_ts);
     // TODO: serializability validation. ASSUMES always valid for now.
@@ -515,14 +515,14 @@ void Txn::Commit() {
     if (!valid) {
         txn_mgr_->Invalidate(commit_ts);
         txn_context_.SetTxnRollbacked();
-        return;
+        return commit_ts;
     }
 
     if (wal_entry_->cmds.empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
         txn_mgr_->Invalidate(commit_ts);
         txn_context_.SetTxnCommitted();
-        return;
+        return commit_ts;
     }
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id = txn_id_;
@@ -532,6 +532,7 @@ void Txn::Commit() {
     // Wait until CommitTxnBottom is done.
     UniqueLock<Mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
+    return commit_ts;
 }
 
 void Txn::CommitBottom() {

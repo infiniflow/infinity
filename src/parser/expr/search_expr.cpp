@@ -13,10 +13,29 @@ namespace infinity {
 
 SearchExpr::~SearchExpr() {
     if (exprs_ != nullptr) {
-        for (auto expr : *exprs_) {
+        for (auto& expr : *exprs_) {
             delete expr;
+            expr = nullptr;
         }
+        delete exprs_;
+        exprs_ = nullptr;
     }
+
+    // following expr ptrs are already freed in exprs_.
+//    for(auto match_expr: match_exprs_) {
+//        delete match_expr;
+//    }
+//
+//    for(auto query_expr: query_exprs_) {
+//        delete query_expr;
+//    }
+//
+//    for(auto knn_expr: knn_exprs_) {
+//        delete knn_expr;
+//    }
+//
+//    delete fusion_expr_;
+//    fusion_expr_ = nullptr;
 }
 
 std::string SearchExpr::ToString() const {

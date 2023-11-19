@@ -140,12 +140,14 @@ TEST_F(CatalogTest, simple_test2) {
         databases["db1"] = base_entry;
     }
 
+    u64 txn1_id = txn1->TxnID();
+    TxnTimeStamp txn1_begin_ts = txn1->BeginTS();
     txn_mgr->CommitTxn(txn1);
 
     // should not be visible to txn2
     {
         BaseEntry* base_db_entry{nullptr};
-        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
+        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1_id, txn1_begin_ts, base_db_entry);
         // should not be visible to same txn
         EXPECT_TRUE(!status1.ok());
     }

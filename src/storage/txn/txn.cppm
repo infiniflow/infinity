@@ -59,7 +59,7 @@ public:
 
     void Begin();
 
-    void Commit();
+    TxnTimeStamp Commit();
 
     void CommitBottom();
 
