@@ -22,7 +22,7 @@ import stl;
 import logger;
 import config;
 import resource_manager;
-import new_task_scheduler;
+import task_scheduler;
 import storage;
 import local_file_system;
 import third_party;

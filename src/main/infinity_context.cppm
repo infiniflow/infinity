@@ -19,7 +19,7 @@ export module infinity_context;
 import stl;
 import config;
 import resource_manager;
-import new_task_scheduler;
+import task_scheduler;
 import storage;
 import singleton;
 
