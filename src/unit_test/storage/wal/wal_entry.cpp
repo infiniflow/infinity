@@ -159,9 +159,15 @@ TEST_F(WalEntryTest, ReadWrite) {
     Vector<u16> row_counts{1, 2, 3};
     entry->cmds.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
 
+    Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
+
     auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
                                            Vector<String>{"col1", "col2"},
-                                           Vector<InitParameter *>{new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")});
+                                           parameters);
+    for(auto parameter: parameters) {
+        delete parameter;
+    }
+
     entry->cmds.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", index_def));
 
     entry->cmds.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));

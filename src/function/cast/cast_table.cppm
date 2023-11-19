@@ -30,7 +30,7 @@ public:
     [[nodiscard]] i64 GetCastCost(LogicalType from, LogicalType to) const;
 
 private:
-    Array<Array<i64, LogicalType::kInvalid>, LogicalType::kInvalid> matrix_{-1};
+    Array<Array<i64, LogicalType::kInvalid>, LogicalType::kInvalid> matrix_{};
 };
 
 } // namespace infinity
