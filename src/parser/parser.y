@@ -598,6 +598,7 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     }
     create_index_info->method_type_ = $10;
     free($10);
+    delete $3;
 
     create_index_info->index_para_list_ = $11;
     $$->create_info_ = create_index_info;
