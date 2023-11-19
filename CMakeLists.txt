@@ -68,9 +68,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 #TODO: Check if build type is debug
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
-endif ()
+#if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+#endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
