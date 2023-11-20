@@ -1,5 +1,4 @@
-
-
+add_compile_options(-Wno-everything)
 # Build cxxopts
 add_subdirectory(cxxopts)
 
