@@ -264,36 +264,33 @@ export struct WalEntry : WalEntryHeader {
 
 export class WalEntryIterator {
 public:
-    explicit WalEntryIterator(String wal) : wal_(Move(wal)), entry_index_(0), entries_() {}
+    static WalEntryIterator Make(const String &wal_path);
 
-    void Init();
-
-    bool Next();
-
-    [[nodiscard]] SharedPtr<WalEntry> GetEntry();
+    [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    String wal_{};
+    WalEntryIterator(Vector<char> &&buf, StreamSize wal_size) : buf_(Move(buf)), wal_size_(wal_size) {
+        end_ = buf_.data() + wal_size_;
+    }
+
+    Vector<char> buf_{};
     StreamSize wal_size_{};
-    char *ptr_{};
-    SizeT entry_index_{};
-    Vector<SharedPtr<WalEntry>> entries_{};
+    char *end_{};
 };
 
 export class WalListIterator {
 public:
-    explicit WalListIterator(const Vector<String> &wal_list) : wal_list_(wal_list), iter_index_(0) {}
+    explicit WalListIterator(const Vector<String> &wal_list) {
+        for (int i = 0; i < wal_list.size(); ++i) {
+            wal_deque_.push_back(wal_list[i]);
+        }
+    }
 
-    void Init();
-
-    bool Next();
-
-    [[nodiscard]] SharedPtr<WalEntry> GetEntry();
+    [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    Vector<String> wal_list_{};
-    SizeT iter_index_{};
-    Vector<SharedPtr<WalEntryIterator>> iters_{};
+    Deque<String> wal_deque_{};
+    UniquePtr<WalEntryIterator> iter_{};
 };
 
 } // namespace infinity

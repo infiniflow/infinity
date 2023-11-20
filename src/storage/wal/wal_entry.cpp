@@ -466,55 +466,50 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
     }
 }
 
-void WalEntryIterator::Init() {
-    std::ifstream ifs(wal_.c_str(), std::ios::binary | std::ios::ate);
+WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
+    std::ifstream ifs(wal_path.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
         Error<StorageException>("Wal open failed");
     }
-    wal_size_ = ifs.tellg();
-    Vector<char> buf(wal_size_);
+    auto wal_size = ifs.tellg();
+    Vector<char> buf(wal_size);
     ifs.seekg(0, std::ios::beg);
-    ifs.read(buf.data(), wal_size_);
+    ifs.read(buf.data(), wal_size);
     ifs.close();
-    ptr_ = buf.data() + wal_size_;
-    while (ptr_ > buf.data()) {
+
+    return WalEntryIterator(Move(buf), wal_size);
+}
+
+SharedPtr<WalEntry> WalEntryIterator::Next() {
+    if (end_ > buf_.data()) {
         i32 entry_size;
-        Memcpy(&entry_size, ptr_ - sizeof(i32), sizeof(entry_size));
-        ptr_ = ptr_ - entry_size;
-        auto entry = WalEntry::ReadAdv(ptr_, entry_size);
-        ptr_ = ptr_ - entry_size;
-        entries_.push_back(entry);
+        Memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
+        end_ = end_ - entry_size;
+        auto entry = WalEntry::ReadAdv(end_, entry_size);
+        end_ = end_ - entry_size;
+        return entry;
+    } else {
+        return nullptr;
     }
 }
 
-bool WalEntryIterator::Next() {
-    if (entry_index_ < entries_.size()) {
-        return true;
-    }
-    return false;
-}
 
-SharedPtr<WalEntry> WalEntryIterator::GetEntry() { return entries_[entry_index_++]; }
+SharedPtr<WalEntry> WalListIterator::Next() {
+    if (iter_.get() != nullptr) {
+        SharedPtr<WalEntry> entry = iter_->Next();
 
-void WalListIterator::Init() {
-    for (const auto &wal : wal_list_) {
-        auto walEntryIterator = std::make_shared<WalEntryIterator>(wal);
-        walEntryIterator->Init();
-        iters_.emplace_back(walEntryIterator);
-    }
-}
-
-bool WalListIterator::Next() {
-    if (iter_index_ < iters_.size()) {
-        if (iters_[iter_index_]->Next()) {
-            return true;
-        } else {
-            iter_index_++;
-            return Next();
+        if (entry.get() != nullptr) {
+            return entry;
         }
     }
-    return false;
+    if (!wal_deque_.empty()) {
+        iter_ = MakeUnique<WalEntryIterator>(WalEntryIterator::Make(wal_deque_.front()));
+        wal_deque_.pop_front();
+
+        return Next();
+    } else {
+        return nullptr;
+    }
 }
-SharedPtr<WalEntry> WalListIterator::GetEntry() { return iters_[iter_index_]->GetEntry(); }
 
 } // namespace infinity

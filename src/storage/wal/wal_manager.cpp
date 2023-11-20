@@ -427,54 +427,61 @@ int64_t WalManager::ReplayWalFile() {
     Vector<SharedPtr<WalEntry>> replay_entries;
     Vector<String> checkpoint_catalog_paths;
 
-    WalListIterator iterator(wal_list_);
-    iterator.Init();
-    // phase 1: find the max commit ts and catalog path
-    LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
-
-        LOG_TRACE(wal_entry->ToString());
-
-        replay_entries.push_back(wal_entry);
-
-        if (wal_entry->IsCheckPoint()) {
-
-            checkpoint_catalog_paths.push_back(wal_entry->GetCheckpointInfo().second);
-
-            if (wal_entry->IsFullCheckPoint()) {
-                auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
-                if (current_max_commit_ts > max_commit_ts) {
-                    max_commit_ts = current_max_commit_ts;
-                    catalog_path = current_catalog_path;
-                }
-                LOG_TRACE(Format("Find checkpoint max commit ts: {}", max_commit_ts));
-                LOG_TRACE(Format("Find catalog path: {}", catalog_path));
+    {
+        WalListIterator iterator(wal_list_);
+        // phase 1: find the max commit ts and catalog path
+        LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
                 break;
-            } else {
-                // delta checkpoint
-                auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
-                // if the current max commit ts is greater than the max commit ts, update the max commit ts and catalog path
-                if (current_max_commit_ts > max_commit_ts) {
-                    max_commit_ts = current_max_commit_ts;
-                    catalog_path = current_catalog_path;
+            }
+
+            LOG_TRACE(wal_entry->ToString());
+
+            replay_entries.push_back(wal_entry);
+
+            if (wal_entry->IsCheckPoint()) {
+
+                checkpoint_catalog_paths.push_back(wal_entry->GetCheckpointInfo().second);
+
+                if (wal_entry->IsFullCheckPoint()) {
+                    auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
+                    if (current_max_commit_ts > max_commit_ts) {
+                        max_commit_ts = current_max_commit_ts;
+                        catalog_path = current_catalog_path;
+                    }
+                    LOG_TRACE(Format("Find checkpoint max commit ts: {}", max_commit_ts));
+                    LOG_TRACE(Format("Find catalog path: {}", catalog_path));
+                    break;
+                } else {
+                    // delta checkpoint
+                    auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
+                    // if the current max commit ts is greater than the max commit ts, update the max commit ts and catalog path
+                    if (current_max_commit_ts > max_commit_ts) {
+                        max_commit_ts = current_max_commit_ts;
+                        catalog_path = current_catalog_path;
+                    }
                 }
             }
         }
-    }
-    LOG_INFO(Format("Find checkpoint max commit ts: {}", max_commit_ts));
+        LOG_INFO(Format("Find checkpoint max commit ts: {}", max_commit_ts));
 
-    // phase 2: by the max commit ts, find the entries to replay
-    LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
+        // phase 2: by the max commit ts, find the entries to replay
+        LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                break;
+            }
 
-        LOG_TRACE(wal_entry->ToString());
+            LOG_TRACE(wal_entry->ToString());
 
-        if (wal_entry->commit_ts > max_commit_ts) {
-            replay_entries.push_back(wal_entry);
-        } else {
-            break;
+            if (wal_entry->commit_ts > max_commit_ts) {
+                replay_entries.push_back(wal_entry);
+            } else {
+                break;
+            }
         }
     }
 
