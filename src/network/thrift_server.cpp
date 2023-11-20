@@ -123,8 +123,33 @@ public:
     }
 
     void CreateIndex(CommonResponse &response, const CreateIndexRequest &request) {
-        // Your implementation goes here
-        printf("CreateIndex\n");
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        auto table = database->GetTable(request.table_name);
+        auto column_names = new Vector<String>();
+
+        column_names->reserve(request.column_names.size());
+        for (auto &column_name : request.column_names) {
+            column_names->emplace_back(column_name);
+        }
+
+        String method_type = request.method_type;
+        auto *index_para_list = new Vector<InitParameter *>();
+
+        for (auto &index_para : request.index_para_list) {
+            auto init_parameter = new InitParameter();
+            init_parameter->para_name_ = index_para.para_name;
+            init_parameter->para_value_ = index_para.para_value;
+            index_para_list->emplace_back(init_parameter);
+        }
+
+        auto result = table->CreateIndex(request.index_name, column_names, method_type, index_para_list, (CreateIndexOptions &)request.option);
+        if (result.IsOk()) {
+            response.__set_success(true);
+        } else {
+            response.__set_success(false);
+            response.__set_error_msg(result.ErrorStr());
+        }
     }
 
     void DropIndex(CommonResponse &response, const DropIndexRequest &request) {
