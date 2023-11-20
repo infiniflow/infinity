@@ -103,7 +103,7 @@ class RemoteTable(Table, ABC):
 
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
-        global covered_column_vector, where_expr
+        global covered_column_vector
         select_list: List[ParsedExpr] = []
 
         for column in query.columns:
@@ -127,6 +127,7 @@ class RemoteTable(Table, ABC):
 
         # str to ParsedExpr
         from sqlglot import condition
+        where_expr = ParsedExpr()
         if query.filter is not None:
             where_expr = traverse_conditions(condition(query.filter))
 
@@ -198,7 +199,11 @@ def traverse_conditions(cons) -> ParsedExpr:
             expr = traverse_conditions(value)
             arguments.append(expr)
         function_expr.arguments = arguments
-        parsed_expr.type = function_expr
+
+        paser_expr_type = ParsedExprType()
+        paser_expr_type.constant_expr = function_expr
+
+        parsed_expr.type = paser_expr_type
 
         return parsed_expr
 
@@ -208,7 +213,10 @@ def traverse_conditions(cons) -> ParsedExpr:
         column_name = [cons.alias_or_name]
         column_expr.column_name = column_name
 
-        parsed_expr.type = column_expr
+        paser_expr_type = ParsedExprType()
+        paser_expr_type.column_expr = column_expr
+
+        parsed_expr.type = paser_expr_type
         return parsed_expr
 
     elif isinstance(cons, exp.Literal):
@@ -224,7 +232,10 @@ def traverse_conditions(cons) -> ParsedExpr:
         else:
             raise Exception(f"unknown literal type: {cons}")
 
-        parsed_expr.type = constant_expr
+        paser_expr_type = ParsedExprType()
+        paser_expr_type.constant_expr = constant_expr
+
+        parsed_expr.type = paser_expr_type
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
