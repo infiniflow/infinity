@@ -13,13 +13,16 @@
 // limitations under the License.
 module;
 
-#include "type/info/array_info.h"
+#include "query_driver.h"
 #include "sql_parser.h"
+#include "type/info/array_info.h"
 #include "type/number/float16.h"
 
 export module parser;
 
 namespace infinity {
+
+export using QueryDriver = QueryDriver;
 
 export using SQLParser = SQLParser;
 export using ParserResult = ParserResult;
