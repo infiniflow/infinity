@@ -96,6 +96,7 @@ struct ConsolidationTask : Task {
 };
 
 void ConsolidationTask::operator()(int id) {
+    LOG_INFO(Format("ConsolidationTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
     if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
@@ -135,6 +136,7 @@ struct CommitTask : Task {
 };
 
 void CommitTask::operator()(int id) {
+    LOG_INFO(Format("CommitTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(commit_interval_));
     state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
     Finalize();
@@ -151,7 +153,9 @@ void CommitTask::Finalize() {
     }
 }
 
-IRSDataStore::IRSDataStore(const String &directory) : directory_(directory), path_{Path(directory_)} {
+IRSDataStore::IRSDataStore(SizeT table_id, const String &directory) {
+    path_ = Path(directory_) / Format("table_index_{}", table_id);
+    directory_ = path_.string();
     async_ = MakeUnique<IRSAsync>();
     maintenance_state_ = MakeShared<MaintenanceState>();
     std::error_code ec;
@@ -223,6 +227,20 @@ void IRSDataStore::BatchInsert(SharedPtr<DataBlock> data_block) {
 }
 
 void IRSDataStore::Reset() { index_writer_.reset(); }
+
+ViewSnapshot *IRSDataStore::GetViewSnapshot() {
+    IRSDataStore::DataSnapshotPtr snapshot = LoadSnapshot();
+    auto vs = MakeUnique<ViewSnapshot>(&(snapshot->reader_));
+    auto &ctx = *vs;
+    return &(ctx);
+}
+
+ViewSnapshot::ViewSnapshot(IRSDirectoryReader *reader) : reader_(reader) {
+    segments_.reserve(reader_->size());
+    for (auto &subreader : *reader_) {
+        segments_.emplace_back(Move(ViewSegment(subreader)));
+    }
+}
 
 const IRSSubReader *ViewSnapshot::operator[](SizeT i) noexcept { return segments_[i].segment_; }
 
