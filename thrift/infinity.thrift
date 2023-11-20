@@ -247,7 +247,7 @@ struct CreateIndexRequest {
     5: string method_type,
     6: list<InitParameter> index_para_list = [],
     7: i64 session_id,
-    8: Option option,
+    8: optional Option option,
 }
 
 struct DropIndexRequest {

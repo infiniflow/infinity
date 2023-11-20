@@ -56,6 +56,7 @@ public:
             infinity_session_map_mutex_.lock();
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
             infinity_session_map_mutex_.unlock();
+            response.session_id=infinity->GetSessionId();
             response.success = true;
         }
     }

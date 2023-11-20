@@ -1,8 +1,21 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import ABC
-
-from python.infinity import InfinityConnection
-from python.infinity.remote.client import GrpcInfinityClient
-
+from infinity import InfinityConnection
+from infinity.remote.client import GrpcInfinityClient
+from infinity.remote.db import RemoteDatabase
 
 
 class RemoteInfinityConnection(InfinityConnection, ABC):
@@ -26,7 +39,6 @@ class RemoteInfinityConnection(InfinityConnection, ABC):
         return self._client.drop_database(db_name=db_name)
 
     def get_database(self, db_name: str):
-        from python.infinity.remote.db import RemoteDatabase
         return RemoteDatabase(self, name=db_name)
 
     def disconnect(self):

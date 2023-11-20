@@ -1,10 +1,23 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import ABC
 import struct
-from python.infinity.query import Query, InfinityVectorQueryBuilder
-from python.infinity.table import Table
-from python.infinity import infinity_pb2
-from python.infinity import infinity_pb2_grpc
-from typing import Optional, Union, List, Dict, Any
+from infinity.query import Query, InfinityVectorQueryBuilder
+from infinity.table import Table
+from infinity.remote.infinity_grpc import infinity_pb2
+from typing import Optional, Union, Dict, Any
 from sqlglot import condition, expressions as exp
 
 
@@ -31,17 +44,17 @@ class RemoteTable(Table, ABC):
                 proto_index_para.para_value = str(value)
                 index_para_list_to_use.append(proto_index_para)
 
-        self._conn.client.create_index(db_name=self._db_name,
-                                       table_name=self._table_name,
-                                       index_name=index_name,
-                                       column_names=column_names,
-                                       method_type=method_type,
-                                       index_para_list=index_para_list_to_use,
-                                       options=None)
+        return self._conn.client.create_index(db_name=self._db_name,
+                                              table_name=self._table_name,
+                                              index_name=index_name,
+                                              column_names=column_names,
+                                              method_type=method_type,
+                                              index_para_list=index_para_list_to_use,
+                                              options=None)
 
     def drop_index(self, index_name: str):
-        self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
-                                     index_name=index_name)
+        return self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
+                                            index_name=index_name)
 
     def insert(self, data: list[dict[str, Union[str, int, float]]]):
 
@@ -77,8 +90,8 @@ class RemoteTable(Table, ABC):
 
     def import_data(self, file_path: str, options=None):
 
-        self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
-                                      import_options=options)
+        return self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
+                                             import_options=options)
 
     def delete(self, condition):
         pass
@@ -100,6 +113,7 @@ class RemoteTable(Table, ABC):
         # process select_list
         global covered_column_vector, where_expr
         select_list: list[infinity_pb2.ParsedExpr] = []
+        group_by_list: list[infinity_pb2.ParsedExpr] = []
 
         for column in query.columns:
             column_expr = infinity_pb2.ColumnExpr()
@@ -136,7 +150,7 @@ class RemoteTable(Table, ABC):
                                        table_name=self._table_name,
                                        select_list=select_list,
                                        where_expr=where_expr,
-                                       group_by_list=None,
+                                       group_by_list=group_by_list,
                                        limit_expr=limit_expr,
                                        offset_expr=offset_expr,
                                        search_expr=None)
@@ -212,6 +226,7 @@ def traverse_conditions(cons) -> infinity_pb2.ParsedExpr:
             traverse_conditions(value)
     else:
         raise Exception(f"unknown condition: {cons}")
+
 
 def binary_exp_to_paser_exp(binary_expr_key) -> str:
     if binary_expr_key == "eq":

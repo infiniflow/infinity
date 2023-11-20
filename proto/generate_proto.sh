@@ -6,7 +6,7 @@ SRC_DIR=$(cd "$current_dir"; pwd)
 echo "SRC_DIR : $SRC_DIR"
 CPP_DST_DIR=$(cd "$current_dir/.."; pwd)"/src/network"
 echo "CPP_DST_DIR : $CPP_DST_DIR"
-PYTHON_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity"
+PYTHON_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity/remote/infinity_grpc"
 echo "PYTHON_DST_DIR : $PYTHON_DST_DIR"
 GRPC_CPP_PLUGIN_DIR=$(which grpc_cpp_plugin)
 /usr/bin/protoc -I=$SRC_DIR --cpp_out=$CPP_DST_DIR  $SRC_DIR/infinity.proto

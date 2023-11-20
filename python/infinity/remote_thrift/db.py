@@ -1,15 +1,12 @@
 from abc import ABC
-
-from infinity_thrift_rpc.ttypes import *
-from python.infinity import RemoteInfinityConnection
-from python.infinity.db import Database
-
+from infinity.db import Database
+from infinity.remote_thrift.table import RemoteTable
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 
 
+class RemoteThriftDatabase(Database, ABC):
 
-class RemoteDatabase(Database, ABC):
-
-    def __init__(self, conn: RemoteInfinityConnection, name: str):
+    def __init__(self, conn, name: str):
         self._conn = conn
         self._db_name = name
 
@@ -25,35 +22,35 @@ class RemoteDatabase(Database, ABC):
                 # "vector,1024,float32"
                 length = column_big_info[1]
                 element_type = column_big_info[2]
-                proto_column_def = infinity_pb2.ColumnDef()
+                proto_column_def = ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
 
-                column_type = infinity_pb2.DataType()
-                column_type.logic_type = infinity_pb2.LogicType.Embedding
+                column_type = DataType()
+                column_type.logic_type = LogicType.Embedding
 
-                embedding_type = infinity_pb2.EmbeddingType()
-
+                embedding_type = EmbeddingType()
                 if element_type == "bit":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemBit
+                    embedding_type.embedding_data_type = ElementType.ElementBit
                 elif element_type == "float32" or element_type == "float":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemFloat
+                    embedding_type.embedding_data_type = ElementType.ElementFloat32
                 elif element_type == "float64" or element_type == "double":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemDouble
+                    embedding_type.embedding_data_type = ElementType.ElementFloat64
                 elif element_type == "int8":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt8
+                    embedding_type.embedding_data_type = ElementType.ElementInt8
                 elif element_type == "int16":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt16
+                    embedding_type.embedding_data_type = ElementType.ElementInt16
                 elif element_type == "int32" or element_type == "int":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt32
+                    embedding_type.embedding_data_type = ElementType.ElementInt32
                 elif element_type == "int64":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt64
+                    embedding_type.embedding_data_type = ElementType.ElementInt64
                 else:
                     raise Exception(f"unknown element type: {element_type}")
 
                 embedding_type.dimension = int(length)
-                column_type.embedding_type.CopyFrom(embedding_type)
-                proto_column_def.column_type.CopyFrom(column_type)
+
+                column_type.physical_type = embedding_type
+                proto_column_def.data_type = column_type
                 column_defs.append(proto_column_def)
 
             else:  # numeric or varchar
@@ -62,51 +59,54 @@ class RemoteDatabase(Database, ABC):
                 constraints = column_big_info[1:]
 
                 # process column definition
-                proto_column_def = infinity_pb2.ColumnDef()
+                proto_column_def = ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
-                proto_column_type = infinity_pb2.DataType()
+                proto_column_type = DataType()
 
                 if datatype == "int8":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.TinyInt
+                    proto_column_type.logic_type = LogicType.TinyInt
                 elif datatype == "int16":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.SmallInt
+                    proto_column_type.logic_type = LogicType.SmallInt
                 elif datatype == "int32" or datatype == "int":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Integer
+                    proto_column_type.logic_type = LogicType.Integer
                 elif datatype == "int64":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.BigInt
+                    proto_column_type.logic_type = LogicType.BigInt
                 elif datatype == "int128":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.HugeInt
+                    proto_column_type.logic_type = LogicType.HugeInt
                 elif datatype == "float":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Float
+                    proto_column_type.logic_type = LogicType.Float
                 elif datatype == "double":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Double
+                    proto_column_type.logic_type = LogicType.Double
                 elif datatype == "varchar":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Varchar
-                    proto_column_type.VarcharType.width = 1024
+                    varchar_type = VarcharType()
+                    varchar_type.dimension = 1024
+                    proto_column_type.logic_type = LogicType.Varchar
+                    proto_column_type.physical_type = varchar_type
                 elif datatype == "bool":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Bool
+                    proto_column_type.logic_type = LogicType.Boolean
                 else:
                     raise Exception(f"unknown datatype: {datatype}")
 
-                proto_column_def.column_type.CopyFrom(proto_column_type)
+                proto_column_def.data_type = proto_column_type
+
                 # process constraints
                 for constraint in constraints:
                     if constraint == "null":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kNull)
+                        proto_column_def.constraints.append(Constraint.Null)
                     elif constraint == "not null":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kNotNull)
+                        proto_column_def.constraints.append(Constraint.NotNull)
                     elif constraint == "primary key":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kPrimaryKey)
+                        proto_column_def.constraints.append(Constraint.PrimaryKey)
                     elif constraint == "unique":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kUnique)
+                        proto_column_def.constraints.append(Constraint.Unique)
                     else:
                         raise Exception(f"unknown constraint: {constraint}")
                 column_defs.append(proto_column_def)
         # print(column_defs)
         return self._conn.client.create_table(db_name=self._conn.db_name, table_name=table_name,
                                               column_defs=column_defs,
-                                              options=options)
+                                              option=options)
 
     def drop_table(self, table_name):
         return self._conn.client.drop_table(db_name=self._conn.db_name, table_name=table_name)
@@ -118,5 +118,4 @@ class RemoteDatabase(Database, ABC):
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
-        from python.infinity.remote.table import RemoteTable
         return RemoteTable(self._conn, self._db_name, table_name)

@@ -1,6 +1,19 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import grpc
-import typing as tp
-from python.infinity import infinity_pb2_grpc, infinity_pb2
+from infinity.remote.infinity_grpc import infinity_pb2_grpc, infinity_pb2
 
 
 class GrpcInfinityClient:
@@ -32,7 +45,6 @@ class GrpcInfinityClient:
         return self.stub.DescribeDatabase(infinity_pb2.DescribeDatabaseRequest(session_id=self.session_id,
                                                                                db_name=db_name))
 
-
     def get_database(self, db_name: str):
         return self.stub.GetDatabase(infinity_pb2.GetDatabaseRequest(session_id=self.session_id,
                                                                      db_name=db_name))
@@ -46,8 +58,8 @@ class GrpcInfinityClient:
 
     def drop_table(self, db_name: str, table_name: str):
         return self.stub.DropTable(infinity_pb2.DropTableRequest(session_id=self.session_id,
-                                                          db_name=db_name,
-                                                          table_name=table_name))
+                                                                 db_name=db_name,
+                                                                 table_name=table_name))
 
     def list_tables(self, db_name: str):
         return self.stub.ListTable(infinity_pb2.ListTableRequest(session_id=self.session_id,

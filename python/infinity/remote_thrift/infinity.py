@@ -1,20 +1,17 @@
 from abc import ABC
 
-from python.infinity import InfinityConnection
-from python.infinity.remote.client import GrpcInfinityClient
+from infinity import InfinityConnection
+from infinity.remote_thrift.client import ThriftInfinityClient
+from infinity.remote_thrift.db import RemoteThriftDatabase
 
 
-
-class RemoteInfinityConnection(InfinityConnection, ABC):
+class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri):
         self.db_name = "default"
-        self._client = GrpcInfinityClient(uri)
+        self._client = ThriftInfinityClient(uri)
 
     def create_database(self, db_name: str, options=None):
-        # new database will be created if not exist
-        # show error if database already exist
-        res = self._client.create_database(db_name=db_name)
-        return res
+        return self._client.create_database(db_name=db_name)
 
     def list_databases(self):
         return self._client.list_databases()
@@ -26,8 +23,7 @@ class RemoteInfinityConnection(InfinityConnection, ABC):
         return self._client.drop_database(db_name=db_name)
 
     def get_database(self, db_name: str):
-        from python.infinity.remote.db import RemoteDatabase
-        return RemoteDatabase(self, name=db_name)
+        return RemoteThriftDatabase(self, name=db_name)
 
     def disconnect(self):
         return self._client.disconnect()
