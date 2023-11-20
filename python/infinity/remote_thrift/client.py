@@ -10,7 +10,7 @@ class ThriftInfinityClient:
     def __init__(self, url='0.0.0.0:9090'):
         self.url = url
         self.db_name = "default"
-        self.transport = TTransport.TBufferedTransport(TSocket.TSocket('0.0.0.0', 9090))
+        self.transport = TTransport.TBufferedTransport(TSocket.TSocket('192.168.1.5', 9090))
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()

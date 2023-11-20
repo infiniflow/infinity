@@ -1,5 +1,5 @@
 sqlglot==11.7.1
 grpcio-tools==1.42.0
-pydantic~=2.4.2
-thrift~=0.16.0
-setuptools~=67.8.0
+pydantic==2.4.2
+thrift==0.17.0
+setuptools

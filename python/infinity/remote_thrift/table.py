@@ -1,10 +1,12 @@
-from abc import ABC
 import struct
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.query import Query, InfinityVectorQueryBuilder
-from infinity.table import Table
+from abc import ABC
 from typing import Optional, Union, List, Dict, Any
+
 from sqlglot import condition, expressions as exp
+
+from infinity.query import Query, InfinityVectorQueryBuilder
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.table import Table
 
 
 class RemoteTable(Table, ABC):
@@ -50,9 +52,8 @@ class RemoteTable(Table, ABC):
         fields: list[Field] = []
         for row in data:
             column_names = list(row.keys())
-            f = Field()
+            parse_exprs = []
             for column_name, value in row.items():
-                print(column_name, value)
                 constant_expression = ConstantExpr()
                 if isinstance(value, str):
                     constant_expression.literal_type = LiteralType.String
@@ -70,11 +71,12 @@ class RemoteTable(Table, ABC):
 
                 paser_expr = ParsedExpr()
                 paser_expr.type = paser_expr_type
-                f.parse_exprs.append(paser_expr)
+                parse_exprs.append(paser_expr)
+            f = Field()
+            f.parse_exprs = parse_exprs
             print(f)
             fields.append(f)
 
-        print(db_name, table_name, column_names, fields)
         return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                         fields=fields)
 
@@ -113,8 +115,11 @@ class RemoteTable(Table, ABC):
                 column_expr.star = False
                 column_expr.column_name.append(column)
 
+            paser_expr_type = ParsedExprType()
+            paser_expr_type.column_expr = column_expr
+
             paser_expr = ParsedExpr()
-            paser_expr.type = column_expr
+            paser_expr.type = paser_expr_type
 
             select_list.append(paser_expr)
 
@@ -131,12 +136,17 @@ class RemoteTable(Table, ABC):
         if query.limit is not None:
             constant_exp = ConstantExpr()
             constant_exp.literal_type = LiteralType.Int64
-            limit_expr.type = constant_exp
+
+            paser_expr_type = ParsedExprType()
+            paser_expr_type.constant_expr = constant_exp
+            limit_expr.type = paser_expr_type
             limit_expr.i64_value = query.limit
         if query.offset is not None:
             constant_exp = ConstantExpr()
             constant_exp.literal_type = LiteralType.Int64
-            offset_expr.type = constant_exp
+            paser_expr_type = ParsedExprType()
+            paser_expr_type.constant_expr = constant_exp
+            offset_expr.type = paser_expr_type
             offset_expr.i64_value = query.offset
 
         res = self._conn.client.select(db_name=self._db_name,
