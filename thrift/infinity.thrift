@@ -23,7 +23,9 @@ struct Option {}
 
 struct NumberType {}
 
-struct VarcharType {}
+struct VarcharType {
+    1: i64 dimension,
+}
 
 enum ElementType {
     ElementBit,
@@ -62,7 +64,7 @@ struct ColumnDef {
     1:  i32 id,
     2:  string name,
     3:  DataType data_type,
-    4:  Constraint constraint = [],
+    4:  list<Constraint> constraints = [],
 }
 
 enum LiteralType {
@@ -113,6 +115,8 @@ struct ConstantExpr {
     3: i64 i64_value,
     4: double f64_value,
     5: string str_value,
+    6: list<i64> i64_array_value,
+    7: list<double> f64_array_value,
 }
 
 struct FunctionExpr {
@@ -317,6 +321,7 @@ struct SelectResponse {
     1: bool success,
     2: string error_msg,
     3: list<ColumnDef> column_defs = [],
+    4: list<ColumnField> column_fields = [];
 }
 
 // Service
