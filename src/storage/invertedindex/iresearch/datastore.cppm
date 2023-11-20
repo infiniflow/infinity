@@ -26,15 +26,28 @@ export module iresearch_datastore;
 namespace infinity {
 
 export struct ViewSegment {
-    ViewSegment(IRSSubReader &segment) : segment_(&segment) {}
-    IRSSubReader *segment_;
+    ViewSegment(const IRSSubReader &segment) : segment_(&segment) {}
+    const IRSSubReader *segment_;
+};
+
+export class ViewSnapshot {
+public:
+    ViewSnapshot(IRSDirectoryReader *reader);
+
+    const IRSSubReader *operator[](SizeT i) noexcept;
+
+    const ViewSegment &GetSegment(SizeT i) noexcept;
+
+public:
+    Vector<ViewSegment> segments_;
+    IRSDirectoryReader *reader_;
 };
 
 class IRSAsync;
-class MaintenanceState;
+struct MaintenanceState;
 export class IRSDataStore {
 public:
-    explicit IRSDataStore(const String &directory);
+    explicit IRSDataStore(SizeT table_id, const String &directory);
 
     struct DataSnapshot {
         DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
@@ -69,6 +82,8 @@ public:
 
     void Reset();
 
+    ViewSnapshot *GetViewSnapshot();
+
 private:
     String directory_;
     Path path_;
@@ -79,19 +94,6 @@ private:
     DataSnapshotPtr snapshot_;
     UniquePtr<IRSAsync> async_;
     SharedPtr<MaintenanceState> maintenance_state_;
-};
-
-export class ViewSnapshot : public IRSIndexReader {
-public:
-    ViewSnapshot() noexcept = default;
-
-    const IRSSubReader *operator[](SizeT i) noexcept;
-
-    const ViewSegment &GetSegment(SizeT i) noexcept;
-
-public:
-    Vector<ViewSegment> segments_;
-    IRSDataStore::DataSnapshotPtr data_store_;
 };
 
 } // namespace infinity
