@@ -42,7 +42,7 @@ double Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, 
     for (SizeT i = 0; i < thread_num; ++i) {
         threads.emplace_back([&]() {
             std::thread::id thread_id = std::this_thread::get_id();
-            std::cout << ">>> Thread ID: <<<" << thread_id << std::endl;
+            std::cout << ">>> Thread ID: " << thread_id << " <<<" << std::endl;
             for (SizeT j = 0; j < shared_size; ++j) {
                 SharedPtr<Infinity> infinity = Infinity::LocalConnect();
                 closure(i * shared_size + j, infinity, thread_id);
