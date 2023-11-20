@@ -36,6 +36,5 @@ SELECT * FROM products;
 statement ok
 DELETE FROM products;
 
-# Table has already been dropped
-statement error
+statement ok
 DROP TABLE products;
