@@ -205,6 +205,39 @@ int main() {
                 });
                 results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
             }
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+                    Vector<UpdateExpr *> *values = new Vector<UpdateExpr *>();
+
+                    Vector<String> *columns = new Vector<String>();
+                    columns->emplace_back(col_name_1);
+                    columns->emplace_back(col_name_2);
+
+                    ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+                    value1->integer_value_ = i;
+                    UpdateExpr *update_expr1 = new UpdateExpr();
+                    update_expr1->column_name = col_name_1;
+                    update_expr1->value = value1;
+
+                    ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+                    value1->integer_value_ = i;
+                    UpdateExpr *update_expr2 = new UpdateExpr();
+                    update_expr2->column_name = col_name_2;
+                    update_expr2->value = value2;
+
+                    values->push_back(update_expr1);
+                    values->push_back(update_expr2);
+
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Update(nullptr, values);
+                });
+                results.push_back(Format("-> Update QPS: {}", total_times / tims_costing_second));
+            }
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Delete(nullptr);
+                });
+                results.push_back(Format("-> Delete QPS: {}", total_times / tims_costing_second));
+            }
         }
     }
 

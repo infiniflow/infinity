@@ -209,42 +209,52 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
     MockWalFile();
     String wal_file_path = "/tmp/infinity/wal/wal.log";
+    {
+        auto iterator1 = WalEntryIterator::Make(wal_file_path);
 
-    WalEntryIterator iterator1(wal_file_path);
-    iterator1.Init();
-    while (iterator1.Next()) {
-        auto wal_entry = iterator1.GetEntry();
-        Println("WAL ENTRY COMMIT TS:", ToStr(wal_entry->commit_ts));
-        for (const auto &cmd : wal_entry->cmds) {
-            Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
+        while (true) {
+            auto wal_entry = iterator1.Next();
+            if (wal_entry == nullptr) {
+                break;
+            }
+            Println("WAL ENTRY COMMIT TS:", ToStr(wal_entry->commit_ts));
+            for (const auto &cmd : wal_entry->cmds) {
+                Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
+            }
         }
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
     int64_t max_commit_ts = 0;
     String catalog_path;
-    WalEntryIterator iterator(wal_file_path);
-    iterator.Init();
+    {
+        auto iterator = WalEntryIterator::Make(wal_file_path);
 
-    // phase 1: find the max commit ts and catalog path
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
-
-        if (!wal_entry->IsCheckPoint()) {
-            replay_entries.push_back(wal_entry);
-        } else {
-            std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-            Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
-            Println("Catalog Path: {}", catalog_path);
-            break;
+        // phase 1: find the max commit ts and catalog path
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry == nullptr) {
+                break;
+            }
+            if (!wal_entry->IsCheckPoint()) {
+                replay_entries.push_back(wal_entry);
+            } else {
+                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
+                Println("Catalog Path: {}", catalog_path);
+                break;
+            }
         }
-    }
 
-    // phase 2: by the max commit ts, find the entries to replay
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
-        if (wal_entry->commit_ts > max_commit_ts) {
-            replay_entries.push_back(wal_entry);
+        // phase 2: by the max commit ts, find the entries to replay
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry == nullptr) {
+                break;
+            }
+            if (wal_entry->commit_ts > max_commit_ts) {
+                replay_entries.push_back(wal_entry);
+            }
         }
     }
 
@@ -267,11 +277,12 @@ TEST_F(WalEntryTest, WalListIterator) {
     MockWalFile("/tmp/infinity/wal/wal2.log");
 
     WalListIterator iterator1({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
-    iterator1.Init();
 
-    iterator1.Init();
-    while (iterator1.Next()) {
-        auto wal_entry = iterator1.GetEntry();
+    while (true) {
+        auto wal_entry = iterator1.Next();
+        if (wal_entry.get() == nullptr) {
+            break;
+        }
         Println("WAL ENTRY COMMIT TS:", ToStr(wal_entry->commit_ts));
         for (const auto &cmd : wal_entry->cmds) {
             Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
@@ -281,28 +292,34 @@ TEST_F(WalEntryTest, WalListIterator) {
     Vector<SharedPtr<WalEntry>> replay_entries;
     int64_t max_commit_ts = 0;
     String catalog_path;
-    WalListIterator iterator({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
-    iterator.Init();
+    {
+        WalListIterator iterator({"/tmp/infinity/wal/wal.log", "/tmp/infinity/wal/wal2.log"});
 
-    // phase 1: find the max commit ts and catalog path
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
-
-        if (!wal_entry->IsCheckPoint()) {
-            replay_entries.push_back(wal_entry);
-        } else {
-            std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-            Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
-            Println("Catalog Path: {}", catalog_path);
-            break;
+        // phase 1: find the max commit ts and catalog path
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                break;
+            }
+            if (!wal_entry->IsCheckPoint()) {
+                replay_entries.push_back(wal_entry);
+            } else {
+                std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
+                Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
+                Println("Catalog Path: {}", catalog_path);
+                break;
+            }
         }
-    }
 
-    // phase 2: by the max commit ts, find the entries to replay
-    while (iterator.Next()) {
-        auto wal_entry = iterator.GetEntry();
-        if (wal_entry->commit_ts > max_commit_ts) {
-            replay_entries.push_back(wal_entry);
+        // phase 2: by the max commit ts, find the entries to replay
+        while (true) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                break;
+            }
+            if (wal_entry->commit_ts > max_commit_ts) {
+                replay_entries.push_back(wal_entry);
+            }
         }
     }
 
