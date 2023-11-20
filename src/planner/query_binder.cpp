@@ -905,8 +905,10 @@ SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
     auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
-    SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-    bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+    if (statement.where_expr_ != nullptr) {
+        SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
+        bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
+    }
     return bound_delete_statement;
 }
 

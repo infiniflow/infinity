@@ -45,14 +45,18 @@ namespace infinity {
 SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     Assert<PlannerException>(bind_context->knn_exprs_.empty(), "knn_exprs_ shall be empty");
-    Assert<PlannerException>(!where_conditions_.empty(), "where_conditions_ shall not be empty");
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
-    SharedPtr<LogicalNode> filter = BuildFilter(from, where_conditions_, query_context, bind_context);
-    filter->set_left_node(from);
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
     SharedPtr<LogicalNode> del = MakeShared<LogicalDelete>(bind_context->GetNewLogicalNodeId(), base_table_ref->table_entry_ptr_);
-    del->set_left_node(filter);
+
+    if (!where_conditions_.empty()) {
+        SharedPtr<LogicalNode> filter = BuildFilter(from, where_conditions_, query_context, bind_context);
+        filter->set_left_node(from);
+        del->set_left_node(filter);
+    } else {
+        del->set_left_node(from);
+    }
     return del;
 }
 

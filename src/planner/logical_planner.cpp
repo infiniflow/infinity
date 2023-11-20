@@ -280,20 +280,10 @@ Status LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    if (statement->where_expr_ == nullptr) {
-        // Rewrite to a DropStatement
-        DropStatement statement2;
-        auto drop_table_info = MakeShared<DropTableInfo>();
-        drop_table_info->schema_name_ = statement->schema_name_;
-        drop_table_info->table_name_ = statement->table_name_;
-        drop_table_info->conflict_type_ = ConflictType::kError;
-        statement2.drop_info_ = drop_table_info;
-        LogicalPlanner::BuildDrop(&statement2, bind_context_ptr);
-    } else {
-        SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-        SharedPtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
-        this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
-    }
+    // FIXME: After supporting Truncate, switch to the Truncate instruction when there is no where_expr_.
+    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    SharedPtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
+    this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
     return Status();
 }
 

@@ -106,7 +106,9 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport: {
+        case PhysicalOperatorType::kExport:
+        case PhysicalOperatorType::kUpdate:
+        case PhysicalOperatorType::kDelete: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(Format("{} shouldn't have child.", phys_op->GetName()));
@@ -136,9 +138,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kUpdate:
-        case PhysicalOperatorType::kDelete: {
+        case PhysicalOperatorType::kSort: {
             if (phys_op->left() == nullptr) {
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
             }
