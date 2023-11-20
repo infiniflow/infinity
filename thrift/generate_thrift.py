@@ -10,8 +10,8 @@ def generate_thrift():
     infinity_thrift_file = "infinity.thrift"
     os.system("thrift --version")
     # os.system(f"thrift --out {python_dir} --gen py {thrift_file}")
-    os.system(f"thrift -r --out {cpp_dir} --gen cpp {thrift_file}")
-    os.system(f"thrift -r --out {infinity_dir} --gen cpp {infinity_thrift_file}")
+    os.system(f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {thrift_file}")
+    os.system(f"thrift -r --out {infinity_dir} --gen cpp:no_skeleton {infinity_thrift_file}")
 
 
 if __name__ == '__main__':
