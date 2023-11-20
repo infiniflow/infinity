@@ -646,11 +646,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
         }
         case PhysicalOperatorType::kTableScan: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())));
-            }
-
             if (tasks_.size() != parallel_count) {
                 Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
             }
