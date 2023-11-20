@@ -27,158 +27,175 @@
 
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
 
+import infinity;
+import stl;
+import infinity_exception;
+import logger;
+import query_result;
+import third_party;
+
 using namespace ::infinity_thrift_rpc;
+
+namespace infinity {
 
 class InfinityServiceHandler : virtual public InfinityServiceIf {
 public:
     InfinityServiceHandler() = default;
 
-    void Connect(CommonResponse &_return) {
+    void Connect(CommonResponse &response) {
         // Your implementation goes here
         printf("Connect\n");
     }
 
-    void Disconnect(CommonResponse& _return, const CommonRequest& request) {
+    void Disconnect(CommonResponse &response, const CommonRequest &request) {
         // Your implementation goes here
         printf("Disconnect\n");
     }
 
-    void CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) {
+    void CreateDatabase(CommonResponse &response, const CreateDatabaseRequest &request) {
         // Your implementation goes here
         printf("CreateDatabase\n");
     }
 
-    void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) {
+    void DropDatabase(CommonResponse &response, const DropDatabaseRequest &request) {
         // Your implementation goes here
         printf("DropDatabase\n");
     }
 
-    void CreateTable(CommonResponse& _return, const CreateTableRequest& request) {
+    void CreateTable(CommonResponse &response, const CreateTableRequest &request) {
         // Your implementation goes here
         printf("CreateTable\n");
     }
 
-    void DropTable(CommonResponse &_return, const DropTableRequest &request) {
+    void DropTable(CommonResponse &response, const DropTableRequest &request) {
         // Your implementation goes here
         printf("DropTable\n");
     }
 
-    void Insert(CommonResponse &_return, const InsertRequest &request) {
+    void Insert(CommonResponse &response, const InsertRequest &request) {
         // Your implementation goes here
         printf("Insert\n");
     }
 
-    void Import(CommonResponse &_return, const ImportRequest &request) {
+    void Import(CommonResponse &response, const ImportRequest &request) {
         // Your implementation goes here
         printf("Import\n");
     }
 
-    void Select(SelectResponse &_return, const SelectRequest &request) {
+    void Select(SelectResponse &response, const SelectRequest &request) {
         // Your implementation goes here
         printf("Select\n");
     }
 
-    void ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) {
+    void ListDatabase(ListDatabaseResponse &response, const ListDatabaseRequest &request) {
         // Your implementation goes here
         printf("ListDatabase\n");
     }
 
-    void ListTable(ListTableResponse &_return, const ListTableRequest &request) {
+    void ListTable(ListTableResponse &response, const ListTableRequest &request) {
         // Your implementation goes here
         printf("ListTable\n");
     }
 
-    void DescribeDatabase(DescribeDatabaseResponse &_return, const DescribeDatabaseRequest &request) {
+    void DescribeDatabase(DescribeDatabaseResponse &response, const DescribeDatabaseRequest &request) {
         // Your implementation goes here
         printf("DescribeDatabase\n");
     }
 
-    void DescribeTable(DescribeTableResponse &_return, const DescribeTableRequest &request) {
+    void DescribeTable(DescribeTableResponse &response, const DescribeTableRequest &request) {
         // Your implementation goes here
         printf("DescribeTable\n");
     }
 
-    void GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) {
+    void GetDatabase(CommonResponse &response, const GetDatabaseRequest &request) {
         // Your implementation goes here
         printf("GetDatabase\n");
     }
 
-    void GetTable(CommonResponse &_return, const GetTableRequest &request) {
+    void GetTable(CommonResponse &response, const GetTableRequest &request) {
         // Your implementation goes here
         printf("GetTable\n");
     }
 
-    void CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) {
+    void CreateIndex(CommonResponse &response, const CreateIndexRequest &request) {
         // Your implementation goes here
         printf("CreateIndex\n");
     }
 
-    void DropIndex(CommonResponse &_return, const DropIndexRequest &request) {
-        // Your implementation goes here
-        printf("DropIndex\n");
+    void DropIndex(CommonResponse &response, const DropIndexRequest &request) {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        auto table = database->GetTable(request.table_name);
+        QueryResult result = table->DropIndex(request.index_name);
+
+        if (result.IsOk()) {
+            response.__set_success(true);
+        } else {
+            response.__set_success(false);
+            response.__set_error_msg(result.ErrorStr());
+        }
     }
 
-protected:
-    std::mutex infinity_session_map_mutex_{};
-    std::unordered_map<infinity::u64, infinity::SharedPtr<infinity::Infinity>> infinity_session_map_{};
+private:
+    Mutex infinity_session_map_mutex_{};
+    HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
+
+    SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
+        auto it = infinity_session_map_.find(session_id);
+        if (it == infinity_session_map_.end()) {
+            Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
+        }
+        return it->second;
+    }
 };
 
-/*
-  CalculatorIfFactory is code generated.
-  CalculatorCloneFactory is useful for getting access to the server side of the
-  transport.  It is also useful for making per-connection state.  Without this
-  CloneFactory, all connections will end up sharing the same handler instance.
-*/
 class InfinityServiceCloneFactory : virtual public InfinityServiceIfFactory {
 public:
     ~InfinityServiceCloneFactory() override = default;
     InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
-        std::shared_ptr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
-        cout << "Incoming connection\n";
-        cout << "\tSocketInfo: " << sock->getSocketInfo() << "\n";
-        cout << "\tPeerHost: " << sock->getPeerHost() << "\n";
-        cout << "\tPeerAddress: " << sock->getPeerAddress() << "\n";
-        cout << "\tPeerPort: " << sock->getPeerPort() << "\n";
+        SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
+        LOG_TRACE(Format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
+                         sock->getSocketInfo(),
+                         sock->getPeerHost(),
+                         sock->getPeerAddress(),
+                         sock->getPeerPort()));
         return new InfinityServiceHandler;
     }
     void releaseHandler(InfinityServiceIf *handler) override { delete handler; }
 };
 
-import logger;
+// Thrift server
 
-namespace infinity {
+void ThreadedThriftServer::Init(i32 port_no) {
 
-void ThreadedThriftServer::Init(int32_t port_no) {
-
-    server = std::make_unique<TThreadedServer>(std::make_shared<InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
-                                               std::make_shared<TServerSocket>(port_no), // port
-                                               std::make_shared<TBufferedTransportFactory>(),
-                                               std::make_shared<TBinaryProtocolFactory>());
+    server = MakeUnique<TThreadedServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+                                         MakeShared<TServerSocket>(port_no), // port
+                                         MakeShared<TBufferedTransportFactory>(),
+                                         MakeShared<TBinaryProtocolFactory>());
 }
 
 void ThreadedThriftServer::Start() { server->serve(); }
 
 void ThreadedThriftServer::Shutdown() { server->stop(); }
 
-void PoolThriftServer::Init(int32_t port_no, int32_t pool_size) {
+void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
-    std::shared_ptr<ThreadFactory> threadFactory = std::make_shared<ThreadFactory>();
+    SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
 
-    std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    server = std::make_unique<TThreadPoolServer>(std::make_shared<InfinityServiceProcessorFactory>(std::make_shared<InfinityServiceCloneFactory>()),
-                                                 std::make_shared<TServerSocket>(port_no),
-                                                 std::make_shared<TBufferedTransportFactory>(),
-                                                 std::make_shared<TBinaryProtocolFactory>(),
-                                                 threadManager);
+    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+                                           MakeShared<TServerSocket>(port_no),
+                                           MakeShared<TBufferedTransportFactory>(),
+                                           MakeShared<TBinaryProtocolFactory>(),
+                                           threadManager);
 }
 
 void PoolThriftServer::Start() { server->serve(); }
