@@ -106,9 +106,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kUpdate:
-        case PhysicalOperatorType::kDelete: {
+        case PhysicalOperatorType::kExport: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(Format("{} shouldn't have child.", phys_op->GetName()));
@@ -143,6 +141,16 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            current_fragment_ptr->AddOperator(phys_op);
+            BuildFragments(phys_op->left(), current_fragment_ptr);
+            break;
+        }
+        case PhysicalOperatorType::kUpdate:
+        case PhysicalOperatorType::kDelete:  {
+            if (phys_op->left() == nullptr) {
+                Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left(), current_fragment_ptr);
             break;
