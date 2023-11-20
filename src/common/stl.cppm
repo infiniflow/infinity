@@ -343,6 +343,8 @@ export {
 
     // Stringstream
     using StringStream = std::basic_stringstream<char>;
+    using IStringStream = std::istringstream;
+    using OStringStream = std::ostringstream;
 
     // Dir
     using Path = std::filesystem::path;

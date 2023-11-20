@@ -1,89 +1,83 @@
-# Prerequisites
-*.d
+# .gitignore uses glob patterns instead of regex
 
-# Compiled Object files
-*.slo
+# file names without extension
+*
+!*.*
+!*/
+
+# names with only extension
+.*
+
+# names with special characters
+*#*
+*~*
+
+# names with given extension
+*.a
+*.app
+*.class
+*.d
+*.dll
+*.dylib
+*.exe
+*.gch
+*.gz
+*.l.cc
+*.la
+*.lai
+*.lib
 *.lo
+*.log
+*.mod
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
+*.orig
 *.out
-*.app
+*.output
+*.pb.h
+*.pb.cc
+*.pch
+*.pyc
+*.slo
+*.smod
+*.so
+*.tab.c
+*.tab.h
+*.tab.cc
+*.tab.hh
+*.tar
+*.tgz
+*.xz
 
-# Clion
-.idea/**
-cmake-build-debug/**
-cmake-build-debug-clang/**
-cmake-build-debug-gcc/**
-cmake-build-release/**
-cmake-build-release-clang/**
-cmake-build-release-gcc/**
-cmake-build-debug-**
-cmake-build-release-**
-Infinity.xml
 
-# OSX dir
-.DS_Store
-
-# compressed file
-*.tar.gz
-*.zip
-
+# build directory of Gradle, CMake etc
+tmp
 build
+cmake-build-*
 
 # ignore compilation configure file
 src/bin/compilation_config.h
 src/bin/compilation_config.cppm
 
-# log file
-*.log
-
 # bison output file
 parser.output
-
-#vscode file
-.cache
-.vscode
 
 # ignore parser auto generated files
 lexer.cpp
 lexer.h
 parser.cpp
 parser.h
+location.h
+location.hh
+query_lexer.h
+query_lexer.cpp
+query_parser.h
+query_parser.cpp
 
 test/data/csv/*big*.csv
 test/sql/**/*big*.slt
 test/data/fvecs/
 test/sql/**/*fvecs*.slt
-
-**/*.pyc
-
-#clang-format
-clang-format-all
-
-#a place for any file unwant to commit
-tmp/
 
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
@@ -91,10 +85,7 @@ benchmark/csv/csv_config.h
 #proto
 python/infinity/remote/infinity_pb2.py
 python/infinity/remote/infinity_pb2_grpc.py
-src/network/infinity.grpc.pb.cc
-src/network/infinity.grpc.pb.h
-src/network/infinity.pb.cc
-src/network/infinity.pb.h
+
 
 #python sdk
 python/build
