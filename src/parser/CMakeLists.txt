@@ -23,7 +23,7 @@ file(GLOB_RECURSE
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
 
-list(FILTER parser_files EXCLUDE REGEX query_main.cpp)
+list(FILTER parser_files EXCLUDE REGEX .*main.cpp)
 
 add_library(sql_parser STATIC ${parser_files} ${BISON_parser_OUTPUTS} ${FLEX_lexer_OUTPUTS} ${BISON_QueryParser_OUTPUTS} ${FLEX_QueryLexer_OUTPUTS})
 

@@ -1784,17 +1784,11 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
 
     EXPECT_EQ(search_expr->match_exprs_.size(), 2);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
-    EXPECT_EQ(match_expr0->fields_.size(), 2);
-    EXPECT_EQ(match_expr0->fields_[0].first, String("author"));
-    EXPECT_EQ(match_expr0->fields_[0].second, 2.0F);
-    EXPECT_EQ(match_expr0->fields_[1].first, String("name"));
-    EXPECT_EQ(match_expr0->fields_[1].second, 5.0F);
+    EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
     EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
     EXPECT_EQ(match_expr0->options_.size(), 0);
     auto *match_expr1 = (MatchExpr *)(search_expr->match_exprs_[1]);
-    EXPECT_EQ(match_expr1->fields_.size(), 1);
-    EXPECT_EQ(match_expr1->fields_[0].first, String("name"));
-    EXPECT_EQ(match_expr1->fields_[0].second, 1.0F);
+    EXPECT_EQ(match_expr1->fields_, String("name"));
     EXPECT_EQ(match_expr1->matching_text_, String("to the star"));
     EXPECT_EQ(match_expr1->options_.size(), 3);
     EXPECT_EQ(match_expr1->options_[0].first, String("operator"));

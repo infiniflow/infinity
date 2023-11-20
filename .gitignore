@@ -92,3 +92,6 @@ python/build
 python/dist
 python/infinity.egg-info
 python/.idea
+
+#brpc
+third_party/brpc/src/butil/config.h

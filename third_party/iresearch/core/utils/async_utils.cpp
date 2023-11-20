@@ -30,8 +30,6 @@
 #include "utils/misc.hpp"
 #include "utils/std.hpp"
 
-#include <absl/strings/str_cat.h>
-
 using namespace std::chrono_literals;
 
 namespace irs::async_utils {
