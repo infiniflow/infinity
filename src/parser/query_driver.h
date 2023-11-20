@@ -32,6 +32,10 @@ public:
     QueryDriver();
     virtual ~QueryDriver();
 
+    int ParseSingleWithFields(const std::string &fields_str, const std::string &query);
+
+    void PopulateDefaultField(const std::string &default_field, float boost = 1.0F);
+
     /**
      * parse a stream - read and parse line by line
      * @param ist - std::istream&, valid input stream

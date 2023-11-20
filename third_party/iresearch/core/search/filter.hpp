@@ -92,6 +92,8 @@ class filter {
 
   bool operator==(const filter& rhs) const noexcept { return equals(rhs); }
 
+  virtual void PopulateDefaultFieldRecursive(const std::string &default_field) {}
+
   virtual filter::prepared::ptr prepare(const PrepareContext& ctx) const = 0;
 
   score_t boost() const noexcept { return boost_; }
@@ -152,6 +154,11 @@ class filter_base : public filter_with_options<Options> {
 
   std::string_view field() const noexcept { return field_; }
   std::string* mutable_field() noexcept { return &field_; }
+
+  void PopulateDefaultFieldRecursive(const std::string &default_field) override {
+      if (field_.empty())
+          field_ = default_field;
+  }
 
   size_t hash() const noexcept final {
     return hash_combine(hash_utils::Hash(field_),
