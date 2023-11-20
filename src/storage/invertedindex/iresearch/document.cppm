@@ -30,15 +30,15 @@ export struct IndexField {
     IndexField(const StringView &n, IndexFeatures index_features, const Features &flags)
         : name_(n), features_(flags), index_features_(index_features) {}
 
-    StringView Name() const noexcept { return name_; }
+    StringView name() const noexcept { return name_; }
 
-    const Features &GetFeatures() const noexcept { return features_; }
+    const Features &features() const noexcept { return features_; }
 
-    IndexFeatures GetIndexFeatures() const noexcept { return index_features_; }
+    IndexFeatures index_features() const noexcept { return index_features_; }
 
-    virtual TokenStream &GetTokens() const = 0;
+    virtual TokenStream &get_tokens() const = 0;
 
-    virtual bool Write(DataOutput &out) const = 0;
+    virtual bool write(DataOutput &out) const = 0;
 
     virtual ~IndexField() = default;
 };
@@ -52,12 +52,12 @@ export struct StringField : public IndexField {
     StringField(const StringView &n, IndexFeatures index_features, const Features &flags, const String &a)
         : IndexField(n, index_features, flags), f_(a) {}
 
-    TokenStream &GetTokens() const override {
+    TokenStream &get_tokens() const override {
         stream_.reset(f_);
         return stream_;
     }
 
-    bool Write(DataOutput &out) const override {
+    bool write(DataOutput &out) const override {
         IRSWriteString(out, f_.c_str(), f_.length());
         return true;
     }
@@ -70,12 +70,12 @@ export struct TextField : public IndexField {
     TextField(const StringView &n, IndexFeatures index_features, const Features &flags, IRSAnalyzer::ptr stream)
         : IndexField(n, index_features, flags), stream_(Move(stream)) {}
 
-    TokenStream &GetTokens() const override {
+    TokenStream &get_tokens() const override {
         stream_->reset(f_);
         return *stream_;
     }
 
-    bool Write(DataOutput &out) const override {
+    bool write(DataOutput &out) const override {
         IRSWriteString(out, f_.c_str(), f_.length());
         return true;
     }
@@ -89,19 +89,15 @@ export struct NumericField : public IndexField {
 
     NumericField(const StringView &n, IndexFeatures index_features, const Features &flags, u64 v) : IndexField(n, index_features, flags), value_(v) {}
 
-    TokenStream &GetTokens() const override {
+    TokenStream &get_tokens() const override {
         stream_.reset(value_);
         return stream_;
     }
 
-    bool Write(DataOutput &out) const override {
+    bool write(DataOutput &out) const override {
         IRSWriteZVlong(out, value_);
         return true;
     }
-};
-
-export struct FieldIterator {
-    FieldIterator();
 };
 
 } // namespace infinity

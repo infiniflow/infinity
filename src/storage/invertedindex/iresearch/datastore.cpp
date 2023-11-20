@@ -25,16 +25,32 @@ module;
 #include "utils/index_utils.hpp"
 
 import stl;
+import parser;
 import logger;
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
 import data_block;
+import operator_state;
 import column_vector;
+import global_block_id;
+import table_scan_function_data;
+import block_index;
+import block_entry;
+import query_context;
+import column_buffer;
+import block_column_entry;
+import default_values;
+import base_table_ref;
 
 module iresearch_datastore;
 
 namespace infinity {
+
+#define DOCMASK 0xFF
+
+u32 RowID2DocID(RowID row_id) { return (row_id.segment_id_ << 16) + row_id.segment_offset_; }
+RowID RowID2DocID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK); }
 
 class IRSAsync {
 public:
@@ -153,8 +169,9 @@ void CommitTask::Finalize() {
     }
 }
 
-IRSDataStore::IRSDataStore(SizeT table_id, const String &directory) {
-    path_ = Path(directory_) / Format("table_index_{}", table_id);
+IRSDataStore::IRSDataStore(const String &table_name, const String &directory, SharedPtr<BaseTableRef> base_table_ref)
+    : base_table_ref_(base_table_ref) {
+    path_ = Path(directory) / table_name;
     directory_ = path_.string();
     async_ = MakeUnique<IRSAsync>();
     maintenance_state_ = MakeShared<MaintenanceState>();
@@ -220,9 +237,39 @@ void IRSDataStore::ScheduleOptimize() {
     async_->Queue<ConsolidationTask>(0, Move(task));
 }
 
-void IRSDataStore::BatchInsert(SharedPtr<DataBlock> data_block) {
+void IRSDataStore::BatchInsert(u32 block_id, SharedPtr<DataBlock> data_block) {
+    SharedPtr<Vector<RowID>> row_ids;
+    data_block->FillRowIDVector(row_ids, block_id);
     Vector<SharedPtr<ColumnVector>> column_vectors = data_block->column_vectors;
-    for (SizeT i = 0; i < column_vectors.size(); ++i) {
+    auto ctx = index_writer_->GetBatch();
+
+    constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
+    constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};
+
+    static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
+    static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
+
+    for (SizeT i = 0; i < row_ids->size(); ++i) {
+        RowID row_id = (*row_ids)[i];
+        auto doc = ctx.Insert(RowID2DocID(row_id));
+        for (SizeT column_id = 0; column_id < column_vectors.size(); ++column_id) {
+            SharedPtr<DataType> data_type = (*base_table_ref_->column_types_)[column_id]; // TODO
+            String column_name = (*base_table_ref_->column_names_)[column_id];            // TODO
+            ptr_t dst_ptr = column_vectors[column_id]->data_ptr_;
+            SizeT data_type_size = column_vectors[column_id]->data_type_size_;
+            if (column_vectors[column_id]->data_type_->IsNumeric()) { // TODO datetime & fixed string could also be filter
+                auto field = MakeShared<NumericField>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                field->value_ = (i64) * (column_vectors[column_id]->data_ptr_ + data_type_size * i);
+                doc.Insert<irs::Action::INDEX>(*field);
+            } else if (column_vectors[column_id]->data_type_->type() == kVarchar) {
+                auto field = MakeShared<TextField>(column_name.c_str(),
+                                                   irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
+                                                   text_features,
+                                                   AnalyzerPool::instance().Get("jieba"));
+                // TODO
+                doc.Insert<irs::Action::INDEX>(*field);
+            }
+        }
     }
 }
 
