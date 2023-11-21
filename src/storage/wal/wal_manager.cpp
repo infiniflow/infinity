@@ -141,8 +141,7 @@ void WalManager::Stop() {
     // pop all the entries in the queue. and notify the condition variable.
     std::lock_guard guard(mutex_);
     for (const auto &entry : que_) {
-        auto wal_entry = que_.front();
-        Txn *txn = txn_mgr->GetTxn(wal_entry->txn_id);
+        Txn *txn = txn_mgr->GetTxn(entry->txn_id);
         if (txn != nullptr) {
             txn->CancelCommitBottom();
         }

@@ -132,7 +132,7 @@ public:
     TableCollectionMeta *table_collection_meta_{};
 
     // From data table
-    SizeT row_count_{};
+    Atomic<SizeT> row_count_{};
     HashMap<u32, SharedPtr<SegmentEntry>> segments_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
