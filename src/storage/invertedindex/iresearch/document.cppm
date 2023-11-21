@@ -81,9 +81,10 @@ export struct TextField : public IndexField {
     }
 };
 
-export struct NumericField : public IndexField {
+export template <typename T>
+struct NumericField : public IndexField {
     mutable NumericTokenStream stream_;
-    i64 value_;
+    T value_;
 
     NumericField(const StringView &n, IndexFeatures index_features, const Features &flags) : IndexField(n, index_features, flags) {}
 
