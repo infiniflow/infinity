@@ -371,7 +371,7 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     int block_count = Min(this->block_entries_.size(), segment_entry2->block_entries_.size());
     for (int i = 0; i < block_count; i++) {
         auto &block_entry1 = this->block_entries_[i];
-        auto &block_entry2 = this->block_entries_[i];
+        auto &block_entry2 = segment_entry2->block_entries_[i];
         if (block_entry1.get() == nullptr)
             block_entry1 = block_entry2;
         else if (block_entry2.get() != nullptr)

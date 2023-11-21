@@ -38,7 +38,7 @@ export struct BlockVersion {
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
 
-    Vector<Pair<TxnTimeStamp, i64>> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+    Vector<Pair<TxnTimeStamp, i32>> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
                                                 // risk to write uninitialized buffer.
     Vector<TxnTimeStamp> deleted_{};
 };
