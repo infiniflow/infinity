@@ -304,9 +304,10 @@ Status TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id
             return Status(ErrorCode::kNotFound, Move(err_msg));
         }
 
-        if (table_entry->commit_ts_ < UNCOMMIT_TS) {
+        u64 table_entry_commit_ts = table_entry->commit_ts_;
+        if (table_entry_commit_ts < UNCOMMIT_TS) {
             // committed
-            if (begin_ts > table_entry->commit_ts_) {
+            if (begin_ts > table_entry_commit_ts) {
                 if (table_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped.");
                     LOG_ERROR(*err_msg);

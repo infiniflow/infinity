@@ -378,7 +378,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
  * @return int64_t The max commit timestamp of the transactions in the wal file.
  *
  */
-int64_t WalManager::ReplayWalFile() {
+i64 WalManager::ReplayWalFile() {
     if (!std::filesystem::exists(wal_path_) || std::filesystem::file_size(wal_path_) == 0) {
         storage_->InitNewCatalog();
         return 0;
@@ -497,7 +497,7 @@ int64_t WalManager::ReplayWalFile() {
     // phase 3: replay the entries
     LOG_INFO("Replay phase 3: replay the entries");
     std::reverse(replay_entries.begin(), replay_entries.end());
-    i64 last_commit_ts = 0;
+    i64 system_start_ts = 0;
     i64 last_txn_id = 0;
     i64 replay_count = 0;
     for (; replay_count < replay_entries.size(); ++replay_count) {
@@ -509,7 +509,7 @@ int64_t WalManager::ReplayWalFile() {
     for (; replay_count < replay_entries.size(); ++replay_count) {
         Assert<StorageException>(replay_entries[replay_count]->commit_ts > max_commit_ts,
                                  "Wal Replay: Commit ts should be greater than max commit ts");
-        last_commit_ts = replay_entries[replay_count]->commit_ts;
+        system_start_ts = replay_entries[replay_count]->commit_ts;
         last_txn_id = replay_entries[replay_count]->txn_id;
         if (replay_entries[replay_count]->IsCheckPoint()) {
             LOG_TRACE(Format("Replay Skip checkpoint entry: {}", replay_entries[replay_count]->ToString()));
@@ -519,9 +519,9 @@ int64_t WalManager::ReplayWalFile() {
         LOG_TRACE(replay_entries[replay_count]->ToString());
     }
 
-    LOG_TRACE(Format("Last commit ts: {}, last txn id: {}", last_commit_ts, last_txn_id));
+    LOG_TRACE(Format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
-    return last_commit_ts;
+    return system_start_ts;
 }
 /*****************************************************************************
  * GC WAL FILE
