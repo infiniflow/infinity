@@ -32,7 +32,8 @@ import parser;
 import base_table_ref;
 import function;
 import column_binding;
-
+import logger;
+import third_party;
 import infinity_exception;
 
 module column_pruner;
@@ -159,6 +160,11 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             // remove the original columns of scan with the filtered columns
             scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
 
+            for(auto &extra_binding: extra_references_) {
+                // Search catalog special function to get correction index to modify base table ref
+                LOG_TRACE(Format("{} {}", extra_binding.table_idx, extra_binding.column_idx));
+            }
+
             // TODO: Scan does not currently support Filter Prune
 
             // TODO: EXISTS is not supported yet
@@ -196,12 +202,13 @@ template <class T>
 Vector<T> RemoveUnusedColumns::ClearUnusedExpressions(const Vector<T> &list, idx_t table_idx) {
     Vector<T> items;
     items.reserve(list.size());
-
+    extra_references_ = column_references_;
     for (idx_t col_idx = 0; col_idx < list.size(); col_idx++) {
         auto current_binding = ColumnBinding(table_idx, col_idx);
 
         if (column_references_.contains(current_binding)) {
             items.push_back(list[col_idx]);
+            extra_references_.erase(current_binding);
         }
     }
     return items;

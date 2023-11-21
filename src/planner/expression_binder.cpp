@@ -48,7 +48,7 @@ import bound_select_statement;
 import function_set;
 import scalar_function_set;
 import scalar_function;
-import special_function_set;
+import special_function;
 
 import new_catalog;
 import query_context;
@@ -226,25 +226,22 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr,
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
-
-    if (function_set_ptr->type() == FunctionType::kSpecial) {
-        SpecialFunctionSet* special_function_set = (SpecialFunctionSet*)function_set_ptr.get();
-        String& table_name = bind_context_ptr->table_names_[0];
-        TableCollectionEntry* table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_set->return_type(),
-                                                                               table_name,
-                                                                               bind_context_ptr->table_name2table_index_[table_name],
-                                                                               function_set_ptr->name(),
-                                                                               table_entry->columns_.size() + special_function_set->column_idx_delta(),
-                                                                               depth,
-                                                                               true);
+    SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    if (special_function != nullptr) {
+        String &table_name = bind_context_ptr->table_names_[0];
+        TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        SharedPtr<ColumnExpression> bound_column_expr =
+            ColumnExpression::Make(special_function->data_type(),
+                                   table_name,
+                                   bind_context_ptr->table_name2table_index_[table_name],
+                                   special_function->name(),
+                                   table_entry->columns_.size() + special_function->extra_idx(),
+                                   depth,
+                                   true);
         return bound_column_expr;
-//        UniquePtr<String> err_msg = MakeUnique<String>(Format("Found special function: {}", function_set_ptr->name()));
-//        LOG_TRACE(*err_msg);
-//        Error<PlannerException>(*err_msg);
-//        return nullptr;
     }
+
+    SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
 
     CheckFuncType(function_set_ptr->type_);
 

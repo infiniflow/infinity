@@ -15,32 +15,31 @@
 module;
 
 import stl;
-import new_catalog;
-import special_function_set;
+import function;
 import parser;
 
 export module special_function;
 
 namespace infinity {
 
-export void RegisterSpecialFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
-    {
-        String func_name = "ROW_ID";
-        SharedPtr<SpecialFunctionSet> function_set_ptr = MakeShared<SpecialFunctionSet>(func_name, DataType(LogicalType::kBigInt), 1);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
-    }
+export class SpecialFunction final : public Function {
+public:
+    SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx)
+        : Function(Move(func_name), FunctionType::kSpecial), data_type_(Move(data_type)), extra_idx_(extra_idx) {}
 
-    {
-        String func_name = "CREATE_TS";
-        SharedPtr<SpecialFunctionSet> function_set_ptr = MakeShared<SpecialFunctionSet>(func_name, DataType(LogicalType::kBigInt), 2);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
-    }
+    const String &name() const { return name_; }
 
-    {
-        String func_name = "DELETE_TS";
-        SharedPtr<SpecialFunctionSet> function_set_ptr = MakeShared<SpecialFunctionSet>(func_name, DataType(LogicalType::kBigInt), 3);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
-    }
-}
+    const DataType &data_type() const { return data_type_; }
+
+    SizeT extra_idx() { return extra_idx_; }
+
+    FunctionType type() { return type_; }
+
+    String ToString() const final { return name(); }
+
+private:
+    DataType data_type_;
+    SizeT extra_idx_{0};
+};
 
 } // namespace infinity

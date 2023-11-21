@@ -46,6 +46,7 @@ private:
 
     bool all_referenced_;
     HashSet<ColumnBinding> column_references_;
+    HashSet<ColumnBinding> extra_references_;
 };
 
 export class ColumnPruner : public OptimizerRule {
