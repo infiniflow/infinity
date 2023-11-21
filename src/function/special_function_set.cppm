@@ -14,36 +14,33 @@
 
 module;
 
-#include <functional>
-
 import stl;
+import base_expression;
+import function;
+import function_set;
+import parser;
 
-export module column_binding;
+export module special_function_set;
 
 namespace infinity {
 
-export struct ColumnBinding {
+export class SpecialFunctionSet final : public FunctionSet {
+public:
+    explicit SpecialFunctionSet(String name, DataType return_type, i64 column_idx_delta)
+        : FunctionSet(Move(name), FunctionType::kSpecial), return_type_(Move(return_type)), column_idx_delta_(column_idx_delta) {}
 
-    ColumnBinding() = default;
+    ~SpecialFunctionSet() final = default;
 
-    explicit ColumnBinding(SizeT tbl_idx, SizeT col_idx) : table_idx(tbl_idx), column_idx(col_idx) {}
+    [[nodiscard]] const DataType& return_type() const {
+        return return_type_;
+    }
 
-    inline bool operator==(const ColumnBinding &other) const { return table_idx == other.table_idx && column_idx == other.column_idx; }
+    [[nodiscard]] i64 column_idx_delta() const {
+        return column_idx_delta_;
+    }
 
-    SizeT table_idx{};
-    SizeT column_idx{};
+    DataType return_type_;
+    i64 column_idx_delta_{};
 };
 
 } // namespace infinity
-
-namespace std {
-
-template <>
-class hash<infinity::ColumnBinding> {
-public:
-    std::size_t operator()(const infinity::ColumnBinding &rhs) const {
-        return hash<std::size_t>().operator()(rhs.table_idx) ^ hash<std::size_t>().operator()(rhs.column_idx);
-    }
-};
-
-} // namespace std

@@ -40,6 +40,10 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
 }
 
 SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
+    if(expression->special()) {
+        return expression;
+    }
+
     SizeT binding_count = bindings_.size();
     for (SizeT idx = 0; idx < binding_count; ++idx) {
         if (expression->binding() == bindings_[idx]) {

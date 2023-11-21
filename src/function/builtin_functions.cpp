@@ -48,6 +48,8 @@ import substract;
 import table_scan;
 import knn_scan;
 
+import special_function;
+
 module builtin_functions;
 
 namespace infinity {
@@ -58,6 +60,7 @@ void BuiltinFunctions::Init() {
     RegisterAggregateFunction();
     RegisterScalarFunction();
     RegisterTableFunction();
+    RegisterSpecialFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterAggregateFunction() {
