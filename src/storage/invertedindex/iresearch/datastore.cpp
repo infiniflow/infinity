@@ -21,20 +21,41 @@ module;
 
 #include "formats/formats.hpp"
 #include "index/index_reader.hpp"
+#include "parser/type/datetime/date_type.h"
+#include "parser/type/datetime/datetime_type.h"
+#include "parser/type/datetime/time_type.h"
+#include "parser/type/datetime/timestamp_type.h"
 #include "store/fs_directory.hpp"
 #include "utils/index_utils.hpp"
 
 import stl;
+import parser;
 import logger;
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
 import data_block;
+import operator_state;
 import column_vector;
+import global_block_id;
+import table_scan_function_data;
+import block_index;
+import block_entry;
+import query_context;
+import column_buffer;
+import block_column_entry;
+import default_values;
+import base_table_ref;
+import value;
 
 module iresearch_datastore;
 
 namespace infinity {
+
+#define DOCMASK 0xFF
+
+u32 RowID2DocID(RowID row_id) { return (row_id.segment_id_ << 16) + row_id.segment_offset_; }
+RowID RowID2DocID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK); }
 
 class IRSAsync {
 public:
@@ -153,8 +174,9 @@ void CommitTask::Finalize() {
     }
 }
 
-IRSDataStore::IRSDataStore(SizeT table_id, const String &directory) {
-    path_ = Path(directory_) / Format("table_index_{}", table_id);
+IRSDataStore::IRSDataStore(const String &table_name, const String &directory, SharedPtr<BaseTableRef> base_table_ref)
+    : base_table_ref_(base_table_ref) {
+    path_ = Path(directory) / table_name;
     directory_ = path_.string();
     async_ = MakeUnique<IRSAsync>();
     maintenance_state_ = MakeShared<MaintenanceState>();
@@ -220,9 +242,105 @@ void IRSDataStore::ScheduleOptimize() {
     async_->Queue<ConsolidationTask>(0, Move(task));
 }
 
-void IRSDataStore::BatchInsert(SharedPtr<DataBlock> data_block) {
+void IRSDataStore::BatchInsert(u32 block_id, SharedPtr<DataBlock> data_block) {
+    SharedPtr<Vector<RowID>> row_ids;
+    data_block->FillRowIDVector(row_ids, block_id);
     Vector<SharedPtr<ColumnVector>> column_vectors = data_block->column_vectors;
-    for (SizeT i = 0; i < column_vectors.size(); ++i) {
+    auto ctx = index_writer_->GetBatch();
+
+    constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
+    constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};
+
+    static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
+    static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
+
+    for (SizeT i = 0; i < row_ids->size(); ++i) {
+        RowID row_id = (*row_ids)[i];
+        auto doc = ctx.Insert(RowID2DocID(row_id));
+        for (SizeT column_id = 0; column_id < column_vectors.size(); ++column_id) {
+            SharedPtr<DataType> data_type = (*base_table_ref_->column_types_)[column_id]; // TODO
+            String column_name = (*base_table_ref_->column_names_)[column_id];            // TODO
+            switch (column_vectors[column_id]->data_type_->type()) {
+                case kTinyInt: {
+                    auto field = MakeShared<NumericField<i32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TinyIntT v = column_vectors[column_id]->GetValue(i).GetValue<TinyIntT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kSmallInt: {
+                    auto field = MakeShared<NumericField<i32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    SmallIntT v = column_vectors[column_id]->GetValue(i).GetValue<SmallIntT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kInteger: {
+                    auto field = MakeShared<NumericField<i32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    IntegerT v = column_vectors[column_id]->GetValue(i).GetValue<IntegerT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kBigInt: {
+                    auto field = MakeShared<NumericField<i64>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    BigIntT v = column_vectors[column_id]->GetValue(i).GetValue<BigIntT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kHugeInt: {
+                    auto field = MakeShared<NumericField<i64>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    HugeIntT v = column_vectors[column_id]->GetValue(i).GetValue<HugeIntT>();
+                    field->value_ = v.lower; // Lose precision
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kFloat: {
+                    auto field = MakeShared<NumericField<f32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    FloatT v = column_vectors[column_id]->GetValue(i).GetValue<FloatT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kDouble: {
+                    auto field = MakeShared<NumericField<f64>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DoubleT v = column_vectors[column_id]->GetValue(i).GetValue<DoubleT>();
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                }
+                case kDecimal:
+                case kDate: {
+                    auto field = MakeShared<NumericField<i32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DateType v = column_vectors[column_id]->GetValue(i).GetValue<DateType>();
+                    field->value_ = v.value;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kTime: {
+                    auto field = MakeShared<NumericField<i32>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TimeType v = column_vectors[column_id]->GetValue(i).GetValue<TimeType>();
+                    field->value_ = v.value;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kDateTime: {
+                    auto field = MakeShared<NumericField<i64>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DateTimeType v = column_vectors[column_id]->GetValue(i).GetValue<DateTimeType>();
+                    field->value_ = ((i64)v.date << 32) + v.time;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kTimestamp: {
+                    auto field = MakeShared<NumericField<i64>>(column_name.c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TimestampType v = column_vectors[column_id]->GetValue(i).GetValue<TimestampType>();
+                    field->value_ = ((i64)v.date << 32) + v.time;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
+                } break;
+                case kVarchar: {
+                    auto field = MakeShared<TextField>(column_name.c_str(),
+                                                       irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
+                                                       text_features,
+                                                       AnalyzerPool::instance().Get("jieba"));
+                    Value value = column_vectors[column_id]->GetValue(i);
+                    field->f_ = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                    doc.Insert<irs::Action::INDEX>(*field);
+                } break;
+                default:
+                    break;
+            }
+        }
     }
 }
 

@@ -39,8 +39,10 @@ module;
 #include "analysis/token_attributes.hpp"
 #include "analysis/token_streams.hpp"
 #include "index/index_writer.hpp"
+#include "index/norm.hpp"
 #include "utils/noncopyable.hpp"
 #include "utils/object_pool.hpp"
+#include "utils/type_info.hpp"
 
 #include "parallel_hashmap/phmap.h"
 
@@ -196,6 +198,11 @@ export using IRSDirectoryReader = irs::DirectoryReader;
 export using IRSSubReader = irs::SubReader;
 export using IRSIndexWriterOptions = irs::IndexWriterOptions;
 export using IRSIndexReaderOptions = irs::IndexReaderOptions;
+export using Norm = irs::Norm2;
+export using GranularityPrefix = irs::granularity_prefix;
+export template <typename T>
+using IRSType = irs::type<T>;
+export using IRSTypeInfo = irs::type_info;
 export using OpenMode = irs::OpenMode;
 export inline void IRSWriteString(DataOutput &out, const char *s, size_t len) { return irs::write_string(out, s, len); }
 export inline void IRSWriteZVlong(DataOutput &out, int64_t v) { return irs::write_zvlong(out, v); }
