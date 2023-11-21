@@ -20,7 +20,7 @@ module;
 import stl;
 import session;
 import config;
-import new_task_scheduler;
+import task_scheduler;
 import storage;
 import resource_manager;
 import txn;

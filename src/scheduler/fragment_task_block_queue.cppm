@@ -22,16 +22,6 @@ export module fragment_task_block_queue;
 
 namespace infinity {
 
-// export struct FragmentTaskBlockQueue {
-//     void Enqueue(FragmentTask *task);
-
-//     void EnqueueBulk(Vector<FragmentTask *>::iterator iter, SizeT count);
-
-//     void Dequeue(FragmentTask *&task);
-
-//     BlockingConcurrentQueue<FragmentTask *> queue_;
-// };
-
 export class FragmentTaskBlockQueue {
 public:
     explicit inline FragmentTaskBlockQueue(SizeT capacity = 1024) : capacity_(capacity) {}

@@ -55,7 +55,6 @@ private:
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
-    bool exist_catalog_{false};
 };
 
 } // namespace infinity
