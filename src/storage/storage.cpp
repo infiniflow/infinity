@@ -59,14 +59,15 @@ void Storage::Init() {
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
-    auto start_time_stamp = wal_mgr_->ReplayWalFile();
-    start_time_stamp = (!exist_catalog_) ? 1 : start_time_stamp + 1;
+    i64 system_start_ts = wal_mgr_->ReplayWalFile();
+    ++ system_start_ts;
+
     // Construct txn manager
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
                                       std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
                                       0,
-                                      start_time_stamp);
+                                      system_start_ts);
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
@@ -136,7 +137,6 @@ void Storage::AttachCatalog(const Vector<String> &catalog_files) {
         LOG_TRACE(Format("Catalog file: {}", catalog_file.c_str()));
     }
     new_catalog_ = NewCatalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
-    exist_catalog_ = true;
 }
 
 void Storage::InitNewCatalog() {
@@ -147,7 +147,6 @@ void Storage::InitNewCatalog() {
         fs.CreateDirectory(catalog_dir);
     }
     new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
-    exist_catalog_ = false;
 }
 
 } // namespace infinity
