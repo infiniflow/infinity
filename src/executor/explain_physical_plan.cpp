@@ -71,6 +71,8 @@ import physical_table_scan;
 import physical_top;
 import physical_union_all;
 import physical_update;
+import physical_match;
+import physical_fusion;
 
 import explain_logical_plan;
 
@@ -266,6 +268,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMergeKnn: {
             Explain((PhysicalMergeKnn *)op, result, is_recursive, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMatch: {
+            Explain((PhysicalMatch *)op, result, is_recursive, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kFusion: {
+            Explain((PhysicalFusion *)op, result, is_recursive, intent_size);
             break;
         }
         default: {
@@ -1670,6 +1680,24 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     if (merge_knn_node->left() != nullptr && is_recursive) {
         intent_size += 2;
         ExplainPhysicalPlan::Explain(merge_knn_node->left(), result, is_recursive, intent_size);
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,
+                                  SharedPtr<Vector<SharedPtr<String>>> &result,
+                                  bool is_recursive,
+                                  i64 intent_size) {
+    result->emplace_back(MakeShared<String>(fusion_node->ToString(intent_size)));
+    if (fusion_node->left() != nullptr && is_recursive) {
+        intent_size += 2;
+        ExplainPhysicalPlan::Explain(fusion_node->left(), result, is_recursive, intent_size);
+        if (fusion_node->right() != nullptr) {
+            ExplainPhysicalPlan::Explain(fusion_node->right(), result, is_recursive, intent_size);
+        }
     }
 }
 

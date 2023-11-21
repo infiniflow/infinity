@@ -63,6 +63,8 @@ public:
 
     virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
+    virtual SharedPtr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+
     // Bind subquery expression.
     virtual SharedPtr<SubqueryExpression>
     BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool root);

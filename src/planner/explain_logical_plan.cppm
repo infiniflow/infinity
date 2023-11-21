@@ -46,6 +46,8 @@ class LogicalShow;
 class LogicalImport;
 class LogicalExport;
 class LogicalFlush;
+class LogicalMatch;
+class LogicalFusion;
 class BaseExpression;
 
 export class ExplainLogicalPlan {
@@ -101,6 +103,10 @@ public:
     static void Explain(const LogicalExport *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalFlush *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const BaseExpression *base_expression, String &expr_str);
 };

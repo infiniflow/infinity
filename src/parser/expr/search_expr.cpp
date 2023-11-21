@@ -3,7 +3,6 @@
 #include "knn_expr.h"
 #include "match_expr.h"
 #include "query_expr.h"
-#include "search_parser.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>

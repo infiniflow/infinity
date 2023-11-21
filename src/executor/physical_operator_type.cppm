@@ -38,6 +38,8 @@ export enum class PhysicalOperatorType : i8 {
     kDummyScan,
     kKnnScan,
     kMergeKnn,
+    kMatch,
+    kFusion,
 
     kHash,
     kMergeHash,

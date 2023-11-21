@@ -14,13 +14,14 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace irs {
 class filter;
 }
 
 namespace infinity {
+
+class SearchOptions;
 
 class QueryExpr : public ParsedExpr {
 public:
@@ -36,7 +37,7 @@ public:
 public:
     std::unique_ptr<irs::filter> flt_ = nullptr;
     std::string query_text_;
-    std::vector<std::pair<std::string, std::string>> options_;
+    std::shared_ptr<SearchOptions> options_ = nullptr;
 };
 
 } // namespace infinity

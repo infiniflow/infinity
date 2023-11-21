@@ -287,6 +287,16 @@ export struct FlushOperatorState : public OperatorState {
     inline explicit FlushOperatorState() : OperatorState(PhysicalOperatorType::kFlush) {}
 };
 
+// Match
+export struct MatchOperatorState : public OperatorState {
+    inline explicit MatchOperatorState() : OperatorState(PhysicalOperatorType::kMatch) {}
+};
+
+// Fusion
+export struct FusionOperatorState : public OperatorState {
+    inline explicit FusionOperatorState() : OperatorState(PhysicalOperatorType::kFusion) {}
+};
+
 // Sink
 export enum class SinkStateType {
     kInvalid,

@@ -124,6 +124,10 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MergeKnn";
         case PhysicalOperatorType::kCommand:
             return "Command";
+        case PhysicalOperatorType::kMatch:
+            return "Match";
+        case PhysicalOperatorType::kFusion:
+            return "Fusion";
     }
 
     Error<NotImplementException>("Unknown physical operator type");

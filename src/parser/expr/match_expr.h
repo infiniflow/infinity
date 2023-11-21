@@ -15,13 +15,14 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace irs {
 class filter;
 } // namespace irs
 
 namespace infinity {
+
+class SearchOptions;
 
 class MatchExpr : public ParsedExpr {
 public:
@@ -35,10 +36,10 @@ public:
     void SetOptions(const std::string &options);
 
 public:
-    std::unique_ptr<irs::filter> flt_ = nullptr;
+    std::unique_ptr<irs::filter> flt_{};
     std::string fields_;
     std::string matching_text_;
-    std::vector<std::pair<std::string, std::string>> options_;
+    std::shared_ptr<SearchOptions> options_{};
 };
 
 } // namespace infinity

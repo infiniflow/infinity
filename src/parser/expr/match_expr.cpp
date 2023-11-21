@@ -2,7 +2,7 @@
 #include "parser_assert.h"
 #include "query_driver.h"
 #include "search/filter.hpp"
-#include "search_parser.h"
+#include "search_options.h"
 #include "spdlog/fmt/fmt.h"
 
 #include <cmath>
@@ -21,15 +21,17 @@ std::string MatchExpr::ToString() const {
     }
 
     std::ostringstream oss;
-    oss << "MATCH(";
+    oss << "MATCH('";
     oss << fields_;
-    oss << ", '" << matching_text_ << "'";
-    oss << SearchParser::OptionsToString(options_);
+    oss << "', '" << matching_text_ << "'";
+    if (options_) {
+        oss << ", '" << options_->ToString() << "'";
+    }
     oss << ")";
     return oss.str();
 }
 
-void MatchExpr::SetOptions(const std::string &options) { SearchParser::ParseOptions(options, options_); }
+void MatchExpr::SetOptions(const std::string &options) { options_ = std::make_shared<SearchOptions>(options); }
 
 int MatchExpr::SetFilter(const std::string &fields, const std::string &matching_text) {
     matching_text_ = matching_text;

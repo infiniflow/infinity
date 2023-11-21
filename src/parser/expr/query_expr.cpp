@@ -2,7 +2,7 @@
 #include "parser_assert.h"
 #include "query_driver.h"
 #include "search/filter.hpp"
-#include "search_parser.h"
+#include "search_options.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>
@@ -22,7 +22,8 @@ std::string QueryExpr::ToString() const {
     oss << "QUERY('";
     oss << query_text_;
     oss << "'";
-    oss << SearchParser::OptionsToString(options_);
+    if (options_)
+        oss << options_->ToString();
     oss << ")";
     return oss.str();
 }
@@ -35,6 +36,6 @@ int QueryExpr::SetFilter(const std::string &query_text) {
     return rc;
 }
 
-void QueryExpr::SetOptions(const std::string &options) { SearchParser::ParseOptions(options, options_); }
+void QueryExpr::SetOptions(const std::string &options) { options_ = std::make_shared<SearchOptions>(options); }
 
 } // namespace infinity
