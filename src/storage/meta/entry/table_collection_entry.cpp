@@ -227,6 +227,7 @@ UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry
 }
 
 void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr) {
+    SizeT row_count = 0;
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE(Format("Commit, segment: {}, block: {} start offset: {}, count: {}",
                          range.segment_id_,
@@ -235,7 +236,9 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
                          range.row_count_));
         SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_offset_, range.row_count_);
+        row_count += range.row_count_;
     }
+    table_entry->row_count_ += row_count;
 }
 
 void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
@@ -254,6 +257,7 @@ void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn
 }
 
 void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, const DeleteState &delete_state) {
+    SizeT row_count = 0;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableCollectionEntry::GetSegmentByID(table_entry, segment_id);
@@ -262,7 +266,9 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
+        row_count += block_row_hashmap.size();
     }
+    table_entry->row_count_ += row_count;
 }
 
 UniquePtr<String>
@@ -276,12 +282,16 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     segment->min_row_ts_ = commit_ts;
     segment->max_row_ts_ = commit_ts;
+
+    SizeT row_count = 0;
     for (auto &block_entry : segment->block_entries_) {
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
         // ATTENTION: Do not modify the block_entry checkpoint_ts_
+        row_count += block_entry->row_count_;
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
     }
+    table_entry->row_count_ += row_count;
 
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);
     table_entry->segments_.emplace(segment->segment_id_, Move(segment));
@@ -328,7 +338,7 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
         json_res["table_entry_dir"] = *table_entry->table_entry_dir_;
         json_res["table_name"] = *table_entry->table_collection_name_;
         json_res["table_entry_type"] = table_entry->table_collection_type_;
-        json_res["row_count"] = table_entry->row_count_;
+        json_res["row_count"] = table_entry->row_count_.load();
         json_res["begin_ts"] = table_entry->begin_ts_;
         json_res["commit_ts"] = table_entry->commit_ts_.load();
         json_res["txn_id"] = table_entry->txn_id_.load();

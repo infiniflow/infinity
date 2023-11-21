@@ -78,7 +78,6 @@ void Storage::Init() {
 
 void Storage::UnInit() {
     Printf("Shutdown storage ...\n");
-    txn_mgr_->Stop();
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
