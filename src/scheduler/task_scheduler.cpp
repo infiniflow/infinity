@@ -23,7 +23,6 @@ import config;
 
 import infinity_exception;
 import fragment_task_block_queue;
-import fragment_task_poller_queue;
 import threadutil;
 import fragment_task;
 import logger;
@@ -32,7 +31,7 @@ import query_context;
 import plan_fragment;
 import fragment_context;
 
-module new_task_scheduler;
+module task_scheduler;
 
 namespace infinity {
 

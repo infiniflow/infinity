@@ -76,7 +76,7 @@ protected:
     mutable Mutex queue_mutex_{};
     CondVar full_cv_{};
     CondVar empty_cv_{};
-    List<T> queue_{};
+    Deque<T> queue_{};
     SizeT capacity_{DEFAULT_BLOCKING_QUEUE_SIZE};
 };
 
