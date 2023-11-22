@@ -460,6 +460,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
                              "DBEntry::MergeFrom requires table_entry_dir_ match");
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
+    this->row_count_.store(Max(this->row_count_, table_entry2->row_count_));
     u32 max_segment_id = 0;
     for (auto &[seg_id, sgement_entry] : this->segments_) {
         max_segment_id = Max(max_segment_id, seg_id);

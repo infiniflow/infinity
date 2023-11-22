@@ -369,7 +369,16 @@ void BlockEntry::MergeFrom(BaseEntry &other) {
     Assert<StorageException>(this->block_id_ == block_entry2->block_id_, "BlockEntry::MergeFrom requires block_id_ match");
     Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_, "BlockEntry::MergeFrom requires row_capacity_ match");
     Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_, "BlockEntry::MergeFrom requires min_row_ts_ match");
-
+    Assert<StorageException>(this->row_count_ <= block_entry2->row_count_,
+                             "BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
+    Assert<StorageException>(
+        this->checkpoint_ts_ <= block_entry2->checkpoint_ts_,
+        "BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
+    Assert<StorageException>(
+        this->checkpoint_row_count_ <= block_entry2->checkpoint_row_count_,
+        "BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
+    Assert<StorageException>(columns_.size() <= block_entry2->columns_.size(),
+                             "BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
     if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
         return;
     this->row_count_ = block_entry2->row_count_;
