@@ -5,42 +5,38 @@
 #include <thread>
 
 import stl;
-import knn_hnsw;
+import hnsw_alg;
+import hnsw_profiler;
 import dist_func_l2;
 import local_file_system;
 
-static const char *sift1m_base = "/home/shenyushi/Documents/Code/infiniflow/infinity/test/data/fvecs/sift_base.fvecs";
-static const char *sift1m_query = "/home/shenyushi/Documents/Code/infiniflow/infinity/test/data/fvecs/sift_query.fvecs";
-static const char *sift1m_groundtruth = "/home/shenyushi/Documents/Code/infiniflow/infinity/test/data/fvecs/sift_groundtruth.ivecs";
-
-static const char *deep10m_base = "/home/shenyushi/Downloads/data/base.10M.fvecs";
-static const char *deep10m_query = "/home/shenyushi/Downloads/data/query.public.10K.fvecs";
-static const char *deep10m_groundtruth = "/home/shenyushi/Downloads/data/groundtruth.public.10K.ivecs";
-
-static const char *base_file = deep10m_base;
-static const char *query_file = deep10m_query;
-static const char *groundtruth_file = deep10m_groundtruth;
+static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
+static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/groundtruth.ivecs";
 
 using namespace infinity;
 
 int main() {
-    size_t dimension = 96;
+    size_t dimension = 128;
     size_t M = 16;
     size_t ef_construction = 200;
-    size_t embedding_count = 10000000;
+    size_t embedding_count = 1000000;
     size_t test_top = 100;
 
     using LabelT = uint64_t;
 
     std::unique_ptr<KnnHnsw<float, LabelT>> knn_hnsw = nullptr;
-    std::string save_place = "./tmp/my.hnsw";
+    std::string save_place = "./tmp/my_sift.hnsw";
+
     std::ifstream f(save_place);
     if (!f.good()) {
         std::cout << "Build index" << std::endl;
 
-        float *input_embeddings = fvecs_read(base_file, &dimension, &embedding_count);
-        assert(dimension == 96 || !"embedding dimension isn't correct");
-        assert(embedding_count == 10000000 || !"embedding size isn't correct");
+        size_t dim = -1;
+        size_t eb_cnt = -1;
+        float *input_embeddings = fvecs_read(base_file, &dim, &eb_cnt);
+        assert(dimension == dim || !"embedding dimension isn't correct");
+        assert(embedding_count == eb_cnt || !"embedding size isn't correct");
 
         DistFuncL2<float> space(dimension);
         knn_hnsw = std::make_unique<KnnHnsw<float, LabelT>>(embedding_count, dimension, space, M, ef_construction);
@@ -75,7 +71,7 @@ int main() {
         assert(dimension == dim || !"query does not have same dimension as train set");
     }
 
-    size_t top_k; // nb of results per query in the GT
+    size_t top_k;                           // nb of results per query in the GT
     Vector<HashSet<int>> ground_truth_sets; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
 
     {
@@ -94,77 +90,80 @@ int main() {
         }
     }
 
-    // if (false) {
-    //     size_t round_n = 100;
-    //     size_t thread_n = 16;
-    //     Vector<std::thread> threads;
-    //     atomic_u64 global_idx = 0;
-    //     atomic_u64 n_valid = 0;
+    // size_t round_n = 100;
+    // size_t thread_n = 16;
+    // Vector<std::thread> threads;
+    // atomic_u64 global_idx = 0;
+    // atomic_u64 n_valid = 0;
 
-    //     knn_hnsw->SetEf(ef_construction);
-    //     infinity::BaseProfiler profiler;
-    //     profiler.Begin();
+    // knn_hnsw->SetEf(ef_construction);
+    // infinity::BaseProfiler profiler;
+    // profiler.Begin();
 
-    //     for (size_t thread_idx = 0; thread_idx < thread_n; ++thread_idx) {
-    //         threads.emplace_back([&]() {
-    //             while (true) {
-    //                 u64 idx = global_idx.fetch_add(1);
-    //                 if (idx >= round_n * number_of_queries) {
-    //                     break;
-    //                 }
-    //                 if (idx % 10000 == 0) {
-    //                     std::cout << idx << ", " << profiler.ElapsedToString() << std::endl;
-    //                 }
-
-    //                 const float *query = queries + (idx % number_of_queries) * dimension;
-    //                 MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
-    //                 int correct = 0;
-    //                 while (!result.empty()) {
-    //                     if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {
-    //                         ++correct;
-    //                     }
-    //                     result.pop();
-    //                 }
-    //                 n_valid.fetch_add(correct);
+    // for (size_t thread_idx = 0; thread_idx < thread_n; ++thread_idx) {
+    //     threads.emplace_back([&]() {
+    //         while (true) {
+    //             u64 idx = global_idx.fetch_add(1);
+    //             if (idx >= round_n * number_of_queries) {
+    //                 break;
     //             }
-    //         });
-    //     }
+    //             if (idx % 10000 == 0) {
+    //                 std::cout << idx << ", " << profiler.ElapsedToString() << std::endl;
+    //             }
 
-    //     for (auto &thread : threads) {
-    //         thread.join();
-    //     }
-
-    //     profiler.End();
-    //     printf("Recall = %.4f, Spend: %s\n", n_valid / float(test_top * number_of_queries * round_n), profiler.ElapsedToString().c_str());
+    //             const float *query = queries + (idx % number_of_queries) * dimension;
+    //             MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
+    //             int correct = 0;
+    //             while (!result.empty()) {
+    //                 if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {
+    //                     ++correct;
+    //                 }
+    //                 result.pop();
+    //             }
+    //             n_valid.fetch_add(correct);
+    //         }
+    //     });
     // }
 
-    if (true) {
-        infinity::BaseProfiler profiler;
-        int round = 10;
-        for (int ef = 100; ef <= 800; ef += 100) {
-            int correct = 0;
+    // for (auto &thread : threads) {
+    //     thread.join();
+    // }
 
-            knn_hnsw->SetEf(ef);
-            Vector<MaxHeap<Pair<float, LabelT>>> results;
-            profiler.Begin();
-            for (int idx = 0; idx < number_of_queries * round; ++idx) {
-                const float *query = queries + (idx % number_of_queries) * dimension;
-                MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
-                results.push_back(std::move(result));
-            }
-            profiler.End();
-            for (int idx = 0; idx < number_of_queries; ++idx) {
-                auto &result = results[idx % number_of_queries];
-                while (!result.empty()) {
-                    if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {
-                        ++correct;
-                    }
-                    result.pop();
-                }
-            }
-            printf("ef = %d, Spend: %s\n", ef, profiler.ElapsedToString().c_str());
-            printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));
+    // profiler.End();
+    // printf("Recall = %.4f, Spend: %s\n", n_valid / float(test_top * number_of_queries * round_n), profiler.ElapsedToString().c_str());
+
+    knn_hnsw->PrintLayer();
+
+    infinity::BaseProfiler profiler;
+    int round = 1;
+    for (int ef = 100; ef <= 800; ef += 100) {
+        auto hnsw_profiler = MakeUnique<HnswProfiler>(knn_hnsw->GetMaxLayer(), 10);
+
+        int correct = 0;
+
+        knn_hnsw->SetEf(ef);
+        Vector<MaxHeap<Pair<float, LabelT>>> results;
+        profiler.Begin();
+        for (int idx = 0; idx < number_of_queries * round; ++idx) {
+            const float *query = queries + (idx % number_of_queries) * dimension;
+            MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top, hnsw_profiler.get());
+            results.push_back(std::move(result));
         }
+        profiler.End();
+        for (int idx = 0; idx < number_of_queries; ++idx) {
+            auto &result = results[idx % number_of_queries];
+            while (!result.empty()) {
+                if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {
+                    ++correct;
+                }
+                result.pop();
+            }
+        }
+        printf("ef = %d, Spend: %s\n", ef, profiler.ElapsedToString().c_str());
+        printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));
+        // hnsw_profiler->PrintResult();
+        std::cout << "Avg low degree: " << knn_hnsw->GetAvgDegree() << std::endl;
+        std::cout << "----------------------------" << std::endl;
     }
 
     delete[] queries;

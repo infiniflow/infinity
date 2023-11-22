@@ -18,7 +18,7 @@ import infinity_exception;
 import stl;
 import index_file_worker;
 import dist_func;
-import knn_hnsw;
+import hnsw_alg;
 import index_hnsw;
 import parser;
 import index_base;

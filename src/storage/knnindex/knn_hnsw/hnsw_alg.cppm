@@ -18,6 +18,7 @@ module;
 #include <algorithm>
 #include <cassert>
 #include <random>
+#include <iostream>
 
 import cmp;
 import stl;
@@ -27,15 +28,16 @@ import file_system_type;
 import hnsw_mem_pool;
 import infinity_exception;
 
-export module knn_hnsw;
+import hnsw_common;
+import hnsw_profiler;
+
+export module hnsw_alg;
 
 namespace infinity {
 
 export template <typename DataType, typename LabelType>
 class KnnHnsw {
 public:
-    static SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
-
     using VertexType = i32;
 
     using PDV = Pair<DataType, VertexType>;
@@ -208,12 +210,13 @@ private:
 public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n) const {
+    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n, HnswProfiler *profiler) const {
         DistHeap result;    // TODO:: use faiss heap
         DistHeap candidate; // TODO:: use pool
         // TODO:: reserve heap size
 
         DataType dist = dist_func_(query, GetData(enter_point), dim_);
+        SizeT cal_num = 1;
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
@@ -247,6 +250,7 @@ public:
                 visited[n_idx] = true;
                 // TODO:: store result.top(), result.size() in variable
                 dist = dist_func_(query, GetData(n_idx), dim_);
+                ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
                     result.emplace(dist, n_idx);
@@ -256,12 +260,16 @@ public:
                 }
             }
         }
+        if (profiler) {
+            profiler->AddSearch(layer_idx, cal_num);
+        }
         return result;
     }
 
-    VertexType SearchLayerNearest(VertexType enter_point, const DataType *query, i32 layer_idx) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const DataType *query, i32 layer_idx, HnswProfiler *profiler) const {
         VertexType cur_p = enter_point;
         DataType cur_dist = dist_func_(query, GetData(enter_point), dim_);
+        SizeT cal_num = 1;
         bool check = true;
         while (check) {
             check = false;
@@ -277,12 +285,16 @@ public:
 #endif
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func_(query, GetData(n_idx), dim_);
+                ++cal_num;
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
                     check = true;
                 }
             }
+        }
+        if (profiler) {
+            profiler->AddSearch(layer_idx, cal_num);
         }
         return cur_p;
     }
@@ -368,10 +380,10 @@ public:
         InitVertex(q_vertex, q_layer, query, label);
         VertexType ep = enterpoint_;
         for (i32 cur_layer = max_layer_; cur_layer > q_layer; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer);
+            ep = SearchLayerNearest(ep, query, cur_layer, nullptr);
         }
         for (i32 cur_layer = Min(q_layer, max_layer_); cur_layer >= 0; --cur_layer) {
-            DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_); // TODO:: use pool
+            DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_, nullptr); // TODO:: use pool
             DistHeap candidates;
             while (!search_result.empty()) {
                 const auto &[dist, idx] = search_result.top();
@@ -389,12 +401,12 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k) const {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k, HnswProfiler *profiler = nullptr) const {
         VertexType ep = enterpoint_;
         for (i32 cur_layer = max_layer_; cur_layer > 0; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer);
+            ep = SearchLayerNearest(ep, query, cur_layer, profiler);
         }
-        DistHeap search_result = SearchLayer(ep, query, 0, Max(k, ef_));
+        DistHeap search_result = SearchLayer(ep, query, 0, Max(k, ef_), profiler);
         while (search_result.size() > k) {
             search_result.pop();
         }
@@ -408,6 +420,8 @@ public:
     }
 
     void SetEf(SizeT ef) { ef_ = ef; }
+
+    i32 GetMaxLayer() const { return max_layer_; }
 
     void SaveIndexInner(FileHandler &file_handler) {
         file_handler.Write(&max_vertex_, sizeof(max_vertex_));
@@ -502,6 +516,32 @@ public:
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
     // check invariant of graph
+
+    void PrintLayer() const {
+        Vector<SizeT> layer_sum_diff(max_layer_ + 1, 0);
+        for (VertexType vi = 0; vi < cur_vertex_n_; ++vi) {
+            LayerSize layer_n = GetLayerN(vi);
+            ++layer_sum_diff[layer_n];
+        }
+        SizeT sum = 0;
+        for (i32 li = max_layer_; li >= 0; --li) {
+            sum += layer_sum_diff[li];
+            std::cout << "layer " << li << ": " << sum << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+    SizeT GetAvgDegree() {
+        SizeT sum = 0;
+        for (VertexType vi = 0; vi < cur_vertex_n_; ++vi) {
+            LayerSize layer_n = GetLayerN(vi);
+            for (i32 li = 0; li <= layer_n; ++li) {
+                auto [neighbors, neighbor_n] = GetNeighbors(vi, li);
+                sum += neighbor_n;
+            }
+        }
+        return double(sum) / cur_vertex_n_;
+    }
 
     void CheckGraph() const {
         assert(cur_vertex_n_ <= max_vertex_);

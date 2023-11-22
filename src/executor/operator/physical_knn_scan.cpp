@@ -47,7 +47,7 @@ import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
-import knn_hnsw;
+import hnsw_alg;
 import table_index_meta;
 import segment_column_index_entry;
 import column_index_entry;

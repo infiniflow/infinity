@@ -20,7 +20,7 @@
 #include <random>
 
 import local_file_system;
-import knn_hnsw;
+import hnsw_alg;
 import dist_func;
 
 using namespace infinity;

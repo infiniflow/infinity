@@ -17,7 +17,7 @@ module;
 import stl;
 import index_file_worker;
 import dist_func;
-import knn_hnsw;
+import hnsw_alg;
 import parser;
 import index_base;
 import dist_func;

@@ -48,7 +48,7 @@ import segment_column_index_entry;
 import column_index_entry;
 import index_base;
 
-import knn_hnsw;
+import hnsw_alg;
 import dist_func;
 
 module segment_entry;
