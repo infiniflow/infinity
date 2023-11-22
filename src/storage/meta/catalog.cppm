@@ -22,6 +22,7 @@ import txn_manager;
 import function;
 import function_set;
 import table_function;
+import special_function;
 import third_party;
 import buffer_manager;
 import profiler;
@@ -108,6 +109,10 @@ public:
 
     static void AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function);
 
+    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+
+    static SharedPtr<SpecialFunction> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
+
     static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
     static Json Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -140,7 +145,9 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    ProfileHistory history{100};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_;
+
+    ProfileHistory history{128};
 };
 
 } // namespace infinity

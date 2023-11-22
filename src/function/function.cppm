@@ -26,6 +26,7 @@ export enum class FunctionType {
     kAggregate,
     kTable,
     kWindow,
+    kSpecial,
 };
 
 export class Function {

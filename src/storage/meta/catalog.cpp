@@ -27,6 +27,7 @@ import status;
 import infinity_exception;
 import function_set;
 import table_function;
+import special_function;
 import buffer_manager;
 
 import local_file_system;
@@ -211,6 +212,23 @@ void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunc
         Error<CatalogException>(Format("Trying to add duplicated table function into catalog: {}", name));
     }
     catalog->table_functions_.emplace(name, table_function);
+}
+
+void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
+    String name = special_function->name();
+    StringToLower(name);
+    if (catalog->table_functions_.contains(name)) {
+        Error<CatalogException>(Format("Trying to add duplicated special function into catalog: {}", name));
+    }
+    catalog->special_functions_.emplace(name, special_function);
+}
+
+SharedPtr<SpecialFunction> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+    StringToLower(function_name);
+    if (!catalog->table_functions_.contains(function_name)) {
+        return nullptr;
+    }
+    return catalog->special_functions_[function_name];
 }
 
 void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) {

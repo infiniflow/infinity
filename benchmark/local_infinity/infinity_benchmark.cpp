@@ -40,7 +40,7 @@ double Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, 
 
     SizeT shared_size = times / thread_num;
     for (SizeT i = 0; i < thread_num; ++i) {
-        threads.emplace_back([&]() {
+        threads.emplace_back([=]() {
             std::thread::id thread_id = std::this_thread::get_id();
             std::cout << ">>> Thread ID: " << thread_id << " <<<" << std::endl;
             for (SizeT j = 0; j < shared_size; ++j) {
@@ -61,8 +61,8 @@ double Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, 
 }
 
 int main() {
-    SizeT thread_num = 1;
-    SizeT total_times = 1;
+    SizeT thread_num = 2;
+    SizeT total_times = 8192;
 
     String path = "/tmp/infinity";
 
@@ -174,7 +174,7 @@ int main() {
 //            });
 //            results.push_back(Format("-> Drop Table QPS: {}", total_times / tims_costing_second));
 //        }
-//        {
+        {
 //            Vector<Pair<ParsedExpr *, ParsedExpr *>> vec_search_exprs;
 //            Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
 //
@@ -184,28 +184,27 @@ int main() {
 //                });
 //                results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
 //            }
-//            {
-//                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-//                    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
-//                    values->emplace_back(new Vector<ParsedExpr *>());
-//
-//                    Vector<String> *columns = new Vector<String>();
-//                    columns->emplace_back(col_name_1);
-//                    columns->emplace_back(col_name_2);
-//
-//                    ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
-//                    value1->integer_value_ = i;
-//                    values->at(0)->emplace_back(value1);
-//
-//                    ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
-//                    value2->integer_value_ = i;
-//                    values->at(0)->emplace_back(value2);
-//
-//                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Insert(columns, values);
-//                });
-//                results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
-//            }
-//        }
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+                    Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
+                    values->emplace_back(new Vector<ParsedExpr *>());
+
+                    Vector<String> *columns = new Vector<String>();
+                    columns->emplace_back(col_name_1);
+                    columns->emplace_back(col_name_2);
+
+                    ConstantExpr *value1 = new ConstantExpr(LiteralType::kInteger);
+                    value1->integer_value_ = i;
+                    values->at(0)->emplace_back(value1);
+
+                    ConstantExpr *value2 = new ConstantExpr(LiteralType::kInteger);
+                    value2->integer_value_ = i;
+                    values->at(0)->emplace_back(value2);
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Insert(columns, values);
+                });
+                results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
+            }
+        }
     }
 
     std::cout << ">>> Infinity Benchmark End <<<" << std::endl;

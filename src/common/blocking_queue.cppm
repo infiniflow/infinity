@@ -26,10 +26,10 @@ class BlockingQueue {
 public:
     explicit BlockingQueue(SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {}
 
-    void Enqueue(T task) {
+    void Enqueue(T& task) {
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
-        queue_.push_back(Move(task));
+        queue_.push_back(task);
         empty_cv_.notify_one();
     }
 
@@ -59,6 +59,14 @@ public:
         UniqueLock<Mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_queue.splice(output_queue.end(), queue_);
+        full_cv_.notify_one();
+    }
+
+    void DequeueBulk(Vector<T> &output_array) {
+        UniqueLock<Mutex> lock(queue_mutex_);
+        empty_cv_.wait(lock, [this] { return !queue_.empty(); });
+        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
+        queue_.clear();
         full_cv_.notify_one();
     }
 

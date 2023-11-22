@@ -48,6 +48,10 @@ import substract;
 import table_scan;
 import knn_scan;
 
+import special_function;
+
+import parser;
+
 module builtin_functions;
 
 namespace infinity {
@@ -58,6 +62,7 @@ void BuiltinFunctions::Init() {
     RegisterAggregateFunction();
     RegisterScalarFunction();
     RegisterTableFunction();
+    RegisterSpecialFunction();
 }
 
 void BuiltinFunctions::RegisterAggregateFunction() {
@@ -111,6 +116,19 @@ void BuiltinFunctions::RegisterTableFunction() {
 
     RegisterTableScanFunction(catalog_ptr_);
     RegisterKnnScanFunction(catalog_ptr_);
+}
+
+void BuiltinFunctions::RegisterSpecialFunction() {
+
+    SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1);
+    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
+
+    SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("CREATE_TS", DataType(LogicalType::kBigInt), 2);
+    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), create_ts_function);
+
+    SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("DELETE_TS", DataType(LogicalType::kBigInt), 3);
+    NewCatalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
+
 }
 
 } // namespace infinity

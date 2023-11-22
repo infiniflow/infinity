@@ -22,7 +22,6 @@ import stl;
 import config;
 
 import infinity_exception;
-import fragment_task_block_queue;
 import threadutil;
 import fragment_task;
 import logger;
@@ -30,6 +29,7 @@ import third_party;
 import query_context;
 import plan_fragment;
 import fragment_context;
+import default_values;
 
 module task_scheduler;
 
@@ -116,10 +116,6 @@ void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu
         if (auto iter = fragment_task_ptr.find(u64(fragment_task)); iter == fragment_task_ptr.end()) {
             fragment_task_ptr.emplace(u64(fragment_task));
         }
-        if (fragment_task == nullptr) {
-            LOG_ERROR("Fragment task coordinator: null task");
-            continue;
-        }
 
         if (fragment_task->IsTerminator()) {
             running = false;
@@ -146,31 +142,35 @@ void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     FragmentTask *fragment_task{nullptr};
+    Vector<FragmentTask*> task_list;
+    task_list.reserve(DEFAULT_BLOCKING_QUEUE_SIZE);
     bool running{true};
     while (running) {
-        task_queue->Dequeue(fragment_task);
-        if (fragment_task == nullptr) {
-            LOG_ERROR(Format("worker {}: null task", worker_id));
-            continue;
-        }
+//        task_queue->Dequeue(fragment_task);
+        task_queue->DequeueBulk(task_list);
+        SizeT list_size = task_list.size();
+        for(SizeT idx = 0; idx < list_size; ++ idx) {
+            fragment_task = task_list[idx];
 
-        if (fragment_task->IsTerminator()) {
-            running = false;
-            continue;
-        }
+            if (fragment_task->IsTerminator()) {
+                running = false;
+                break;
+            }
 
-        if (!fragment_task->Ready()) {
-            ready_queue_->Enqueue(fragment_task);
-            continue;
-        }
+            if (!fragment_task->Ready()) {
+                ready_queue_->Enqueue(fragment_task);
+                continue;
+            }
 
-        fragment_task->OnExecute(worker_id);
-        fragment_task->SetLastWorkID(worker_id);
-        if (!fragment_task->IsComplete()) {
-            ready_queue_->Enqueue(fragment_task);
-        } else {
-            fragment_task->TryCompleteFragment();
+            fragment_task->OnExecute(worker_id);
+            fragment_task->SetLastWorkID(worker_id);
+            if (!fragment_task->IsComplete()) {
+                ready_queue_->Enqueue(fragment_task);
+            } else {
+                fragment_task->TryCompleteFragment();
+            }
         }
+        task_list.clear();
     }
 }
 

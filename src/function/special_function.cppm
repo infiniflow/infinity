@@ -14,18 +14,32 @@
 
 module;
 
-#include "blockingconcurrentqueue.h"
-
-import fragment_task;
 import stl;
+import function;
+import parser;
 
-module fragment_task_block_queue;
+export module special_function;
 
 namespace infinity {
-// void FragmentTaskBlockQueue::Enqueue(FragmentTask *task) { queue_.enqueue(task); }
 
-// void FragmentTaskBlockQueue::EnqueueBulk(Vector<FragmentTask *>::iterator iter, SizeT count) { queue_.enqueue_bulk(iter, count); }
+export class SpecialFunction final : public Function {
+public:
+    SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx)
+        : Function(Move(func_name), FunctionType::kSpecial), data_type_(Move(data_type)), extra_idx_(extra_idx) {}
 
-// void FragmentTaskBlockQueue::Dequeue(FragmentTask *&task) { queue_.wait_dequeue(task); }
+    const String &name() const { return name_; }
+
+    const DataType &data_type() const { return data_type_; }
+
+    SizeT extra_idx() { return extra_idx_; }
+
+    FunctionType type() { return type_; }
+
+    String ToString() const final { return name(); }
+
+private:
+    DataType data_type_;
+    SizeT extra_idx_{0};
+};
 
 } // namespace infinity
