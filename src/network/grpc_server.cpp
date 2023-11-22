@@ -402,17 +402,17 @@ GrpcServiceImpl::Insert(grpc::ServerContext *context, const infinity_grpc_proto:
     }
 }
 
-void GrpcServiceImpl::Run(UniquePtr<grpc::Server>& server_ptr) {
+void GrpcServiceImpl::Run() {
     // Grpc service starts immediately
-    std::string server_address("0.0.0.0:50051");
+    std::string server_address("0.0.0.0:50052");
     GrpcServiceImpl service;
     grpc::ServerBuilder builder;
     builder.RegisterService(&service);
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    //    std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
-    server_ptr = builder.BuildAndStart();
+    std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
+    server = builder.BuildAndStart();
     std::cout << "GRPC server listening on " << server_address << std::endl;
-    server_ptr->Wait();
+    server->Wait();
 }
 
 void GrpcServiceImpl::Shutdown() {

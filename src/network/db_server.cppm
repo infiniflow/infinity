@@ -22,7 +22,7 @@ import connection;
 
 export module db_server;
 
-namespace grpc_impl {
+namespace grpc {
 
 class Server;
 
@@ -54,13 +54,6 @@ private:
     AsioIOService io_service_{};
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
     SharedPtr<String> config_path_{};
-
-    Thread grpc_thread_{};
-    UniquePtr<grpc_impl::Server>* grpc_server_{nullptr};
-
-    Thread thrift_thread_{};
-    SharedPtr<ThriftServer> thrift_server_{nullptr};
-    Thread brpc_thread_{};
 };
 
 }

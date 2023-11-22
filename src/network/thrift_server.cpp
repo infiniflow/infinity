@@ -665,6 +665,8 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
+    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << std::endl;
+
     server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                            MakeShared<TServerSocket>(port_no),
                                            MakeShared<TBufferedTransportFactory>(),
