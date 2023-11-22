@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <algorithm>
@@ -8,9 +22,9 @@ module;
 import stl;
 import hnsw_common;
 import file_system;
-import plain_data;
+import plain_store;
 
-export module lvq_data;
+export module lvq_store;
 
 namespace infinity {
 
@@ -44,6 +58,7 @@ public:
     using RtnType = LVQ<T, CompressType>;
 
     static constexpr bool DEFAULT_PADDING = true;
+    static constexpr SizeT ERR_IDX = DataStore<T>::ERR_IDX;
 
 private:
     constexpr static SizeT MAX_BUCKET_IDX = std::numeric_limits<CompressType>::max(); // 255 for u8

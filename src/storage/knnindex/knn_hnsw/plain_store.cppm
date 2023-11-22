@@ -1,81 +1,29 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <algorithm>
 #include <cassert>
-#include <concepts>
-#include <limits>
 
 import stl;
 import file_system;
+import hnsw_common;
 
-export module plain_data;
+export module plain_store;
 
 namespace infinity {
-
-export template <typename Store>
-concept DataStoreConcept = requires(Store s) {
-    typename Store::DataType;
-    typename Store::RtnType;
-    { s.AddVec(std::declval<SizeT>(), std::declval<const typename Store::DataType *>()) } -> std::same_as<SizeT>;
-    { s.AddBatchVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
-    { s.GetVec(std::declval<SizeT>()) } -> std::same_as<typename Store::RtnType>;
-};
-
-export template <typename T>
-class DataStore {
-public:
-    static constexpr SizeT ERR_IDX = std::numeric_limits<SizeT>::max();
-
-private:
-    SizeT cur_vec_num_;
-
-public:
-    const SizeT max_vec_num_;
-    const SizeT dim_;
-
-public:
-    DataStore(SizeT max_vec_num, SizeT dim) : cur_vec_num_(0), max_vec_num_(max_vec_num), dim_(dim) {}
-
-    DataStore(DataStore &&other) = default;
-    DataStore &operator=(DataStore &&other) {
-        cur_vec_num_ = other.cur_vec_num_;
-        const_cast<SizeT &>(max_vec_num_) = other.max_vec_num_;
-        const_cast<SizeT &>(dim_) = other.dim_;
-        return *this;
-    }
-
-    SizeT AllocateVec(SizeT alloc_n) {
-        if (cur_vec_num_ + alloc_n > max_vec_num_) {
-            return ERR_IDX;
-        }
-        SizeT ret = cur_vec_num_;
-        cur_vec_num_ += alloc_n;
-        return ret;
-    }
-
-    void Save(FileHandler &file_handler) const {
-        file_handler.Write(&cur_vec_num_, sizeof(SizeT));
-        file_handler.Write(&max_vec_num_, sizeof(SizeT));
-        file_handler.Write(&dim_, sizeof(SizeT));
-    }
-
-    static DataStore<T> Load(FileHandler &file_handler, SizeT new_vec_n) {
-        SizeT cur_vec_num, max_vec_num, dim;
-        file_handler.Read(&cur_vec_num, sizeof(SizeT));
-        file_handler.Read(&max_vec_num, sizeof(SizeT));
-        if (new_vec_n != 0) {
-            assert(new_vec_n >= cur_vec_num);
-            max_vec_num = new_vec_n;
-        }
-        file_handler.Read(&dim, sizeof(SizeT));
-        DataStore<T> ret(max_vec_num, dim);
-        ret.cur_vec_num_ = cur_vec_num;
-        return ret;
-    }
-
-public:
-    SizeT cur_vec_num() const { return cur_vec_num_; }
-};
 
 export template <typename T>
 class PlainStore {
@@ -83,6 +31,7 @@ public:
     using DataType = T;
     using RtnType = const T *;
 
+    static constexpr SizeT ERR_IDX = DataStore<T>::ERR_IDX;
 private:
     DataStore<T> base_;
     const UniquePtr<T[]> ptr_;

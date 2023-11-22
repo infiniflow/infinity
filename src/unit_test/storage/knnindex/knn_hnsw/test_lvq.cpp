@@ -2,7 +2,7 @@
 #include <iostream>
 #include <random>
 
-import lvq_data;
+import lvq_store;
 import local_file_system;
 import file_system;
 import file_system_type;
@@ -17,6 +17,7 @@ public:
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 20;
     static constexpr size_t buffer_size_ = 4;
+    const std::string file_dir_ = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
     bool dump_ = false;
 
@@ -98,7 +99,7 @@ TEST_F(HnswLVQTest, test1) {
     }
 
     {
-        std::string file_path = "../../tmp/lvq_store1.bin";
+        std::string file_path = file_dir_ + "/lvq_store1.bin";
         LocalFileSystem fs;
 
         size_t idx = 0;
@@ -118,13 +119,13 @@ TEST_F(HnswLVQTest, test1) {
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
 
             LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, buffer_size_);
-            
+
             DumpStore(lvq_store, data.get());
         }
     }
 
     {
-        std::string file_path = "../../tmp/lvq_store2.bin";
+        std::string file_path = file_dir_ + "/lvq_store2.bin";
         LocalFileSystem fs;
 
         size_t idx = 0;

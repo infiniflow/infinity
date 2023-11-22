@@ -233,7 +233,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
                         SizeT block_row_cnt = block_entry->row_count_;
                         for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
                             RowID row_id(segment_entry->segment_id_, segment_offset + block_offset);
-                            hnsw_index->Insert(block_column_data_ptr + block_offset * dimension, row_id.ToUint64());
+                            // hnsw_index->Insert(block_column_data_ptr + block_offset * dimension, row_id.ToUint64());
                         }
                         segment_offset += block_row_cnt;
                     }

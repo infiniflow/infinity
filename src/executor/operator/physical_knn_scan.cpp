@@ -250,7 +250,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                     const DataType *query =
                         static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                    MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                    // MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                    MaxHeap<Pair<DataType, u64>> heap;
                     if (result_n < 0) {
                         result_n = heap.size();
                     } else if (result_n != heap.size()) {
