@@ -14,17 +14,18 @@
 
 import os
 import unittest
-
+from sqlglot import condition
 import infinity
+from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
-from sqlglot import condition
+
 
 
 class MyTestCase(unittest.TestCase):
 
     def test_infinity(self):
-        infinity_obj = infinity.connect("192.168.1.5:9090")
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
         self.assertIsNotNone(infinity_obj)
         # infinity
         res = infinity_obj.create_database("my_db")
@@ -64,17 +65,37 @@ class MyTestCase(unittest.TestCase):
         self.assertIsNotNone(table_obj)
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         self.assertEqual(res.success, True)
-        res = table_obj.search().output(["c1", "c2"]).filter("c1>1").to_list()
+
+        # search
+        res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
         print(res)
+        res = db_obj.drop_table("my_table3")
+        self.assertEqual(res.success, True)
+
+        # import
+        res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
+        self.assertEqual(res.success, True)
+        table_obj = db_obj.get_table("my_table4")
+        self.assertIsNotNone(table_obj)
+        parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
+        test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
+        self.assertTrue(os.path.exists(test_csv_dir))
+        res = table_obj.import_data(test_csv_dir, None)
+        self.assertEqual(res.success, True)
+        # search
+        res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
+        print(res)
+        res = db_obj.drop_table("my_table4")
+        self.assertEqual(res.success, True)
 
         # disconnect
         res = infinity_obj.disconnect()
         self.assertEqual(res.success, True)
 
     def test_traverse_conditions(self):
-
-        res =traverse_conditions(condition("c1>1 and c2<2 or c3=3.3"))
+        res = traverse_conditions(condition("c1>1 and c2<2 or c3=3.3"))
         print(res)
+
 
 if __name__ == '__main__':
     unittest.main()

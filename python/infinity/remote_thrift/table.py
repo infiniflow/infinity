@@ -107,17 +107,18 @@ class RemoteTable(Table, ABC):
         select_list: List[ParsedExpr] = []
 
         for column in query.columns:
-            column_expr = ColumnExpr()
-
+            column_name = []
             if column == "*":
-                column_expr.star = True
+                star = True
             else:
-                column_expr.star = False
-                column_expr.column_name.append(column)
+                star = False
+                column_name.append(column)
 
+            column_expr = ColumnExpr()
+            column_expr.star = star
+            column_expr.column_name = column_name
             paser_expr_type = ParsedExprType()
             paser_expr_type.column_expr = column_expr
-
             paser_expr = ParsedExpr()
             paser_expr.type = paser_expr_type
 
@@ -167,6 +168,7 @@ class RemoteTable(Table, ABC):
             column_field = res.column_fields[column_id]
             column_type = column_field.column_type
             column_vector = column_field.column_vector
+            print(column_name, column_type, column_vector)
             length = len(column_vector)
             if column_type == ColumnType.ColumnInt32:
                 value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
@@ -201,7 +203,7 @@ def traverse_conditions(cons) -> ParsedExpr:
         function_expr.arguments = arguments
 
         paser_expr_type = ParsedExprType()
-        paser_expr_type.constant_expr = function_expr
+        paser_expr_type.function_expr = function_expr
 
         parsed_expr.type = paser_expr_type
 

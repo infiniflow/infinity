@@ -203,11 +203,11 @@ public:
 
             for (auto &column_vector : all_column_vectors) {
                 auto size = column_vector->data_type()->Size() * all_row_count;
-                char *dst = new char[size];
-                memcpy(dst, column_vector->data(), size);
-
+                String dst;
+                dst.resize(size);
+                Memcpy(dst.data(), column_vector->data(), size);
                 infinity_thrift_rpc::ColumnField columnField;
-                columnField.__set_column_vector(dst);
+                columnField.__set_column_vector(Move(dst));
                 columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
                 response.column_fields.emplace_back(columnField);
             }

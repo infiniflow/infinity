@@ -1,4 +1,20 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import typing as tp
+
+from infinity import URI
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from thrift.transport import TSocket
@@ -7,10 +23,9 @@ from thrift.protocol import TBinaryProtocol
 
 
 class ThriftInfinityClient:
-    def __init__(self, url='0.0.0.0:9090'):
-        self.url = url
+    def __init__(self, uri: URI):
         self.db_name = "default"
-        self.transport = TTransport.TBufferedTransport(TSocket.TSocket('192.168.1.5', 9090))
+        self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port))
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
@@ -88,34 +103,23 @@ class ThriftInfinityClient:
                                                 fields=fields))
 
     def import_data(self, db_name: str, table_name: str, file_path: str, import_options):
-
-        try:
-            res = self.client.Import(ImportRequest(session_id=self.session_id,
-                                                   db_name=db_name,
-                                                   table_name=table_name,
-                                                   file_path=file_path,
-                                                   import_option=import_options))
-            return res
-        except Exception as e:
-            print(e)
-            return None
+        return self.client.Import(ImportRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                file_path=file_path,
+                                                import_option=import_options))
 
     def select(self, db_name: str, table_name: str, select_list, where_expr, group_by_list, limit_expr, offset_expr,
                search_expr):
-        res = self.client.Select(SelectRequest(session_id=self.session_id,
-                                               db_name=db_name,
-                                               table_name=table_name,
-                                               select_list=select_list,
-                                               where_expr=where_expr,
-                                               group_by_list=group_by_list,
-                                               limit_expr=limit_expr,
-                                               offset_expr=offset_expr,
-                                               ))
-
-        if res.success:
-            return res
-        else:
-            return None
+        return self.client.Select(SelectRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                select_list=select_list,
+                                                where_expr=where_expr,
+                                                group_by_list=group_by_list,
+                                                limit_expr=limit_expr,
+                                                offset_expr=offset_expr,
+                                                ))
 
     def disconnect(self):
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))

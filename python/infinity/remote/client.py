@@ -100,34 +100,23 @@ class GrpcInfinityClient:
                                                            fields=fields))
 
     def import_data(self, db_name: str, table_name: str, file_path: str, import_options):
-
-        try:
-            res = self.stub.Import(infinity_pb2.ImportRequest(session_id=self.session_id,
-                                                              db_name=db_name,
-                                                              table_name=table_name,
-                                                              file_path=file_path,
-                                                              import_options=import_options))
-            return res
-        except Exception as e:
-            print(e)
-            return None
+        return self.stub.Import(infinity_pb2.ImportRequest(session_id=self.session_id,
+                                                           db_name=db_name,
+                                                           table_name=table_name,
+                                                           file_path=file_path,
+                                                           import_options=import_options))
 
     def select(self, db_name: str, table_name: str, select_list, where_expr, group_by_list, limit_expr, offset_expr,
                search_expr):
-        res = self.stub.Search(infinity_pb2.SelectStatement(session_id=self.session_id,
-                                                            db_name=db_name,
-                                                            table_name=table_name,
-                                                            select_list=select_list,
-                                                            where_expr=where_expr,
-                                                            group_by_list=group_by_list,
-                                                            limit_expr=limit_expr,
-                                                            offset_expr=offset_expr,
-                                                            search_expr=search_expr))
-
-        if res.success:
-            return res
-        else:
-            return None
+        return self.stub.Search(infinity_pb2.SelectStatement(session_id=self.session_id,
+                                                             db_name=db_name,
+                                                             table_name=table_name,
+                                                             select_list=select_list,
+                                                             where_expr=where_expr,
+                                                             group_by_list=group_by_list,
+                                                             limit_expr=limit_expr,
+                                                             offset_expr=offset_expr,
+                                                             search_expr=search_expr))
 
     def disconnect(self):
         res = self.stub.DisConnect(infinity_pb2.DisConnectRequest(session_id=self.session_id))

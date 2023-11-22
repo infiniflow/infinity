@@ -16,7 +16,7 @@ import importlib.metadata
 
 __version__ = importlib.metadata.version("infinity")
 
-from infinity.infinity import URI, InfinityConnection
+from infinity.infinity import URI, InfinityConnection, NetworkAddress
 from infinity.remote.infinity import RemoteInfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
@@ -24,7 +24,11 @@ from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 def connect(
         uri: URI,
 ) -> InfinityConnection:
-    if isinstance(uri, str) and uri.endswith("50051"):
+    if isinstance(uri, NetworkAddress) and uri.port == 50001:
         return RemoteInfinityConnection(uri)
-    else:
+    if isinstance(uri, NetworkAddress) and uri.port == 9090:
         return RemoteThriftInfinityConnection(uri)
+    else:
+        raise Exception(f"unknown uri: {uri}")
+
+
