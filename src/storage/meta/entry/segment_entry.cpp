@@ -309,9 +309,9 @@ Json SegmentEntry::Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commi
                          block_entry->max_row_ts_,
                          max_commit_ts));
         // WARNING: this operation may influence data visibility
-        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
-            continue;
-        }
+        //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
+        //            continue;
+        //        }
         json_res["block_entries"].emplace_back(BlockEntry::Serialize(block_entry, max_commit_ts));
     }
     return json_res;
@@ -363,19 +363,28 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     Assert<StorageException>(this->column_count_ == segment_entry2->column_count_, "SegmentEntry::MergeFrom requires column_count_ match");
     Assert<StorageException>(this->row_capacity_ == segment_entry2->row_capacity_, "SegmentEntry::MergeFrom requires row_capacity_ match");
     Assert<StorageException>(this->min_row_ts_ == segment_entry2->min_row_ts_, "SegmentEntry::MergeFrom requires min_row_ts_ match");
+    Assert<StorageException>(this->block_entries_.size() <= segment_entry2->block_entries_.size(),
+                             "SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
 
     this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
     this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);
     this->row_capacity_ = Max(this->row_capacity_, segment_entry2->row_capacity_);
 
-    int block_count = Min(this->block_entries_.size(), segment_entry2->block_entries_.size());
-    for (int i = 0; i < block_count; i++) {
-        auto &block_entry1 = this->block_entries_[i];
-        auto &block_entry2 = segment_entry2->block_entries_[i];
-        if (block_entry1.get() == nullptr)
+    SizeT block_count = this->block_entries_.size();
+    SizeT idx = 0;
+    for (; idx < block_count; ++idx) {
+        auto &block_entry1 = this->block_entries_[idx];
+        auto &block_entry2 = segment_entry2->block_entries_[idx];
+        if (block_entry1.get() == nullptr) {
             block_entry1 = block_entry2;
-        else if (block_entry2.get() != nullptr)
+        } else if (block_entry2.get() != nullptr) {
             block_entry1->MergeFrom(*block_entry2);
+        }
+    }
+
+    SizeT segment2_block_count = segment_entry2->block_entries_.size();
+    for(; idx < segment2_block_count; ++ idx) {
+        this->block_entries_.emplace_back(segment_entry2->block_entries_[idx]);
     }
 
     // for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
