@@ -95,3 +95,6 @@ src/network/infinity.grpc.pb.cc
 src/network/infinity.grpc.pb.h
 src/network/infinity.pb.cc
 src/network/infinity.pb.h
+src/network/infinity_thrift/*
+python/infinity/remote_thrift/infinity_thrift_rpc/*
+python/infinity/remote/infinity_grpc/*
