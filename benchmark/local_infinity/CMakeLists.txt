@@ -10,4 +10,5 @@ target_link_libraries(
         faiss
         onnxruntime_mlas
         zsv_parser
+        iresearch
 )

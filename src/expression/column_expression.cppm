@@ -26,12 +26,12 @@ namespace infinity {
 export class ColumnExpression final : public BaseExpression {
 public:
     static inline SharedPtr<ColumnExpression>
-    Make(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth) {
-        return MakeShared<ColumnExpression>(Move(data_type), Move(table_name), table_index, Move(column_name), column_index, depth);
+    Make(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth, bool special = false) {
+        return MakeShared<ColumnExpression>(Move(data_type), Move(table_name), table_index, Move(column_name), column_index, depth, special);
     }
 
 public:
-    ColumnExpression(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth);
+    ColumnExpression(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth, bool special = false);
 
     inline DataType Type() const override { return data_type_; };
 
@@ -57,19 +57,23 @@ public:
 
     inline i64 depth() const { return depth_; }
 
+    inline bool special() const { return special_; }
+
 private:
     String ToString() const final;
 
 private:
     DataType data_type_;
 
-    ColumnBinding binding_;
+    ColumnBinding binding_{};
 
     String table_name_{};
 
     String column_name_{};
 
-    i64 depth_;
+    i64 depth_{};
+
+    bool special_{false};
 };
 
 } // namespace infinity

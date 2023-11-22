@@ -40,7 +40,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&count_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(ValueType); }
+    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
 };
 
 void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

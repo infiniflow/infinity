@@ -35,7 +35,7 @@ namespace infinity {
 class IndexDefEntry;
 class TableCollectionEntry;
 
-export class SegmentEntry;
+export struct SegmentEntry;
 
 struct SegmentEntry : public BaseEntry {
 public:

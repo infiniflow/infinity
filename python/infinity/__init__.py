@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import importlib.metadata
-
 __version__ = importlib.metadata.version("infinity")
 
 from infinity.infinity import URI, InfinityConnection, NetworkAddress

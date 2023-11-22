@@ -13,13 +13,17 @@
 // limitations under the License.
 module;
 
-#include "type/info/array_info.h"
+#include "query_driver.h"
 #include "sql_parser.h"
+#include "type/info/array_info.h"
 #include "type/number/float16.h"
 
 export module parser;
 
 namespace infinity {
+
+export using IrsFilter = irs::filter;
+export using QueryDriver = QueryDriver;
 
 export using SQLParser = SQLParser;
 export using ParserResult = ParserResult;
@@ -100,7 +104,6 @@ export using EmbeddingDataType = EmbeddingDataType;
 export using EmbeddingInfo = EmbeddingInfo;
 export using DecimalInfo = DecimalInfo;
 export using BitmapInfo = BitmapInfo;
-export using VarcharInfo = VarcharInfo;
 export using ArrayInfo = ArrayInfo;
 
 export using TypeInfoType = TypeInfoType;
@@ -111,7 +114,6 @@ int32_t GetSizeInBytes(const T &value);
 export template <>
 int32_t GetSizeInBytes(const std::string &value);
 
-export constexpr int64_t MAX_VARCHAR_SIZE = MAX_VARCHAR_SIZE_INTERNAL;
 export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
 export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
 

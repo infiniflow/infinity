@@ -22,6 +22,7 @@ import txn_manager;
 import function;
 import function_set;
 import table_function;
+import special_function;
 import third_party;
 import buffer_manager;
 import profiler;
@@ -84,11 +85,13 @@ public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
-    static EntryResult CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static Status
+    CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
 
-    static EntryResult DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static Status
+    DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
 
-    static Status GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry);
+    static Status GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
 
     static void RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr);
 
@@ -105,6 +108,10 @@ public:
     static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
 
     static void AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function);
+
+    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+
+    static SharedPtr<SpecialFunction> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 
     static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
@@ -138,7 +145,9 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_;
     HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    ProfileHistory history{100};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_;
+
+    ProfileHistory history{128};
 };
 
 } // namespace infinity

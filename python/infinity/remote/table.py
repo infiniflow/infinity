@@ -86,7 +86,8 @@ class RemoteTable(Table, ABC):
             fields.append(field)
 
         # print(db_name, table_name, column_names, fields)
-        self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names, fields=fields)
+        return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
+                                        fields=fields)
 
     def import_data(self, file_path: str, options=None):
 
@@ -114,6 +115,7 @@ class RemoteTable(Table, ABC):
         global covered_column_vector, where_expr
         select_list: list[infinity_pb2.ParsedExpr] = []
         group_by_list: list[infinity_pb2.ParsedExpr] = []
+
 
         for column in query.columns:
             column_expr = infinity_pb2.ColumnExpr()

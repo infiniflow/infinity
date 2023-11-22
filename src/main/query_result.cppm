@@ -16,7 +16,6 @@ export module query_result;
 
 import stl;
 import data_table;
-import database_object;
 import status;
 import logical_node_type;
 
@@ -24,6 +23,15 @@ namespace infinity {
 
 export struct BaseResult {
 public:
+    BaseResult() = default;
+
+    BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {}
+
+    BaseResult& operator=(BaseResult&& other)  noexcept {
+        status_ = Move(other.status_);
+        result_table_ = Move(other.result_table_);
+        return *this;
+    }
 
     [[nodiscard]] inline bool IsOk() const { return status_.ok(); }
     [[nodiscard]] inline ErrorCode ErrorCode() const { return status_.code(); }

@@ -136,15 +136,23 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kUpdate:
-        case PhysicalOperatorType::kDelete: {
+        case PhysicalOperatorType::kSort: {
             if (phys_op->left() == nullptr) {
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left(), current_fragment_ptr);
+            break;
+        }
+        case PhysicalOperatorType::kUpdate:
+        case PhysicalOperatorType::kDelete:  {
+            if (phys_op->left() == nullptr) {
+                Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            BuildFragments(phys_op->left(), current_fragment_ptr);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate:

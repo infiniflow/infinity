@@ -3,3 +3,4 @@ grpcio-tools==1.42.0
 pydantic==2.4.2
 thrift==0.17.0
 setuptools
+grpcio-tools==1.42.0

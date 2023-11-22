@@ -66,16 +66,16 @@ enum class SetVarType { kBool, kInteger, kDouble, kString };
 class SetCmd final : public CommandInfo {
 public:
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, bool value_bool)
-        : CommandInfo(CommandType::kSet), scope_(scope), value_type_(value_type), var_name_(var_name), value_bool_(value_bool) {}
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_bool_(value_bool) {}
 
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, int64_t value_int)
-        : CommandInfo(CommandType::kSet), scope_(scope), value_type_(value_type), var_name_(var_name), value_int_(value_int) {}
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_int_(value_int) {}
 
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, double value_double)
-        : CommandInfo(CommandType::kSet), scope_(scope), value_type_(value_type), var_name_(var_name), value_double_(value_double) {}
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_double_(value_double) {}
 
     SetCmd(SetScope scope, SetVarType value_type, const char *var_name, const char *value_str)
-        : CommandInfo(CommandType::kSet), scope_(scope), value_type_(value_type), var_name_(var_name), value_str_(value_str) {}
+        : CommandInfo(CommandType::kSet), scope_(scope), var_name_(var_name), value_type_(value_type), value_str_(value_str) {}
 
     ~SetCmd() final = default;
 
@@ -113,8 +113,8 @@ public:
     [[nodiscard]] std::string ToString() const final;
 
     [[nodiscard]] const std::string &file_name() const { return file_name_; }
-    [[nodiscard]] const ExportType export_type() const { return export_type_; }
-    [[nodiscard]] const int64_t file_no() const { return file_no_; }
+    [[nodiscard]] ExportType export_type() const { return export_type_; }
+    [[nodiscard]] int64_t file_no() const { return file_no_; }
 
 private:
     std::string file_name_{};

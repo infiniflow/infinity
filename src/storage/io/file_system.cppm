@@ -74,7 +74,7 @@ public:
 
     virtual void CreateDirectory(const String &path) = 0;
 
-    virtual void DeleteDirectory(const String &path) = 0;
+    virtual u64 DeleteDirectory(const String &path) = 0;
 
     virtual Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) = 0;
 

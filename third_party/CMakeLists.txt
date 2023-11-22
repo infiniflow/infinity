@@ -1,5 +1,4 @@
-
-
+add_compile_options(-Wno-everything)
 # Build cxxopts
 add_subdirectory(cxxopts)
 
@@ -82,5 +81,8 @@ add_subdirectory(openfst)
 
 add_subdirectory(iresearch)
 
-
 add_subdirectory(thrift)
+################################################################################
+### brpc
+################################################################################
+add_subdirectory(brpc)

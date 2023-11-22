@@ -15,8 +15,6 @@
 from abc import ABC, abstractmethod
 import typing as tp
 from typing import Literal, Optional, Type, Union
-
-
 class Table(ABC):
 
     @abstractmethod

@@ -54,7 +54,7 @@ public:
 
         auto *this_ptr = (PointType *)(ptr);
         auto *other_ptr = (PointType *)(other.ptr);
-        for (int32_t i = 0; i < this->point_count; ++i) {
+        for (uint32_t i = 0; i < this->point_count; ++i) {
             if (this_ptr[i] != other_ptr[i])
                 return false;
         }

@@ -14,7 +14,6 @@
 
 module;
 
-
 import base_entry;
 import stl;
 import parser;
@@ -36,24 +35,26 @@ public:
         : db_entry_dir_(db_entry_dir), table_collection_name_(Move(name)), db_entry_(db_entry) {}
 
 public:
-    static EntryResult CreateNewEntry(TableCollectionMeta *table_meta,
-                                      TableCollectionType table_collection_type,
-                                      const SharedPtr<String> &table_collection_name,
-                                      const Vector<SharedPtr<ColumnDef>> &columns,
-                                      u64 txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnManager *txn_mgr);
+    static Status CreateNewEntry(TableCollectionMeta *table_meta,
+                                 TableCollectionType table_collection_type,
+                                 const SharedPtr<String> &table_collection_name,
+                                 const Vector<SharedPtr<ColumnDef>> &columns,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr,
+                                 BaseEntry *&base_entry);
 
-    static EntryResult DropNewEntry(TableCollectionMeta *table_meta,
-                                    u64 txn_id,
-                                    TxnTimeStamp begin_ts,
-                                    TxnManager *txn_mgr,
-                                    const String &table_name,
-                                    ConflictType conflict_type);
+    static Status DropNewEntry(TableCollectionMeta *table_meta,
+                               u64 txn_id,
+                               TxnTimeStamp begin_ts,
+                               TxnManager *txn_mgr,
+                               const String &table_name,
+                               ConflictType conflict_type,
+                               BaseEntry *&base_entry);
 
     static void DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static Status GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_table_entry);
+    static Status GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_table_entry);
 
     static SharedPtr<String> ToString(TableCollectionMeta *table_meta);
 
@@ -67,8 +68,8 @@ public:
 
 public:
     RWMutex rw_locker_{};
-    SharedPtr<String> table_collection_name_{};
     SharedPtr<String> db_entry_dir_{};
+    SharedPtr<String> table_collection_name_{};
 
     DBEntry *db_entry_{};
 

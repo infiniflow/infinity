@@ -38,6 +38,7 @@ import column_vector;
 import data_block;
 import value;
 import third_party;
+import parser;
 
 using namespace ::infinity_thrift_rpc;
 
@@ -603,8 +604,7 @@ private:
             case LogicalType::kVarchar: {
                 auto *data_type_proto = new infinity_thrift_rpc::DataType();
                 infinity_thrift_rpc::VarcharType varchar_type;
-                auto varchar_info = static_cast<VarcharInfo *>(data_type->type_info().get());
-                varchar_type.__set_dimension(varchar_info->dimension());
+                varchar_type.__set_dimension(0);
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Varchar);
                 infinity_thrift_rpc::PhysicalType physical_type;
                 physical_type.__set_varchar_type(varchar_type);

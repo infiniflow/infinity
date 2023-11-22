@@ -15,6 +15,7 @@
 #include "network/thrift_server.h"
 #include <csignal>
 #include <cstdlib>
+
 import compilation_config;
 import stl;
 import third_party;
@@ -60,7 +61,7 @@ void RegisterSignal() {
     sig_action.sa_flags = SA_SIGINFO;
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
-    sigaction(SIGINT, &sig_action, NULL);
+//    sigaction(SIGINT, &sig_action, NULL);
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
 }

@@ -89,7 +89,7 @@ void BlockVersion::LoadFromFile(const String &version_path) {
 void BlockVersion::SaveToFile(const String &version_path) {
     int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
     exp_size += sizeof(int32_t) + deleted_.size() * sizeof(TxnTimeStamp);
-    Vector<char> buf(exp_size);
+    Vector<char> buf(exp_size, 0);
     char *ptr = buf.data();
     WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
     WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
@@ -108,8 +108,8 @@ void BlockVersion::SaveToFile(const String &version_path) {
 }
 
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr)
-    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), checkpoint_ts_(checkpoint_ts),
-      row_capacity_(DEFAULT_VECTOR_SIZE), row_count_(0) {
+    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
+      checkpoint_ts_(checkpoint_ts) {
     base_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir_, block_id);
     columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {

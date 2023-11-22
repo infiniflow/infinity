@@ -27,6 +27,7 @@ import status;
 import infinity_exception;
 import function_set;
 import table_function;
+import special_function;
 import buffer_manager;
 
 import local_file_system;
@@ -46,10 +47,13 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
         Path parent_path = catalog_path.parent_path();
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir_, db_meta->db_name_, 0, 0);
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
         db_entry->commit_ts_ = 0;
-        db_meta->entry_list_.emplace_front(Move(db_entry));
+        DBMeta::AddEntry(db_meta.get(), Move(db_entry));
+
+        this->rw_locker_.lock();
         this->databases_["default"] = Move(db_meta);
+        this->rw_locker_.unlock();
     }
 }
 
@@ -57,22 +61,23 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::CreateDatabase instead
-EntryResult NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Status
+NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
 
     // Check if there is db_meta with the db_name
-    catalog->rw_locker_.lock_shared();
-
     DBMeta *db_meta{nullptr};
-    if (catalog->databases_.find(db_name) != catalog->databases_.end()) {
-        db_meta = catalog->databases_[db_name].get();
-    }
-    catalog->rw_locker_.unlock_shared();
 
-    // no db_meta
-    if (db_meta == nullptr) {
-        // Create new db meta
+    catalog->rw_locker_.lock_shared();
+    auto db_iter = catalog->databases_.find(db_name);
+    if (db_iter != catalog->databases_.end()) {
+        // Find the db
+        db_meta = db_iter->second.get();
+        catalog->rw_locker_.unlock_shared();
+    } else {
+        catalog->rw_locker_.unlock_shared();
+
         LOG_TRACE(Format("Create new database: {}", db_name));
-        // db current dir is same level as catalog
+        // Not find the db and create new db meta
         Path catalog_path(*catalog->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
@@ -80,21 +85,25 @@ EntryResult NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_nam
         db_meta = new_db_meta.get();
 
         catalog->rw_locker_.lock();
-        catalog->databases_[db_name] = Move(new_db_meta);
+        auto db_iter2 = catalog->databases_.find(db_name);
+        if(db_iter2 == catalog->databases_.end()) {
+            catalog->databases_[db_name] = Move(new_db_meta);
+        } else {
+            db_meta = db_iter2->second.get();
+        }
         catalog->rw_locker_.unlock();
     }
 
     LOG_TRACE(Format("Add new database entry: {}", db_name));
-    EntryResult res = DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry);
 }
 
 // do not only use this method to drop database
 // it will not record database in transaction, so when you commit transaction
-// it will lost operation
+// it will lose operation
 // use Txn::DropDatabase instead
-EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Status
+NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
 
     catalog->rw_locker_.lock_shared();
 
@@ -104,17 +113,16 @@ EntryResult NewCatalog::DropDatabase(NewCatalog *catalog, const String &db_name,
     }
     catalog->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
-        LOG_TRACE(Format("Attempt to drop not existed database entry {}", db_name));
-        return {nullptr, MakeUnique<String>("Attempt to drop not existed database entry")};
+        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed database entry {}", db_name));
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     LOG_TRACE(Format("Drop a database entry {}", db_name));
-    EntryResult res = DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_mgr);
-
-    return res;
+    return DBMeta::DropNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry);
 }
 
-Status NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& new_db_entry) {
+Status NewCatalog::GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry) {
 
     DBMeta *db_meta{nullptr};
     catalog->rw_locker_.lock_shared();
@@ -150,9 +158,9 @@ Vector<DBEntry *> NewCatalog::Databases(NewCatalog *catalog, u64 txn_id, TxnTime
     Vector<DBEntry *> res;
     res.reserve(catalog->databases_.size());
     for (const auto &db_meta : catalog->databases_) {
-        BaseEntry* base_db_entry{nullptr};
+        BaseEntry *base_db_entry{nullptr};
         Status status = DBMeta::GetEntry(db_meta.second.get(), txn_id, begin_ts, base_db_entry);
-        if(status.ok()) {
+        if (status.ok()) {
             res.emplace_back(static_cast<DBEntry *>(base_db_entry));
         }
     }
@@ -206,6 +214,23 @@ void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunc
     catalog->table_functions_.emplace(name, table_function);
 }
 
+void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
+    String name = special_function->name();
+    StringToLower(name);
+    if (catalog->table_functions_.contains(name)) {
+        Error<CatalogException>(Format("Trying to add duplicated special function into catalog: {}", name));
+    }
+    catalog->special_functions_.emplace(name, special_function);
+}
+
+SharedPtr<SpecialFunction> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+    StringToLower(function_name);
+    if (!catalog->table_functions_.contains(function_name)) {
+        return nullptr;
+    }
+    return catalog->special_functions_[function_name];
+}
+
 void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) {
     // Unused now.
     StringToLower(function_name);
@@ -237,7 +262,7 @@ Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool
 
 void NewCatalog::CheckCatalog() {
     for (auto &[db_name, db_meta] : this->databases_) {
-        for (auto &base_entry : db_meta->entry_list_) {
+        for (auto &base_entry : db_meta->entry_list()) {
             if (base_entry->entry_type_ == EntryType::kDummy) {
                 continue;
             }
@@ -312,7 +337,7 @@ void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-            catalog->databases_.emplace(*db_meta->db_name_, Move(db_meta));
+            catalog->databases_.emplace(*db_meta->db_name(), Move(db_meta));
         }
     }
 }

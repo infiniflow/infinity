@@ -1,5 +1,11 @@
 statement ok
+DROP TABLE IF EXISTS t1;
+
+statement ok
 CREATE TABLE t1 (c1 INTEGER PRIMARY KEY, c2 INTEGER, c3 INTEGER, c4 INTEGER);
+
+statement ok
+DROP TABLE IF EXISTS t2;
 
 statement ok
 CREATE TABLE t2 (c1 INTEGER PRIMARY KEY, c2 INTEGER, c3 INTEGER, c4 INTEGER);
@@ -135,7 +141,7 @@ query I
 EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;
 ----
 DELETE FROM default.t1
--> FILTER (3)
+-> FILTER (4)
    - filter: CAST(c1 (#0) AS BigInt) = 1
    - output columns: [c1]
   -> TABLE SCAN (2)

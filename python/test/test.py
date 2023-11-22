@@ -15,11 +15,10 @@
 import os
 import unittest
 from sqlglot import condition
+
 import infinity
 from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
-
-
 
 
 class MyTestCase(unittest.TestCase):
@@ -42,7 +41,6 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(res.success, True)
         res = db_obj.list_tables("default")
         self.assertEqual(res.success, True)
-
         res = db_obj.drop_table("my_table1")
         self.assertEqual(res.success, True)
 
@@ -65,7 +63,6 @@ class MyTestCase(unittest.TestCase):
         self.assertIsNotNone(table_obj)
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         self.assertEqual(res.success, True)
-
         # search
         res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
         print(res)

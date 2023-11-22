@@ -10,6 +10,9 @@ add_subdirectory(parser)
 
 ### Infinity
 
+### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
+add_definitions(-march=native)
+
 file(GLOB_RECURSE
         main_cpp
         CONFIGURE_DEPENDS
@@ -47,7 +50,7 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        grpc_cpp
+        brpc_cpp
         CONFIGURE_DEPENDS
         network/*.cpp
         network/*.cc
@@ -150,7 +153,6 @@ file(GLOB_RECURSE
 #)
 
 add_library(infinity_core
-#        ${main_cpp}
         ${infinity_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
@@ -174,7 +176,6 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
-#        ${std_cppm}
 )
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -199,13 +200,14 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/brpc/src")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
-#        ${grpc_cpp}
+        ${brpc_cpp}
 )
 
 target_sources(infinity
@@ -225,20 +227,32 @@ target_link_libraries(infinity
         newpfor
         openfst
 
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
+        protobuf
+        grpc
+        grpc++
+        gpr
+        absl_synchronization
 #        iresearch
 
         thrift
+        iresearch
+        lz4
+        atomic
 #        profiler
+
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
+target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
+
 ### unit test
 
 file(GLOB_RECURSE
@@ -322,7 +336,6 @@ add_executable(unit_test
         ${ut_function_cpp}
 
         ${infinity_cpp}
-        ${network_cpp}
         ${planner_cpp}
         ${scheduler_cpp}
         ${storage_cpp}
@@ -349,14 +362,17 @@ target_link_libraries(unit_test
         fastpfor
         newpfor
         openfst
-#        protobuf
-#        grpc
-#        grpc++
-#        gpr
-#        absl_synchronization
         iresearch
+        lz4
+        atomic
 #        profiler
         thrift
+#        leveldb
+#        protobuf
+#        ssl
+#        brpc-static
+#        gflags
+#        crypto
 )
 
 target_sources(unit_test
@@ -381,5 +397,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
+target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)

@@ -29,7 +29,7 @@ import fragment_builder;
 import bind_context;
 import logical_node;
 import physical_operator;
-import new_task_scheduler;
+import task_scheduler;
 import fragment_context;
 import fragment_task;
 

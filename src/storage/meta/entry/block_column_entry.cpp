@@ -112,6 +112,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             break;
         }
         case kVarchar: {
+            // FIXME
             auto inline_p = reinterpret_cast<VarcharLayout *>(dst_p);
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);

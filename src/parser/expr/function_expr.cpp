@@ -30,6 +30,12 @@ FunctionExpr::~FunctionExpr() {
 std::string FunctionExpr::ToString() const {
     std::stringstream ss;
 
+    if(arguments_ == nullptr) {
+        // No argument function
+        ss << func_name_ << "()";
+        return ss.str();
+    }
+
     if (arguments_->size() == 1) {
         // Unary argument function
         ss << func_name_ << '(' << arguments_->at(0)->ToString() << ")";

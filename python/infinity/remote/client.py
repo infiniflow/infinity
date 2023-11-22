@@ -15,7 +15,6 @@
 import grpc
 from infinity.remote.infinity_grpc import infinity_pb2_grpc, infinity_pb2
 
-
 class GrpcInfinityClient:
     db_name: str
     channel: grpc.Channel
@@ -44,6 +43,7 @@ class GrpcInfinityClient:
     def describe_database(self, db_name: str):
         return self.stub.DescribeDatabase(infinity_pb2.DescribeDatabaseRequest(session_id=self.session_id,
                                                                                db_name=db_name))
+
 
     def get_database(self, db_name: str):
         return self.stub.GetDatabase(infinity_pb2.GetDatabaseRequest(session_id=self.session_id,

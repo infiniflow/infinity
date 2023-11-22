@@ -16,8 +16,9 @@ module;
 
 #include <boost/bind.hpp>
 #include <thread>
-//#include "grpc_server.h"
+#include "grpc_server.h"
 #include "thrift_server.h"
+#include "brpc_server.h"
 
 module db_server;
 import infinity_context;
@@ -41,11 +42,12 @@ void DBServer::Run() {
 
     InfinityContext::instance().Init(config_path_);
 
-//    grpc_server_ = new UniquePtr<grpc_impl::Server>();
-//    grpc_thread_ = Thread([&]() { GrpcServiceImpl::Run(*grpc_server_); });
+    grpc_server_ = new UniquePtr<grpc_impl::Server>();
+    grpc_thread_ = Thread([&]() { GrpcServiceImpl::Run(*grpc_server_); });
 
 //    thrift_server_ = MakeShared<ThriftServer>();
 //    thrift_thread_ = Thread([&]() { thrift_server_->Start(); });
+    brpc_thread_ = Thread([]() { BrpcServiceImpl::Run(); });
 
     u16 pg_port = InfinityContext::instance().config()->pg_port();
     const String &listen_address_ref = InfinityContext::instance().config()->listen_address();
@@ -89,10 +91,12 @@ void DBServer::Shutdown() {
 //    thrift_server_ = nullptr;
 //    thrift_thread_.join();
 
-//    (*grpc_server_)->Shutdown();
-//    delete grpc_server_;
-//    grpc_server_ = nullptr;
-//    grpc_thread_.join();
+    (*grpc_server_)->Shutdown();
+    delete grpc_server_;
+    grpc_server_ = nullptr;
+    grpc_thread_.join();
+
+    brpc_thread_.join();
 
     infinity::InfinityContext::instance().UnInit();
     Printf("Shutdown infinity server successfully\n");

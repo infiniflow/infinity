@@ -1,0 +1,98 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+syntax="proto2";
+import "google/protobuf/descriptor.proto";
+
+package brpc;
+option java_package="com.brpc";
+option java_outer_classname="Options";
+
+enum TalkType {
+    TALK_TYPE_NORMAL = 0;
+    TALK_TYPE_ONEWAY = 1;
+}
+
+enum ConnectionType {
+    // bit-exclusive values since we may OR them to represent supported types.
+    CONNECTION_TYPE_UNKNOWN = 0;
+    CONNECTION_TYPE_SINGLE = 1;
+    CONNECTION_TYPE_POOLED = 2;
+    CONNECTION_TYPE_SHORT = 4;  
+}
+
+enum ProtocolType {
+    PROTOCOL_UNKNOWN = 0;
+    PROTOCOL_BAIDU_STD = 1;
+    PROTOCOL_STREAMING_RPC = 2;
+    PROTOCOL_HULU_PBRPC = 3;
+    PROTOCOL_SOFA_PBRPC = 4;
+    PROTOCOL_RTMP = 5;
+    PROTOCOL_THRIFT = 6;
+    PROTOCOL_HTTP = 7;
+    PROTOCOL_PUBLIC_PBRPC = 8;
+    PROTOCOL_NOVA_PBRPC = 9;
+    PROTOCOL_REDIS = 10;
+    PROTOCOL_NSHEAD_CLIENT = 11;       // implemented in baidu-rpc-ub
+    PROTOCOL_NSHEAD = 12;
+    PROTOCOL_HADOOP_RPC = 13;
+    PROTOCOL_HADOOP_SERVER_RPC = 14;
+    PROTOCOL_MONGO = 15;               // server side only
+    PROTOCOL_UBRPC_COMPACK = 16;
+    PROTOCOL_DIDX_CLIENT = 17;         // Client side only
+    PROTOCOL_MEMCACHE = 18;            // Client side only
+    PROTOCOL_ITP = 19;
+    PROTOCOL_NSHEAD_MCPACK = 20;
+    PROTOCOL_DISP_IDL = 21;            // Client side only
+    PROTOCOL_ERSDA_CLIENT = 22;        // Client side only
+    PROTOCOL_UBRPC_MCPACK2 = 23;       // Client side only
+    // Reserve special protocol for cds-agent, which depends on FIFO right now
+    PROTOCOL_CDS_AGENT = 24;           // Client side only
+    PROTOCOL_ESP = 25;                 // Client side only
+    PROTOCOL_H2 = 26;
+}
+
+enum CompressType {
+    COMPRESS_TYPE_NONE = 0;
+    COMPRESS_TYPE_SNAPPY = 1;
+    COMPRESS_TYPE_GZIP = 2;
+    COMPRESS_TYPE_ZLIB = 3;
+    COMPRESS_TYPE_LZ4 = 4;
+}
+
+message ChunkInfo {
+    required int64 stream_id = 1;
+    required int64 chunk_id = 2;
+}
+
+extend google.protobuf.ServiceOptions {
+    // Timeout in milliseconds, at service level.
+    optional int64 service_timeout = 90000 [default = 10000];
+}
+
+extend google.protobuf.MethodOptions {
+    // Talk type.
+    optional TalkType request_talk_type = 90001 [default = TALK_TYPE_NORMAL];
+    optional TalkType response_talk_type = 90002 [default = TALK_TYPE_NORMAL];
+
+    // If set, override service_timeout.
+    optional int64 method_timeout = 90003;
+
+    // Compression for request/response.
+    optional CompressType request_compression = 90004 [default = COMPRESS_TYPE_NONE];
+    optional CompressType response_compression = 90005 [default = COMPRESS_TYPE_NONE];
+}

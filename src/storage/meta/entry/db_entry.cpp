@@ -36,54 +36,62 @@ module db_entry;
 
 namespace infinity {
 
-EntryResult DBEntry::CreateTableCollection(DBEntry *db_entry,
-                                           TableCollectionType table_collection_type,
-                                           const SharedPtr<String> &table_collection_name,
-                                           const Vector<SharedPtr<ColumnDef>> &columns,
-                                           u64 txn_id,
-                                           TxnTimeStamp begin_ts,
-                                           TxnManager *txn_mgr) {
+Status DBEntry::CreateTableCollection(DBEntry *db_entry,
+                                      TableCollectionType table_collection_type,
+                                      const SharedPtr<String> &table_collection_name,
+                                      const Vector<SharedPtr<ColumnDef>> &columns,
+                                      u64 txn_id,
+                                      TxnTimeStamp begin_ts,
+                                      TxnManager *txn_mgr,
+                                      BaseEntry *&base_entry) {
     const String &table_name = *table_collection_name;
 
     // Check if there is table_meta with the table_name
-    db_entry->rw_locker_.lock_shared();
-
     TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_name].get();
-    }
-    db_entry->rw_locker_.unlock_shared();
+    db_entry->rw_locker_.lock_shared();
+    auto table_iter = db_entry->tables_.find(table_name);
+    if (table_iter != db_entry->tables_.end()) {
+        table_meta = table_iter->second.get();
+        db_entry->rw_locker_.unlock_shared();
 
-    // no table_meta
-    if (table_meta == nullptr) {
-        // Create new db meta
+        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_));
+
+    } else {
+        db_entry->rw_locker_.unlock_shared();
+
         LOG_TRACE(Format("Create new table/collection: {}", table_name));
         UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry->db_entry_dir_, table_collection_name, db_entry);
         table_meta = new_table_meta.get();
 
         db_entry->rw_locker_.lock();
-        db_entry->tables_[table_name] = Move(new_table_meta);
+        auto table_iter2 = db_entry->tables_.find(table_name);
+        if (table_iter2 != db_entry->tables_.end()) {
+            table_meta = table_iter2->second.get();
+        } else {
+            db_entry->tables_[table_name] = Move(new_table_meta);
+        }
         db_entry->rw_locker_.unlock();
 
         LOG_TRACE(Format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *db_entry->db_entry_dir_));
-
-        EntryResult res =
-            TableCollectionMeta::CreateNewEntry(table_meta, table_collection_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
-        return res;
-    } else {
-        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_));
-        EntryResult res =
-            TableCollectionMeta::CreateNewEntry(table_meta, table_collection_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
-        return res;
     }
+
+    return TableCollectionMeta::CreateNewEntry(table_meta,
+                                               table_collection_type,
+                                               table_collection_name,
+                                               columns,
+                                               txn_id,
+                                               begin_ts,
+                                               txn_mgr,
+                                               base_entry);
 }
 
-EntryResult DBEntry::DropTableCollection(DBEntry *db_entry,
-                                         const String &table_collection_name,
-                                         ConflictType conflict_type,
-                                         u64 txn_id,
-                                         TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr) {
+Status DBEntry::DropTableCollection(DBEntry *db_entry,
+                                    const String &table_collection_name,
+                                    ConflictType conflict_type,
+                                    u64 txn_id,
+                                    TxnTimeStamp begin_ts,
+                                    TxnManager *txn_mgr,
+                                    BaseEntry *&base_entry) {
     db_entry->rw_locker_.lock_shared();
 
     TableCollectionMeta *table_meta{nullptr};
@@ -94,16 +102,16 @@ EntryResult DBEntry::DropTableCollection(DBEntry *db_entry,
     if (table_meta == nullptr) {
         if (conflict_type == ConflictType::kIgnore) {
             LOG_TRACE(Format("Ignore drop a not existed table/collection entry {}", table_collection_name));
-            return {nullptr, nullptr};
+            return Status::OK();
         }
-        LOG_TRACE(Format("Attempt to drop not existed table/collection entry {}", table_collection_name));
-        return {nullptr, MakeUnique<String>("Attempt to drop not existed table/collection entry")};
+
+        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed table/collection entry {}", table_collection_name));
+        LOG_ERROR(*err_msg);
+        return Status(ErrorCode::kNotFound, Move(err_msg));
     }
 
     LOG_TRACE(Format("Drop a table/collection entry {}", table_collection_name));
-    EntryResult res = TableCollectionMeta::DropNewEntry(table_meta, txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
-
-    return res;
+    return TableCollectionMeta::DropNewEntry(table_meta, txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type, base_entry);
 }
 
 Status
@@ -146,7 +154,7 @@ Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 
     results.reserve(db_entry->tables_.size());
     for (auto &table_collection_meta_pair : db_entry->tables_) {
         TableCollectionMeta *table_collection_meta = table_collection_meta_pair.second.get();
-        BaseEntry* table_collection_entry{nullptr};
+        BaseEntry *table_collection_entry{nullptr};
         Status status = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts, table_collection_entry);
         if (!status.ok()) {
             LOG_WARN(Format("error when get table/collection entry: {}", *status.message()));

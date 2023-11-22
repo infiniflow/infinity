@@ -28,7 +28,7 @@ namespace infinity {
 void
 PrintStacktrace(const String& err_msg) {
     int trace_stack_depth = 256;
-    void* array[trace_stack_depth];
+    void* array[256];
     int stack_num = backtrace(array, trace_stack_depth);
     char** stacktrace = backtrace_symbols(array, stack_num);
 

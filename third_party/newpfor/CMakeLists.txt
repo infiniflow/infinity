@@ -1,5 +1,7 @@
 project(NewPFOR CXX C)
 
+add_definitions(-march=native)
+
 # library target
 add_library(newpfor STATIC
     decompress_sse4.cpp

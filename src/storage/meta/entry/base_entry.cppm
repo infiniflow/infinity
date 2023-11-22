@@ -67,22 +67,6 @@ public:
     EntryType entry_type_{EntryType::kDummy};
 };
 
-export struct EntryResult {
-    BaseEntry *entry_;
-    UniquePtr<String> err_;
-
-    bool Success() { return err_.get() == nullptr; }
-
-    bool Fail() { return err_.get() != nullptr; }
-
-    String ToString() {
-        if (err_.get() == nullptr) {
-            return "Success";
-        }
-        return *err_.get();
-    }
-};
-
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &list2);
 

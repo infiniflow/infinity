@@ -71,10 +71,10 @@ public:
     void UnionWith(const SharedPtr<TableDef> &other);
 
 private:
+    SharedPtr<String> schema_name_{};
+    SharedPtr<String> table_name_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    SharedPtr<String> table_name_{};
-    SharedPtr<String> schema_name_{};
     Vector<IndexDef> indexes_{};
 };
 

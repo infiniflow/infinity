@@ -61,6 +61,11 @@ class boolean_filter : public filter, public AllDocsProvider {
   bool empty() const { return filters_.empty(); }
   size_t size() const { return filters_.size(); }
 
+  void PopulateDefaultFieldRecursive(const std::string &default_field) override {
+      for (auto &fltptr : filters_)
+          fltptr->PopulateDefaultFieldRecursive(default_field);
+  }
+
   filter::prepared::ptr prepare(const PrepareContext& ctx) const override;
 
  protected:
@@ -139,8 +144,15 @@ class Not : public filter, public AllDocsProvider {
     return static_cast<type&>(*filter_);
   }
 
+  void set_filter(filter::ptr &&filter) {
+      IRS_ASSERT(filter);
+      filter_ = std::move(filter);
+  }
+
   void clear() { filter_.reset(); }
   bool empty() const { return nullptr == filter_; }
+
+  void PopulateDefaultFieldRecursive(const std::string &default_field) override { filter_->PopulateDefaultFieldRecursive(default_field); }
 
   filter::prepared::ptr prepare(const PrepareContext& ctx) const final;
 

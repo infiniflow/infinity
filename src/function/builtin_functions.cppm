@@ -37,6 +37,8 @@ private:
     void RegisterScalarFunction();
 
     void RegisterTableFunction();
+
+    void RegisterSpecialFunction();
 };
 
 } // namespace infinity

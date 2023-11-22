@@ -135,11 +135,12 @@ void TxnManager::Stop() {
 
 bool TxnManager::Stopped() { return !is_running_.load(); }
 
-void TxnManager::CommitTxn(Txn* txn) {
-    txn->Commit();
+TxnTimeStamp TxnManager::CommitTxn(Txn* txn) {
+    TxnTimeStamp txn_ts = txn->Commit();
     rw_locker_.lock();
     txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
+    return txn_ts;
 }
 
 void TxnManager::RollBackTxn(Txn* txn) {

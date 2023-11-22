@@ -1,5 +1,5 @@
 statement ok
-CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR(50), age INTEGER);
+CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR, age INTEGER);
 
 statement ok
 CREATE TABLE select2 (id INTEGER , age INTEGER);

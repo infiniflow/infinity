@@ -103,8 +103,6 @@ TEST_F(TableCollectionEntryTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
-    EntryResult create1_res, table1_res, get_res;
-
     // Txn1: Create, OK
     Txn *new_txn = txn_mgr->CreateTxn();
 
@@ -112,9 +110,10 @@ TEST_F(TableCollectionEntryTest, test2) {
     new_txn->Begin();
 
     // Txn1: Create db1, OK
-    create1_res = new_txn->CreateDatabase("db1", ConflictType::kError);
-    EXPECT_NE(create1_res.entry_, nullptr);
-    EXPECT_EQ(create1_res.entry_->Committed(), false);
+    BaseEntry* base_entry{nullptr};
+    Status status = new_txn->CreateDatabase("db1", ConflictType::kError, base_entry);
+    EXPECT_NE(base_entry, nullptr);
+    EXPECT_EQ(base_entry->Committed(), false);
 
     // Txn1: Create tbl1, OK
     // Define columns

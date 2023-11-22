@@ -18,7 +18,6 @@ from infinity.remote.infinity_grpc import infinity_pb2, infinity_pb2_grpc
 from infinity.db import Database
 from infinity.remote.table import RemoteTable
 
-
 class RemoteDatabase(Database, ABC):
     def __init__(self, conn, name: str):
         self._conn = conn

@@ -18,16 +18,19 @@
 namespace infinity {
 
 CreateTableInfo::~CreateTableInfo() {
-    for (auto *column_def : column_defs_) {
+    for (auto *&column_def : column_defs_) {
         delete column_def;
+        column_def = nullptr;
     }
 
-    for (auto *table_constraint : constraints_) {
+    for (auto *&table_constraint : constraints_) {
         delete table_constraint;
+        table_constraint = nullptr;
     }
 
     if (select_ != nullptr) {
         delete select_;
+        select_ = nullptr;
     }
 }
 

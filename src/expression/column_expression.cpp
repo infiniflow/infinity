@@ -25,9 +25,15 @@ module column_expression;
 
 namespace infinity {
 
-ColumnExpression::ColumnExpression(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth)
-    : BaseExpression(ExpressionType::kColumn, {}), data_type_(Move(data_type)), table_name_(Move(table_name)), column_name_(Move(column_name)),
-      binding_(table_index, column_index), depth_(depth) {}
+ColumnExpression::ColumnExpression(DataType data_type,
+                                   String table_name,
+                                   u64 table_index,
+                                   String column_name,
+                                   i64 column_index,
+                                   i64 depth,
+                                   bool special)
+    : BaseExpression(ExpressionType::kColumn, {}), data_type_(Move(data_type)), binding_(table_index, column_index), table_name_(Move(table_name)),
+      column_name_(Move(column_name)), depth_(depth), special_(special) {}
 
 String ColumnExpression::ToString() const {
     if (alias_.empty()) {

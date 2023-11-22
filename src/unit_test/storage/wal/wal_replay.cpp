@@ -66,32 +66,37 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        txn->CreateDatabase("db1", ConflictType::kIgnore);
+        BaseEntry* base_entry{nullptr};
+        txn->CreateDatabase("db1", ConflictType::kIgnore, base_entry);
         txn_mgr->CommitTxn(txn);
 
         auto *txn2 = txn_mgr->CreateTxn();
         txn2->Begin();
-        txn2->CreateDatabase("db2", ConflictType::kIgnore);
+        base_entry = nullptr;
+        txn2->CreateDatabase("db2", ConflictType::kIgnore, base_entry);
         txn_mgr->CommitTxn(txn2);
 
         auto *txn3 = txn_mgr->CreateTxn();
         txn3->Begin();
-        txn3->CreateDatabase("db3", ConflictType::kIgnore);
-        txn_mgr->CommitTxn(txn3);
+        base_entry = nullptr;
+        txn3->CreateDatabase("db3", ConflictType::kIgnore, base_entry);
+        TxnTimeStamp txn3_ts = txn_mgr->CommitTxn(txn3);
 
         auto *txn4 = txn_mgr->CreateTxn();
         txn4->Begin();
-        txn4->CreateDatabase("db4", ConflictType::kIgnore);
+        base_entry = nullptr;
+        txn4->CreateDatabase("db4", ConflictType::kIgnore, base_entry);
         txn_mgr->CommitTxn(txn4);
 
         auto *txn5 = txn_mgr->CreateTxn();
         txn5->Begin();
-        txn5->Checkpoint(txn3->CommitTS(), true);
+        txn5->Checkpoint(txn3_ts, true);
         txn_mgr->CommitTxn(txn5);
 
         auto *txn6 = txn_mgr->CreateTxn();
         txn6->Begin();
-        txn6->CreateDatabase("db5", ConflictType::kIgnore);
+        base_entry = nullptr;
+        txn6->CreateDatabase("db5", ConflictType::kIgnore, base_entry);
         txn_mgr->CommitTxn(txn6);
 
         infinity::InfinityContext::instance().UnInit();
@@ -110,9 +115,10 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto result = txn->DropDatabase("db4", ConflictType::kInvalid);
-        EXPECT_EQ(result.err_, nullptr);
-        EXPECT_NE(result.entry_, nullptr);
+        BaseEntry* base_entry{nullptr};
+        Status status = txn->DropDatabase("db4", ConflictType::kInvalid, base_entry);
+        EXPECT_EQ(status.ok(), true);
+        EXPECT_NE(base_entry, nullptr);
         txn_mgr->CommitTxn(txn);
 
         infinity::InfinityContext::instance().UnInit();
@@ -177,7 +183,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
         Status status2 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore, base_table2_entry);
         EXPECT_TRUE(status2.ok());
         EXPECT_NE(base_table2_entry, nullptr);
-        txn_mgr->CommitTxn(txn2);
+        TxnTimeStamp txn2_ts = txn_mgr->CommitTxn(txn2);
 
         {
             auto *txn = txn_mgr->CreateTxn();
@@ -201,7 +207,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
         {
             auto *txn6 = txn_mgr->CreateTxn();
             txn6->Begin();
-            txn6->Checkpoint(txn2->CommitTS(), true);
+            txn6->Checkpoint(txn2_ts, true);
             txn_mgr->CommitTxn(txn6);
         }
 
@@ -496,9 +502,8 @@ TEST_F(WalReplayTest, WalReplayImport) {
         Status status = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore, base_table_entry);
         EXPECT_TRUE(status.ok());
         EXPECT_NE(base_table_entry, nullptr);
-        txn_mgr->CommitTxn(txn2);
+        TxnTimeStamp tx4_commit_ts = txn_mgr->CommitTxn(txn2);
 
-        TxnTimeStamp tx4_commit_ts = txn2->CommitTS();
         {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();

@@ -40,6 +40,10 @@ public:
 
     [[nodiscard]] const String &name() const { return name_; }
 
+    FunctionType type() const  {
+        return type_;
+    }
+
     String name_;
     FunctionType type_;
 };
