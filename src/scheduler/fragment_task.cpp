@@ -97,8 +97,8 @@ bool FragmentTask::Ready() const {
 }
 
 bool FragmentTask::IsComplete() const {
-    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    PhysicalSink *sink_op = fragment_context->GetSinkOperator();
+//    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+//    PhysicalSink *sink_op = fragment_context->GetSinkOperator();
     return sink_state_->prev_op_state_->Complete();
 }
 

@@ -17,7 +17,7 @@ module;
 import config;
 import stl;
 import fragment_task;
-import fragment_task_block_queue;
+import blocking_queue;
 
 export module task_scheduler;
 
@@ -25,6 +25,8 @@ namespace infinity {
 
 class QueryContext;
 class PlanFragment;
+
+using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
 
 struct Worker {
     Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
