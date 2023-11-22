@@ -26,7 +26,7 @@ class BlockingQueue {
 public:
     explicit BlockingQueue(SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {}
 
-    void Enqueue(T task) {
+    void Enqueue(T& task) {
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(Move(task));

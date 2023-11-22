@@ -17,11 +17,15 @@ module;
 import stl;
 import third_party;
 import fragment_task;
+import blocking_queue;
 
 export module fragment_task_block_queue;
 
 namespace infinity {
 
+export using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
+
+#if 0
 export class FragmentTaskBlockQueue {
 public:
     explicit inline FragmentTaskBlockQueue(SizeT capacity = 1024) : capacity_(capacity) {}
@@ -62,8 +66,9 @@ protected:
     mutable Mutex queue_mutex_{};
     CondVar full_cv_{};
     CondVar empty_cv_{};
-    List<FragmentTask *> queue_{};
+    Deque<FragmentTask *> queue_{};
     SizeT capacity_{32};
 };
+#endif
 
 } // namespace infinity
