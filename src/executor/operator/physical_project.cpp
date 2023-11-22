@@ -49,6 +49,11 @@ void PhysicalProject::Init() {
 void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
+    if (prev_op_state->Complete() && !prev_op_state->data_block_->Finalized()) {
+        project_operator_state->data_block_->Finalize();
+        project_operator_state->SetComplete();
+        return ;
+    }
 
     // FIXME: need to handle statement like: SELECT 1;
 
@@ -77,6 +82,7 @@ void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operat
     }
 
     project_operator_state->data_block_->Finalize();
+    prev_op_state->data_block_->Reset();
     if (prev_op_state->Complete()) {
         project_operator_state->SetComplete();
     }

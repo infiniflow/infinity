@@ -92,6 +92,7 @@ public:
     }
 
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
+    [[nodiscard]] inline SizeT available_capacity() const { return capacity_ - row_count_; }
 
     bool operator==(const DataBlock &other) const;
     bool operator!=(const DataBlock &other) const { return !(*this == other); }
