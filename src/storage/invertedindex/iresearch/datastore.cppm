@@ -22,7 +22,6 @@ import data_block;
 import operator_state;
 import column_vector;
 import query_context;
-import base_table_ref;
 import index_def;
 import segment_entry;
 import table_collection_entry;
@@ -54,7 +53,7 @@ class IRSAsync;
 struct MaintenanceState;
 export class IRSDataStore {
 public:
-    explicit IRSDataStore(const String &table_name, const String &directory, SharedPtr<BaseTableRef> base_table_ref);
+    explicit IRSDataStore(const String &table_name, const String &directory);
 
     struct DataSnapshot {
         DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
@@ -85,8 +84,6 @@ public:
 
     void ScheduleOptimize();
 
-    void BatchInsert(u32 block_id, SharedPtr<DataBlock> data_block);
-
     void BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
@@ -96,7 +93,6 @@ public:
 private:
     String directory_;
     Path path_;
-    SharedPtr<BaseTableRef> base_table_ref_{};
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
     IRSIndexWriter::Transaction recovery_txn_;
