@@ -38,7 +38,7 @@ export struct BlockVersion {
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
 
-    Vector<Pair<TxnTimeStamp, i32>> created_{};
+    Vector<Pair<TxnTimeStamp, i32>> created_{};  // (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
 };
 

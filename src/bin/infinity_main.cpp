@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "network/thrift_server.h"
 #include <csignal>
 #include <cstdlib>
-
 import compilation_config;
 import stl;
 import third_party;
@@ -24,11 +24,23 @@ namespace {
 
 infinity::DBServer db_server;
 
+infinity::Thread threaded_thrift_thread;
+infinity::ThreadedThriftServer threaded_thrift_server;
+
+infinity::Thread pool_thrift_thread;
+infinity::PoolThriftServer pool_thrift_server;
+
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
+            threaded_thrift_server.Shutdown();
+            threaded_thrift_thread.join();
+
+            pool_thrift_server.Shutdown();
+            pool_thrift_thread.join();
+
             db_server.Shutdown();
             break;
         }
@@ -105,6 +117,12 @@ auto main(int argc, char **argv) -> int {
 
     db_server.Init(parameters);
     RegisterSignal();
+
+    threaded_thrift_server.Init(9080);
+    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+
+    pool_thrift_server.Init(9090, 16);
+    pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
     db_server.Run();
 
     return 0;

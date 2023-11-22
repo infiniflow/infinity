@@ -1,14 +1,26 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import ABC
 
-from python.infinity import infinity_pb2, RemoteInfinityConnection
-from python.infinity.db import Database
-
-
+from infinity.remote.infinity_grpc import infinity_pb2, infinity_pb2_grpc
+from infinity.db import Database
+from infinity.remote.table import RemoteTable
 
 
 class RemoteDatabase(Database, ABC):
-
-    def __init__(self, conn: RemoteInfinityConnection, name: str):
+    def __init__(self, conn, name: str):
         self._conn = conn
         self._db_name = name
 
@@ -117,5 +129,5 @@ class RemoteDatabase(Database, ABC):
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
-        from python.infinity.remote.table import RemoteTable
+
         return RemoteTable(self._conn, self._db_name, table_name)
