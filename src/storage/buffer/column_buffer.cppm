@@ -33,6 +33,8 @@ struct OutlineBuffer {
 
     BufferHandle outline_ele_{};
 
+    OutlineBuffer(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr), base_dir_(buffer_mgr->BaseDir()) {}
+
     OutlineBuffer(BufferManager *buffer_mgr, SharedPtr<String> base_dir) : buffer_mgr_(buffer_mgr), base_dir_(Move(base_dir)) {}
 };
 
@@ -44,6 +46,12 @@ export class ColumnBuffer {
 
 public:
     ColumnBuffer(BufferObj *buffer, BufferManager *buffer_mgr){};
+
+    ColumnBuffer(const BufferHandle &buffer_handle, BufferManager *buffer_mgr) : inline_col_(buffer_handle) {
+        if (buffer_mgr) {
+            outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr);
+        }
+    }
 
     explicit ColumnBuffer(BufferObj *buffer, BufferManager *buffer_mgr = nullptr, SharedPtr<String> base_dir = nullptr)
         : inline_col_(buffer->Load()) {

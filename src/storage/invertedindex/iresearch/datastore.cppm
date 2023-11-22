@@ -23,6 +23,10 @@ import operator_state;
 import column_vector;
 import query_context;
 import base_table_ref;
+import index_def;
+import segment_entry;
+import table_collection_entry;
+import buffer_manager;
 
 export module iresearch_datastore;
 
@@ -82,6 +86,8 @@ public:
     void ScheduleOptimize();
 
     void BatchInsert(u32 block_id, SharedPtr<DataBlock> data_block);
+
+    void BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
 
