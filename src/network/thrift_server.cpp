@@ -266,7 +266,7 @@ public:
 
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
-                Value value = data_block->GetValue(0, i);
+                Value value = data_block->GetValue(1, i);
                 if (value.value_.varchar.IsInlined()) {
                     String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
                     response.table_names.emplace_back(prefix);
