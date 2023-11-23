@@ -488,9 +488,9 @@ struct ListDatabaseRequestDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ListDatabaseRequestDefaultTypeInternal _ListDatabaseRequest_default_instance_;
-PROTOBUF_CONSTEXPR ListDatabaseResponse::ListDatabaseResponse(
-    ::_pbi::ConstantInitialized): _impl_{/*decltype(_impl_.db_names_)*/ {}, /*decltype(_impl_.error_msg_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.success_)*/false
+PROTOBUF_CONSTEXPR ListDatabaseResponse::ListDatabaseResponse(::_pbi::ConstantInitialized)
+    : _impl_{/*decltype(_impl_.db_names_)*/ {},
+             /*decltype(_impl_.error_msg_)*/ {&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}, /*decltype(_impl_.success_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ListDatabaseResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ListDatabaseResponseDefaultTypeInternal()
@@ -971,7 +971,7 @@ const uint32_t TableStruct_infinity_5fgrpc_2eproto::offsets[] PROTOBUF_SECTION_V
   ~0u,  // no _inlined_string_donated_
     PROTOBUF_FIELD_OFFSET(::infinity_grpc_proto::ListDatabaseResponse, _impl_.db_names_),
     PROTOBUF_FIELD_OFFSET(::infinity_grpc_proto::ListDatabaseResponse, _impl_.success_),
-  PROTOBUF_FIELD_OFFSET(::infinity_grpc_proto::ListDatabaseResponse, _impl_.error_msg_),
+    PROTOBUF_FIELD_OFFSET(::infinity_grpc_proto::ListDatabaseResponse, _impl_.error_msg_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::infinity_grpc_proto::DescribeDatabaseRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -9981,8 +9981,8 @@ ListDatabaseResponse::ListDatabaseResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena
 ListDatabaseResponse::ListDatabaseResponse(const ListDatabaseResponse& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   ListDatabaseResponse* const _this = this; (void)_this;
-  new (&_impl_) Impl_{decltype(_impl_.db_names_){from._impl_.db_names_}, decltype(_impl_.error_msg_){}
-    , decltype(_impl_.success_){}
+  new (&_impl_) Impl_{decltype(_impl_.db_names_){from._impl_.db_names_},
+                      decltype(_impl_.error_msg_){}, decltype(_impl_.success_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -10002,8 +10002,8 @@ inline void ListDatabaseResponse::SharedCtor(
     ::_pb::Arena* arena, bool is_message_owned) {
   (void)arena;
   (void)is_message_owned;
-  new (&_impl_) Impl_{decltype(_impl_.db_names_){arena}, decltype(_impl_.error_msg_){}
-    , decltype(_impl_.success_){false}
+  new (&_impl_) Impl_{decltype(_impl_.db_names_){arena},
+                      decltype(_impl_.error_msg_){}, decltype(_impl_.success_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_msg_.InitDefault();

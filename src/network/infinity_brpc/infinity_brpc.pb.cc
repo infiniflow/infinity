@@ -540,10 +540,10 @@ struct ListDatabaseRequestDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ListDatabaseRequestDefaultTypeInternal _ListDatabaseRequest_default_instance_;
 PROTOBUF_CONSTEXPR ListDatabaseResponse::ListDatabaseResponse(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_._has_bits_)*/{}
-  , /*decltype(_impl_._cached_size_)*/{},
-             /*decltype(_impl_.db_names_)*/ {}, /*decltype(_impl_.error_msg_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.success_)*/false} {}
+    /*decltype(_impl_._has_bits_)*/{},
+             /*decltype(_impl_._cached_size_)*/ {},
+             /*decltype(_impl_.db_names_)*/ {},
+             /*decltype(_impl_.error_msg_)*/ {&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}, /*decltype(_impl_.success_)*/false} {}
 struct ListDatabaseResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ListDatabaseResponseDefaultTypeInternal()
       : _instance(::_pbi::ConstantInitialized{}) {}
@@ -1142,7 +1142,7 @@ const uint32_t TableStruct_infinity_5fbrpc_2eproto::offsets[] PROTOBUF_SECTION_V
   ~0u,  // no _inlined_string_donated_
     PROTOBUF_FIELD_OFFSET(::infinity_brpc_proto::ListDatabaseResponse, _impl_.db_names_),
     PROTOBUF_FIELD_OFFSET(::infinity_brpc_proto::ListDatabaseResponse, _impl_.success_),
-  PROTOBUF_FIELD_OFFSET(::infinity_brpc_proto::ListDatabaseResponse, _impl_.error_msg_),
+    PROTOBUF_FIELD_OFFSET(::infinity_brpc_proto::ListDatabaseResponse, _impl_.error_msg_),
   ~0u,
   1,
   0,
@@ -11801,10 +11801,10 @@ ListDatabaseResponse::ListDatabaseResponse(const ListDatabaseResponse& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   ListDatabaseResponse* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_._has_bits_){from._impl_._has_bits_}
-    , /*decltype(_impl_._cached_size_)*/{},
-                      decltype(_impl_.db_names_){from._impl_.db_names_}, decltype(_impl_.error_msg_){}
-    , decltype(_impl_.success_){}};
+      decltype(_impl_._has_bits_){from._impl_._has_bits_},
+                      /*decltype(_impl_._cached_size_)*/ {},
+                      decltype(_impl_.db_names_){from._impl_.db_names_},
+                      decltype(_impl_.error_msg_){}, decltype(_impl_.success_){}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   _impl_.error_msg_.InitDefault();
@@ -11824,10 +11824,10 @@ inline void ListDatabaseResponse::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_._has_bits_){}
-    , /*decltype(_impl_._cached_size_)*/{},
-                      decltype(_impl_.db_names_){arena}, decltype(_impl_.error_msg_){}
-    , decltype(_impl_.success_){false}
+      decltype(_impl_._has_bits_){},
+                      /*decltype(_impl_._cached_size_)*/ {},
+                      decltype(_impl_.db_names_){arena},
+                      decltype(_impl_.error_msg_){}, decltype(_impl_.success_){false}
   };
   _impl_.error_msg_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
@@ -11888,7 +11888,7 @@ const char* ListDatabaseResponse::_InternalParse(const char* ptr, ::_pbi::ParseC
             CHK_(ptr);
             #ifndef NDEBUG
             ::_pbi::VerifyUTF8(str, "infinity_brpc_proto.ListDatabaseResponse.db_names");
-#endif  // !NDEBUG
+#endif // !NDEBUG
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<10>(ptr));
         } else
