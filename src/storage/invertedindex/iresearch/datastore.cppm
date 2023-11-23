@@ -49,7 +49,29 @@ public:
     IRSDirectoryReader *reader_;
 };
 
-class IRSAsync;
+export class IRSAsync {
+public:
+    ~IRSAsync() { Stop(); }
+
+    void Stop() noexcept {
+        try {
+            pool_0_.stop(true);
+        } catch (...) {
+        }
+        try {
+            pool_1_.stop(true);
+        } catch (...) {
+        }
+    }
+
+    template <typename T>
+    void Queue(SizeT id, T &&fn);
+
+private:
+    ThreadPool pool_0_{1};
+    ThreadPool pool_1_{1};
+};
+
 struct MaintenanceState;
 export class IRSDataStore {
 public:

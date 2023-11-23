@@ -72,29 +72,6 @@ u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
 
 RowID DocID2RowID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK); }
 
-class IRSAsync {
-public:
-    ~IRSAsync() { Stop(); }
-
-    void Stop() noexcept {
-        try {
-            pool_0_.stop(true);
-        } catch (...) {
-        }
-        try {
-            pool_1_.stop(true);
-        } catch (...) {
-        }
-    }
-
-    template <typename T>
-    void Queue(SizeT id, T &&fn);
-
-private:
-    ThreadPool pool_0_{1};
-    ThreadPool pool_1_{1};
-};
-
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
     if (0 == id)

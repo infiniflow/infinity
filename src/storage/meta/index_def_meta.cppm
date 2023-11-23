@@ -31,6 +31,7 @@ namespace infinity {
 class BufferManager;
 class TableCollectionEntry;
 class SegmentEntry;
+class IRSDataStore;
 
 export class IndexDefMeta : public BaseMeta {
 public:
@@ -64,5 +65,7 @@ public:
     RWMutex rw_locker_{};
 
     TableCollectionEntry *const table_collection_entry_{};
+
+    SharedPtr<IRSDataStore> irs_index_{};
 };
 } // namespace infinity

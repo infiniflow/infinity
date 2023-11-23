@@ -38,6 +38,7 @@ import index_def_meta;
 import txn_manager;
 import index_entry;
 import index_def_entry;
+import iresearch_datastore;
 
 module table_collection_entry;
 
@@ -71,6 +72,7 @@ Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                          BaseEntry *&new_index_entry) {
     // TODO: lock granularity can be narrowed.
     table_entry->rw_locker_.lock_shared();
+
     IndexDefMeta *index_def_meta{nullptr};
     if (index_def->index_name_->empty()) {
         // set default index name
@@ -200,6 +202,13 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            IndexDefEntry *index_def_entry,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
+    if (index_def_entry->index_def_->method_type_ == IndexMethod::kIRSFullText) {
+        IndexDefMeta *index_def_meta = table_entry->indexes_[*(index_def_entry->index_def_->index_name_)].get();
+        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+            index_def_meta->irs_index_->BatchInsert(table_entry, index_def_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
+        }
+    }
+
     SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
     if (index_def->column_names_.size() != 1) {
