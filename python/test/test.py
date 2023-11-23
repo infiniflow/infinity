@@ -20,214 +20,274 @@ import infinity
 from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
-
-class MyTestCase(unittest.TestCase):
+class TestCase:
 
     def test_version(self):
         print(infinity.__version__)
 
     def test_infinity_thrift(self):
+        """
+        target: test basic operation
+        method:
+        1. connect
+        2. create db
+        3. list db
+        4. drop db
+        5. get db
+        6. create table
+        7. drop table
+        8. create index
+        9. drop index
+        10. insert and search
+        11. import and search
+        12.
+        expected: ok
+        """
         infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
-        self.assertIsNotNone(infinity_obj)
+        assert infinity_obj
+
         # infinity
         res = infinity_obj.create_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = infinity_obj.list_databases()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         for db in res.db_names:
-            self.assertIn(db, ['my_db', 'default'])
+            assert db in ['my_db', 'default']
+
         res = infinity_obj.drop_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+        
         res = db_obj.list_tables()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table1")
-        self.assertEqual(res.success, True)
+        assert res.success
+
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table2")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.create_index("my_index", ["c1"], "IVFFlat", [{"centroids_count": 128}, {"metric": "l2"}], None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = table_obj.drop_index("my_index")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table2")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # insert
         res = db_obj.create_table("my_table3", {"c1": "int, primary key", "c2": "float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         table_obj = db_obj.get_table("my_table3")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
-        self.assertEqual(res.success, True)
+        assert res.success
         # search
         res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
         print(res)
+
         res = db_obj.drop_table("my_table3")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # import
         res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table4")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
         test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
-        self.assertTrue(os.path.exists(test_csv_dir))
+        assert os.path.exists(test_csv_dir)
+
         res = table_obj.import_data(test_csv_dir, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         # search
         res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
         print(res)
         res = db_obj.drop_table("my_table4")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # disconnect
         res = infinity_obj.disconnect()
-        self.assertEqual(res.success, True)
+        assert res.success
 
     def test_infinity_grpc(self):
         infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50052))
-        self.assertIsNotNone(infinity_obj)
+        assert infinity_obj
+
         # infinity
         res = infinity_obj.create_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = infinity_obj.list_databases()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         for db in res.db_names:
-            self.assertIn(db, ['my_db', 'default'])
+            assert db in ['my_db', 'default']
+
         res = infinity_obj.drop_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.list_tables()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table1")
-        self.assertEqual(res.success, True)
+        assert res.success
+
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table2")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.create_index("my_index", ["c1"], "IVFFlat", [{"centroids_count": 128}, {"metric": "l2"}], None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = table_obj.drop_index("my_index")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table2")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # insert
         res = db_obj.create_table("my_table3", {"c1": "int, primary key", "c2": "float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         table_obj = db_obj.get_table("my_table3")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
-        self.assertEqual(res.success, True)
+        assert res.success
         # search
         res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
         print(res)
+
         res = db_obj.drop_table("my_table3")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # import
         res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table4")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
         test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
-        self.assertTrue(os.path.exists(test_csv_dir))
+        assert os.path.exists(test_csv_dir)
+
         res = table_obj.import_data(test_csv_dir, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         # search
         res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
         print(res)
         res = db_obj.drop_table("my_table4")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # disconnect
         res = infinity_obj.disconnect()
-        self.assertEqual(res.success, True)
+        assert res.success
 
     def test_infinity_brpc(self):
         infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50051))
-        self.assertIsNotNone(infinity_obj)
+        assert infinity_obj
+
         # infinity
         res = infinity_obj.create_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = infinity_obj.list_databases()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         for db in res.db_names:
-            self.assertIn(db, ['my_db', 'default'])
+            assert db in ['my_db', 'default']
+
         res = infinity_obj.drop_database("my_db")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
-        self.assertEqual(res.success, True)
+
+        assert res.success
         res = db_obj.list_tables()
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table1")
-        self.assertEqual(res.success, True)
+        assert res.success
+
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table2")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.create_index("my_index", ["c1"], "IVFFlat", [{"centroids_count": 128}, {"metric": "l2"}], None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = table_obj.drop_index("my_index")
-        self.assertEqual(res.success, True)
+        assert res.success
+
         res = db_obj.drop_table("my_table2")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # insert
         res = db_obj.create_table("my_table3", {"c1": "int, primary key", "c2": "float"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         table_obj = db_obj.get_table("my_table3")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
-        self.assertEqual(res.success, True)
+        assert res.success
         # search
         res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
         print(res)
+
         res = db_obj.drop_table("my_table3")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # import
         res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
-        self.assertEqual(res.success, True)
+        assert res.success
         table_obj = db_obj.get_table("my_table4")
-        self.assertIsNotNone(table_obj)
+        assert table_obj
+
         parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
         test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
-        self.assertTrue(os.path.exists(test_csv_dir))
+        assert os.path.exists(test_csv_dir)
+
         res = table_obj.import_data(test_csv_dir, None)
-        self.assertEqual(res.success, True)
+        assert res.success
+
         # search
         res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
         print(res)
         res = db_obj.drop_table("my_table4")
-        self.assertEqual(res.success, True)
+        assert res.success
 
         # disconnect
         res = infinity_obj.disconnect()
-        self.assertEqual(res.success, True)
+        assert res.success
 
     def test_traverse_conditions(self):
         res = traverse_conditions(condition("c1>1 and c2<2 or c3=3.3"))
         print(res)
-
-
-if __name__ == '__main__':
-    unittest.main()
