@@ -42,6 +42,7 @@ def generate_thrift():
     parent_dir = os.path.dirname(os.getcwd())
     python_dir = parent_dir + "/python/infinity/remote_thrift"
     cpp_dir = parent_dir + "/src/network/infinity_thrift"
+    create_dir([python_dir, cpp_dir])
     infinity_thrift_file = python_dir + "/infinity_thrift_rpc/infinity.thrift"
     os.system("thrift --version")
     os.system(f"thrift --out {python_dir} --gen py {infinity_thrift_file}")

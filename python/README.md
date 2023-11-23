@@ -1,18 +1,22 @@
 # dependency
 
+## python
 pip install -r requirements.txt
+conda install grpcio-tools
+
+## cpp
+
+### brpc
 sudo apt-get install -y libssl-dev libgflags-dev libprotobuf-dev libprotoc-dev protobuf-compiler libleveldb-dev
 
+### thrift
+
+sudo apt-get install thrift-compiler
 # build
-
 python setup.py bdist_wheel
-
 # install
-
 cd dist
 pip install infinity-0.0.1-py3-none-any.whl
-
-
 # using
 ```python
 import infinity
