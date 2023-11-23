@@ -7386,9 +7386,9 @@ class ListDatabaseResponse final :
   // accessors -------------------------------------------------------
 
   enum : int {
-      kDbNamesFieldNumber = 1,
-      kErrorMsgFieldNumber = 3,
-      kSuccessFieldNumber = 2,
+    kDbNamesFieldNumber = 1,
+    kErrorMsgFieldNumber = 3,
+    kSuccessFieldNumber = 2,
   };
   // repeated string db_names = 1;
   int db_names_size() const;
@@ -7396,24 +7396,22 @@ class ListDatabaseResponse final :
   int _internal_db_names_size() const;
   public:
   void clear_db_names();
-      const std::string &db_names(int index) const;
-      std::string *mutable_db_names(int index);
-      void set_db_names(int index, const std::string &value);
-      void set_db_names(int index, std::string &&value);
-      void set_db_names(int index, const char *value);
-      void set_db_names(int index, const char *value, size_t size);
-      std::string *add_db_names();
-      void add_db_names(const std::string &value);
-      void add_db_names(std::string &&value);
-      void add_db_names(const char *value);
-      void add_db_names(const char *value, size_t size);
-      const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &db_names() const;
-      ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> *mutable_db_names();
-
+  const std::string& db_names(int index) const;
+  std::string* mutable_db_names(int index);
+  void set_db_names(int index, const std::string& value);
+  void set_db_names(int index, std::string&& value);
+  void set_db_names(int index, const char* value);
+  void set_db_names(int index, const char* value, size_t size);
+  std::string* add_db_names();
+  void add_db_names(const std::string& value);
+  void add_db_names(std::string&& value);
+  void add_db_names(const char* value);
+  void add_db_names(const char* value, size_t size);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>& db_names() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>* mutable_db_names();
   private:
-      const std::string &_internal_db_names(int index) const;
-      std::string *_internal_add_db_names();
-
+  const std::string& _internal_db_names(int index) const;
+  std::string* _internal_add_db_names();
   public:
 
   // optional string error_msg = 3;
@@ -15524,63 +15522,76 @@ inline void ListDatabaseRequest::set_session_id(uint64_t value) {
 // ListDatabaseResponse
 
 // repeated string db_names = 1;
-inline int ListDatabaseResponse::_internal_db_names_size() const { return _impl_.db_names_.size(); }
-inline int ListDatabaseResponse::db_names_size() const { return _internal_db_names_size(); }
-inline void ListDatabaseResponse::clear_db_names() { _impl_.db_names_.Clear(); }
-inline std::string *ListDatabaseResponse::add_db_names() {
-  std::string *_s = _internal_add_db_names();
+inline int ListDatabaseResponse::_internal_db_names_size() const {
+  return _impl_.db_names_.size();
+}
+inline int ListDatabaseResponse::db_names_size() const {
+  return _internal_db_names_size();
+}
+inline void ListDatabaseResponse::clear_db_names() {
+  _impl_.db_names_.Clear();
+}
+inline std::string* ListDatabaseResponse::add_db_names() {
+  std::string* _s = _internal_add_db_names();
   // @@protoc_insertion_point(field_add_mutable:infinity_brpc_proto.ListDatabaseResponse.db_names)
   return _s;
 }
-inline const std::string &ListDatabaseResponse::_internal_db_names(int index) const { return _impl_.db_names_.Get(index); }
-inline const std::string &ListDatabaseResponse::db_names(int index) const {
+inline const std::string& ListDatabaseResponse::_internal_db_names(int index) const {
+  return _impl_.db_names_.Get(index);
+}
+inline const std::string& ListDatabaseResponse::db_names(int index) const {
   // @@protoc_insertion_point(field_get:infinity_brpc_proto.ListDatabaseResponse.db_names)
   return _internal_db_names(index);
 }
-inline std::string *ListDatabaseResponse::mutable_db_names(int index) {
+inline std::string* ListDatabaseResponse::mutable_db_names(int index) {
   // @@protoc_insertion_point(field_mutable:infinity_brpc_proto.ListDatabaseResponse.db_names)
   return _impl_.db_names_.Mutable(index);
 }
-inline void ListDatabaseResponse::set_db_names(int index, const std::string &value) {
+inline void ListDatabaseResponse::set_db_names(int index, const std::string& value) {
   _impl_.db_names_.Mutable(index)->assign(value);
   // @@protoc_insertion_point(field_set:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::set_db_names(int index, std::string &&value) {
+inline void ListDatabaseResponse::set_db_names(int index, std::string&& value) {
   _impl_.db_names_.Mutable(index)->assign(std::move(value));
   // @@protoc_insertion_point(field_set:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::set_db_names(int index, const char *value) {
+inline void ListDatabaseResponse::set_db_names(int index, const char* value) {
   GOOGLE_DCHECK(value != nullptr);
   _impl_.db_names_.Mutable(index)->assign(value);
   // @@protoc_insertion_point(field_set_char:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::set_db_names(int index, const char *value, size_t size) {
-  _impl_.db_names_.Mutable(index)->assign(reinterpret_cast<const char *>(value), size);
+inline void ListDatabaseResponse::set_db_names(int index, const char* value, size_t size) {
+  _impl_.db_names_.Mutable(index)->assign(
+    reinterpret_cast<const char*>(value), size);
   // @@protoc_insertion_point(field_set_pointer:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline std::string *ListDatabaseResponse::_internal_add_db_names() { return _impl_.db_names_.Add(); }
-inline void ListDatabaseResponse::add_db_names(const std::string &value) {
+inline std::string* ListDatabaseResponse::_internal_add_db_names() {
+  return _impl_.db_names_.Add();
+}
+inline void ListDatabaseResponse::add_db_names(const std::string& value) {
   _impl_.db_names_.Add()->assign(value);
   // @@protoc_insertion_point(field_add:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::add_db_names(std::string &&value) {
+inline void ListDatabaseResponse::add_db_names(std::string&& value) {
   _impl_.db_names_.Add(std::move(value));
   // @@protoc_insertion_point(field_add:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::add_db_names(const char *value) {
+inline void ListDatabaseResponse::add_db_names(const char* value) {
   GOOGLE_DCHECK(value != nullptr);
   _impl_.db_names_.Add()->assign(value);
   // @@protoc_insertion_point(field_add_char:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline void ListDatabaseResponse::add_db_names(const char *value, size_t size) {
-  _impl_.db_names_.Add()->assign(reinterpret_cast<const char *>(value), size);
+inline void ListDatabaseResponse::add_db_names(const char* value, size_t size) {
+  _impl_.db_names_.Add()->assign(reinterpret_cast<const char*>(value), size);
   // @@protoc_insertion_point(field_add_pointer:infinity_brpc_proto.ListDatabaseResponse.db_names)
 }
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &ListDatabaseResponse::db_names() const {
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>&
+ListDatabaseResponse::db_names() const {
   // @@protoc_insertion_point(field_list:infinity_brpc_proto.ListDatabaseResponse.db_names)
   return _impl_.db_names_;
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> *ListDatabaseResponse::mutable_db_names() {
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>*
+ListDatabaseResponse::mutable_db_names() {
   // @@protoc_insertion_point(field_mutable_list:infinity_brpc_proto.ListDatabaseResponse.db_names)
   return &_impl_.db_names_;
 }
