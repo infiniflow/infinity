@@ -26,22 +26,16 @@ class TestTest:
         target: test table apis
         method:
         1. create databases
-            - 'my_database'     √
-            - 'my_database!@#'     √
-            - 'my-database-dash'   √
-            - '123_database'       √
-            - ''                ❌
+            - 'my_database'         √
+            - 'my_database!@#'      ❌
+            - 'my-database-dash'    ❌
+            - '123_database'        ❌
+            - ''                    ❌
         2. list databases
             - 'my_database'
-            - 'my_database!@#'
-            - 'my-database-dash'
-            - '123_database'
             - 'default'
         3. drop databases
             - 'my_database'
-            - 'my_database!@#'
-            - 'my-database-dash'
-            - '123_database'
         4. list tables:
             - 'default'
         expect: all operations successfully
@@ -53,13 +47,13 @@ class TestTest:
         assert res.success
 
         res = infinity_obj.create_database("my_database!@#")
-        assert res.success
+        assert not res.success
 
         res = infinity_obj.create_database("my-database-dash")
-        assert res.success
+        assert not res.success
 
         res = infinity_obj.create_database("123_database")
-        assert res.success
+        assert not res.success
 
         res = infinity_obj.create_database("")
         assert not res.success
@@ -69,20 +63,14 @@ class TestTest:
 
         res.db_names.sort()
 
-        assert res.db_names[0] == '123_database'
-        assert res.db_names[1] == 'default'
-        assert res.db_names[2] == 'my-database-dash'
-        assert res.db_names[3] == 'my_database'
-        assert res.db_names[4] == 'my_database!@#'
+        assert res.db_names[0] == 'default'
+        assert res.db_names[1] == 'my_database'
 
-        res = infinity_obj.drop_database("123_database")
-        assert res.success
-        res = infinity_obj.drop_database("my-database-dash")
-        assert res.success
         res = infinity_obj.drop_database("my_database")
         assert res.success
-        res = infinity_obj.drop_database("my_database!@#")
-        assert res.success
+
+        # res = infinity_obj.drop_database("default")
+        # assert not res.success
 
         res = infinity_obj.list_databases()
         assert res.success
