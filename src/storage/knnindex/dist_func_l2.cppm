@@ -1,7 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include "header.h"
-#include <concepts>
+// #include <concepts>
 
 import stl;
 import dist_func;
@@ -10,15 +24,14 @@ export module dist_func_l2;
 
 namespace infinity {
 
-template <typename T>
-concept L2DataType = requires(T data) {
-    { data *data } -> std::same_as<T>;
-    { data - data } -> std::same_as<T>;
-};
+// template <typename T>
+// concept L2DataType = requires(T data) {
+//     { data *data } -> std::same_as<T>;
+//     { data - data } -> std::same_as<T>;
+// };
 
-
 template <typename T>
-    requires L2DataType<T>
+// requires L2DataType<T>
 static T L2Sqr(const T *v1, const T *v2, size_t dim) {
     T res = 0;
     for (size_t i = 0; i < dim; ++i) {
@@ -194,13 +207,11 @@ static float FloatL2SqrSIMD4ExtResiduals(const float *pVect1v, const float *pVec
 #endif
 
 export template <typename T>
-    requires L2DataType<T>
+// requires L2DataType<T>
 class DistFuncL2 : public SpaceBase<T> {
-    DistFunc<T> fstdistfunc_;
-
 public:
     DistFuncL2(size_t dim) {
-        fstdistfunc_ = L2Sqr<T>;
+        this->fstdistfunc_ = L2Sqr<T>;
 #if defined(USE_SSE) || defined(USE_AVX) || defined(USE_AVX512)
 #if defined(USE_AVX512)
         if (AVX512Capable())
@@ -213,17 +224,16 @@ public:
 #endif
 
         if (dim % 16 == 0)
-            fstdistfunc_ = FloatL2SqrSIMD16Ext;
+            this->fstdistfunc_ = FloatL2SqrSIMD16Ext;
         else if (dim % 4 == 0)
-            fstdistfunc_ = FloatL2SqrSIMD4Ext;
+            this->fstdistfunc_ = FloatL2SqrSIMD4Ext;
         else if (dim > 16)
-            fstdistfunc_ = FloatL2SqrSIMD16ExtResiduals;
+            this->fstdistfunc_ = FloatL2SqrSIMD16ExtResiduals;
         else if (dim > 4)
-            fstdistfunc_ = FloatL2SqrSIMD4ExtResiduals;
+            this->fstdistfunc_ = FloatL2SqrSIMD4ExtResiduals;
 #endif
+        this->fstdistfunc2_ = this->fstdistfunc_;
     }
-
-    virtual DistFunc<T> DistFuncPtr() const override { return fstdistfunc_; }
 };
 
-}
+} // namespace infinity

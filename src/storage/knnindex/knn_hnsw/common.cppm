@@ -30,6 +30,7 @@ export template <typename Store, typename DataType>
 concept DataStoreConcept = requires(Store s) {
     { std::same_as<typename Store::DataType, DataType> };
     typename Store::RtnType;
+    typename Store::InitArgs;
     { s.AddVec(std::declval<const typename Store::DataType *>()) } -> std::same_as<SizeT>;
     { s.AddBatchVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
     { s.GetVec(std::declval<SizeT>()) } -> std::same_as<typename Store::RtnType>;
@@ -38,12 +39,12 @@ concept DataStoreConcept = requires(Store s) {
     { s.dim() } -> std::same_as<SizeT>;
     { s.max_vec_num() } -> std::same_as<SizeT>;
     { s.Save(std::declval<FileHandler &>()) };
-    { Store::Load(std::declval<FileHandler &>()) } -> std::same_as<Store>;
-    { Store::Make(std::declval<SizeT>(), std::declval<SizeT>()) } -> std::same_as<Store>;
+    { Store::Load(std::declval<FileHandler &>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
+    { Store::Make(std::declval<SizeT>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
 };
 
 export template <typename T>
-class DataStore {
+class IndexAllocator {
 public:
     static constexpr SizeT ERR_IDX = std::numeric_limits<SizeT>::max();
 
@@ -55,10 +56,10 @@ public:
     const SizeT dim_;
 
 public:
-    DataStore(SizeT max_vec_num, SizeT dim) : cur_vec_num_(0), max_vec_num_(max_vec_num), dim_(dim) {}
+    IndexAllocator(SizeT max_vec_num, SizeT dim) : cur_vec_num_(0), max_vec_num_(max_vec_num), dim_(dim) {}
 
-    DataStore(DataStore &&other) = default;
-    DataStore &operator=(DataStore &&other) {
+    IndexAllocator(IndexAllocator &&other) = default;
+    IndexAllocator &operator=(IndexAllocator &&other) {
         cur_vec_num_ = other.cur_vec_num_;
         const_cast<SizeT &>(max_vec_num_) = other.max_vec_num_;
         const_cast<SizeT &>(dim_) = other.dim_;
@@ -80,7 +81,7 @@ public:
         file_handler.Write(&dim_, sizeof(SizeT));
     }
 
-    static DataStore<T> Load(FileHandler &file_handler, SizeT new_vec_n) {
+    static IndexAllocator<T> Load(FileHandler &file_handler, SizeT new_vec_n) {
         SizeT cur_vec_num, max_vec_num, dim;
         file_handler.Read(&cur_vec_num, sizeof(SizeT));
         file_handler.Read(&max_vec_num, sizeof(SizeT));
@@ -89,7 +90,7 @@ public:
             max_vec_num = new_vec_n;
         }
         file_handler.Read(&dim, sizeof(SizeT));
-        DataStore<T> ret(max_vec_num, dim);
+        IndexAllocator<T> ret(max_vec_num, dim);
         ret.cur_vec_num_ = cur_vec_num;
         return ret;
     }

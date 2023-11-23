@@ -37,6 +37,7 @@ export template <typename DataType, typename LabelType, DataStoreConcept<DataTyp
 class KnnHnsw {
 public:
     using This = KnnHnsw<DataType, LabelType, DataStore>;
+    using DataRtnType = typename DataStore::RtnType;
     using PDV = Pair<DataType, VertexType>;
     using CMP = CompareByFirst<DataType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
@@ -47,31 +48,35 @@ private:
     const SizeT Mmax0_;
     const SizeT ef_construction_;
     SizeT ef_;
-    const DistFunc<DataType> dist_func_;
+    const DistFunc<DataType, DataRtnType> dist_func_;
+    const DistFunc2<DataType, DataRtnType> dist_func2_;
 
     // 1 / log(1.0 * M_)
     const double mult_;
     std::default_random_engine level_rng_{};
 
     DataStore data_store_;
-    GraphStore<LabelType> graph_;
+    GraphStore graph_;
+    const UniquePtr<LabelType[]> labels_;
 
 private:
-    KnnHnsw(const SpaceBase<DataType> &space,
+    KnnHnsw(const SpaceBase<DataType, DataRtnType> &space,
             SizeT M,
             SizeT Mmax,
             SizeT Mmax0,
             SizeT ef_construction,
             DataStore data_store,
-            GraphStore<LabelType> graph_store,
+            GraphStore graph_store,
+            UniquePtr<LabelType[]> labels,
             SizeT ef,
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
           dist_func_(space.DistFuncPtr()),                                               //
+          dist_func2_(space.DistFuncPtr2()),                                             //
           mult_(1 / std::log(1.0 * M_)),                                                 //
           data_store_(Move(data_store)),                                                 //
-          graph_(Move(graph_store))                                                      //
-    {
+          graph_(Move(graph_store)),                                                     //
+          labels_(Move(labels)) {
         if (ef == 0) {
             ef = ef_construction_;
         }
@@ -82,12 +87,13 @@ private:
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {M, 2 * M}; }
 
 public:
-    template <typename... Args>
-    static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, const SpaceBase<DataType> &space, SizeT M, SizeT ef_construction, Args... args) {
+    static UniquePtr<This>
+    Make(SizeT max_vertex, SizeT dim, const SpaceBase<DataType, DataRtnType> &space, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
         auto [Mmax, Mmax0] = This::GetMmax(M);
-        DataStore data_store = DataStore::Make(max_vertex, dim, args...);
-        GraphStore graph_store = GraphStore<LabelType>::Make(max_vertex, Mmax, Mmax0);
-        return UniquePtr<This>(new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), 0, 0));
+        DataStore data_store = DataStore::Make(max_vertex, dim, args);
+        GraphStore graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
+        return UniquePtr<This>(
+            new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), MakeUnique<LabelType[]>(max_vertex), 0, 0));
     }
 
     ~KnnHnsw() = default;
@@ -100,13 +106,13 @@ private:
         return static_cast<i32>(r);
     }
 
-    VertexType InitVertex(i32 layer_n, const DataType *data, LabelType label) {
-        VertexType vertex_idx = data_store_.AddVec(data);
-        if (vertex_idx == DataStore::ERR_IDX) {
-            Error<StorageException>("KnnHnsw::InitVertex: data_store_ is not enough.");
+    VertexType StoreData(const DataType *data, const LabelType *labels, SizeT insert_n) {
+        VertexType ret = data_store_.AddBatchVec(data, insert_n);
+        if (ret == DataStore::ERR_IDX) {
+            Error<StorageException>("Data index is not enough.");
         }
-        graph_.AddVertex(vertex_idx, layer_n, label);
-        return vertex_idx;
+        std::copy(labels, labels + insert_n, labels_.get() + ret);
+        return ret;
     }
 
 public:
@@ -132,13 +138,13 @@ public:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(c_idx, layer_idx);
-#ifdef USE_SSE
+#ifndef USE_SSE
             if (neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-#ifdef USE_SSE
+#ifndef USE_SSE
                 if (i - 1 >= 0) [[likely]]
                     _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
@@ -172,12 +178,12 @@ public:
         while (check) {
             check = false;
             const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(cur_p, layer_idx);
-#ifdef USE_SSE
+#ifndef USE_SSE
             if (neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
             for (int i = neighbor_size - 1; i >= 0; --i) {
-#ifdef USE_SSE
+#ifndef USE_SSE
                 if (i - 1 >= 0) [[likely]]
                     _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
@@ -211,19 +217,18 @@ public:
         } else {
             while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
                 const auto &[minus_c_dist, c_idx] = candidates.top();
-                const DataType *c_data = data_store_.GetVec(c_idx);
                 bool check = true;
-#ifdef USE_SSE
+#ifndef USE_SSE
                 if (result_size) [[likely]]
                     _mm_prefetch(data_store_.GetVec(result_p[0]), _MM_HINT_T0);
 #endif
                 for (SizeT i = 0; i < result_size; ++i) {
-#ifdef USE_SSE
+#ifndef USE_SSE
                     if (i + 1 < result_size) [[likely]]
                         _mm_prefetch(data_store_.GetVec(result_p[i + 1]), _MM_HINT_T0);
 #endif
                     VertexType r_idx = result_p[i];
-                    DataType cr_dist = dist_func_(c_data, data_store_.GetVec(r_idx), data_store_.dim());
+                    DataType cr_dist = dist_func2_(data_store_.GetVec(c_idx), data_store_.GetVec(r_idx), data_store_.dim());
                     if (cr_dist < -minus_c_dist) {
                         check = false;
                         break;
@@ -249,22 +254,22 @@ public:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            const DataType *n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = dist_func_(n_data, data_store_.GetVec(vertex_idx), data_store_.dim());
+            // const DataType *n_data = data_store_.GetVec(n_idx);
+            DataType n_dist = dist_func2_(data_store_.GetVec(n_idx), data_store_.GetVec(vertex_idx), data_store_.dim());
 
             Vector<PDV> tmp;
             tmp.reserve(n_neighbor_size + 1);
             tmp.emplace_back(-n_dist, vertex_idx);
-#ifdef USE_SSE
+#ifndef USE_SSE
             if (n_neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(n_neighbors_p[0]), _MM_HINT_T0);
 #endif
             for (int i = 0; i < n_neighbor_size; ++i) {
-#ifdef USE_SSE
+#ifndef USE_SSE
                 if (i + 1 < n_neighbor_size) [[likely]]
                     _mm_prefetch(data_store_.GetVec(n_neighbors_p[i + 1]), _MM_HINT_T0);
 #endif
-                tmp.emplace_back(-dist_func_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
+                tmp.emplace_back(-dist_func2_(data_store_.GetVec(n_idx), data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
             }
 
             DistHeap candidates(tmp.begin(), tmp.end());
@@ -272,29 +277,39 @@ public:
         }
     }
 
-    // TODO: batch insert
-    void Insert(const DataType *query, LabelType label) {
-        i32 q_layer = GenerateRandomLayer();
-        i32 max_layer = graph_.max_layer();
-        VertexType ep = graph_.enterpoint();
-        VertexType q_vertex = InitVertex(q_layer, query, label);
-        for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer, nullptr);
-        }
-        for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-            DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_, nullptr); // TODO:: use pool
-            DistHeap candidates;
-            while (!search_result.empty()) {
-                const auto &[dist, idx] = search_result.top();
-                candidates.emplace(-dist, idx);
-                search_result.pop();
+    void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
+
+    void Insert(const DataType *queries, const LabelType *label, SizeT insert_n) {
+        VertexType vertex_idx = StoreData(queries, label, insert_n);
+        for (SizeT i = 0; i < insert_n; ++i) {
+            const DataType *query = queries + i * data_store_.dim();
+            i32 q_layer = GenerateRandomLayer();
+            i32 max_layer = graph_.max_layer();
+            VertexType ep = graph_.enterpoint();
+            VertexType q_vertex = vertex_idx + i;
+            graph_.AddVertex(q_vertex, q_layer);
+
+            for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
+                ep = SearchLayerNearest(ep, query, cur_layer, nullptr);
             }
-            const auto [q_neighbors_p, q_neighbor_size_p] = graph_.GetNeighborsMut(q_vertex, cur_layer);
-            SelectNeighborsHeuristic(candidates, M_, q_neighbors_p, q_neighbor_size_p);
-            ep = q_neighbors_p[0];
-            ConnectNeighbors(q_vertex, q_neighbors_p, *q_neighbor_size_p, cur_layer);
+            for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
+                DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_, nullptr); // TODO:: use pool
+                DistHeap candidates;
+                while (!search_result.empty()) {
+                    const auto &[dist, idx] = search_result.top();
+                    candidates.emplace(-dist, idx);
+                    search_result.pop();
+                }
+                const auto [q_neighbors_p, q_neighbor_size_p] = graph_.GetNeighborsMut(q_vertex, cur_layer);
+                SelectNeighborsHeuristic(candidates, M_, q_neighbors_p, q_neighbor_size_p);
+                ep = q_neighbors_p[0];
+                ConnectNeighbors(q_vertex, q_neighbors_p, *q_neighbor_size_p, cur_layer);
+            }
+            if (i && i % 10000 == 0) {
+                std::cout << "Inserted " << i << " / " << insert_n << std::endl;
+            }
         }
-    }
+    }   
 
     MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k, HnswProfiler *profiler = nullptr) const {
         VertexType ep = graph_.enterpoint();
@@ -308,7 +323,7 @@ public:
         MaxHeap<Pair<DataType, LabelType>> result; // TODO:: reserve
         while (!search_result.empty()) {
             const auto &[dist, idx] = search_result.top();
-            result.emplace(dist, graph_.GetLabel(idx));
+            result.emplace(dist, labels_[idx]);
             search_result.pop();
         }
         return result;
@@ -321,18 +336,20 @@ public:
         file_handler.Write(&ef_construction_, sizeof(ef_construction_));
         data_store_.Save(file_handler);
         graph_.SaveGraph(file_handler, data_store_.cur_vec_num());
+        file_handler.Write(labels_.get(), sizeof(LabelType) * data_store_.cur_vec_num());
     }
 
-    template <typename... Args>
-    static UniquePtr<This> LoadIndex(FileHandler &file_handler, const SpaceBase<DataType> &space, Args... args) {
+    static UniquePtr<This> LoadIndex(FileHandler &file_handler, const SpaceBase<DataType, DataRtnType> &space, DataStore::InitArgs args) {
         SizeT M;
         file_handler.Read(&M, sizeof(M));
         SizeT ef_construction;
         file_handler.Read(&ef_construction, sizeof(ef_construction));
         auto [Mmax, Mmax0] = This::GetMmax(M);
-        auto data_store = DataStore::Load(file_handler, args...);
-        auto graph_store = GraphStore<LabelType>::LoadGraph(file_handler, data_store.max_vec_num(), Mmax, Mmax0, data_store.cur_vec_num());
-        return UniquePtr<This>(new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), 0, 0));
+        auto data_store = DataStore::Load(file_handler, 0, args);
+        auto graph_store = GraphStore::LoadGraph(file_handler, data_store.max_vec_num(), Mmax, Mmax0, data_store.cur_vec_num());
+        auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
+        file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
+        return UniquePtr<This>(new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), Move(labels), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

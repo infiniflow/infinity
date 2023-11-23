@@ -37,10 +37,11 @@ struct LVQ {
     const LVQStore<T, CompressType> *const data_store_;
 
     void DecompressForTest(T *result) const {
-        if (vec_idx_ < data_store_->cur_vec_num()) {
+        SizeT compressed_n = data_store_->base_.cur_vec_num();
+        if (vec_idx_ < compressed_n) {
             data_store_->Decompress(vec_idx_, result);
         } else {
-            const T *p = data_store_->plain_data_.GetVec(vec_idx_ - data_store_->cur_vec_num());
+            const T *p = data_store_->plain_data_.GetVec(vec_idx_ - compressed_n);
             std::copy(p, p + data_store_->dim(), result);
         }
     }
@@ -54,16 +55,17 @@ public:
 
     friend class LVQ<T, CompressType>;
 
+    using This = LVQStore<T, CompressType>;
+    using InitArgs = Pair<SizeT, bool>; // first is buffer size, second is whether to make padding
     using DataType = T;
-    using RtnType = LVQ<T, CompressType>;
+    using RtnType = const LVQ<T, CompressType>;
 
-    static constexpr bool DEFAULT_PADDING = true;
-    static constexpr SizeT ERR_IDX = DataStore<T>::ERR_IDX;
+    static constexpr SizeT ERR_IDX = IndexAllocator<T>::ERR_IDX;
 
 private:
     constexpr static SizeT MAX_BUCKET_IDX = std::numeric_limits<CompressType>::max(); // 255 for u8
-    
-    DataStore<T> base_;
+
+    IndexAllocator<T> base_;
 
     const SizeT buffer_plain_size_;
 
@@ -73,7 +75,7 @@ private:
     const SizeT compressed_vec_size_;
     const SizeT compressed_vecs_offset_;
 
-    char *ptr_;
+    char *const ptr_;
     PlainStore<T> plain_data_;
 
 private:
@@ -172,31 +174,31 @@ private:
         return start_idx;
     }
 
-    LVQStore(DataStore<T> base, SizeT buffer_size, bool padding = DEFAULT_PADDING)
-        : base_(Move(base)),                                                              //
-          buffer_plain_size_(buffer_size),                                                //
-          mean_offset_(0),                                                                //
-          min_offset_(AlignTo(sizeof(CompressType) * dim(), sizeof(T))),                  //
-          max_offset_(AlignTo(min_offset_ + sizeof(T), sizeof(T))),                       //
-          compressed_vec_size_(AlignTo(max_offset_ + sizeof(T), padding ? 32 : 1)),       //
-          compressed_vecs_offset_(AlignTo(dim() * sizeof(T), padding ? 32 : 1)),          //
-          ptr_(new char[compressed_vecs_offset_ + compressed_vec_size_ * max_vec_num()]), //
-          plain_data_(PlainStore<T>::Make(0, dim()))                                      //
+    LVQStore(IndexAllocator<T> base, This::InitArgs init_args)
+        : base_(Move(base)),                                                                 //
+          buffer_plain_size_(init_args.first),                                               //
+          mean_offset_(0),                                                                   //
+          min_offset_(AlignTo(sizeof(CompressType) * dim(), sizeof(T))),                     //
+          max_offset_(AlignTo(min_offset_ + sizeof(T), sizeof(T))),                          //
+          compressed_vec_size_(AlignTo(max_offset_ + sizeof(T), init_args.second ? 32 : 1)), //
+          compressed_vecs_offset_(AlignTo(dim() * sizeof(T), init_args.second ? 32 : 1)),    //
+          ptr_(new char[compressed_vecs_offset_ + compressed_vec_size_ * max_vec_num()]),    //
+          plain_data_(PlainStore<T>::Make(0, dim()))                                         //
     {
         T *mean = GetMeanMut();
         std::fill(mean, mean + dim(), 0);
     }
 
 public:
-    SizeT cur_vec_num() const { return base_.cur_vec_num(); }
+    SizeT cur_vec_num() const { return base_.cur_vec_num() + plain_data_.cur_vec_num(); }
     SizeT max_vec_num() const { return base_.max_vec_num_; }
     SizeT dim() const { return base_.dim_; }
 
-    static SizeT err_idx() { return DataStore<T>::ERR_IDX; }
+    static SizeT err_idx() { return IndexAllocator<T>::ERR_IDX; }
 
-    static LVQStore Make(SizeT max_vec_num, SizeT dim, SizeT buffer_size, bool padding = DEFAULT_PADDING) {
-        DataStore<T> data_store(max_vec_num, dim);
-        return LVQStore(Move(data_store), buffer_size, padding);
+    static LVQStore Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
+        IndexAllocator<T> data_store(max_vec_num, dim);
+        return LVQStore(Move(data_store), Move(init_args));
     }
 
     LVQStore(const LVQStore &) = delete;
@@ -212,10 +214,7 @@ public:
           compressed_vecs_offset_(other.compressed_vecs_offset_), //
           ptr_(other.ptr_),                                       //
           plain_data_(Move(other.plain_data_)) {
-        if (other.ptr_ != nullptr) {
-            delete[] other.ptr_;
-            other.ptr_ = nullptr;
-        }
+        const_cast<char *&>(other.ptr_) = nullptr;
     }
     LVQStore &operator=(LVQStore &&other) = delete;
 
@@ -228,9 +227,9 @@ public:
     SizeT AddVec(const DataType *vec) { return AddBatchVec(vec, 1); }
 
     SizeT AddBatchVec(const DataType *vecs, SizeT vec_num) {
-        if (SizeT idx = plain_data_.AddBatchVec(vecs, vec_num); idx != DataStore<T>::ERR_IDX) {
-            return cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != DataStore<T>::ERR_IDX) {
+        if (SizeT idx = plain_data_.AddBatchVec(vecs, vec_num); idx != IndexAllocator<T>::ERR_IDX) {
+            return base_.cur_vec_num() + idx;
+        } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != IndexAllocator<T>::ERR_IDX) {
             return idx;
         } else {
             return err_idx();
@@ -244,7 +243,7 @@ public:
 
     void Compress() {
         SizeT ret = MergeCompress(nullptr, 0);
-        assert(ret != DataStore<T>::ERR_IDX);
+        assert(ret != IndexAllocator<T>::ERR_IDX);
     }
 
     void Save(FileHandler &file_handler) {
@@ -253,9 +252,9 @@ public:
         file_handler.Write(ptr_, compressed_vecs_offset_ + compressed_vec_size_ * cur_vec_num());
     }
 
-    static LVQStore Load(FileHandler &file_handler, SizeT buffer_size, SizeT max_vec_num = 0, bool padding = DEFAULT_PADDING) {
-        DataStore<T> base = DataStore<T>::Load(file_handler, max_vec_num);
-        LVQStore ret(Move(base), buffer_size, padding);
+    static LVQStore Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
+        IndexAllocator<T> base = IndexAllocator<T>::Load(file_handler, max_vec_num);
+        LVQStore ret(Move(base), Move(init_args));
         file_handler.Read(ret.ptr_, ret.compressed_vecs_offset_ + ret.compressed_vec_size_ * ret.cur_vec_num());
         return ret;
     }

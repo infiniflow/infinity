@@ -25,8 +25,7 @@ export module graph_store;
 
 namespace infinity {
 
-export template <typename LabelType>
-class GraphStore {
+export class GraphStore {
 public:
     const char *GetLayers(VertexType vertex_idx) const {
         return *reinterpret_cast<const char **>(graph_ + vertex_idx * level0_size_ + layers_offset_);
@@ -60,11 +59,6 @@ public:
     }
     LayerSize *GetLayerNMut(VertexType vertex_idx) { return reinterpret_cast<LayerSize *>(graph_ + vertex_idx * level0_size_ + layer_n_offset_); }
 
-    LabelType GetLabel(VertexType vertex_idx) const {
-        return *reinterpret_cast<const LabelType *>(graph_ + vertex_idx * level0_size_ + label_offset_);
-    }
-    LabelType *GetLabelMut(VertexType vertex_idx) { return reinterpret_cast<LabelType *>(graph_ + vertex_idx * level0_size_ + label_offset_); }
-
     i32 max_layer() const { return max_layer_; }
 
     VertexType enterpoint() const { return enterpoint_; }
@@ -76,8 +70,7 @@ private:
           neighbors0_offset_(AlignTo(neighbor_n0_offset_ + sizeof(VertexListSize), sizeof(VertexType))), //
           layer_n_offset_(AlignTo(neighbors0_offset_ + sizeof(VertexType) * Mmax0, sizeof(LayerSize))),  //
           layers_offset_(AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(void *))),                  //
-          label_offset_(AlignTo(layers_offset_ + sizeof(void *), sizeof(LabelType))),                    //
-          level0_size_(AlignTo(label_offset_ + sizeof(LabelType), 8)),                                   //
+          level0_size_(AlignTo(layers_offset_ + sizeof(void *), 8)),                                     //
           neighbor_n1_offset_(0),                                                                        //
           neighbors1_offset_(AlignTo(sizeof(VertexListSize), sizeof(VertexType))),                       //
           layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax, sizeof(VertexListSize))),  //
@@ -94,8 +87,8 @@ private:
     }
 
 public:
-    static GraphStore<LabelType> Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
-        return GraphStore<LabelType>(max_vertex, Mmax, Mmax0, 0, nullptr);
+    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
+        return GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr);
     }
 
     GraphStore(const GraphStore &) = delete;
@@ -107,7 +100,6 @@ public:
           neighbors0_offset_(other.neighbors0_offset_),   //
           layer_n_offset_(other.layer_n_offset_),         //
           layers_offset_(other.layers_offset_),           //
-          label_offset_(other.label_offset_),             //
           level0_size_(other.level0_size_),               //
           neighbor_n1_offset_(other.neighbor_n1_offset_), //
           neighbors1_offset_(other.neighbors1_offset_),   //
@@ -142,7 +134,6 @@ private:
     const SizeT neighbors0_offset_;
     const SizeT layer_n_offset_;
     const SizeT layers_offset_;
-    const SizeT label_offset_;
     const SizeT level0_size_;
 
     const SizeT neighbor_n1_offset_;
@@ -158,9 +149,8 @@ private:
     VertexType enterpoint_{};
 
 public:
-    void AddVertex(VertexType vertex_idx, i32 layer_n, LabelType label) {
+    void AddVertex(VertexType vertex_idx, i32 layer_n, SizeT add_n = 1) {
         *GetNeighborsMut(vertex_idx, 0).second = 0;
-        *GetLabelMut(vertex_idx) = label;
         *GetLayerNMut(vertex_idx) = layer_n;
         if (layer_n) {
             *GetLayersMut(vertex_idx) = new char[layer_size_ * layer_n];
@@ -191,13 +181,13 @@ public:
         }
     }
 
-    static GraphStore<LabelType> LoadGraph(FileHandler &file_handler, SizeT max_vertex, SizeT Mmax, SizeT Mmax0, VertexType cur_vertex_n) {
+    static GraphStore LoadGraph(FileHandler &file_handler, SizeT max_vertex, SizeT Mmax, SizeT Mmax0, VertexType cur_vertex_n) {
         i32 max_layer;
         file_handler.Read(&max_layer, sizeof(max_layer));
         VertexType enterpoint;
         file_handler.Read(&enterpoint, sizeof(enterpoint));
 
-        GraphStore<LabelType> graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n, nullptr);
+        GraphStore graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n, nullptr);
         graph_store.max_layer_ = max_layer;
         graph_store.enterpoint_ = enterpoint;
 
