@@ -125,6 +125,15 @@ public:
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:
+    static bool ValidIdentifier(const String &identifier) {
+        if (identifier.empty()) {
+            return false;
+        }
+        Regex pattern("^[a-zA-Z_\u00C0-\u017F][a-zA-Z0-9_\u00C0-\u017F]*$");
+
+        return RegexMatch(identifier, pattern);
+    }
+
     QueryContext *query_context_ptr_{};
 
     SharedPtr<Vector<String>> names_ptr_{};

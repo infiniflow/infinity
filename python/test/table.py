@@ -29,13 +29,13 @@ class TestTable:
             - 'my_table'        √
                 - c1 int primary key
                 - c2 float
-            - 'my_table!@#'     √
+            - 'my_table!@#'     ❌
                 - c1 int primary key
                 - c2 float
-            - 'my-table-dash'   √
+            - 'my-table-dash'   ❌
                 - c1 float primary key
                 - c2 int
-            - '123_table'       √
+            - '123_table'       ❌
                 - c1 int primary key
                 - c2 float
             - 'bad_column'      ❌
@@ -46,14 +46,8 @@ class TestTable:
                 - c2 float
         2. list tables
             - 'my_table'
-            - 'my_table!@#'
-            - 'my-table_dash'
-            - '123_table'
         3. drop tables
             - 'my_table'
-            - 'my_table!@#'
-            - 'my-table-dash'
-            - '123_table'
         4. list tables: empty
         expect: all operations successfully
         """
@@ -65,40 +59,28 @@ class TestTable:
         assert res.success
 
         res = db_obj.create_table("my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
-        assert res.success
+        assert not res.success
 
         res = db_obj.create_table("my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
-        assert res.success
+        assert not res.success
 
         res = db_obj.create_table("123_table", {"c1": "int, primary key", "c1": "float"}, None)
-        assert res.success
+        assert not res.success
 
-        # FIXME:
-        # res = db_obj.create_table("bad_column", {"123": "int, primary key", "c2": "float"}, None)
-        # assert not res.success
+        res = db_obj.create_table("bad_column", {"123": "int, primary key", "c2": "float"}, None)
+        assert not res.success
 
         res = db_obj.create_table("", {"c1": "int, primary key", "c2": "float"}, None)
         assert not res.success
 
         # FIXME: res = db_obj.describe_table("my_table")
 
-        res = db_obj.list_tables('default')
+        res = db_obj.list_tables()
         assert res.success
 
-        res.table_names.sort()
+        assert res.table_names[0] == 'my_table'
 
-        assert res.table_names[0] == '123_table'
-        assert res.table_names[1] == 'my_table'
-        assert res.table_names[2] == 'my-table-dash'
-        assert res.table_names[3] == 'my_table!@#'
-
-        res = db_obj.drop_table("123_table")
-        assert res.success
         res = db_obj.drop_table("my_table")
-        assert res.success
-        res = db_obj.drop_table("my-table-dash")
-        assert res.success
-        res = db_obj.drop_table("my_table!@#")
         assert res.success
 
         res = db_obj.list_tables()
