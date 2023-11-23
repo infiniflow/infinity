@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import unittest
 from sqlglot import condition
 
 import infinity
