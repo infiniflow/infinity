@@ -109,7 +109,6 @@ Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         LOG_TRACE(
             Format("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_));
     }
-    IndexDef *index_def_ptr = index_def.get();
     return IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
