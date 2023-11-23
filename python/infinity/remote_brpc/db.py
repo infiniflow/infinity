@@ -123,8 +123,8 @@ class RemoteDatabase(Database, ABC):
     def drop_table(self, table_name):
         return self._conn.client.drop_table(db_name=self._conn.db_name, table_name=table_name)
 
-    def list_tables(self, db_name):
-        return self._conn.client.list_tables(db_name=self._db_name)
+    def list_tables(self):
+        return self._conn.client.list_tables(self._db_name)
 
     def describe_table(self, table_name):
         pass  # implement describe table logic here
