@@ -48,11 +48,10 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
     }
 
     while(it2 != list2.end()) {
-        if ((*it2)->entry_type_ == EntryType::kDummy) {
-            ++it2;
-        } else {
+        if ((*it2)->entry_type_ != EntryType::kDummy) {
             list1.insert(it1, Move(*it2));
         }
+        ++it2;
     }
 
     list2.clear();
