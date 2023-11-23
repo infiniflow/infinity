@@ -18,6 +18,7 @@ python setup.py bdist_wheel
 cd dist
 pip install infinity-0.0.1-py3-none-any.whl
 # using
+
 ```python
 import infinity
 
@@ -31,7 +32,7 @@ db_obj = infinity_obj.get_database("default")
 
 db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
 
-db_obj.list_tables("default")
+db_obj.list_tables()
 
 db_obj.drop_table("my_table1")
 
