@@ -498,6 +498,10 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     ParserHelper::ToLower($4);
     create_schema_info->schema_name_ = $4;
     free($4);
+    if(create_schema_info->schema_name_.empty()) {
+        yyerror(&yyloc, scanner, result, "Empty database name is given.");
+        YYERROR;
+    }
 
     $$->create_info_ = create_schema_info;
     $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;

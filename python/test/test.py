@@ -24,6 +24,31 @@ class TestCase:
     def test_version(self):
         print(infinity.__version__)
 
+    def test_connection(self):
+        """
+        target: test connect and disconnect server ok
+        method: connect server
+        expect: connect and disconnect successfully
+        """
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        assert infinity_obj
+        assert infinity_obj.disconnect()
+
+    def test_create_db_with_invalid_name(self):
+        """
+        target: test db name limitation
+        method: create db with empty name
+        expect: create db fail with error message
+        """
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        assert infinity_obj
+
+        res = infinity_obj.create_database("")
+        assert res.success == False
+        assert res.error_msg
+
+        assert infinity_obj.disconnect()
+
     def test_infinity_thrift(self):
         """
         target: test basic operation
@@ -40,7 +65,7 @@ class TestCase:
         10. insert and search
         11. import and search
         12.
-        expected: ok
+        expect: all operations successfully
         """
         infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
         assert infinity_obj
