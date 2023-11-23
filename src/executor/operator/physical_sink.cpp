@@ -98,7 +98,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 Error<ExecutorException>("Empty projection output");
             }
             auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
-            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
+            if(new_data_block->Finalized() && new_data_block->row_count() > 0) {
+                materialize_sink_state->data_block_array_.emplace_back(new_data_block);
+            }
+
             break;
         }
         case PhysicalOperatorType::kKnnScan: {

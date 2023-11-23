@@ -63,16 +63,16 @@ src/bin/compilation_config.cppm
 parser.output
 
 # ignore parser auto generated files
-lexer.cpp
-lexer.h
-parser.cpp
-parser.h
-location.h
-location.hh
-query_lexer.h
-query_lexer.cpp
-query_parser.h
-query_parser.cpp
+#lexer.cpp
+#lexer.h
+#parser.cpp
+#parser.h
+#location.h
+#location.hh
+#query_lexer.h
+#query_lexer.cpp
+#query_parser.h
+#query_parser.cpp
 
 test/data/csv/*big*.csv
 test/sql/**/*big*.slt

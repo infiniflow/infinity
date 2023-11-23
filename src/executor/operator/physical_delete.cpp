@@ -57,8 +57,9 @@ void PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
         ++ delete_operator_state->count_;
         delete_operator_state->sum_ += row_ids.size();
     }
-    if (prev_op_state->Complete())
+    if (prev_op_state->Complete()) {
         operator_state->SetComplete();
+    }
 }
 
 } // namespace infinity
