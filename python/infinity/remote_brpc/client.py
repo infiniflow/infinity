@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .grpc_pb.infinity_grpc_pb2 import *
-from .grpc_pb.infinity_grpc_pb2_grpc import *
+from .brpc_pb.infinity_brpc_pb2 import *
+from .brpc_pb.infinity_brpc_pb2_grpc import *
 from .. import URI
 
 
-class GrpcInfinityClient:
+class BrpcInfinityClient:
     db_name: str
     channel: grpc.Channel
-    stub: InfinityGrpcServiceStub
+    stub: InfinityBrpcServiceStub
 
     def __init__(self, uri: URI):
         self.url = uri.ip + ":" + str(uri.port)
         self.db_name = "default"
         self.channel = grpc.insecure_channel(self.url)
-        self.stub = InfinityGrpcServiceStub(self.channel)
+        self.stub = InfinityBrpcServiceStub(self.channel)
         res = self.stub.Connect(Empty())
         self.session_id = res.session_id
 

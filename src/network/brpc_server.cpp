@@ -113,10 +113,10 @@ void BrpcServiceImpl::ListDatabase(google::protobuf::RpcController *cntl_base,
             Value value = data_block->GetValue(0, i);
             if (value.value_.varchar.IsInlined()) {
                 String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
-                response->add_db_name(prefix);
+                response->add_db_names(prefix);
             } else {
                 String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
-                response->add_db_name(whole_str);
+                response->add_db_names(whole_str);
             }
         }
 

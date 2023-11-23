@@ -14,18 +14,16 @@
 
 from abc import ABC
 from infinity import InfinityConnection
-from infinity.remote_grpc.client import GrpcInfinityClient
-from infinity.remote_grpc.db import RemoteDatabase
+from infinity.remote_brpc.client import BrpcInfinityClient
+from infinity.remote_brpc.db import RemoteDatabase
 
 
-class RemoteGrpcInfinityConnection(InfinityConnection, ABC):
+class RemoteBrpcInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri):
         self.db_name = "default"
-        self._client = GrpcInfinityClient(uri)
+        self._client = BrpcInfinityClient(uri)
 
     def create_database(self, db_name: str, options=None):
-        # new database will be created if not exist
-        # show error if database already exist
         res = self._client.create_database(db_name=db_name)
         return res
 
