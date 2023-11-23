@@ -16,7 +16,8 @@ from abc import ABC
 import struct
 from infinity.query import Query, InfinityVectorQueryBuilder
 from infinity.table import Table
-from infinity.remote.infinity_grpc import infinity_pb2
+from infinity.remote_grpc.grpc_pb.infinity_grpc_pb2_grpc import *
+from infinity.remote_grpc.grpc_pb.infinity_grpc_pb2 import *
 from typing import Optional, Union, Dict, Any
 from sqlglot import condition, expressions as exp
 
@@ -35,11 +36,11 @@ class RemoteTable(Table, ABC):
         index_name = index_name.strip()
         column_names: list[str] = [column_name.strip() for column_name in column_names]
         method_type = method_type.strip()
-        index_para_list_to_use: infinity_pb2.InitParameter = []
+        index_para_list_to_use: InitParameter = []
 
         for index_para in index_para_list:
             for index, (key, value) in enumerate(index_para.items()):
-                proto_index_para = infinity_pb2.InitParameter()
+                proto_index_para = InitParameter()
                 proto_index_para.para_name = key
                 proto_index_para.para_value = str(value)
                 index_para_list_to_use.append(proto_index_para)
@@ -61,25 +62,25 @@ class RemoteTable(Table, ABC):
         db_name = self._db_name
         table_name = self._table_name
         column_names: list[str] = []
-        fields: list[infinity_pb2.Field] = []
+        fields: list[Field] = []
         for row in data:
             column_names = list(row.keys())
 
-            field = infinity_pb2.Field()
+            field = Field()
             for index, (column_name, value) in enumerate(row.items()):
-                constant_expression = infinity_pb2.ConstantExpr()
+                constant_expression = ConstantExpr()
                 if isinstance(value, str):
-                    constant_expression.literal_type = infinity_pb2.ConstantExpr.LiteralType.kString
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kString
                     constant_expression.str_value = value
                 elif isinstance(value, int):
-                    constant_expression.literal_type = infinity_pb2.ConstantExpr.LiteralType.kInt64
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kInt64
                     constant_expression.i64_value = value
                 elif isinstance(value, float):
-                    constant_expression.literal_type = infinity_pb2.ConstantExpr.LiteralType.kDouble
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kDouble
                     constant_expression.f64_value = value
                 else:
                     raise Exception("Invalid constant expression")
-                paser_expr = infinity_pb2.ParsedExpr()
+                paser_expr = ParsedExpr()
                 paser_expr.constant_expr.CopyFrom(constant_expression)
                 field.parse_exprs.append(paser_expr)
 
@@ -113,12 +114,12 @@ class RemoteTable(Table, ABC):
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
         global covered_column_vector, where_expr
-        select_list: list[infinity_pb2.ParsedExpr] = []
-        group_by_list: list[infinity_pb2.ParsedExpr] = []
+        select_list: list[ParsedExpr] = []
+        group_by_list: list[ParsedExpr] = []
 
 
         for column in query.columns:
-            column_expr = infinity_pb2.ColumnExpr()
+            column_expr = ColumnExpr()
 
             if column == "*":
                 column_expr.star = True
@@ -126,7 +127,7 @@ class RemoteTable(Table, ABC):
                 column_expr.star = False
                 column_expr.column_name.append(column)
 
-            paser_expr = infinity_pb2.ParsedExpr()
+            paser_expr = ParsedExpr()
             paser_expr.column_expr.CopyFrom(column_expr)
 
             select_list.append(paser_expr)
@@ -139,13 +140,13 @@ class RemoteTable(Table, ABC):
             where_expr = traverse_conditions(condition(query.filter))
 
         # process limit_expr and offset_expr
-        limit_expr = infinity_pb2.ParsedExpr()
-        offset_expr = infinity_pb2.ParsedExpr()
+        limit_expr = ParsedExpr()
+        offset_expr = ParsedExpr()
         if query.limit is not None:
-            limit_expr.constant_expr.literal_type = infinity_pb2.ConstantExpr.LiteralType.kInt64
+            limit_expr.constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
             limit_expr.constant_expr.i64_value = query.limit
         if query.offset is not None:
-            offset_expr.constant_expr.literal_type = infinity_pb2.ConstantExpr.LiteralType.kInt64
+            offset_expr.constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
             offset_expr.constant_expr.i64_value = query.offset
 
         res = self._conn.client.select(db_name=self._db_name,
@@ -166,16 +167,16 @@ class RemoteTable(Table, ABC):
             column_type = column_field.column_type
             column_vector = column_field.column_vector
             length = len(column_vector)
-            if column_type == infinity_pb2.ColumnType.kColumnInt32:
+            if column_type == ColumnType.kColumnInt32:
                 value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
                 results[column_name] = value_list
-            elif column_type == infinity_pb2.ColumnType.kColumnInt64:
+            elif column_type == ColumnType.kColumnInt64:
                 value_list = struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector)
                 results[column_name] = value_list
-            elif column_type == infinity_pb2.ColumnType.kColumnFloat:
+            elif column_type == ColumnType.kColumnFloat:
                 value_list = struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
                 results[column_name] = value_list
-            elif column_type == infinity_pb2.ColumnType.kColumnDouble:
+            elif column_type == ColumnType.kColumnDouble:
                 value_list = struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
                 results[column_name] = value_list
             else:
@@ -185,10 +186,10 @@ class RemoteTable(Table, ABC):
         # todo: how to convert bytes to string?
 
 
-def traverse_conditions(cons) -> infinity_pb2.ParsedExpr:
+def traverse_conditions(cons) -> ParsedExpr:
     if isinstance(cons, exp.Binary):
-        parsed_expr = infinity_pb2.ParsedExpr()
-        function_expr = infinity_pb2.FunctionExpr()
+        parsed_expr = ParsedExpr()
+        function_expr = FunctionExpr()
         function_expr.function_name = binary_exp_to_paser_exp(
             cons.key)  # key is the function name cover to >, <, =, and, or, etc.
 
@@ -200,22 +201,22 @@ def traverse_conditions(cons) -> infinity_pb2.ParsedExpr:
         return parsed_expr
 
     elif isinstance(cons, exp.Column):
-        parsed_expr = infinity_pb2.ParsedExpr()
-        column_expr = infinity_pb2.ColumnExpr()
+        parsed_expr = ParsedExpr()
+        column_expr = ColumnExpr()
         column_expr.column_name.append(cons.alias_or_name)
 
         parsed_expr.column_expr.CopyFrom(column_expr)
         return parsed_expr
 
     elif isinstance(cons, exp.Literal):
-        parsed_expr = infinity_pb2.ParsedExpr()
-        constant_expr = infinity_pb2.ConstantExpr()
+        parsed_expr = ParsedExpr()
+        constant_expr = ConstantExpr()
 
         if cons.is_int:
-            constant_expr.literal_type = infinity_pb2.ConstantExpr.LiteralType.kInt64
+            constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
             constant_expr.i64_value = int(cons.output_name)
         elif cons.is_number:
-            constant_expr.literal_type = infinity_pb2.ConstantExpr.LiteralType.kDouble
+            constant_expr.literal_type = ConstantExpr.LiteralType.kDouble
             constant_expr.f64_value = float(cons.output_name)
         else:
             raise Exception(f"unknown literal type: {cons}")

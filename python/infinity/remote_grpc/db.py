@@ -14,9 +14,11 @@
 
 from abc import ABC
 
-from infinity.remote.infinity_grpc import infinity_pb2, infinity_pb2_grpc
+from .grpc_pb.infinity_grpc_pb2 import *
+from .grpc_pb.infinity_grpc_pb2_grpc import *
 from infinity.db import Database
-from infinity.remote.table import RemoteTable
+from infinity.remote_grpc.table import RemoteTable
+
 
 class RemoteDatabase(Database, ABC):
     def __init__(self, conn, name: str):
@@ -35,29 +37,29 @@ class RemoteDatabase(Database, ABC):
                 # "vector,1024,float32"
                 length = column_big_info[1]
                 element_type = column_big_info[2]
-                proto_column_def = infinity_pb2.ColumnDef()
+                proto_column_def = ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
 
-                column_type = infinity_pb2.DataType()
-                column_type.logic_type = infinity_pb2.LogicType.Embedding
+                column_type = DataType()
+                column_type.logic_type = LogicType.Embedding
 
-                embedding_type = infinity_pb2.EmbeddingType()
+                embedding_type = EmbeddingType()
 
                 if element_type == "bit":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemBit
+                    embedding_type.embedding_data_type = ElementType.kElemBit
                 elif element_type == "float32" or element_type == "float":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemFloat
+                    embedding_type.embedding_data_type = ElementType.kElemFloat
                 elif element_type == "float64" or element_type == "double":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemDouble
+                    embedding_type.embedding_data_type = ElementType.kElemDouble
                 elif element_type == "int8":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt8
+                    embedding_type.embedding_data_type = ElementType.kElemInt8
                 elif element_type == "int16":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt16
+                    embedding_type.embedding_data_type = ElementType.kElemInt16
                 elif element_type == "int32" or element_type == "int":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt32
+                    embedding_type.embedding_data_type = ElementType.kElemInt32
                 elif element_type == "int64":
-                    embedding_type.embedding_data_type = infinity_pb2.ElementType.kElemInt64
+                    embedding_type.embedding_data_type = ElementType.kElemInt64
                 else:
                     raise Exception(f"unknown element type: {element_type}")
 
@@ -72,30 +74,30 @@ class RemoteDatabase(Database, ABC):
                 constraints = column_big_info[1:]
 
                 # process column definition
-                proto_column_def = infinity_pb2.ColumnDef()
+                proto_column_def = ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
-                proto_column_type = infinity_pb2.DataType()
+                proto_column_type = DataType()
 
                 if datatype == "int8":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.TinyInt
+                    proto_column_type.logic_type = LogicType.TinyInt
                 elif datatype == "int16":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.SmallInt
+                    proto_column_type.logic_type = LogicType.SmallInt
                 elif datatype == "int32" or datatype == "int":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Integer
+                    proto_column_type.logic_type = LogicType.Integer
                 elif datatype == "int64":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.BigInt
+                    proto_column_type.logic_type = LogicType.BigInt
                 elif datatype == "int128":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.HugeInt
+                    proto_column_type.logic_type = LogicType.HugeInt
                 elif datatype == "float":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Float
+                    proto_column_type.logic_type = LogicType.Float
                 elif datatype == "double":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Double
+                    proto_column_type.logic_type = LogicType.Double
                 elif datatype == "varchar":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Varchar
+                    proto_column_type.logic_type = LogicType.Varchar
                     proto_column_type.VarcharType.width = 1024
                 elif datatype == "bool":
-                    proto_column_type.logic_type = infinity_pb2.LogicType.Bool
+                    proto_column_type.logic_type = LogicType.Bool
                 else:
                     raise Exception(f"unknown datatype: {datatype}")
 
@@ -103,13 +105,13 @@ class RemoteDatabase(Database, ABC):
                 # process constraints
                 for constraint in constraints:
                     if constraint == "null":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kNull)
+                        proto_column_def.constraints.append(Constraint.kNull)
                     elif constraint == "not null":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kNotNull)
+                        proto_column_def.constraints.append(Constraint.kNotNull)
                     elif constraint == "primary key":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kPrimaryKey)
+                        proto_column_def.constraints.append(Constraint.kPrimaryKey)
                     elif constraint == "unique":
-                        proto_column_def.constraints.append(infinity_pb2.Constraint.kUnique)
+                        proto_column_def.constraints.append(Constraint.kUnique)
                     else:
                         raise Exception(f"unknown constraint: {constraint}")
                 column_defs.append(proto_column_def)

@@ -16,7 +16,7 @@ import importlib.metadata
 __version__ = importlib.metadata.version("infinity")
 
 from infinity.infinity import URI, InfinityConnection, NetworkAddress
-from infinity.remote.infinity import RemoteInfinityConnection
+from infinity.remote_grpc.infinity import RemoteInfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 

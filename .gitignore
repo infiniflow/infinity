@@ -90,10 +90,15 @@ src/network/infinity.grpc.pb.h
 src/network/infinity.pb.cc
 src/network/infinity.pb.h
 src/network/infinity_thrift/*
-python/infinity/remote_thrift/infinity_thrift_rpc/*
-python/infinity/remote/infinity_grpc/*
-python/infinity/remote/infinity_pb2.py
-python/infinity/remote/infinity_pb2_grpc.py
+
+python/infinity/remote_thrift/infinity_thrift_rpc/constants.py
+python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService.py
+python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService-remote
+python/infinity/remote_thrift/infinity_thrift_rpc/ttypes.py
+
+python/infinity/remote_grpc/grpc_pb/infinity_grpc_pb2*
+
+python/infinity/remote_brpc/brpc_pb/infinity_brpc_pb2*
 
 
 #python sdk

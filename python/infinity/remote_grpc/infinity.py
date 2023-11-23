@@ -14,8 +14,8 @@
 
 from abc import ABC
 from infinity import InfinityConnection
-from infinity.remote.client import GrpcInfinityClient
-from infinity.remote.db import RemoteDatabase
+from infinity.remote_grpc.client import GrpcInfinityClient
+from infinity.remote_grpc.db import RemoteDatabase
 
 
 class RemoteInfinityConnection(InfinityConnection, ABC):

@@ -10,8 +10,8 @@ CPP_BRPC_DST_DIR=$(cd "$current_dir/.."; pwd)"/src/network/infinity_brpc"
 echo "CPP_GRPC_DST_DIR : $CPP_GRPC_DST_DIR"
 echo "CPP_BRPC_DST_DIR : $CPP_BRPC_DST_DIR"
 
-PYTHON_GRPC_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity/remote/infinity_grpc"
-PYTHON_BRPC_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity/remote/infinity_brpc"
+PYTHON_GRPC_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity/remote_grpc/grpc_pb"
+PYTHON_BRPC_DST_DIR=$(cd "$current_dir/.."; pwd)"/python/infinity/remote_brpc/brpc_pb"
 echo "PYTHON_GRPC_DST_DIR : $PYTHON_GRPC_DST_DIR"
 echo "PYTHON_BRPC_DST_DIR : $PYTHON_BRPC_DST_DIR"
 
