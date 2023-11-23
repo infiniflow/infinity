@@ -14,6 +14,7 @@
 
 from .grpc_pb.infinity_grpc_pb2 import *
 from .grpc_pb.infinity_grpc_pb2_grpc import *
+from .. import URI
 
 
 class GrpcInfinityClient:
@@ -21,10 +22,11 @@ class GrpcInfinityClient:
     channel: grpc.Channel
     stub: InfinityGrpcServiceStub
 
-    def __init__(self, url='localhost:50051'):
-        self.url = url
+    def __init__(self, uri: URI):
+        self.url = uri.ip + ":" + str(uri.port)
+        print(self.url)
         self.db_name = "default"
-        self.channel = grpc.insecure_channel(url)
+        self.channel = grpc.insecure_channel(self.url)
         self.stub = InfinityGrpcServiceStub(self.channel)
         res = self.stub.Connect(Empty())
         self.session_id = res.session_id
