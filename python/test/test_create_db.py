@@ -21,7 +21,7 @@ from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
 
-class MyTestCase(unittest.TestCase):
+class MyTestCreateDB(unittest.TestCase):
 
     def test_version(self):
         print(infinity.__version__)

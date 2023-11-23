@@ -23,7 +23,7 @@ from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 def connect(
         uri: URI,
 ) -> InfinityConnection:
-    if isinstance(uri, NetworkAddress) and uri.port == 50001:
+    if isinstance(uri, NetworkAddress) and uri.port == 50002:
         return RemoteInfinityConnection(uri)
     if isinstance(uri, NetworkAddress) and uri.port == 9090:
         return RemoteThriftInfinityConnection(uri)
