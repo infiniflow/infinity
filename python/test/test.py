@@ -93,7 +93,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(res.success, True)
 
     def test_infinity_grpc(self):
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50002))
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50052))
         self.assertIsNotNone(infinity_obj)
         # infinity
         res = infinity_obj.create_database("my_db")
@@ -159,7 +159,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(res.success, True)
 
     def test_infinity_brpc(self):
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50001))
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 50051))
         self.assertIsNotNone(infinity_obj)
         # infinity
         res = infinity_obj.create_database("my_db")

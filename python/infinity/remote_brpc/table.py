@@ -1,12 +1,24 @@
-import struct
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import ABC
-from typing import Optional, Union, List, Dict, Any
-
-from sqlglot import condition, expressions as exp
-
+import struct
 from infinity.query import Query, InfinityVectorQueryBuilder
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.table import Table
+from infinity.remote_brpc.brpc_pb.infinity_brpc_pb2 import *
+from typing import Optional, Union, Dict, Any
+from sqlglot import condition, expressions as exp
 
 
 class RemoteTable(Table, ABC):
@@ -23,7 +35,7 @@ class RemoteTable(Table, ABC):
         index_name = index_name.strip()
         column_names: list[str] = [column_name.strip() for column_name in column_names]
         method_type = method_type.strip()
-        index_para_list_to_use: list[InitParameter] = []
+        index_para_list_to_use: InitParameter = []
 
         for index_para in index_para_list:
             for index, (key, value) in enumerate(index_para.items()):
@@ -38,44 +50,42 @@ class RemoteTable(Table, ABC):
                                               column_names=column_names,
                                               method_type=method_type,
                                               index_para_list=index_para_list_to_use,
-                                              option=options)
+                                              options=None)
 
     def drop_index(self, index_name: str):
         return self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
                                             index_name=index_name)
 
     def insert(self, data: list[dict[str, Union[str, int, float]]]):
-        # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
+
         db_name = self._db_name
         table_name = self._table_name
         column_names: list[str] = []
         fields: list[Field] = []
         for row in data:
             column_names = list(row.keys())
-            parse_exprs = []
-            for column_name, value in row.items():
+
+            field = Field()
+            for index, (column_name, value) in enumerate(row.items()):
                 constant_expression = ConstantExpr()
                 if isinstance(value, str):
-                    constant_expression.literal_type = LiteralType.String
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kString
                     constant_expression.str_value = value
                 elif isinstance(value, int):
-                    constant_expression.literal_type = LiteralType.Int64
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kInt64
                     constant_expression.i64_value = value
                 elif isinstance(value, float):
-                    constant_expression.literal_type = LiteralType.Double
+                    constant_expression.literal_type = ConstantExpr.LiteralType.kDouble
                     constant_expression.f64_value = value
                 else:
                     raise Exception("Invalid constant expression")
-                paser_expr_type = ParsedExprType()
-                paser_expr_type.constant_expr = constant_expression
-
                 paser_expr = ParsedExpr()
-                paser_expr.type = paser_expr_type
-                parse_exprs.append(paser_expr)
-            f = Field()
-            f.parse_exprs = parse_exprs
-            fields.append(f)
+                paser_expr.constant_expr.CopyFrom(constant_expression)
+                field.parse_exprs.append(paser_expr)
 
+            fields.append(field)
+
+        # print(db_name, table_name, column_names, fields)
         return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                         fields=fields)
 
@@ -102,24 +112,21 @@ class RemoteTable(Table, ABC):
 
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
-        global covered_column_vector
-        select_list: List[ParsedExpr] = []
+        global covered_column_vector, where_expr
+        select_list: list[ParsedExpr] = []
+        group_by_list: list[ParsedExpr] = []
 
         for column in query.columns:
-            column_name = []
-            if column == "*":
-                star = True
-            else:
-                star = False
-                column_name.append(column)
-
             column_expr = ColumnExpr()
-            column_expr.star = star
-            column_expr.column_name = column_name
-            paser_expr_type = ParsedExprType()
-            paser_expr_type.column_expr = column_expr
+
+            if column == "*":
+                column_expr.star = True
+            else:
+                column_expr.star = False
+                column_expr.column_name.append(column)
+
             paser_expr = ParsedExpr()
-            paser_expr.type = paser_expr_type
+            paser_expr.column_expr.CopyFrom(column_expr)
 
             select_list.append(paser_expr)
 
@@ -127,7 +134,6 @@ class RemoteTable(Table, ABC):
 
         # str to ParsedExpr
         from sqlglot import condition
-        where_expr = ParsedExpr()
         if query.filter is not None:
             where_expr = traverse_conditions(condition(query.filter))
 
@@ -135,26 +141,17 @@ class RemoteTable(Table, ABC):
         limit_expr = ParsedExpr()
         offset_expr = ParsedExpr()
         if query.limit is not None:
-            constant_exp = ConstantExpr()
-            constant_exp.literal_type = LiteralType.Int64
-
-            paser_expr_type = ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            limit_expr.type = paser_expr_type
-            limit_expr.i64_value = query.limit
+            limit_expr.constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
+            limit_expr.constant_expr.i64_value = query.limit
         if query.offset is not None:
-            constant_exp = ConstantExpr()
-            constant_exp.literal_type = LiteralType.Int64
-            paser_expr_type = ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            offset_expr.type = paser_expr_type
-            offset_expr.i64_value = query.offset
+            offset_expr.constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
+            offset_expr.constant_expr.i64_value = query.offset
 
         res = self._conn.client.select(db_name=self._db_name,
                                        table_name=self._table_name,
                                        select_list=select_list,
                                        where_expr=where_expr,
-                                       group_by_list=None,
+                                       group_by_list=group_by_list,
                                        limit_expr=limit_expr,
                                        offset_expr=offset_expr,
                                        search_expr=None)
@@ -167,18 +164,17 @@ class RemoteTable(Table, ABC):
             column_field = res.column_fields[column_id]
             column_type = column_field.column_type
             column_vector = column_field.column_vector
-            # print(column_name, column_type, column_vector)
-
-            if column_type == ColumnType.ColumnInt32:
+            length = len(column_vector)
+            if column_type == ColumnType.kColumnInt32:
                 value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
                 results[column_name] = value_list
-            elif column_type == ColumnType.ColumnInt64:
+            elif column_type == ColumnType.kColumnInt64:
                 value_list = struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector)
                 results[column_name] = value_list
-            elif column_type == ColumnType.ColumnFloat32:
+            elif column_type == ColumnType.kColumnFloat:
                 value_list = struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
                 results[column_name] = value_list
-            elif column_type == ColumnType.ColumnFloat64:
+            elif column_type == ColumnType.kColumnDouble:
                 value_list = struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
                 results[column_name] = value_list
             else:
@@ -195,29 +191,19 @@ def traverse_conditions(cons) -> ParsedExpr:
         function_expr.function_name = binary_exp_to_paser_exp(
             cons.key)  # key is the function name cover to >, <, =, and, or, etc.
 
-        arguments = []
         for value in cons.hashable_args:
             expr = traverse_conditions(value)
-            arguments.append(expr)
-        function_expr.arguments = arguments
+            function_expr.arguments.append(expr)
 
-        paser_expr_type = ParsedExprType()
-        paser_expr_type.function_expr = function_expr
-
-        parsed_expr.type = paser_expr_type
-
+        parsed_expr.function_expr.CopyFrom(function_expr)
         return parsed_expr
 
     elif isinstance(cons, exp.Column):
         parsed_expr = ParsedExpr()
         column_expr = ColumnExpr()
-        column_name = [cons.alias_or_name]
-        column_expr.column_name = column_name
+        column_expr.column_name.append(cons.alias_or_name)
 
-        paser_expr_type = ParsedExprType()
-        paser_expr_type.column_expr = column_expr
-
-        parsed_expr.type = paser_expr_type
+        parsed_expr.column_expr.CopyFrom(column_expr)
         return parsed_expr
 
     elif isinstance(cons, exp.Literal):
@@ -225,18 +211,15 @@ def traverse_conditions(cons) -> ParsedExpr:
         constant_expr = ConstantExpr()
 
         if cons.is_int:
-            constant_expr.literal_type = LiteralType.Int64
+            constant_expr.literal_type = ConstantExpr.LiteralType.kInt64
             constant_expr.i64_value = int(cons.output_name)
         elif cons.is_number:
-            constant_expr.literal_type = LiteralType.Double
+            constant_expr.literal_type = ConstantExpr.LiteralType.kDouble
             constant_expr.f64_value = float(cons.output_name)
         else:
             raise Exception(f"unknown literal type: {cons}")
 
-        paser_expr_type = ParsedExprType()
-        paser_expr_type.constant_expr = constant_expr
-
-        parsed_expr.type = paser_expr_type
+        parsed_expr.constant_expr.CopyFrom(constant_expr)
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):

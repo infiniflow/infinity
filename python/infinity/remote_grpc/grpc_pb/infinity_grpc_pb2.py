@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x13infinity_grpc.proto\x12\x13infinity_grpc_proto\"\t\n\x07Options\"k\n\x15\x43reateDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12-\n\x07options\x18\x02 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"i\n\x13\x44ropDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12-\n\x07options\x18\x02 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xb1\x01\n\x12\x43reateTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x33\n\x0b\x63olumn_defs\x18\x03 \x03(\x0b\x32\x1e.infinity_grpc_proto.ColumnDef\x12-\n\x07options\x18\x05 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x06 \x01(\x04\"\\\n\x10\x43olumnConstraint\x12\x13\n\x0b\x63olumn_name\x18\x01 \x01(\t\x12\x33\n\nconstraint\x18\x02 \x03(\x0e\x32\x1f.infinity_grpc_proto.Constraint\"\x8f\x01\n\tColumnDef\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x32\n\x0b\x63olumn_type\x18\x03 \x01(\x0b\x32\x1d.infinity_grpc_proto.DataType\x12\x34\n\x0b\x63onstraints\x18\x04 \x03(\x0e\x32\x1f.infinity_grpc_proto.Constraint\"\xfe\x01\n\x08\x44\x61taType\x12\x32\n\nlogic_type\x18\x01 \x01(\x0e\x32\x1e.infinity_grpc_proto.LogicType\x12\x36\n\x0bnumber_type\x18\x02 \x01(\x0b\x32\x1f.infinity_grpc_proto.NumberTypeH\x00\x12\x38\n\x0cvarchar_type\x18\x03 \x01(\x0b\x32 .infinity_grpc_proto.VarcharTypeH\x00\x12<\n\x0e\x65mbedding_type\x18\x04 \x01(\x0b\x32\".infinity_grpc_proto.EmbeddingTypeH\x00\x42\x0e\n\x0cPhysicalType\"a\n\rEmbeddingType\x12=\n\x13\x65mbedding_data_type\x18\x01 \x01(\x0e\x32 .infinity_grpc_proto.ElementType\x12\x11\n\tdimension\x18\x02 \x01(\x05\"\x1c\n\x0bVarcharType\x12\r\n\x05width\x18\x01 \x01(\x05\"\x0c\n\nNumberType\"z\n\x10\x44ropTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12-\n\x07options\x18\x03 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x04 \x01(\x04\"\x8a\x01\n\rInsertRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x14\n\x0c\x63olumn_names\x18\x03 \x03(\t\x12*\n\x06\x66ields\x18\x04 \x03(\x0b\x32\x1a.infinity_grpc_proto.Field\x12\x12\n\nsession_id\x18\x05 \x01(\x04\"=\n\x05\x46ield\x12\x34\n\x0bparse_exprs\x18\x01 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"\xde\x02\n\rImportRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x11\n\tfile_path\x18\x03 \x01(\t\x12H\n\x0eimport_options\x18\x04 \x01(\x0b\x32\x30.infinity_grpc_proto.ImportRequest.ImportOptions\x12\x12\n\nsession_id\x18\x05 \x01(\x04\x1a\xb6\x01\n\rImportOptions\x12\x11\n\tdelimiter\x18\x01 \x01(\t\x12\x11\n\tfile_type\x18\x02 \x01(\t\x12\x12\n\ntable_name\x18\x03 \x01(\t\x12\x13\n\x0bschema_name\x18\x04 \x01(\t\x12\x11\n\tcopy_from\x18\x05 \x01(\x08\x12\x12\n\nhas_header\x18\x06 \x01(\x08\"/\n\x0c\x43opyFileType\x12\x08\n\x04kCSV\x10\x00\x12\t\n\x05kJSON\x10\x01\x12\n\n\x06kFVECS\x10\x02\"\x8f\x02\n\nParsedExpr\x12:\n\rconstant_expr\x18\x02 \x01(\x0b\x32!.infinity_grpc_proto.ConstantExprH\x00\x12\x36\n\x0b\x63olumn_expr\x18\x04 \x01(\x0b\x32\x1f.infinity_grpc_proto.ColumnExprH\x00\x12:\n\rfunction_expr\x18\x05 \x01(\x0b\x32!.infinity_grpc_proto.FunctionExprH\x00\x12\x30\n\x08knn_expr\x18\x0c \x01(\x0b\x32\x1c.infinity_grpc_proto.KnnExprH\x00\x12\r\n\x05\x61lias\x18\x01 \x01(\tB\x10\n\x0eParsedExprType\"\xd1\x02\n\x0c\x43onstantExpr\x12\x43\n\x0cliteral_type\x18\x01 \x01(\x0e\x32-.infinity_grpc_proto.ConstantExpr.LiteralType\x12\x12\n\nbool_value\x18\x02 \x01(\x08\x12\x11\n\ti64_value\x18\x03 \x01(\x03\x12\x11\n\tf64_value\x18\x04 \x01(\x01\x12\x11\n\tstr_value\x18\x05 \x01(\t\x12\x12\n\ndate_value\x18\x06 \x01(\t\x12\x12\n\nlong_array\x18\x07 \x03(\x03\x12\x14\n\x0c\x64ouble_array\x18\x08 \x03(\x01\"q\n\x0bLiteralType\x12\x0c\n\x08kBoolean\x10\x00\x12\x0b\n\x07kDouble\x10\x01\x12\x0b\n\x07kString\x10\x02\x12\n\n\x06kInt64\x10\x03\x12\t\n\x05kNull\x10\x04\x12\x11\n\rkIntegerArray\x10\x05\x12\x10\n\x0ckDoubleArray\x10\x06\"Y\n\x0c\x46unctionExpr\x12\x15\n\rfunction_name\x18\x01 \x01(\t\x12\x32\n\targuments\x18\x02 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"/\n\nColumnExpr\x12\x13\n\x0b\x63olumn_name\x18\x01 \x03(\t\x12\x0c\n\x04star\x18\x02 \x01(\x08\"\xa9\x01\n\x0b\x42\x65tweenExpr\x12.\n\x05value\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0bupper_bound\x18\x02 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0blower_bound\x18\x03 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"{\n\x06InExpr\x12-\n\x04left\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x32\n\targuments\x18\x02 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x0e\n\x06not_in\x18\x03 \x01(\x08\"\xc9\x03\n\x07KnnExpr\x12\x34\n\x0b\x63olumn_expr\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x16\n\x0e\x65mbedding_data\x18\x02 \x03(\t\x12\x11\n\tdimension\x18\x03 \x01(\x03\x12K\n\x13\x65mbedding_data_type\x18\x04 \x01(\x0e\x32..infinity_grpc_proto.KnnExpr.EmbeddingDataType\x12\x43\n\rdistance_type\x18\x05 \x01(\x0e\x32,.infinity_grpc_proto.KnnExpr.KnnDistanceType\"D\n\x0fKnnDistanceType\x12\x06\n\x02L2\x10\x00\x12\n\n\x06\x43osine\x10\x01\x12\x10\n\x0cInnerProduct\x10\x02\x12\x0b\n\x07Hamming\x10\x03\"\x84\x01\n\x11\x45mbeddingDataType\x12\x0c\n\x08\x45lemBool\x10\x00\x12\x0f\n\x0b\x45lemTinyInt\x10\x01\x12\x10\n\x0c\x45lemSmallInt\x10\x02\x12\x0f\n\x0b\x45lemInteger\x10\x03\x12\x0e\n\nElemBigInt\x10\x04\x12\r\n\tElemFloat\x10\x07\x12\x0e\n\nElemDouble\x10\x08\"\x8e\x03\n\x0fSelectStatement\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\t \x01(\x04\x12\x34\n\x0bselect_list\x18\x03 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x33\n\nwhere_expr\x18\x04 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x36\n\rgroup_by_list\x18\x05 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x33\n\nlimit_expr\x18\x06 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0boffset_expr\x18\x07 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0bsearch_expr\x18\x08 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"\'\n\x11\x44isConnectRequest\x12\x12\n\nsession_id\x18\x01 \x01(\x04\"\x07\n\x05\x45mpty\"H\n\x0e\x43ommonResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x11\n\terror_msg\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xa2\x01\n\x0eSelectResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x11\n\terror_msg\x18\x02 \x01(\t\x12\x33\n\x0b\x63olumn_defs\x18\x03 \x03(\x0b\x32\x1e.infinity_grpc_proto.ColumnDef\x12\x37\n\rcolumn_fields\x18\x04 \x03(\x0b\x32 .infinity_grpc_proto.ColumnField\"Z\n\x0b\x43olumnField\x12\x34\n\x0b\x63olumn_type\x18\x01 \x01(\x0e\x32\x1f.infinity_grpc_proto.ColumnType\x12\x15\n\rcolumn_vector\x18\x02 \x01(\x0c\"\xe0\x01\n\tDataBlock\x12\x11\n\trow_count\x18\x01 \x01(\x05\x12\x14\n\x0c\x63olumn_count\x18\x02 \x01(\x05\x12\x10\n\x08\x63\x61pacity\x18\x03 \x01(\x05\x12\x43\n\x0e\x63olumn_vectors\x18\x04 \x03(\x0b\x32+.infinity_grpc_proto.DataBlock.ColumnVector\x1aS\n\x0c\x43olumnVector\x12\x43\n\x0e\x63olumn_vectors\x18\x01 \x03(\x0b\x32+.infinity_grpc_proto.DataBlock.ColumnVector\")\n\x13ListDatabaseRequest\x12\x12\n\nsession_id\x18\x01 \x01(\x04\"K\n\x14ListDatabaseResponse\x12\x0f\n\x07\x64\x62_name\x18\x01 \x03(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\">\n\x17\x44\x65scribeDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"d\n\x18\x44\x65scribeDatabaseResponse\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\r\n\x05\x64\x62_id\x18\x02 \x01(\x05\x12\x14\n\x0cnum_segments\x18\x03 \x01(\x05\x12\x12\n\nnum_blocks\x18\x04 \x01(\x05\"[\n\x10ListTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\x12\x12\n\nsession_id\x18\x04 \x01(\x04\"K\n\x11ListTableResponse\x12\x12\n\ntable_name\x18\x01 \x03(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\";\n\x14\x44\x65scribeTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"g\n\x15\x44\x65scribeTableResponse\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\x10\n\x08table_id\x18\x02 \x01(\x05\x12\x14\n\x0cnum_segments\x18\x03 \x01(\x05\x12\x12\n\nnum_blocks\x18\x04 \x01(\x05\"9\n\x12GetDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"J\n\x0fGetTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xf8\x01\n\x12\x43reateIndexRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nindex_name\x18\x03 \x01(\t\x12\x13\n\x0bmethod_type\x18\x04 \x01(\t\x12\x14\n\x0c\x63olumn_names\x18\x05 \x03(\t\x12;\n\x0findex_para_list\x18\x06 \x03(\x0b\x32\".infinity_grpc_proto.InitParameter\x12-\n\x07options\x18\x07 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x08 \x01(\x04\"6\n\rInitParameter\x12\x11\n\tpara_name\x18\x01 \x01(\t\x12\x12\n\npara_value\x18\x02 \x01(\t\"_\n\x10\x44ropIndexRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nindex_name\x18\x03 \x01(\t\x12\x12\n\nsession_id\x18\x04 \x01(\x04*\xa6\x01\n\tLogicType\x12\x0b\n\x07\x42oolean\x10\x00\x12\x0b\n\x07TinyInt\x10\x01\x12\x0c\n\x08SmallInt\x10\x02\x12\x0b\n\x07Integer\x10\x03\x12\n\n\x06\x42igInt\x10\x04\x12\x0b\n\x07HugeInt\x10\x05\x12\x0b\n\x07\x44\x65\x63imal\x10\x06\x12\t\n\x05\x46loat\x10\x07\x12\n\n\x06\x44ouble\x10\x08\x12\x0b\n\x07Varchar\x10\t\x12\r\n\tEmbedding\x10\n\x12\x0b\n\x07Invalid\x10\x0b*C\n\nConstraint\x12\t\n\x05kNull\x10\x00\x12\x0c\n\x08kNotNull\x10\x01\x12\x0f\n\x0bkPrimaryKey\x10\x02\x12\x0b\n\x07kUnique\x10\x03*{\n\x0b\x45lementType\x12\x0c\n\x08kElemBit\x10\x00\x12\r\n\tkElemInt8\x10\x02\x12\x0e\n\nkElemInt16\x10\x03\x12\x0e\n\nkElemInt32\x10\x04\x12\x0e\n\nkElemInt64\x10\x07\x12\x0e\n\nkElemFloat\x10\x08\x12\x0f\n\x0bkElemDouble\x10\t*\xc7\x01\n\nColumnType\x12\x0f\n\x0bkColumnBool\x10\x00\x12\x0f\n\x0bkColumnInt8\x10\x01\x12\x10\n\x0ckColumnInt16\x10\x02\x12\x10\n\x0ckColumnInt32\x10\x03\x12\x10\n\x0ckColumnInt64\x10\x04\x12\x10\n\x0ckColumnFloat\x10\x05\x12\x11\n\rkColumnDouble\x10\x06\x12\x12\n\x0ekColumnVarchar\x10\n\x12\x14\n\x10kColumnEmbedding\x10\x0b\x12\x12\n\x0ekColumnInvalid\x10\x0c\x32\xb3\x0c\n\x13InfinityGrpcService\x12J\n\x07\x43onnect\x12\x1a.infinity_grpc_proto.Empty\x1a#.infinity_grpc_proto.CommonResponse\x12Y\n\nDisConnect\x12&.infinity_grpc_proto.DisConnectRequest\x1a#.infinity_grpc_proto.CommonResponse\x12\x61\n\x0e\x43reateDatabase\x12*.infinity_grpc_proto.CreateDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12]\n\x0c\x44ropDatabase\x12(.infinity_grpc_proto.DropDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12\x63\n\x0cListDatabase\x12(.infinity_grpc_proto.ListDatabaseRequest\x1a).infinity_grpc_proto.ListDatabaseResponse\x12o\n\x10\x44\x65scribeDatabase\x12,.infinity_grpc_proto.DescribeDatabaseRequest\x1a-.infinity_grpc_proto.DescribeDatabaseResponse\x12[\n\x0bGetDatabase\x12\'.infinity_grpc_proto.GetDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12[\n\x0b\x43reateTable\x12\'.infinity_grpc_proto.CreateTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12W\n\tDropTable\x12%.infinity_grpc_proto.DropTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Z\n\tListTable\x12%.infinity_grpc_proto.ListTableRequest\x1a&.infinity_grpc_proto.ListTableResponse\x12\x66\n\rDescribeTable\x12).infinity_grpc_proto.DescribeTableRequest\x1a*.infinity_grpc_proto.DescribeTableResponse\x12U\n\x08GetTable\x12$.infinity_grpc_proto.GetTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Q\n\x06Insert\x12\".infinity_grpc_proto.InsertRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Q\n\x06Import\x12\".infinity_grpc_proto.ImportRequest\x1a#.infinity_grpc_proto.CommonResponse\x12[\n\x0b\x43reateIndex\x12\'.infinity_grpc_proto.CreateIndexRequest\x1a#.infinity_grpc_proto.CommonResponse\x12W\n\tDropIndex\x12%.infinity_grpc_proto.DropIndexRequest\x1a#.infinity_grpc_proto.CommonResponse\x12S\n\x06Search\x12$.infinity_grpc_proto.SelectStatement\x1a#.infinity_grpc_proto.SelectResponseb\x06proto3'
+    serialized_pb=b'\n\x13infinity_grpc.proto\x12\x13infinity_grpc_proto\"\t\n\x07Options\"k\n\x15\x43reateDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12-\n\x07options\x18\x02 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"i\n\x13\x44ropDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12-\n\x07options\x18\x02 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xb1\x01\n\x12\x43reateTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x33\n\x0b\x63olumn_defs\x18\x03 \x03(\x0b\x32\x1e.infinity_grpc_proto.ColumnDef\x12-\n\x07options\x18\x05 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x06 \x01(\x04\"\\\n\x10\x43olumnConstraint\x12\x13\n\x0b\x63olumn_name\x18\x01 \x01(\t\x12\x33\n\nconstraint\x18\x02 \x03(\x0e\x32\x1f.infinity_grpc_proto.Constraint\"\x8f\x01\n\tColumnDef\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x32\n\x0b\x63olumn_type\x18\x03 \x01(\x0b\x32\x1d.infinity_grpc_proto.DataType\x12\x34\n\x0b\x63onstraints\x18\x04 \x03(\x0e\x32\x1f.infinity_grpc_proto.Constraint\"\xfe\x01\n\x08\x44\x61taType\x12\x32\n\nlogic_type\x18\x01 \x01(\x0e\x32\x1e.infinity_grpc_proto.LogicType\x12\x36\n\x0bnumber_type\x18\x02 \x01(\x0b\x32\x1f.infinity_grpc_proto.NumberTypeH\x00\x12\x38\n\x0cvarchar_type\x18\x03 \x01(\x0b\x32 .infinity_grpc_proto.VarcharTypeH\x00\x12<\n\x0e\x65mbedding_type\x18\x04 \x01(\x0b\x32\".infinity_grpc_proto.EmbeddingTypeH\x00\x42\x0e\n\x0cPhysicalType\"a\n\rEmbeddingType\x12=\n\x13\x65mbedding_data_type\x18\x01 \x01(\x0e\x32 .infinity_grpc_proto.ElementType\x12\x11\n\tdimension\x18\x02 \x01(\x05\"\x1c\n\x0bVarcharType\x12\r\n\x05width\x18\x01 \x01(\x05\"\x0c\n\nNumberType\"z\n\x10\x44ropTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12-\n\x07options\x18\x03 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x04 \x01(\x04\"\x8a\x01\n\rInsertRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x14\n\x0c\x63olumn_names\x18\x03 \x03(\t\x12*\n\x06\x66ields\x18\x04 \x03(\x0b\x32\x1a.infinity_grpc_proto.Field\x12\x12\n\nsession_id\x18\x05 \x01(\x04\"=\n\x05\x46ield\x12\x34\n\x0bparse_exprs\x18\x01 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"\xde\x02\n\rImportRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x11\n\tfile_path\x18\x03 \x01(\t\x12H\n\x0eimport_options\x18\x04 \x01(\x0b\x32\x30.infinity_grpc_proto.ImportRequest.ImportOptions\x12\x12\n\nsession_id\x18\x05 \x01(\x04\x1a\xb6\x01\n\rImportOptions\x12\x11\n\tdelimiter\x18\x01 \x01(\t\x12\x11\n\tfile_type\x18\x02 \x01(\t\x12\x12\n\ntable_name\x18\x03 \x01(\t\x12\x13\n\x0bschema_name\x18\x04 \x01(\t\x12\x11\n\tcopy_from\x18\x05 \x01(\x08\x12\x12\n\nhas_header\x18\x06 \x01(\x08\"/\n\x0c\x43opyFileType\x12\x08\n\x04kCSV\x10\x00\x12\t\n\x05kJSON\x10\x01\x12\n\n\x06kFVECS\x10\x02\"\x8f\x02\n\nParsedExpr\x12:\n\rconstant_expr\x18\x02 \x01(\x0b\x32!.infinity_grpc_proto.ConstantExprH\x00\x12\x36\n\x0b\x63olumn_expr\x18\x04 \x01(\x0b\x32\x1f.infinity_grpc_proto.ColumnExprH\x00\x12:\n\rfunction_expr\x18\x05 \x01(\x0b\x32!.infinity_grpc_proto.FunctionExprH\x00\x12\x30\n\x08knn_expr\x18\x0c \x01(\x0b\x32\x1c.infinity_grpc_proto.KnnExprH\x00\x12\r\n\x05\x61lias\x18\x01 \x01(\tB\x10\n\x0eParsedExprType\"\xd1\x02\n\x0c\x43onstantExpr\x12\x43\n\x0cliteral_type\x18\x01 \x01(\x0e\x32-.infinity_grpc_proto.ConstantExpr.LiteralType\x12\x12\n\nbool_value\x18\x02 \x01(\x08\x12\x11\n\ti64_value\x18\x03 \x01(\x03\x12\x11\n\tf64_value\x18\x04 \x01(\x01\x12\x11\n\tstr_value\x18\x05 \x01(\t\x12\x12\n\ndate_value\x18\x06 \x01(\t\x12\x12\n\nlong_array\x18\x07 \x03(\x03\x12\x14\n\x0c\x64ouble_array\x18\x08 \x03(\x01\"q\n\x0bLiteralType\x12\x0c\n\x08kBoolean\x10\x00\x12\x0b\n\x07kDouble\x10\x01\x12\x0b\n\x07kString\x10\x02\x12\n\n\x06kInt64\x10\x03\x12\t\n\x05kNull\x10\x04\x12\x11\n\rkIntegerArray\x10\x05\x12\x10\n\x0ckDoubleArray\x10\x06\"Y\n\x0c\x46unctionExpr\x12\x15\n\rfunction_name\x18\x01 \x01(\t\x12\x32\n\targuments\x18\x02 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"/\n\nColumnExpr\x12\x13\n\x0b\x63olumn_name\x18\x01 \x03(\t\x12\x0c\n\x04star\x18\x02 \x01(\x08\"\xa9\x01\n\x0b\x42\x65tweenExpr\x12.\n\x05value\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0bupper_bound\x18\x02 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0blower_bound\x18\x03 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"{\n\x06InExpr\x12-\n\x04left\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x32\n\targuments\x18\x02 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x0e\n\x06not_in\x18\x03 \x01(\x08\"\xc9\x03\n\x07KnnExpr\x12\x34\n\x0b\x63olumn_expr\x18\x01 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x16\n\x0e\x65mbedding_data\x18\x02 \x03(\t\x12\x11\n\tdimension\x18\x03 \x01(\x03\x12K\n\x13\x65mbedding_data_type\x18\x04 \x01(\x0e\x32..infinity_grpc_proto.KnnExpr.EmbeddingDataType\x12\x43\n\rdistance_type\x18\x05 \x01(\x0e\x32,.infinity_grpc_proto.KnnExpr.KnnDistanceType\"D\n\x0fKnnDistanceType\x12\x06\n\x02L2\x10\x00\x12\n\n\x06\x43osine\x10\x01\x12\x10\n\x0cInnerProduct\x10\x02\x12\x0b\n\x07Hamming\x10\x03\"\x84\x01\n\x11\x45mbeddingDataType\x12\x0c\n\x08\x45lemBool\x10\x00\x12\x0f\n\x0b\x45lemTinyInt\x10\x01\x12\x10\n\x0c\x45lemSmallInt\x10\x02\x12\x0f\n\x0b\x45lemInteger\x10\x03\x12\x0e\n\nElemBigInt\x10\x04\x12\r\n\tElemFloat\x10\x07\x12\x0e\n\nElemDouble\x10\x08\"\x8e\x03\n\x0fSelectStatement\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\t \x01(\x04\x12\x34\n\x0bselect_list\x18\x03 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x33\n\nwhere_expr\x18\x04 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x36\n\rgroup_by_list\x18\x05 \x03(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x33\n\nlimit_expr\x18\x06 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0boffset_expr\x18\x07 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\x12\x34\n\x0bsearch_expr\x18\x08 \x01(\x0b\x32\x1f.infinity_grpc_proto.ParsedExpr\"\'\n\x11\x44isConnectRequest\x12\x12\n\nsession_id\x18\x01 \x01(\x04\"\x07\n\x05\x45mpty\"H\n\x0e\x43ommonResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x11\n\terror_msg\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xa2\x01\n\x0eSelectResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x11\n\terror_msg\x18\x02 \x01(\t\x12\x33\n\x0b\x63olumn_defs\x18\x03 \x03(\x0b\x32\x1e.infinity_grpc_proto.ColumnDef\x12\x37\n\rcolumn_fields\x18\x04 \x03(\x0b\x32 .infinity_grpc_proto.ColumnField\"Z\n\x0b\x43olumnField\x12\x34\n\x0b\x63olumn_type\x18\x01 \x01(\x0e\x32\x1f.infinity_grpc_proto.ColumnType\x12\x15\n\rcolumn_vector\x18\x02 \x01(\x0c\"\xe0\x01\n\tDataBlock\x12\x11\n\trow_count\x18\x01 \x01(\x05\x12\x14\n\x0c\x63olumn_count\x18\x02 \x01(\x05\x12\x10\n\x08\x63\x61pacity\x18\x03 \x01(\x05\x12\x43\n\x0e\x63olumn_vectors\x18\x04 \x03(\x0b\x32+.infinity_grpc_proto.DataBlock.ColumnVector\x1aS\n\x0c\x43olumnVector\x12\x43\n\x0e\x63olumn_vectors\x18\x01 \x03(\x0b\x32+.infinity_grpc_proto.DataBlock.ColumnVector\")\n\x13ListDatabaseRequest\x12\x12\n\nsession_id\x18\x01 \x01(\x04\"L\n\x14ListDatabaseResponse\x12\x10\n\x08\x64\x62_names\x18\x01 \x03(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\">\n\x17\x44\x65scribeDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"d\n\x18\x44\x65scribeDatabaseResponse\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\r\n\x05\x64\x62_id\x18\x02 \x01(\x05\x12\x14\n\x0cnum_segments\x18\x03 \x01(\x05\x12\x12\n\nnum_blocks\x18\x04 \x01(\x05\"[\n\x10ListTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\x12\x12\n\nsession_id\x18\x04 \x01(\x04\"K\n\x11ListTableResponse\x12\x12\n\ntable_name\x18\x01 \x03(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x11\n\terror_msg\x18\x03 \x01(\t\";\n\x14\x44\x65scribeTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"g\n\x15\x44\x65scribeTableResponse\x12\x12\n\ntable_name\x18\x01 \x01(\t\x12\x10\n\x08table_id\x18\x02 \x01(\x05\x12\x14\n\x0cnum_segments\x18\x03 \x01(\x05\x12\x12\n\nnum_blocks\x18\x04 \x01(\x05\"9\n\x12GetDatabaseRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\x04\"J\n\x0fGetTableRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\x04\"\xf8\x01\n\x12\x43reateIndexRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nindex_name\x18\x03 \x01(\t\x12\x13\n\x0bmethod_type\x18\x04 \x01(\t\x12\x14\n\x0c\x63olumn_names\x18\x05 \x03(\t\x12;\n\x0findex_para_list\x18\x06 \x03(\x0b\x32\".infinity_grpc_proto.InitParameter\x12-\n\x07options\x18\x07 \x01(\x0b\x32\x1c.infinity_grpc_proto.Options\x12\x12\n\nsession_id\x18\x08 \x01(\x04\"6\n\rInitParameter\x12\x11\n\tpara_name\x18\x01 \x01(\t\x12\x12\n\npara_value\x18\x02 \x01(\t\"_\n\x10\x44ropIndexRequest\x12\x0f\n\x07\x64\x62_name\x18\x01 \x01(\t\x12\x12\n\ntable_name\x18\x02 \x01(\t\x12\x12\n\nindex_name\x18\x03 \x01(\t\x12\x12\n\nsession_id\x18\x04 \x01(\x04*\xa6\x01\n\tLogicType\x12\x0b\n\x07\x42oolean\x10\x00\x12\x0b\n\x07TinyInt\x10\x01\x12\x0c\n\x08SmallInt\x10\x02\x12\x0b\n\x07Integer\x10\x03\x12\n\n\x06\x42igInt\x10\x04\x12\x0b\n\x07HugeInt\x10\x05\x12\x0b\n\x07\x44\x65\x63imal\x10\x06\x12\t\n\x05\x46loat\x10\x07\x12\n\n\x06\x44ouble\x10\x08\x12\x0b\n\x07Varchar\x10\t\x12\r\n\tEmbedding\x10\n\x12\x0b\n\x07Invalid\x10\x0b*C\n\nConstraint\x12\t\n\x05kNull\x10\x00\x12\x0c\n\x08kNotNull\x10\x01\x12\x0f\n\x0bkPrimaryKey\x10\x02\x12\x0b\n\x07kUnique\x10\x03*{\n\x0b\x45lementType\x12\x0c\n\x08kElemBit\x10\x00\x12\r\n\tkElemInt8\x10\x02\x12\x0e\n\nkElemInt16\x10\x03\x12\x0e\n\nkElemInt32\x10\x04\x12\x0e\n\nkElemInt64\x10\x07\x12\x0e\n\nkElemFloat\x10\x08\x12\x0f\n\x0bkElemDouble\x10\t*\xc7\x01\n\nColumnType\x12\x0f\n\x0bkColumnBool\x10\x00\x12\x0f\n\x0bkColumnInt8\x10\x01\x12\x10\n\x0ckColumnInt16\x10\x02\x12\x10\n\x0ckColumnInt32\x10\x03\x12\x10\n\x0ckColumnInt64\x10\x04\x12\x10\n\x0ckColumnFloat\x10\x05\x12\x11\n\rkColumnDouble\x10\x06\x12\x12\n\x0ekColumnVarchar\x10\n\x12\x14\n\x10kColumnEmbedding\x10\x0b\x12\x12\n\x0ekColumnInvalid\x10\x0c\x32\xb3\x0c\n\x13InfinityGrpcService\x12J\n\x07\x43onnect\x12\x1a.infinity_grpc_proto.Empty\x1a#.infinity_grpc_proto.CommonResponse\x12Y\n\nDisConnect\x12&.infinity_grpc_proto.DisConnectRequest\x1a#.infinity_grpc_proto.CommonResponse\x12\x61\n\x0e\x43reateDatabase\x12*.infinity_grpc_proto.CreateDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12]\n\x0c\x44ropDatabase\x12(.infinity_grpc_proto.DropDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12\x63\n\x0cListDatabase\x12(.infinity_grpc_proto.ListDatabaseRequest\x1a).infinity_grpc_proto.ListDatabaseResponse\x12o\n\x10\x44\x65scribeDatabase\x12,.infinity_grpc_proto.DescribeDatabaseRequest\x1a-.infinity_grpc_proto.DescribeDatabaseResponse\x12[\n\x0bGetDatabase\x12\'.infinity_grpc_proto.GetDatabaseRequest\x1a#.infinity_grpc_proto.CommonResponse\x12[\n\x0b\x43reateTable\x12\'.infinity_grpc_proto.CreateTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12W\n\tDropTable\x12%.infinity_grpc_proto.DropTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Z\n\tListTable\x12%.infinity_grpc_proto.ListTableRequest\x1a&.infinity_grpc_proto.ListTableResponse\x12\x66\n\rDescribeTable\x12).infinity_grpc_proto.DescribeTableRequest\x1a*.infinity_grpc_proto.DescribeTableResponse\x12U\n\x08GetTable\x12$.infinity_grpc_proto.GetTableRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Q\n\x06Insert\x12\".infinity_grpc_proto.InsertRequest\x1a#.infinity_grpc_proto.CommonResponse\x12Q\n\x06Import\x12\".infinity_grpc_proto.ImportRequest\x1a#.infinity_grpc_proto.CommonResponse\x12[\n\x0b\x43reateIndex\x12\'.infinity_grpc_proto.CreateIndexRequest\x1a#.infinity_grpc_proto.CommonResponse\x12W\n\tDropIndex\x12%.infinity_grpc_proto.DropIndexRequest\x1a#.infinity_grpc_proto.CommonResponse\x12S\n\x06Search\x12$.infinity_grpc_proto.SelectStatement\x1a#.infinity_grpc_proto.SelectResponseb\x06proto3'
 )
 
 _LOGICTYPE = _descriptor.EnumDescriptor(
@@ -93,8 +93,8 @@ _LOGICTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5454,
-  serialized_end=5620,
+    serialized_start=5455,
+    serialized_end=5621,
 )
 _sym_db.RegisterEnumDescriptor(_LOGICTYPE)
 
@@ -129,8 +129,8 @@ _CONSTRAINT = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5622,
-  serialized_end=5689,
+    serialized_start=5623,
+    serialized_end=5690,
 )
 _sym_db.RegisterEnumDescriptor(_CONSTRAINT)
 
@@ -180,8 +180,8 @@ _ELEMENTTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5691,
-  serialized_end=5814,
+    serialized_start=5692,
+    serialized_end=5815,
 )
 _sym_db.RegisterEnumDescriptor(_ELEMENTTYPE)
 
@@ -246,8 +246,8 @@ _COLUMNTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5817,
-  serialized_end=6016,
+    serialized_start=5818,
+    serialized_end=6017,
 )
 _sym_db.RegisterEnumDescriptor(_COLUMNTYPE)
 
@@ -1935,7 +1935,7 @@ _LISTDATABASERESPONSE = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='db_name', full_name='infinity_grpc_proto.ListDatabaseResponse.db_name', index=0,
+        name='db_names', full_name='infinity_grpc_proto.ListDatabaseResponse.db_names', index=0,
       number=1, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -1968,7 +1968,7 @@ _LISTDATABASERESPONSE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=4335,
-  serialized_end=4410,
+    serialized_end=4411,
 )
 
 
@@ -2006,8 +2006,8 @@ _DESCRIBEDATABASEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4412,
-  serialized_end=4474,
+    serialized_start=4413,
+    serialized_end=4475,
 )
 
 
@@ -2059,8 +2059,8 @@ _DESCRIBEDATABASERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4476,
-  serialized_end=4576,
+    serialized_start=4477,
+    serialized_end=4577,
 )
 
 
@@ -2112,8 +2112,8 @@ _LISTTABLEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4578,
-  serialized_end=4669,
+    serialized_start=4579,
+    serialized_end=4670,
 )
 
 
@@ -2158,8 +2158,8 @@ _LISTTABLERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4671,
-  serialized_end=4746,
+    serialized_start=4672,
+    serialized_end=4747,
 )
 
 
@@ -2197,8 +2197,8 @@ _DESCRIBETABLEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4748,
-  serialized_end=4807,
+    serialized_start=4749,
+    serialized_end=4808,
 )
 
 
@@ -2250,8 +2250,8 @@ _DESCRIBETABLERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4809,
-  serialized_end=4912,
+    serialized_start=4810,
+    serialized_end=4913,
 )
 
 
@@ -2289,8 +2289,8 @@ _GETDATABASEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4914,
-  serialized_end=4971,
+    serialized_start=4915,
+    serialized_end=4972,
 )
 
 
@@ -2335,8 +2335,8 @@ _GETTABLEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4973,
-  serialized_end=5047,
+    serialized_start=4974,
+    serialized_end=5048,
 )
 
 
@@ -2416,8 +2416,8 @@ _CREATEINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5050,
-  serialized_end=5298,
+    serialized_start=5051,
+    serialized_end=5299,
 )
 
 
@@ -2455,8 +2455,8 @@ _INITPARAMETER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5300,
-  serialized_end=5354,
+    serialized_start=5301,
+    serialized_end=5355,
 )
 
 
@@ -2508,8 +2508,8 @@ _DROPINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5356,
-  serialized_end=5451,
+    serialized_start=5357,
+    serialized_end=5452,
 )
 
 _CREATEDATABASEREQUEST.fields_by_name['options'].message_type = _OPTIONS
@@ -2941,8 +2941,8 @@ _INFINITYGRPCSERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=6019,
-  serialized_end=7606,
+    serialized_start=6020,
+    serialized_end=7607,
   methods=[
   _descriptor.MethodDescriptor(
     name='Connect',

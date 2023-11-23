@@ -328,7 +328,7 @@ message ListDatabaseRequest {
 }
 
 message ListDatabaseResponse{
-  repeated string db_name = 1;
+  repeated string db_names = 1;
   bool success = 2;
   string error_msg = 3;
 }

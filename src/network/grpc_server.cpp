@@ -99,13 +99,14 @@ grpc::Status GrpcServiceImpl::ListDatabase(grpc::ServerContext *context, const i
             Value value = data_block->GetValue(0, i);
             if (value.value_.varchar.IsInlined()) {
                 String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
-                response->add_db_name(prefix);
+                response->add_db_names(prefix);
             } else {
                 String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
-                response->add_db_name(whole_str);
+                response->add_db_names(whole_str);
             }
         }
 
+        response->set_success(true);
         return grpc::Status::OK;
     } else {
         response->set_success(false);

@@ -16,17 +16,20 @@ import importlib.metadata
 __version__ = importlib.metadata.version("infinity")
 
 from infinity.infinity import URI, InfinityConnection, NetworkAddress
-from infinity.remote_grpc.infinity import RemoteInfinityConnection
+from infinity.remote_grpc.infinity import RemoteGrpcInfinityConnection
+from infinity.remote_brpc.infinity import RemoteBrpcInfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 
 def connect(
         uri: URI,
 ) -> InfinityConnection:
-    if isinstance(uri, NetworkAddress) and uri.port == 50002:
-        return RemoteInfinityConnection(uri)
-    if isinstance(uri, NetworkAddress) and uri.port == 9090:
+    if isinstance(uri, NetworkAddress) and uri.port == 50052:
+        return RemoteGrpcInfinityConnection(uri)
+    elif isinstance(uri, NetworkAddress) and uri.port == 9090:
         return RemoteThriftInfinityConnection(uri)
+    elif isinstance(uri, NetworkAddress) and uri.port == 50051:
+        return RemoteBrpcInfinityConnection(uri)
     else:
         raise Exception(f"unknown uri: {uri}")
 
