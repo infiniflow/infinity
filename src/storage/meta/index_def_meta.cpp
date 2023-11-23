@@ -30,6 +30,7 @@ import third_party;
 import infinity_exception;
 import table_collection_entry;
 import status;
+import iresearch_datastore;
 
 module index_def_meta;
 
@@ -71,6 +72,11 @@ Status IndexDefMeta::CreateNewEntry(IndexDefMeta *index_def_meta,
             auto index_def_entry = IndexDefEntry::NewIndexDefEntry(index_def, index_def_meta, txn_id, begin_ts);
             new_index_entry = index_def_entry.get();
             index_def_meta->entry_list_.emplace_front(Move(index_def_entry));
+            if (index_def->method_type_ == IndexMethod::kIRSFullText) {
+                index_def_meta->irs_index_ =
+                    MakeShared<IRSDataStore>(*(index_def_meta->table_collection_entry_->table_collection_name_), *(index_def_entry->index_dir_));
+            }
+
             return Status::OK();
         }
         case BaseMeta::kConflict: {
