@@ -38,6 +38,7 @@ import index_def_meta;
 import txn_manager;
 import index_entry;
 import index_def_entry;
+import iresearch_datastore;
 
 module table_collection_entry;
 
@@ -71,6 +72,7 @@ Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
                                          BaseEntry *&new_index_entry) {
     // TODO: lock granularity can be narrowed.
     table_entry->rw_locker_.lock_shared();
+
     IndexDefMeta *index_def_meta{nullptr};
     if (index_def->index_name_->empty()) {
         // set default index name
@@ -107,7 +109,6 @@ Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
         LOG_TRACE(
             Format("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_));
     }
-    IndexDef *index_def_ptr = index_def.get();
     return IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
@@ -200,16 +201,23 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            IndexDefEntry *index_def_entry,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
-    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-    auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-    if (index_def->column_names_.size() != 1) {
-        StorageException("Not implemented");
-    }
-    const String &column_name = index_def->column_names_[0];
-    u64 column_id = table_entry->GetColumnIdByName(column_name);
-    SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
-    for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-        SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+    if (index_def_entry->index_def_->method_type_ == IndexMethod::kIRSFullText) {
+        IndexDefMeta *index_def_meta = table_entry->indexes_[*(index_def_entry->index_def_->index_name_)].get();
+        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+            index_def_meta->irs_index_->BatchInsert(table_entry, index_def_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
+        }
+    } else {
+        SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
+        auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
+        if (index_def->column_names_.size() != 1) {
+            StorageException("Not implemented");
+        }
+        const String &column_name = index_def->column_names_[0];
+        u64 column_id = table_entry->GetColumnIdByName(column_name);
+        SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
+        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+            SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+        }
     }
 }
 
@@ -460,6 +468,7 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
                              "DBEntry::MergeFrom requires table_entry_dir_ match");
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
+    this->row_count_.store(Max(this->row_count_, table_entry2->row_count_));
     u32 max_segment_id = 0;
     for (auto &[seg_id, sgement_entry] : this->segments_) {
         max_segment_id = Max(max_segment_id, seg_id);

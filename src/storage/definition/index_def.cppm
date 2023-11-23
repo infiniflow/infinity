@@ -25,6 +25,7 @@ export enum class IndexMethod {
     kIVFFlat,
     kIVFSQ8,
     kHnsw,
+    kIRSFullText,
     kInvalid,
 };
 

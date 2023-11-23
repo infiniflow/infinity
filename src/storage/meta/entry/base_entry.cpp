@@ -46,7 +46,14 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
             }
         }
     }
-    list1.splice(it1, list2, it2, list2.end());
+
+    while(it2 != list2.end()) {
+        if ((*it2)->entry_type_ != EntryType::kDummy) {
+            list1.insert(it1, Move(*it2));
+        }
+        ++it2;
+    }
+
     list2.clear();
 }
 

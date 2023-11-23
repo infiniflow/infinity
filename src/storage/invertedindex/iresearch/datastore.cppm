@@ -22,7 +22,10 @@ import data_block;
 import operator_state;
 import column_vector;
 import query_context;
-import base_table_ref;
+import index_def;
+import segment_entry;
+import table_collection_entry;
+import buffer_manager;
 
 export module iresearch_datastore;
 
@@ -46,11 +49,33 @@ public:
     IRSDirectoryReader *reader_;
 };
 
-class IRSAsync;
+export class IRSAsync {
+public:
+    ~IRSAsync() { Stop(); }
+
+    void Stop() noexcept {
+        try {
+            pool_0_.stop(true);
+        } catch (...) {
+        }
+        try {
+            pool_1_.stop(true);
+        } catch (...) {
+        }
+    }
+
+    template <typename T>
+    void Queue(SizeT id, T &&fn);
+
+private:
+    ThreadPool pool_0_{1};
+    ThreadPool pool_1_{1};
+};
+
 struct MaintenanceState;
 export class IRSDataStore {
 public:
-    explicit IRSDataStore(const String &table_name, const String &directory, SharedPtr<BaseTableRef> base_table_ref);
+    explicit IRSDataStore(const String &table_name, const String &directory);
 
     struct DataSnapshot {
         DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
@@ -81,7 +106,7 @@ public:
 
     void ScheduleOptimize();
 
-    void BatchInsert(u32 block_id, SharedPtr<DataBlock> data_block);
+    void BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
 
@@ -90,7 +115,6 @@ public:
 private:
     String directory_;
     Path path_;
-    SharedPtr<BaseTableRef> base_table_ref_{};
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
     IRSIndexWriter::Transaction recovery_txn_;

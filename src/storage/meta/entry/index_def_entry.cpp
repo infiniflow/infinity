@@ -96,6 +96,7 @@ UniquePtr<IndexDefEntry> IndexDefEntry::Deserialize(const Json &index_def_entry_
     if (deleted) {
         auto index_def_entry = MakeUnique<IndexDefEntry>(nullptr, index_def_meta, nullptr, txn_id, begin_ts);
         index_def_entry->deleted_ = true;
+        index_def_entry->commit_ts_.store(commit_ts);
         return index_def_entry;
     }
 
