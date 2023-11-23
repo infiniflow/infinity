@@ -61,30 +61,36 @@ double Measurement(SizeT thread_num, SizeT times, const StdFunction<void(SizeT, 
 }
 
 int main() {
-    SizeT thread_num = 2;
-    SizeT total_times = 8192;
+    SizeT thread_num = 16;
+    SizeT total_times = 8192*4;
 
     String path = "/tmp/infinity";
 
-    LocalFileSystem fs;
-    if (fs.Exists(path)) {
-        fs.DeleteDirectory(path);
-    }
-    fs.CreateDirectory(path);
+//    LocalFileSystem fs;
+//    if (fs.Exists(path)) {
+//        fs.DeleteDirectory(path);
+//    }
+//    fs.CreateDirectory(path);
 
     Infinity::LocalInit(path);
 
     std::cout << ">>> Infinity Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
-    
+
+    {
+        SharedPtr <Infinity> infinity = Infinity::LocalConnect();
+        auto result = infinity->Query("select * from benchmark_test;");
+        infinity->LocalDisconnect();
+    }
+
     Vector<String> results;
     // Database
-    {
-        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-            auto _ = infinity->GetDatabase("default");
-        });
-        results.push_back(Format("-> Get Database QPS: {}", total_times / tims_costing_second));
-    }
+//    {
+//        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+//            auto _ = infinity->GetDatabase("default");
+//        });
+//        results.push_back(Format("-> Get Database QPS: {}", total_times / tims_costing_second));
+//    }
 //    {
 //        auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
 //            auto _ = infinity->ListDatabases();
@@ -175,15 +181,15 @@ int main() {
 //            results.push_back(Format("-> Drop Table QPS: {}", total_times / tims_costing_second));
 //        }
         {
-//            Vector<Pair<ParsedExpr *, ParsedExpr *>> vec_search_exprs;
-//            Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
-//
-//            {
-//                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-//                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(vec_search_exprs, fts_search_exprs, nullptr, nullptr, nullptr, nullptr);
-//                });
-//                results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
-//            }
+            Vector<Pair<ParsedExpr *, ParsedExpr *>> vec_search_exprs;
+            Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
+
+            {
+                auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(vec_search_exprs, fts_search_exprs, nullptr, nullptr, nullptr, nullptr);
+                });
+                results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
+            }
             {
                 auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
                     Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
@@ -205,6 +211,12 @@ int main() {
                 results.push_back(Format("-> Insert QPS: {}", total_times / tims_costing_second));
             }
         }
+    }
+
+    {
+        SharedPtr <Infinity> infinity = Infinity::LocalConnect();
+        auto result = infinity->Query("select * from benchmark_test;");
+        infinity->LocalDisconnect();
     }
 
     std::cout << ">>> Infinity Benchmark End <<<" << std::endl;
