@@ -11,4 +11,6 @@ target_link_libraries(
         onnxruntime_mlas
         zsv_parser
         iresearch
+        lz4
+        atomic
 )
