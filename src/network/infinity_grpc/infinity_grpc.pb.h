@@ -6566,33 +6566,31 @@ class ListDatabaseResponse final :
   enum : int {
       kDbNamesFieldNumber = 1,
       kErrorMsgFieldNumber = 3,
-    kSuccessFieldNumber = 2,
+      kSuccessFieldNumber = 2,
   };
   // repeated string db_names = 1;
   int db_names_size() const;
-
   private:
   int _internal_db_names_size() const;
-
   public:
   void clear_db_names();
-  const std::string &db_names(int index) const;
-  std::string *mutable_db_names(int index);
-  void set_db_names(int index, const std::string &value);
-  void set_db_names(int index, std::string &&value);
-  void set_db_names(int index, const char *value);
-  void set_db_names(int index, const char *value, size_t size);
-  std::string *add_db_names();
-  void add_db_names(const std::string &value);
-  void add_db_names(std::string &&value);
-  void add_db_names(const char *value);
-  void add_db_names(const char *value, size_t size);
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &db_names() const;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> *mutable_db_names();
+      const std::string &db_names(int index) const;
+      std::string *mutable_db_names(int index);
+      void set_db_names(int index, const std::string &value);
+      void set_db_names(int index, std::string &&value);
+      void set_db_names(int index, const char *value);
+      void set_db_names(int index, const char *value, size_t size);
+      std::string *add_db_names();
+      void add_db_names(const std::string &value);
+      void add_db_names(std::string &&value);
+      void add_db_names(const char *value);
+      void add_db_names(const char *value, size_t size);
+      const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &db_names() const;
+      ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> *mutable_db_names();
 
   private:
-  const std::string &_internal_db_names(int index) const;
-  std::string *_internal_add_db_names();
+      const std::string &_internal_db_names(int index) const;
+      std::string *_internal_add_db_names();
 
   public:
 
@@ -13541,7 +13539,7 @@ inline void ListDatabaseResponse::set_db_names(int index, const char *value) {
   // @@protoc_insertion_point(field_set_char:infinity_grpc_proto.ListDatabaseResponse.db_names)
 }
 inline void ListDatabaseResponse::set_db_names(int index, const char *value, size_t size) {
-  _impl_.db_names_.Mutable(index)->assign(reinterpret_cast<const char*>(value), size);
+  _impl_.db_names_.Mutable(index)->assign(reinterpret_cast<const char *>(value), size);
   // @@protoc_insertion_point(field_set_pointer:infinity_grpc_proto.ListDatabaseResponse.db_names)
 }
 inline std::string *ListDatabaseResponse::_internal_add_db_names() { return _impl_.db_names_.Add(); }
@@ -13562,11 +13560,11 @@ inline void ListDatabaseResponse::add_db_names(const char *value, size_t size) {
   _impl_.db_names_.Add()->assign(reinterpret_cast<const char *>(value), size);
   // @@protoc_insertion_point(field_add_pointer:infinity_grpc_proto.ListDatabaseResponse.db_names)
 }
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>&ListDatabaseResponse::db_names() const {
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> &ListDatabaseResponse::db_names() const {
   // @@protoc_insertion_point(field_list:infinity_grpc_proto.ListDatabaseResponse.db_names)
   return _impl_.db_names_;
 }
-inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string>*ListDatabaseResponse::mutable_db_names() {
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField<std::string> *ListDatabaseResponse::mutable_db_names() {
   // @@protoc_insertion_point(field_mutable_list:infinity_grpc_proto.ListDatabaseResponse.db_names)
   return &_impl_.db_names_;
 }
