@@ -207,18 +207,18 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
         for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
             index_def_meta->irs_index_->BatchInsert(table_entry, index_def_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
         }
-    }
-
-    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-    auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-    if (index_def->column_names_.size() != 1) {
-        StorageException("Not implemented");
-    }
-    const String &column_name = index_def->column_names_[0];
-    u64 column_id = table_entry->GetColumnIdByName(column_name);
-    SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
-    for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-        SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+    } else {
+        SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
+        auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
+        if (index_def->column_names_.size() != 1) {
+            StorageException("Not implemented");
+        }
+        const String &column_name = index_def->column_names_[0];
+        u64 column_id = table_entry->GetColumnIdByName(column_name);
+        SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
+        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
+            SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+        }
     }
 }
 
