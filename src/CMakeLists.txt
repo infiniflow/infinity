@@ -54,14 +54,22 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         network/*.h
 )
-#
-#
+
+find_package(Protobuf REQUIRED)
+get_filename_component(infinity_proto "../proto/infinity.proto" ABSOLUTE)
+protobuf_generate_cpp(infinity_proto_src infinity_proto_hdr ${infinity_proto}
+        PROTOC_OUT_DIR network)
+protobuf_generate_python(infinity_proto_py ${infinity_proto}
+        PROTOC_OUT_DIR python/infinity/remote)
+
 file(GLOB_RECURSE
         brpc_cpp
         CONFIGURE_DEPENDS
         network/*.cpp
         network/*.cc
 )
+
+list(FILTER brpc_cpp EXCLUDE REGEX .*pb.cc)
 
 file(GLOB_RECURSE
         function_cpp
@@ -215,7 +223,14 @@ add_executable(infinity
         ${main_cpp}
         ${network_cpp}
         ${brpc_cpp}
+        ${infinity_proto_src}
 )
+
+# Add a custom target for generating Python files
+add_custom_target(generate_python_files DEPENDS ${infinity_proto_py})
+
+# Make an existing target depend on another existing target.
+add_dependencies(infinity generate_python_files)
 
 target_sources(infinity
         PUBLIC

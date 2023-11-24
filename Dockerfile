@@ -14,6 +14,9 @@ RUN tar xzf cmake-3.28.0-rc5-linux-x86_64.tar.gz && cp -rf cmake-3.28.0-rc5-linu
 
 RUN apt install -y wget emacs-nox git make ninja-build bison flex libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev
 
+ENV CC=/usr/bin/clang-17
+ENV CXX=/usr/bin/clang++-17
+
 # iresearch requires lz4
 # git clone https://github.com/lz4/lz4.git && tar czvf lz4.tgz lz4
 COPY lz4.tgz .
@@ -23,5 +26,4 @@ RUN tar xzf lz4.tgz && cd lz4 && make && make install
 RUN apt install -y libgrpc++-dev libgrpc-dev protobuf-compiler-grpc libprotobuf-dev python3-grpcio python3-grpc-tools libprotoc-dev libprotoc-dev
 
 ENV LZ4_ROOT=/usr/local
-ENV CC=/usr/bin/clang-17
-ENV CXX=/usr/bin/clang++-17
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
