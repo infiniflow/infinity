@@ -30,8 +30,8 @@ import base_entry;
 
 import infinity_exception;
 import defer_op;
-import ivfflat_index_def;
-import hnsw_index_def;
+import ivfflat_def;
+import hnsw_def;
 import buffer_handle;
 import annivfflat_index_data;
 import annivfflat_index_file_worker;
@@ -42,8 +42,11 @@ import logger;
 import local_file_system;
 import random;
 import parser;
-import index_entry;
 import txn_store;
+import table_index_entry;
+import segment_column_index_entry;
+import column_index_entry;
+import base_index;
 
 import knn_hnsw;
 import dist_func;
@@ -154,25 +157,36 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
-                                                    IndexDefEntry *index_def_entry,
-                                                    SharedPtr<ColumnDef> column_def,
-                                                    TxnTimeStamp create_ts,
-                                                    BufferManager *buffer_mgr,
-                                                    TxnTableStore *txn_store) {
+// NewIndexEntry(ColumnIndexEntry *column_index_entry,
+//               u32 segment_id,
+//               TxnTimeStamp create_ts,
+//               BufferManager *buffer_manager,
+//               UniquePtr<CreateIndexParam> param)
+
+SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
+                                                                 ColumnIndexEntry *column_index_entry,
+                                                                 SharedPtr<ColumnDef> column_def,
+                                                                 TxnTimeStamp create_ts,
+                                                                 BufferManager *buffer_mgr,
+                                                                 TxnTableStore *txn_store) {
     u64 column_id = column_def->id();
-    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-    SharedPtr<IndexEntry> index_entry =
-        IndexEntry::NewIndexEntry(index_def_entry, segment_entry, create_ts, buffer_mgr, GetCreateIndexPara(segment_entry, index_def, column_def));
-    switch (index_def->method_type_) {
-        case IndexMethod::kIVFFlat: {
+    //    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
+    BaseIndex *base_index = column_index_entry->base_index_.get();
+    UniquePtr<CreateIndexParam> create_index_param = MakeUnique<CreateIndexParam>(base_index, column_def.get());
+    SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
+        SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, segment_entry->segment_id_, create_ts, buffer_mgr, create_index_param.get());
+    //    SharedPtr<IndexEntry> index_entry =
+    //        IndexEntry::NewIndexEntry(index_def_entry, segment_entry, create_ts, buffer_mgr, GetCreateIndexParam(segment_entry, index_def,
+    //        column_def));
+    switch (base_index->index_type_) {
+        case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Error<StorageException>("AnnIVFFlat supports embedding type.");
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
             SizeT dimension = embedding_info->Dimension();
-            BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
+            BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     auto annivfflat_index = static_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
@@ -181,10 +195,12 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
                     segment_column_data.reserve(segment_entry->row_count_ * dimension);
                     for (const auto &block_entry : segment_entry->block_entries_) {
                         auto block_column_entry = block_entry->columns_[column_id].get();
-                        BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-                        auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
+                        BufferHandle block_column_buffer_handle = block_column_entry->buffer_->Load();
+                        auto block_column_data_ptr = reinterpret_cast<const float *>(block_column_buffer_handle.GetData());
                         SizeT block_row_cnt = block_entry->row_count_;
-                        segment_column_data.insert(segment_column_data.end(), block_data_ptr, block_data_ptr + block_row_cnt * dimension);
+                        segment_column_data.insert(segment_column_data.end(),
+                                                   block_column_data_ptr,
+                                                   block_column_data_ptr + block_row_cnt * dimension);
                     }
                     SizeT total_row_cnt = segment_column_data.size() / dimension;
                     annivfflat_index->train_centroids(dimension, total_row_cnt, segment_column_data.data());
@@ -197,26 +213,26 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
             }
             break;
         }
-        case IndexMethod::kHnsw: {
+        case IndexType::kHnsw: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Error<StorageException>("HNSW supports embedding type.");
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
             SizeT dimension = embedding_info->Dimension();
-            BufferHandle buffer_handle = IndexEntry::GetIndex(index_entry.get(), buffer_mgr);
+            BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     auto hnsw_index = static_cast<KnnHnsw<float, u64> *>(buffer_handle.GetDataMut());
                     u32 segment_offset = 0;
                     for (const auto &block_entry : segment_entry->block_entries_) {
                         auto block_column_entry = block_entry->columns_[column_id].get();
-                        BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-                        auto block_data_ptr = reinterpret_cast<const float *>(buffer_handle.GetData());
+                        BufferHandle block_column_buffer_handle = block_column_entry->buffer_->Load();
+                        auto block_column_data_ptr = reinterpret_cast<const float *>(block_column_buffer_handle.GetData());
                         SizeT block_row_cnt = block_entry->row_count_;
                         for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
                             RowID row_id(segment_entry->segment_id_, segment_offset + block_offset);
-                            hnsw_index->Insert(block_data_ptr + block_offset * dimension, row_id.ToUint64());
+                            hnsw_index->Insert(block_column_data_ptr + block_offset * dimension, row_id.ToUint64());
                         }
                         segment_offset += block_row_cnt;
                     }
@@ -232,8 +248,8 @@ SharedPtr<IndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
             throw NotImplementException("Not implemented.");
         }
     }
-    txn_store->CreateIndexFile(index_def_entry, segment_entry->segment_id_, index_entry);
-    return index_entry;
+    txn_store->CreateIndexFile(column_index_entry->table_index_entry_, column_id, segment_entry->segment_id_, segment_column_index_entry);
+    return segment_column_index_entry;
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count) {
@@ -383,7 +399,7 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     }
 
     SizeT segment2_block_count = segment_entry2->block_entries_.size();
-    for(; idx < segment2_block_count; ++ idx) {
+    for (; idx < segment2_block_count; ++idx) {
         this->block_entries_.emplace_back(segment_entry2->block_entries_[idx]);
     }
 
@@ -396,20 +412,20 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     // }
 }
 
-UniquePtr<CreateIndexPara>
-SegmentEntry::GetCreateIndexPara(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def) {
-    switch (index_def->method_type_) {
-        case IndexMethod::kIVFFlat: {
-            return MakeUnique<CreateAnnIVFFlatPara>(index_def, column_def, segment_entry->row_count_);
-        }
-        case IndexMethod::kHnsw: {
-            SizeT max_element = segment_entry->row_capacity_;
-            return MakeUnique<CreateHnswPara>(index_def, column_def, max_element);
-        }
-        default: {
-            throw NotImplementException("Not implemented.");
-        }
-    }
-}
+// UniquePtr<CreateIndexParam>
+// SegmentEntry::GetCreateIndexParam(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def) {
+//     switch (index_def->method_type_) {
+//         case IndexMethod::kIVFFlat: {
+//             return MakeUnique<CreateAnnIVFFlatParam>(index_def, column_def, segment_entry->row_count_);
+//         }
+//         case IndexMethod::kHnsw: {
+//             SizeT max_element = segment_entry->row_capacity_;
+//             return MakeUnique<CreateHnswParam>(index_def, column_def, max_element);
+//         }
+//         default: {
+//             throw NotImplementException("Not implemented.");
+//         }
+//     }
+// }
 
 } // namespace infinity

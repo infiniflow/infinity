@@ -42,8 +42,8 @@ struct TableName {
 };
 
 struct InitParameter {
-    std::string para_name_{};
-    std::string para_value_{};
+    std::string param_name_{};
+    std::string param_value_{};
 };
 
 struct IfExistsInfo {

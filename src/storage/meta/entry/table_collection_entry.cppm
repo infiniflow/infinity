@@ -26,9 +26,9 @@ import block_index;
 import table_collection_meta;
 import data_access_state;
 import txn_manager;
-import index_entry;
+import segment_column_index_entry;
 import segment_entry;
-import index_def_meta;
+import table_index_meta;
 import txn;
 import status;
 
@@ -38,7 +38,7 @@ namespace infinity {
 
 class DBEntry;
 class IndexDef;
-class IndexDefEntry;
+class TableIndexEntry;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
@@ -67,7 +67,8 @@ public:
                             TxnManager *txn_mgr,
                             BaseEntry *&new_index_entry);
 
-    static Status GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&index_entry);
+    static Status
+    GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&segment_column_index_entry);
 
     static void RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
@@ -76,7 +77,7 @@ public:
 
     static void CreateIndexFile(TableCollectionEntry *table_entry,
                                 void *txn_store,
-                                IndexDefEntry *index_def_entry,
+                                TableIndexEntry *table_index_entry,
                                 TxnTimeStamp begin_ts,
                                 BufferManager *buffer_mgr);
 
@@ -126,19 +127,21 @@ public:
     SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_collection_name_{};
-    Vector<SharedPtr<ColumnDef>> columns_{}; // 2. So this should be HashMap
+
+    Vector<SharedPtr<ColumnDef>> columns_{};
+
     TableCollectionType table_collection_type_{TableCollectionType::kTableEntry};
 
     TableCollectionMeta *table_collection_meta_{};
 
     // From data table
     Atomic<SizeT> row_count_{};
-    HashMap<u32, SharedPtr<SegmentEntry>> segments_{};
+    HashMap<u32, SharedPtr<SegmentEntry>> segment_map_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
     // Index definition
-    HashMap<String, UniquePtr<IndexDefMeta>> indexes_{};
+    HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
 };
 
 } // namespace infinity

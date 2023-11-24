@@ -44,7 +44,7 @@ protected:
     };
 
     // The write lock must be held before calling this function.
-    // It return the status useful when to add new/delete entry
+    // It returns the status useful when to add new/delete entry
     EntryStatus AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const;
 
     RWMutex rw_locker_{};

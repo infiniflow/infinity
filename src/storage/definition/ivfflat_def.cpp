@@ -21,61 +21,62 @@ import index_def;
 import parser;
 import third_party;
 import serialize;
+import base_index;
 
 import infinity_exception;
 
-module ivfflat_index_def;
+module ivfflat_def;
 
 namespace infinity {
 
-SharedPtr<IndexDef> IVFFlatIndexDef::Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list) {
+SharedPtr<BaseIndex> IVFFlatDef::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT centroids_count = 0;
     MetricType metric_type = MetricType::kInvalid;
-    for (auto para : index_para_list) {
-        if (para->para_name_ == "centroids_count") {
-            centroids_count = std::stoi(para->para_value_);
-        } else if (para->para_name_ == "metric") {
-            metric_type = StringToMetricType(para->para_value_);
+    for (auto para : index_param_list) {
+        if (para->param_name_ == "centroids_count") {
+            centroids_count = std::stoi(para->param_value_);
+        } else if (para->param_name_ == "metric") {
+            metric_type = StringToMetricType(para->param_value_);
         }
     }
     if (metric_type == MetricType::kInvalid) {
         Error<StorageException>("Lack index parameter metric_type");
     }
-    return MakeShared<IVFFlatIndexDef>(Move(index_name), Move(column_names), centroids_count, metric_type);
+    return MakeShared<IVFFlatDef>(Move(file_name), Move(column_names), centroids_count, metric_type);
 }
 
-bool IVFFlatIndexDef::operator==(const IndexDef &other) const {
+bool IVFFlatDef::operator==(const BaseIndex &other) const {
     try {
-        auto other1 = dynamic_cast<const IVFFlatIndexDef &>(other);
-        return IndexDef::operator==(other) && centroids_count_ == other1.centroids_count_ && metric_type_ == other1.metric_type_;
+        auto other1 = dynamic_cast<const IVFFlatDef &>(other);
+        return BaseIndex::operator==(other) && centroids_count_ == other1.centroids_count_ && metric_type_ == other1.metric_type_;
     } catch (std::bad_cast exception) {
         return false;
     }
 }
 
-bool IVFFlatIndexDef::operator!=(const IndexDef &other) const { return !(*this == other); }
+bool IVFFlatDef::operator!=(const BaseIndex &other) const { return !(*this == other); }
 
-i32 IVFFlatIndexDef::GetSizeInBytes() const {
-    SizeT size = IndexDef::GetSizeInBytes();
+i32 IVFFlatDef::GetSizeInBytes() const {
+    SizeT size = BaseIndex::GetSizeInBytes();
     size += sizeof(centroids_count_);
     size += sizeof(metric_type_);
     return size;
 }
 
-void IVFFlatIndexDef::WriteAdv(char *&ptr) const {
-    IndexDef::WriteAdv(ptr);
+void IVFFlatDef::WriteAdv(char *&ptr) const {
+    BaseIndex::WriteAdv(ptr);
     WriteBufAdv(ptr, centroids_count_);
     WriteBufAdv(ptr, metric_type_);
 }
 
-String IVFFlatIndexDef::ToString() const {
+String IVFFlatDef::ToString() const {
     std::stringstream ss;
-    ss << IndexDef::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
+    ss << BaseIndex::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
     return ss.str();
 }
 
-Json IVFFlatIndexDef::Serialize() const {
-    Json res = IndexDef::Serialize();
+Json IVFFlatDef::Serialize() const {
+    Json res = BaseIndex::Serialize();
     res["centroids_count"] = centroids_count_;
     res["metric_type"] = MetricTypeToString(metric_type_);
     return res;

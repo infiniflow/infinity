@@ -162,9 +162,9 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->column_names_->size(), 2);
         EXPECT_EQ((*create_index_info->column_names_)[0], "c1");
         EXPECT_EQ((*create_index_info->column_names_)[1], "c2");
-        EXPECT_EQ(create_index_info->index_para_list_->size(), 1);
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_name_, "metric");
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_value_, "l2");
+        EXPECT_EQ(create_index_info->index_param_list_->size(), 1);
+        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_name_, "metric");
+        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_value_, "l2");
 
         result->Reset();
     }

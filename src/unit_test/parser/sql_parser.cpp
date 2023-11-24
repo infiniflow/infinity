@@ -525,7 +525,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
         EXPECT_EQ(create_index_info->column_names_->size(), 1);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
     {
@@ -547,7 +547,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
         EXPECT_EQ(create_index_info->column_names_->size(), 1);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
     {
@@ -569,7 +569,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
         EXPECT_EQ(create_index_info->column_names_->size(), 1);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
     {
@@ -591,7 +591,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
         EXPECT_EQ(create_index_info->column_names_->size(), 1);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
     {
@@ -614,7 +614,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->column_names_->size(), 2);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
         EXPECT_EQ((*create_index_info->column_names_)[1], "b");
-        EXPECT_TRUE(create_index_info->index_para_list_->empty());
+        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
     {
@@ -636,9 +636,9 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
         EXPECT_EQ(create_index_info->column_names_->size(), 1);
         EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_EQ(create_index_info->index_para_list_->size(), 1);
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_name_, "metric");
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_value_, "l2");
+        EXPECT_EQ(create_index_info->index_param_list_->size(), 1);
+        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_name_, "metric");
+        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_value_, "l2");
         result->Reset();
     }
 }

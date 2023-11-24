@@ -18,20 +18,19 @@ import stl;
 import index_file_worker;
 import dist_func;
 import knn_hnsw;
-import hnsw_index_def;
 import parser;
-import index_def;
+import base_index;
 import dist_func;
 
 export module hnsw_file_worker;
 
 namespace infinity {
 
-export struct CreateHnswPara : public CreateIndexPara {
-    const SizeT max_element_;
+export struct CreateHnswParam : public CreateIndexParam {
+    const SizeT max_element_{};
 
-    CreateHnswPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def, SizeT max_element)
-        : CreateIndexPara(index_def, column_def), max_element_(max_element) {}
+    CreateHnswParam(BaseIndex *base_index, ColumnDef *column_def, SizeT max_element)
+        : CreateIndexParam(base_index, column_def), max_element_(max_element) {}
 };
 
 export class HnswFileWorker : public IndexFileWorker {
@@ -40,10 +39,10 @@ export class HnswFileWorker : public IndexFileWorker {
 public:
     explicit HnswFileWorker(SharedPtr<String> file_dir,
                             SharedPtr<String> file_name,
-                            SharedPtr<IndexDef> index_def,
-                            SharedPtr<ColumnDef> column_def,
+                            BaseIndex* base_index,
+                            ColumnDef* column_def,
                             SizeT max_element)
-        : IndexFileWorker(file_dir, file_name, index_def, column_def), max_element_(max_element) {}
+        : IndexFileWorker(file_dir, file_name, base_index, column_def), max_element_(max_element) {}
 
     virtual ~HnswFileWorker() override;
 

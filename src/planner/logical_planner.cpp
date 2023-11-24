@@ -17,8 +17,8 @@ module;
 #include <memory>
 
 import stl;
-import parser;
 import bind_context;
+import parser;
 
 import infinity_exception;
 import query_binder;
@@ -61,10 +61,12 @@ import explain_ast;
 import local_file_system;
 import parser;
 import index_def;
-import ivfflat_index_def;
 import status;
 import default_values;
-import hnsw_index_def;
+import base_index;
+import ivfflat_def;
+import hnsw_def;
+import full_text_def;
 
 module logical_planner;
 
@@ -153,7 +155,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
-    BaseEntry* base_table_entry{nullptr};
+    BaseEntry *base_table_entry{nullptr};
     Status status = txn->GetTableByName(schema_name, table_name, base_table_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
@@ -412,46 +414,62 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     return Status();
 }
 
+// struct IndexInfo {
+//     ~IndexInfo();
+//     IndexType method_type_{};
+//     std::string column_name_{};
+//     std::vector<InitParameter *> *index_param_list_{nullptr};
+//
+//     static std::string IndexTypeToString(IndexType index_type);
+// };
+
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
-    if (create_index_info->column_names_->size() != 1) {
-        Error<NotImplementException>("Creating index only support single column now.");
-    }
+    //    if (create_index_info->column_names_->size() != 1) {
+    //        Error<NotImplementException>("Creating index only support single column now.");
+    //    }
 
-    Vector<String> column_names(*create_index_info->column_names_);
-    String index_name = Move(create_index_info->index_name_);
-    IndexMethod method_type = IndexMethod::kInvalid;
-    if (IsEqual(create_index_info->method_type_, "IVFFlat")) {
-        method_type = IndexMethod::kIVFFlat;
-    } else if (IsEqual(create_index_info->method_type_, "IVFSQ8")) {
-        method_type = IndexMethod::kIVFSQ8;
-    } else if (IsEqual(create_index_info->method_type_, "Hnsw")) {
-        method_type = IndexMethod::kHnsw;
-    } else {
-        PlannerException("Invalid index method type.");
-    }
-    // auto index_def_common = IndexDefCommon(Move(index_name), Move(method_type), Move(column_names));
+    SharedPtr<String> index_name = MakeShared<String>(Move(create_index_info->index_name_));
+    SharedPtr<IndexDef> index_def_ptr = MakeShared<IndexDef>(index_name);
 
-    SharedPtr<IndexDef> index_def_ptr = nullptr;
-    switch (method_type) {
-        case IndexMethod::kIVFFlat: {
-            index_def_ptr = IVFFlatIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
-            break;
+    Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
+    index_def_ptr->index_array_.reserve(index_info_list.size());
+    for (IndexInfo *index_info : index_info_list) {
+        SharedPtr<BaseIndex> base_index_ptr{nullptr};
+        switch (index_info->index_type_) {
+            case IndexType::kIRSFullText: {
+                base_index_ptr = FullTextDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                                                   {index_info->column_name_},
+                                                   *(index_info->index_param_list_));
+                break;
+            }
+            //            case IndexType::kHnswLVQ: {
+            //                base_index_ptr =
+            //                        HnswLVQ::Make(MakeShared<String>(table_name + "_" + index_name), {index_info->column_name_},
+            //                        *(index_info->index_param_list_));
+            //                break;
+            //            }
+            case IndexType::kHnsw: {
+                base_index_ptr = HnswDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                                               {index_info->column_name_},
+                                               *(index_info->index_param_list_));
+                break;
+            }
+            case IndexType::kIVFFlat: {
+                base_index_ptr = IVFFlatDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                                                  {index_info->column_name_},
+                                                  *(index_info->index_param_list_));
+                break;
+            }
+            case IndexType::kInvalid: {
+                PlannerException("Invalid index type.");
+                break;
+            }
         }
-        case IndexMethod::kHnsw: {
-            index_def_ptr = HnswIndexDef::Make(MakeShared<String>(index_name), Move(column_names), *create_index_info->index_para_list_);
-            break;
-        }
-        case IndexMethod::kInvalid: {
-            Error<PlannerException>("Invalid index method type.");
-            break;
-        }
-        default: {
-            Error<NotImplementException>("Not implemented");
-        }
+        index_def_ptr->index_array_.emplace_back(base_index_ptr);
     }
 
     auto logical_create_index_operator =
@@ -603,7 +621,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
 
-    BaseEntry* base_entry{nullptr};
+    BaseEntry *base_entry{nullptr};
     Status status = txn->GetTableByName(statement->schema_name_, statement->table_name_, base_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
@@ -632,7 +650,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    BaseEntry* base_entry{nullptr};
+    BaseEntry *base_entry{nullptr};
     Status status = txn->GetTableByName(statement->schema_name_, statement->table_name_, base_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
@@ -669,7 +687,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            BaseEntry* base_db_entry{nullptr};
+            BaseEntry *base_db_entry{nullptr};
             Status status = txn->GetDatabase(use_command_info->db_name(), base_db_entry);
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
@@ -697,7 +715,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
-            BaseEntry* base_table_entry{nullptr};
+            BaseEntry *base_table_entry{nullptr};
             Status status = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name(), base_table_entry);
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =

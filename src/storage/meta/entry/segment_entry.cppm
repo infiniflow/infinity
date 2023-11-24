@@ -21,18 +21,19 @@ import block_entry;
 import third_party;
 import txn;
 import buffer_manager;
-import index_def;
+import base_index;
 import data_access_state;
 import parser;
-import index_entry;
+import segment_column_index_entry;
+import table_index_entry;
 import txn_store;
 import index_file_worker;
+import column_index_entry;
 
 export module segment_entry;
 
 namespace infinity {
 
-class IndexDefEntry;
 class TableCollectionEntry;
 
 export struct SegmentEntry;
@@ -67,12 +68,12 @@ public:
 
     static void DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
-    static SharedPtr<IndexEntry> CreateIndexFile(SegmentEntry *segment_entry,
-                                                 IndexDefEntry *index_def_entry,
-                                                 SharedPtr<ColumnDef> column_def,
-                                                 TxnTimeStamp create_ts,
-                                                 BufferManager *buffer_mgr,
-                                                 TxnTableStore *txn_store);
+    static SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(SegmentEntry *segment_entry,
+                                                              ColumnIndexEntry *column_index_entry,
+                                                              SharedPtr<ColumnDef> column_def,
+                                                              TxnTimeStamp create_ts,
+                                                              BufferManager *buffer_mgr,
+                                                              TxnTableStore *txn_store);
 
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
@@ -94,8 +95,8 @@ private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);
 
 public:
-    static UniquePtr<CreateIndexPara>
-    GetCreateIndexPara(const SegmentEntry *segment_entry, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def);
+    static UniquePtr<CreateIndexParam>
+    GetCreateIndexParam(const SegmentEntry *segment_entry, SharedPtr<BaseIndex> base_index, SharedPtr<ColumnDef> column_def);
 };
 
 } // namespace infinity

@@ -25,15 +25,15 @@ export enum EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
-    kIndexDef,
-    kIndex,
+    kTableIndex,
+    kColumnIndex,
+    kIRSIndex,
+    kSegmentColumnIndex,
     kView,
     kColumn,
     kSegment,
-    kSegmentColumn,
     kBlock,
     kBlockColumn,
-    kDeleteFile,
 };
 
 export struct BaseEntry {

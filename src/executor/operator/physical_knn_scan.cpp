@@ -35,9 +35,6 @@ import table_collection_entry;
 import default_values;
 
 import segment_entry;
-import index_def_meta;
-import index_def_entry;
-import index_entry;
 import block_column_entry;
 import base_entry;
 import knn_expression;

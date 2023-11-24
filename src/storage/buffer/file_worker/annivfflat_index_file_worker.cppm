@@ -20,21 +20,21 @@ import stl;
 import index_file_worker;
 import file_worker;
 import parser;
-import index_def;
+import base_index;
 import annivfflat_index_data;
 import infinity_exception;
-import ivfflat_index_def;
+import ivfflat_def;
 
 export module annivfflat_index_file_worker;
 
 namespace infinity {
 
-export struct CreateAnnIVFFlatPara : public CreateIndexPara {
+export struct CreateAnnIVFFlatParam : public CreateIndexParam {
     // used when ivfflat_index_def->centroids_count_ == 0
-    const SizeT row_count_;
+    const SizeT row_count_{};
 
-    CreateAnnIVFFlatPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def, SizeT row_count)
-        : CreateIndexPara(index_def, column_def), row_count_(row_count) {}
+    CreateAnnIVFFlatParam(BaseIndex *base_index, ColumnDef *column_def, SizeT row_count)
+        : CreateIndexParam(base_index, column_def), row_count_(row_count) {}
 };
 
 export template <typename DataType>
@@ -44,10 +44,10 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
-                                       SharedPtr<IndexDef> index_def,
-                                       SharedPtr<ColumnDef> column_def,
+                                       BaseIndex *base_index,
+                                       ColumnDef *column_def,
                                        SizeT row_count)
-        : IndexFileWorker(file_dir, file_name, index_def, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
+        : IndexFileWorker(file_dir, file_name, base_index, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -80,7 +80,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
         Error<StorageException>("Data is already allocated.");
     }
-    if (index_def_->method_type_ != IndexMethod::kIVFFlat) {
+    if (index_def_->index_type_ != IndexType::kIVFFlat) {
         Error<StorageException>("Bug.");
     }
     auto data_type = column_def_->type();
@@ -89,7 +89,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
+    auto ivfflat_index_def = static_cast<IVFFlatDef *>(index_def_);
     auto centroids_count = ivfflat_index_def->centroids_count_;
     if (centroids_count == 0) {
         centroids_count = default_centroid_num_;

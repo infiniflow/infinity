@@ -18,23 +18,23 @@ import stl;
 import index_def;
 import parser;
 import third_party;
+import base_index;
 
-export module hnsw_index_def;
+export module hnsw_def;
 
 namespace infinity {
-export class HnswIndexDef : public IndexDef {
+export class HnswDef : public BaseIndex {
 public:
-    static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    static SharedPtr<BaseIndex> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    HnswIndexDef(SharedPtr<String> index_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
-        : IndexDef(Move(index_name), IndexMethod::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction),
-          ef_(ef) {}
+    HnswDef(String file_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
+        : BaseIndex(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction), ef_(ef) {}
 
-    ~HnswIndexDef() = default;
+    ~HnswDef() = default;
 
-    virtual bool operator==(const IndexDef &other) const override;
+    virtual bool operator==(const BaseIndex &other) const override;
 
-    virtual bool operator!=(const IndexDef &other) const override;
+    virtual bool operator!=(const BaseIndex &other) const override;
 
 public:
     virtual i32 GetSizeInBytes() const override;

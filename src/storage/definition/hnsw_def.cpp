@@ -24,25 +24,26 @@ import third_party;
 import infinity_exception;
 import serialize;
 import default_values;
+import base_index;
 
-module hnsw_index_def;
+module hnsw_def;
 
 namespace infinity {
 
-SharedPtr<IndexDef> HnswIndexDef::Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list) {
+SharedPtr<BaseIndex> HnswDef::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
     SizeT ef = HNSW_EF;
     MetricType metric_type = MetricType::kInvalid;
-    for (auto para : index_para_list) {
-        if (para->para_name_ == "M") {
-            M = std::stoi(para->para_value_);
-        } else if (para->para_name_ == "ef_construction") {
-            ef_construction = std::stoi(para->para_value_);
-        } else if (para->para_name_ == "ef") {
-            ef = std::stoi(para->para_value_);
-        } else if (para->para_name_ == "metric") {
-            metric_type = StringToMetricType(para->para_value_);
+    for (auto para : index_param_list) {
+        if (para->param_name_ == "M") {
+            M = std::stoi(para->param_value_);
+        } else if (para->param_name_ == "ef_construction") {
+            ef_construction = std::stoi(para->param_value_);
+        } else if (para->param_name_ == "ef") {
+            ef = std::stoi(para->param_value_);
+        } else if (para->param_name_ == "metric") {
+            metric_type = StringToMetricType(para->param_value_);
         } else {
             Error<StorageException>("Invalid index parameter");
         }
@@ -50,23 +51,23 @@ SharedPtr<IndexDef> HnswIndexDef::Make(SharedPtr<String> index_name, Vector<Stri
     if (metric_type == MetricType::kInvalid) {
         Error<StorageException>("Lack index parameters");
     }
-    return MakeShared<HnswIndexDef>(Move(index_name), Move(column_names), metric_type, M, ef_construction, ef);
+    return MakeShared<HnswDef>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
 }
 
-bool HnswIndexDef::operator==(const IndexDef &other) const {
+bool HnswDef::operator==(const BaseIndex &other) const {
     try {
-        auto other1 = dynamic_cast<const HnswIndexDef &>(other);
-        return IndexDef::operator==(other) && metric_type_ == other1.metric_type_ && M_ == other1.M_ && ef_construction_ == other1.ef_construction_ &&
+        auto other1 = dynamic_cast<const HnswDef &>(other);
+        return BaseIndex::operator==(other) && metric_type_ == other1.metric_type_ && M_ == other1.M_ && ef_construction_ == other1.ef_construction_ &&
                ef_ == other1.ef_;
     } catch (std::bad_cast exception) {
         return false;
     }
 }
 
-bool HnswIndexDef::operator!=(const IndexDef &other) const { return !(*this == other); }
+bool HnswDef::operator!=(const BaseIndex &other) const { return !(*this == other); }
 
-i32 HnswIndexDef::GetSizeInBytes() const {
-    SizeT size = IndexDef::GetSizeInBytes();
+i32 HnswDef::GetSizeInBytes() const {
+    SizeT size = BaseIndex::GetSizeInBytes();
     size += sizeof(metric_type_);
     size += sizeof(M_);
     size += sizeof(ef_construction_);
@@ -74,22 +75,22 @@ i32 HnswIndexDef::GetSizeInBytes() const {
     return size;
 }
 
-void HnswIndexDef::WriteAdv(char *&ptr) const {
-    IndexDef::WriteAdv(ptr);
+void HnswDef::WriteAdv(char *&ptr) const {
+    BaseIndex::WriteAdv(ptr);
     WriteBufAdv(ptr, metric_type_);
     WriteBufAdv(ptr, M_);
     WriteBufAdv(ptr, ef_construction_);
     WriteBufAdv(ptr, ef_);
 }
 
-String HnswIndexDef::ToString() const {
+String HnswDef::ToString() const {
     std::stringstream ss;
-    ss << IndexDef::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_;
+    ss << BaseIndex::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_;
     return ss.str();
 }
 
-Json HnswIndexDef::Serialize() const {
-    Json res = IndexDef::Serialize();
+Json HnswDef::Serialize() const {
+    Json res = BaseIndex::Serialize();
     res["metric_type"] = MetricTypeToString(metric_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;

@@ -17,23 +17,24 @@ module;
 import stl;
 import index_def;
 import parser;
+import base_index;
 import third_party;
 
-export module ivfflat_index_def;
+export module ivfflat_def;
 
 namespace infinity {
-export class IVFFlatIndexDef : public IndexDef {
+export class IVFFlatDef : public BaseIndex {
 public:
-    static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    static SharedPtr<BaseIndex> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IVFFlatIndexDef(SharedPtr<String> index_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexDef(Move(index_name), IndexMethod::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+    IVFFlatDef(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
+        : BaseIndex(file_name, IndexType::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
-    ~IVFFlatIndexDef() = default;
+    ~IVFFlatDef() = default;
 
-    virtual bool operator==(const IndexDef &other) const override;
+    virtual bool operator==(const BaseIndex &other) const override;
 
-    virtual bool operator!=(const IndexDef &other) const override;
+    virtual bool operator!=(const BaseIndex &other) const override;
 
 public:
     virtual i32 GetSizeInBytes() const override;

@@ -129,6 +129,7 @@ export using TableRefType = TableRefType;
 export using ExplainType = ExplainType;
 export using FlushType = FlushType;
 export using EmbeddingDataType = EmbeddingDataType;
+export using IndexType = IndexType;
 
 export using ExtraDDLInfo = ExtraDDLInfo;
 export using CreateTableInfo = CreateTableInfo;
@@ -143,6 +144,8 @@ export using DropCollectionInfo = DropCollectionInfo;
 export using DropSchemaInfo = DropSchemaInfo;
 export using DropViewInfo = DropViewInfo;
 export using CommandInfo = CommandInfo;
+export using IndexInfo = IndexInfo;
+
 export using UseCmd = UseCmd;
 export using CheckTable = CheckTable;
 export using SetCmd = SetCmd;

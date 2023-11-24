@@ -22,8 +22,8 @@ module;
 import stl;
 import infinity_exception;
 import parser;
-import ivfflat_index_def;
-import index_def;
+import ivfflat_def;
+import base_index;
 import file_system;
 import third_party;
 
@@ -71,10 +71,10 @@ void FaissIndexFileWorker::AllocateInMemory() {
     }
     SizeT dimension = embedding_info->Dimension();
 
-    if (index_def_->method_type_ != IndexMethod::kIVFFlat) {
+    if (index_def_->index_type_ != IndexType::kIVFFlat) {
         Error<StorageException>("Not implemented.");
     }
-    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def_.get());
+    auto ivfflat_index_def = static_cast<IVFFlatDef *>(index_def_);
     faiss::IndexFlat *quantizer = nullptr;
     faiss::MetricType metric = faiss::MetricType::METRIC_L2;
 

@@ -249,16 +249,16 @@ void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
     }
 
     const String &method_type = request->method_type();
-    auto *index_para_list = new Vector<InitParameter *>();
+    auto *index_param_list = new Vector<InitParameter *>();
 
-    for (auto &index_para : request->index_para_list()) {
+    for (auto &index_para : request->index_param_list()) {
         auto init_parameter = new InitParameter();
-        init_parameter->para_name_ = index_para.para_name();
-        init_parameter->para_value_ = index_para.para_value();
-        index_para_list->emplace_back(init_parameter);
+        init_parameter->param_name_ = index_para.para_name();
+        init_parameter->param_value_ = index_para.para_value();
+        index_param_list->emplace_back(init_parameter);
     }
 
-    auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_para_list, (CreateIndexOptions &)request->options());
+    auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_param_list, (CreateIndexOptions &)request->options());
 
     ProcessResult(result, response);
 }

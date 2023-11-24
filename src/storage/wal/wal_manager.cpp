@@ -38,7 +38,7 @@ import segment_entry;
 import block_entry;
 import table_collection_entry;
 import data_access_state;
-import index_def_entry;
+import table_index_entry;
 import status;
 import base_entry;
 
@@ -666,13 +666,13 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     if (!index_def_entry_status.ok()) {
         Error<StorageException>("Wal Replay: Create index failed");
     }
-    IndexDefEntry *index_def_entry = static_cast<IndexDefEntry *>(base_entry);
+    TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), index_def_entry, commit_ts, storage_->buffer_manager());
+    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), table_index_entry, commit_ts, storage_->buffer_manager());
     TableCollectionEntry::CommitCreateIndex(table_entry, table_store->txn_indexes_store_);
-    index_def_entry->Commit(commit_ts);
+    table_index_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
@@ -730,7 +730,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         segment_entry->row_count_ += cmd.row_counts_[id];
     }
 
-    table_entry->segments_.emplace(cmd.segment_id, Move(segment_entry));
+    table_entry->segment_map_.emplace(cmd.segment_id, Move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }

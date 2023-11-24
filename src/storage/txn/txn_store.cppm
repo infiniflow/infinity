@@ -17,7 +17,9 @@ module;
 import stl;
 import parser;
 import data_access_state;
-import index_def_entry;
+import table_index_entry;
+import column_index_entry;
+import irs_index_entry;
 
 export module txn_store;
 
@@ -27,15 +29,23 @@ class Txn;
 class TableCollectionEntry;
 class SegmentEntry;
 class DataBlock;
-class IndexEntry;
+class SegmentColumnIndexEntry;
+
+struct TxnSegmentIndexStore {
+    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_entry_map_{};
+};
 
 export struct TxnIndexStore {
 public:
-    TxnIndexStore(IndexDefEntry *index_def_entry) : index_def_entry_(index_def_entry) {}
+    explicit TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
 
-    IndexDefEntry *const index_def_entry_{};
+    TableIndexEntry *const table_index_entry_{};
 
-    HashMap<u32, SharedPtr<IndexEntry>> index_entry_map_{};
+//    Vector<ColumnIndexEntry*> column_index_entry_{};
+//
+    IrsIndexEntry* irs_index_entry_{};
+
+    HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
 };
 
 export class TxnTableStore {
@@ -46,7 +56,7 @@ public:
 
     UniquePtr<String> Import(const SharedPtr<SegmentEntry> &segment);
 
-    UniquePtr<String> CreateIndexFile(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index);
+    UniquePtr<String> CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
 
     UniquePtr<String> Delete(const Vector<RowID> &row_ids);
 
