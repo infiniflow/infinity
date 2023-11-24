@@ -16,7 +16,7 @@ import infinity
 from infinity.infinity import NetworkAddress
 
 
-class TestTest:
+class TestDatabase:
 
     def test_version(self):
         print(infinity.__version__)
@@ -41,7 +41,7 @@ class TestTest:
         expect: all operations successfully
         """
         infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
-        
+
         # infinity
         res = infinity_obj.create_database("my_database")
         assert res.success
