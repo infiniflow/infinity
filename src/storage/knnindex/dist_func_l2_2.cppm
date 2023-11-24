@@ -48,45 +48,45 @@ export uint32_t U8IPSIMD16ExtAVX(const uint8_t *v1, const uint8_t *v2, size_t di
     return _mm_cvtsi128_si32(sum_low);
 }
 
-export uint32_t U8L2SIMD16ExtAVX(const uint8_t *v, size_t dim) {
-    __m256i sum = _mm256_setzero_si256();
-    size_t qty16 = dim >> 4;
+// export uint32_t U8L2SIMD16ExtAVX(const uint8_t *v, size_t dim) {
+//     __m256i sum = _mm256_setzero_si256();
+//     size_t qty16 = dim >> 4;
 
-    for (size_t i = 0; i < qty16; i++) {
-        __m256i vec = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(v + i * 16)));
-        __m256i square = _mm256_madd_epi16(vec, vec);
-        sum = _mm256_add_epi32(sum, square);
-    }
+//     for (size_t i = 0; i < qty16; i++) {
+//         __m256i vec = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(v + i * 16)));
+//         __m256i square = _mm256_madd_epi16(vec, vec);
+//         sum = _mm256_add_epi32(sum, square);
+//     }
 
-    __m128i sum_low = _mm256_extracti128_si256(sum, 0);
-    __m128i sum_high = _mm256_extracti128_si256(sum, 1);
-    sum_low = _mm_add_epi32(sum_low, sum_high);
+//     __m128i sum_low = _mm256_extracti128_si256(sum, 0);
+//     __m128i sum_high = _mm256_extracti128_si256(sum, 1);
+//     sum_low = _mm_add_epi32(sum_low, sum_high);
 
-    sum_low = _mm_add_epi32(sum_low, _mm_srli_si128(sum_low, 8));
-    sum_low = _mm_add_epi32(sum_low, _mm_srli_si128(sum_low, 4));
+//     sum_low = _mm_add_epi32(sum_low, _mm_srli_si128(sum_low, 8));
+//     sum_low = _mm_add_epi32(sum_low, _mm_srli_si128(sum_low, 4));
 
-    return _mm_cvtsi128_si32(sum_low);
-}
+//     return _mm_cvtsi128_si32(sum_low);
+// }
 
-export uint16_t U8L1SIMD16ExtAVX(const uint8_t *v, size_t dim) {
-    __m256i sum = _mm256_setzero_si256();
-    size_t qty16 = dim >> 4;
+// export uint16_t U8L1SIMD16ExtAVX(const uint8_t *v, size_t dim) {
+//     __m256i sum = _mm256_setzero_si256();
+//     size_t qty16 = dim >> 4;
 
-    for (size_t i = 0; i < qty16; i++) {
-        __m256i vec = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(v + i * 16)));
-        sum = _mm256_add_epi16(sum, vec);
-    }
+//     for (size_t i = 0; i < qty16; i++) {
+//         __m256i vec = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(v + i * 16)));
+//         sum = _mm256_add_epi16(sum, vec);
+//     }
 
-    __m128i sum_low = _mm256_extracti128_si256(sum, 0);
-    __m128i sum_high = _mm256_extracti128_si256(sum, 1);
-    sum_low = _mm_add_epi16(sum_low, sum_high);
+//     __m128i sum_low = _mm256_extracti128_si256(sum, 0);
+//     __m128i sum_high = _mm256_extracti128_si256(sum, 1);
+//     sum_low = _mm_add_epi16(sum_low, sum_high);
 
-    sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 8));
-    sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 4));
-    sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 2));
+//     sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 8));
+//     sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 4));
+//     sum_low = _mm_add_epi16(sum_low, _mm_srli_si128(sum_low, 2));
 
-    return _mm_extract_epi16(sum_low, 0);
-}
+//     return _mm_extract_epi16(sum_low, 0);
+// }
 
 export float L2Sqr3(const LVQ8 &v1, const LVQ8 &v2, SizeT dim) {
     double alpha1 = v1.alpha_;
@@ -95,13 +95,9 @@ export float L2Sqr3(const LVQ8 &v1, const LVQ8 &v2, SizeT dim) {
     const uint8_t *c1 = v1.c_;
     const uint8_t *c2 = v2.c_;
 
-    uint32_t c1_l2 = U8L2SIMD16ExtAVX(c1, dim);
-    uint32_t c2_l2 = U8L2SIMD16ExtAVX(c2, dim);
     uint32_t c1c2_ip = U8IPSIMD16ExtAVX(c1, c2, dim);
-    uint16_t c1_l1 = U8L1SIMD16ExtAVX(c1, dim);
-    uint16_t c2_l1 = U8L1SIMD16ExtAVX(c2, dim);
-    double dist = alpha1 * alpha1 * c1_l2 + alpha2 * alpha2 * c2_l2 + beta * beta * dim - 2 * alpha1 * alpha2 * c1c2_ip + 2 * alpha1 * beta * c1_l1 -
-                 2 * alpha2 * beta * c2_l1;
+    double dist = alpha1 * alpha1 * v1.norm2sq_ + alpha2 * alpha2 * v2.norm2sq_ + beta * beta * dim - 2 * alpha1 * alpha2 * c1c2_ip +
+                  2 * alpha1 * beta * v1.norm1_ - 2 * alpha2 * beta * v2.norm1_;
 
     return dist;
 }

@@ -46,7 +46,7 @@ int main() {
     std::unique_ptr<HNSW> knn_hnsw = nullptr;
 
     std::ifstream f(save_place);
-    if (!f.good() || true) {
+    if (!f.good()) {
         std::cout << "Build index" << std::endl;
 
         size_t dim = -1;
