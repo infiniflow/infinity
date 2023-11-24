@@ -129,9 +129,17 @@ private:
         if (identifier.empty()) {
             return false;
         }
-        Regex pattern("^[a-zA-Z_\u00C0-\u017F][a-zA-Z0-9_\u00C0-\u017F]*$");
+        if (!IsAlpha(identifier[0]) && identifier[0] != '_') {
+            return false;
+        }
+        for (SizeT i = 1; i < identifier.length(); i++) {
+            char ch = identifier[i];
+            if (!IsAlNum(ch) && ch != '_') {
+                return false;
+            }
+        }
 
-        return RegexMatch(identifier, pattern);
+        return true;
     }
 
     QueryContext *query_context_ptr_{};

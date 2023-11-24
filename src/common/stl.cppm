@@ -42,7 +42,6 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <regex>
 
 export module stl;
 
@@ -377,9 +376,12 @@ export {
     template <typename T, typename Allocator = std::allocator<T>>
     using ForwardList = std::forward_list<T, Allocator>;
 
-    using Regex = std::regex;
-    inline bool RegexMatch(const String &identifier, Regex regex) {
-        return std::regex_match(identifier, regex);
+    inline bool IsAlpha(const char &c) {
+        return std::isalpha(c);
+    }
+
+    inline bool IsAlNum(const char &c) {
+        return std::isalnum(c);
     }
 }
 
