@@ -81,6 +81,8 @@ private:
     char *const ptr_;
     PlainStore<T> plain_data_;
 
+    const UniquePtr<CompressType[]> convert_space_;
+
 public:
     const char *GetCompressedData(SizeT vec_idx) const { return ptr_ + compressed_data_offset_ + vec_idx * compressed_data_size_; }
     char *GetCompressedDataMut(SizeT vec_idx) { return ptr_ + compressed_data_offset_ + vec_idx * compressed_data_size_; }
@@ -215,7 +217,8 @@ private:
           norm2sq_offset_(AlignTo(norm1_offset_ + sizeof(Norm1Type), sizeof(Norm2SqType))),                 //
           compressed_data_size_(AlignTo(norm2sq_offset_ + sizeof(Norm2SqType), init_args.second ? 32 : 1)), //
           ptr_(new char[compressed_data_offset_ + compressed_data_size_ * max_vec_num()]),                  //
-          plain_data_(PlainStore<T>::Make(0, dim()))                                                        //
+          plain_data_(PlainStore<T>::Make(0, dim())),                                                       //
+          convert_space_(MakeUnique<CompressType[]>(dim()))                                                 //
     {
         MeanType *mean = GetMeanMut();
         std::fill(mean, mean + dim(), 0);
@@ -237,17 +240,19 @@ public:
     LVQStore &operator=(const LVQStore &) = delete;
 
     LVQStore(LVQStore &&other)
-        : base_(Move(other.base_)),                               //
-          buffer_plain_size_(other.buffer_plain_size_),           //
-          mean_offset_(other.mean_offset_),                       //
-          min_offset_(other.min_offset_),                         //
-          max_offset_(other.max_offset_),                         //
-          norm1_offset_(other.norm1_offset_),                     //
-          norm2sq_offset_(other.norm2sq_offset_),                 //
-          compressed_data_size_(other.compressed_data_size_),     //
-          compressed_data_offset_(other.compressed_data_offset_), //
-          ptr_(other.ptr_),                                       //
-          plain_data_(Move(other.plain_data_)) {
+        : base_(Move(other.base_)),                                                           //
+          buffer_plain_size_(other.buffer_plain_size_),                                       //
+          mean_offset_(other.mean_offset_),                                                   //
+          min_offset_(other.min_offset_),                                                     //
+          max_offset_(other.max_offset_),                                                     //
+          norm1_offset_(other.norm1_offset_),                                                 //
+          norm2sq_offset_(other.norm2sq_offset_),                                             //
+          compressed_data_size_(other.compressed_data_size_),                                 //
+          compressed_data_offset_(other.compressed_data_offset_),                             //
+          ptr_(other.ptr_),                                                                   //
+          plain_data_(Move(other.plain_data_)),                                               //
+          convert_space_(Move(const_cast<UniquePtr<CompressType[]> &>(other.convert_space_))) //
+    {
         const_cast<char *&>(other.ptr_) = nullptr;
     }
     LVQStore &operator=(LVQStore &&other) = delete;
@@ -270,7 +275,7 @@ public:
         }
     }
 
-    const RtnType GetVec(SizeT vec_idx) const {
+    RtnType GetVec(SizeT vec_idx) const {
         assert(vec_idx < cur_vec_num());
         auto [lower, range] = GetLowerRange(vec_idx);
         auto [norm1, norm2sq] = GetNorm(vec_idx);
@@ -278,13 +283,13 @@ public:
         return LVQ(range, lower, norm1, norm2sq, const_cast<CompressType *>(compressed_vec));
     }
 
-    const RtnType GetVec(const T *vec, CompressType *space) const {
+    RtnType Convert(const T *vec) const {
         const MeanType *mean = GetMean();
         BoundType lower, range;
         Norm1Type norm1;
         Norm2SqType norm2sq;
-        CompressVec(vec, mean, space, &lower, &range, &norm1, &norm2sq);
-        return LVQ(range, lower, norm1, norm2sq, space);
+        CompressVec(vec, mean, convert_space_.get(), &lower, &range, &norm1, &norm2sq);
+        return LVQ(range, lower, norm1, norm2sq, convert_space_.get());
     }
 
     void Compress() {

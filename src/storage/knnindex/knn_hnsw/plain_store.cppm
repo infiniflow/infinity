@@ -74,10 +74,12 @@ public:
         return new_idx;
     }
 
-    const RtnType GetVec(SizeT vec_idx) const {
+    RtnType GetVec(SizeT vec_idx) const {
         assert(vec_idx < cur_vec_num());
         return ptr_.get() + vec_idx * dim();
     }
+
+    RtnType Convert(const DataType *vec) const { return vec; }
 
     void Save(FileHandler &file_handler) const {
         base_.Save(file_handler);

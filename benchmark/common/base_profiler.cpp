@@ -28,17 +28,24 @@ std::chrono::nanoseconds BaseProfiler::ElapsedInternal() const {
 std::string BaseProfiler::ElapsedToString() const {
     auto duration = this->ElapsedInternal();
     std::stringstream ss;
-    // if (duration.count() <= 1000) {
-    //     ss << duration.count() << "ns";
-    // } else if (duration.count() <= 1000 * 1000) {
-    //     ss << std::chrono::duration_cast<std::chrono::microseconds>(duration).count() << "us";
-    // } else if (duration.count() <= 1000 * 1000 * 1000) {
-    //     ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms";
-    // } else {
-    //     ss << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << "s";
-    // }
-    ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms";
+    if (duration.count() <= 1000) {
+        ss << duration.count() << "ns";
+    } else if (duration.count() <= 1000 * 1000) {
+        ss << std::chrono::duration_cast<std::chrono::microseconds>(duration).count() << "us";
+    } else if (duration.count() <= 1000 * 1000 * 1000) {
+        ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms";
+    } else {
+        ss << std::chrono::duration_cast<std::chrono::seconds>(duration).count() << "s";
+    }
     return ss.str();
 }
 
+int BaseProfiler::ElapsedToMs() const {
+    std::stringstream ss;
+    auto duration = this->ElapsedInternal();
+    ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    int ret;
+    ss >> ret;
+    return ret;
+}
 } // namespace infinity

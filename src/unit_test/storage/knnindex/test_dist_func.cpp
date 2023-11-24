@@ -34,11 +34,13 @@ float F32L2Test(const float *v1, const float *v2, size_t dim) {
 }
 
 TEST_F(DistFuncTest, test1) {
-    size_t dim = 16;
+    size_t dim = 32;
     size_t vec_n = 10000;
 
     auto vecs1 = std::make_unique<uint8_t[]>(dim * vec_n);
     auto vecs2 = std::make_unique<uint8_t[]>(dim * vec_n);
+
+    assert(dim % 32 == 0);
 
     // generate a random vector of uint8_t
     std::default_random_engine rng;
@@ -51,24 +53,10 @@ TEST_F(DistFuncTest, test1) {
     }
 
     for (size_t i = 0; i < vec_n; ++i) {
-        uint8_t *v1 = vecs1.get() + i * dim;
-        uint8_t *v2 = vecs2.get() + i * dim;
+        auto v1 = vecs1.get() + i * dim;
+        auto v2 = vecs2.get() + i * dim;
         uint32_t res = U8IPSIMD16ExtAVX(v1, v2, dim);
         uint32_t res2 = U8IPTest(v1, v2, dim);
-        EXPECT_EQ(res, res2);
-    }
-
-    for (size_t i = 0; i < vec_n; ++i) {
-        uint8_t *v = vecs1.get() + i * dim;
-        uint32_t res = U8L2SIMD16ExtAVX(v, dim);
-        uint32_t res2 = U8IPTest(v, v, dim);
-        EXPECT_EQ(res, res2);
-    }
-
-    for (size_t i = 0; i < vec_n; ++i) {
-        auto v = vecs1.get() + i * dim;
-        auto res = U8L1SIMD16ExtAVX(v, dim);
-        auto res2 = U8L1Test(v, dim);
         EXPECT_EQ(res, res2);
     }
 }
@@ -105,7 +93,7 @@ TEST_F(DistFuncTest, test2) {
         const float *v2 = vecs2.get() + i * dim;
 
         LVQ8 lvq1 = lvq_store.GetVec(i);
-        LVQ8 lvq2 = lvq_store.GetVec(v2, space.get());
+        LVQ8 lvq2 = lvq_store.Convert(v2);
 
         dist = L2Sqr3(lvq1, lvq2, dim);
 

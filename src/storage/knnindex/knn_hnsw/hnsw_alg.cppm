@@ -28,12 +28,13 @@ import hnsw_common;
 import hnsw_profiler;
 import plain_store;
 import graph_store;
+import lvq_store;
 
 export module hnsw_alg;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType, DataStoreConcept<DataType> DataStore = PlainStore<DataType>>
+export template <typename DataType, typename LabelType, DataStoreConcept<DataType> DataStore>
 class KnnHnsw {
 public:
     using This = KnnHnsw<DataType, LabelType, DataStore>;
@@ -116,7 +117,7 @@ private:
 public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataRtnType &query, i32 layer_idx, SizeT candidate_n, HnswProfiler *profiler) const {
+    DistHeap SearchLayer(VertexType enter_point, const DataRtnType &query, i32 layer_idx, SizeT candidate_n) const {
         DistHeap result;
         DistHeap candidate;
 
@@ -162,13 +163,10 @@ public:
                 }
             }
         }
-        if (profiler) {
-            profiler->AddSearch(layer_idx, cal_num);
-        }
         return result;
     }
 
-    VertexType SearchLayerNearest(VertexType enter_point, const DataRtnType &query, i32 layer_idx, HnswProfiler *profiler) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const DataRtnType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
         DataType cur_dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
         SizeT cal_num = 1;
@@ -194,9 +192,6 @@ public:
                     check = true;
                 }
             }
-        }
-        if (profiler) {
-            profiler->AddSearch(layer_idx, cal_num);
         }
         return cur_p;
     }
@@ -289,10 +284,10 @@ public:
             graph_.AddVertex(q_vertex, q_layer);
 
             for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
-                ep = SearchLayerNearest(ep, query, cur_layer, nullptr);
+                ep = SearchLayerNearest(ep, query, cur_layer);
             }
             for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-                DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_, nullptr); // TODO:: use pool
+                DistHeap search_result = SearchLayer(ep, query, cur_layer, ef_construction_); // TODO:: use pool
                 DistHeap candidates;
                 while (!search_result.empty()) {
                     const auto &[dist, idx] = search_result.top();
@@ -310,15 +305,13 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, HnswProfiler *profiler = nullptr) const {
-        auto space = MakeUnique<uint8_t[]>(data_store_.dim()); // TODO: fix it
-        DataRtnType query = data_store_.GetVec(q, space.get());
-        // DataRtnType query = q;
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) {
+        DataRtnType query = data_store_.Convert(q);
         VertexType ep = graph_.enterpoint();
         for (i32 cur_layer = graph_.max_layer(); cur_layer > 0; --cur_layer) {
-            ep = SearchLayerNearest(ep, query, cur_layer, profiler);
+            ep = SearchLayerNearest(ep, query, cur_layer);
         }
-        DistHeap search_result = SearchLayer(ep, query, 0, Max(k, ef_), profiler);
+        DistHeap search_result = SearchLayer(ep, query, 0, Max(k, ef_));
         while (search_result.size() > k) {
             search_result.pop();
         }
@@ -331,6 +324,7 @@ public:
         return result;
     }
 
+public:
     void SetEf(SizeT ef) { ef_ = ef; }
 
     void SaveIndex(FileHandler &file_handler) {

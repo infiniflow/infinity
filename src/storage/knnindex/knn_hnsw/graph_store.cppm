@@ -87,9 +87,7 @@ private:
     }
 
 public:
-    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
-        return GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr);
-    }
+    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) { return GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr); }
 
     GraphStore(const GraphStore &) = delete;
     GraphStore &operator=(const GraphStore &) = delete;
@@ -164,7 +162,7 @@ public:
         }
     }
 
-    void SaveGraph(FileHandler &file_handler, VertexType cur_vertex_n) {
+    void SaveGraph(FileHandler &file_handler, VertexType cur_vertex_n) const {
         file_handler.Write(&max_layer_, sizeof(max_layer_));
         file_handler.Write(&enterpoint_, sizeof(enterpoint_));
         file_handler.Write(graph_, cur_vertex_n * level0_size_);

@@ -25,6 +25,8 @@ import index_base;
 import dist_func_l2;
 import dist_func_ip;
 
+import plain_store;
+
 module hnsw_file_worker;
 
 namespace infinity {
@@ -73,7 +75,7 @@ void HnswFileWorker::FreeInMemory() {
     }
     switch (GetType()) {
         case kElemFloat: {
-            auto hnsw_index_ptr = static_cast<KnnHnsw<f32, u64> *>(data_);
+            auto hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
             delete hnsw_index_ptr;
             break;
         }
@@ -87,7 +89,7 @@ void HnswFileWorker::FreeInMemory() {
 void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
     switch (GetType()) {
         case kElemFloat: {
-            auto *hnsw_index_ptr = static_cast<KnnHnsw<f32, u64> *>(data_);
+            auto *hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
             hnsw_index_ptr->SaveIndex(*file_handler_);
             break;
         }
@@ -104,7 +106,7 @@ void HnswFileWorker::ReadFromFileImpl() {
         case kElemFloat: {
             // auto dist_func = GetDistFunc<f32>(dimension);
             // UniquePtr<KnnHnsw<f32, u64>> hnsw_index = KnnHnsw<f32, u64>::LoadIndexInner(*file_handler_, *dist_func);
-            UniquePtr<KnnHnsw<f32, u64>> hnsw_index = nullptr;
+            UniquePtr<KnnHnsw<f32, u64, PlainStore<f32>>> hnsw_index = nullptr;
             // TODO!! not save index parameter in index file.
             data_ = static_cast<void *>(hnsw_index.release());
             break;

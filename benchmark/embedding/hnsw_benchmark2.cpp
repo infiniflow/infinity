@@ -12,6 +12,7 @@ import dist_func_l2;
 import local_file_system;
 import file_system_type;
 import file_system;
+import plain_store;
 import lvq_store;
 import dist_func_l2_2;
 
@@ -33,16 +34,17 @@ int main() {
 
     using LabelT = uint64_t;
 
-    // using HNSW = KnnHnsw<float, LabelT>;
-    // std::tuple<> init_args = {};
-    // DistFuncL2<float> space(dimension);
-    // std::string save_place = "/my_sift_plain.hnsw";
+    using HNSW = KnnHnsw<float, LabelT, PlainStore<float>>;
+    std::tuple<> init_args = {};
+    FloatL2Space space(dimension);
+    std::string save_place = save_dir + "/my_sift_plain.hnsw";
 
-    using HNSW = KnnHnsw<float, LabelT, LVQStore<float, uint8_t>>;
-    Pair<SizeT, bool> init_args = {0, true};
-    FloatLVQ8L2Space space(dimension);
-    std::string save_place = save_dir + "/my_sift_lvq8.hnsw";
+    // using HNSW = KnnHnsw<float, LabelT, LVQStore<float, uint8_t>>;
+    // Pair<SizeT, bool> init_args = {0, true};
+    // FloatLVQ8L2Space space(dimension);
+    // std::string save_place = save_dir + "/my_sift_lvq8.hnsw";
 
+    std::cout << "File path: " << save_place << std::endl;
     std::unique_ptr<HNSW> knn_hnsw = nullptr;
 
     std::ifstream f(save_place);
@@ -122,33 +124,38 @@ int main() {
     }
 
     infinity::BaseProfiler profiler;
-    int round = 1;
-    for (int ef = 100; ef <= 800; ef += 100) {
-        // auto hnsw_profiler = MakeUnique<HnswProfiler>(knn_hnsw->GetMaxLayer(), 10);
-
-        int correct = 0;
-
+    int round = 10;
+    Vector<MaxHeap<Pair<float, LabelT>>> results;
+    results.reserve(number_of_queries);
+    for (int ef = 100; ef <= 300; ef += 25) {
         knn_hnsw->SetEf(ef);
-        Vector<MaxHeap<Pair<float, LabelT>>> results;
-        profiler.Begin();
-        for (int idx = 0; idx < number_of_queries * round; ++idx) {
-            const float *query = queries + (idx % number_of_queries) * dimension;
-            MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top, nullptr);
-            results.push_back(std::move(result));
-        }
-        profiler.End();
-        for (int idx = 0; idx < number_of_queries; ++idx) {
-            auto &result = results[idx % number_of_queries];
-            while (!result.empty()) {
-                if (ground_truth_sets[idx % number_of_queries].contains(result.top().second)) {
-                    ++correct;
-                }
-                result.pop();
+        int correct = 0;
+        int sum_time = 0;
+        for (size_t i = 0; i < round; ++i) {
+            profiler.Begin();
+            for (int idx = 0; idx < number_of_queries; ++idx) {
+                const float *query = queries + idx * dimension;
+                MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
+                results[idx] = std::move(result);
             }
+            profiler.End();
+            if (i == 0) {
+                for (int idx = 0; idx < number_of_queries; ++idx) {
+                    auto &result = results[idx];
+                    while (!result.empty()) {
+                        if (ground_truth_sets[idx].contains(result.top().second)) {
+                            ++correct;
+                        }
+                        result.pop();
+                    }
+                }
+                printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));
+            }
+            sum_time += profiler.ElapsedToMs();
         }
-        printf("ef = %d, Spend: %s\n", ef, profiler.ElapsedToString().c_str());
-        printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));
-        // hnsw_profiler->PrintResult();
+        sum_time /= round;
+        printf("ef = %d, Spend: %dms\n", ef, sum_time);
+
         std::cout << "----------------------------" << std::endl;
     }
 

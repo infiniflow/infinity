@@ -23,6 +23,8 @@ public:
 
     [[nodiscard]] std::string ElapsedToString() const;
 
+    [[nodiscard]] int ElapsedToMs() const;
+
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline int64_t Elapsed() const { return ElapsedInternal().count(); }
 
