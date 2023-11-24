@@ -162,7 +162,7 @@ public:
         output_columns->reserve(request.select_list.size());
 
         for (auto &expr : request.select_list) {
-            auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
+            auto parsed_expr = GetParsedExprFromProto(expr);
             output_columns->emplace_back(parsed_expr);
         }
 

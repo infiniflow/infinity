@@ -102,31 +102,11 @@ class RemoteTable(Table, ABC):
 
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
-        global covered_column_vector
         select_list: List[ParsedExpr] = []
-
         for column in query.columns:
-            column_name = []
-            if column == "*":
-                star = True
-            else:
-                star = False
-                column_name.append(column)
-
-            column_expr = ColumnExpr()
-            column_expr.star = star
-            column_expr.column_name = column_name
-            paser_expr_type = ParsedExprType()
-            paser_expr_type.column_expr = column_expr
-            paser_expr = ParsedExpr()
-            paser_expr.type = paser_expr_type
-
-            select_list.append(paser_expr)
+            select_list.append(traverse_conditions(condition(column)))
 
         # process where_expr
-
-        # str to ParsedExpr
-        from sqlglot import condition
         where_expr = ParsedExpr()
         if query.filter is not None:
             where_expr = traverse_conditions(condition(query.filter))
@@ -212,6 +192,10 @@ def traverse_conditions(cons) -> ParsedExpr:
         parsed_expr = ParsedExpr()
         column_expr = ColumnExpr()
         column_name = [cons.alias_or_name]
+        if cons.alias_or_name == "*":
+            column_expr.star = True
+        else:
+            column_expr.star = False
         column_expr.column_name = column_name
 
         paser_expr_type = ParsedExprType()
@@ -263,5 +247,13 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "and"
     elif binary_expr_key == "or":
         return "or"
+    elif binary_expr_key == "add":
+        return "+"
+    elif binary_expr_key == "sub":
+        return "-"
+    elif binary_expr_key == "mul":
+        return "*"
+    elif binary_expr_key == "div":
+        return "/"
     else:
         raise Exception(f"unknown binary expression: {binary_expr_key}")

@@ -63,23 +63,23 @@ def measure_time_external(num_threads, num_times):
     return elapsed_time
 
 
-def worker_internal_connection(thread_id, num_iterations, some_function):
+def worker_internal_connection(thread_id, num_iterations, some_function, port=9090):
     print(f">>> Thread ID: {thread_id} <<<")
     for j in range(num_iterations):
         # Simulate the "work" to be done during each iteration.
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', port))
         some_function(infinity_obj, thread_id, j)
         infinity_obj.disconnect()
 
 
-def measure_time_internal(num_threads, num_times, some_function):
+def measure_time_internal(num_threads, num_times, some_function, port=None):
     # Calculate how many iterations each thread should do
     num_iterations = num_times // num_threads
 
     start_time = time.perf_counter()
     threads = []
     for i in range(num_threads):
-        thread = threading.Thread(target=worker_internal_connection, args=(i, num_iterations, some_function))
+        thread = threading.Thread(target=worker_internal_connection, args=(i, num_iterations, some_function, port))
         threads.append(thread)
         thread.start()
 
@@ -119,3 +119,24 @@ class TestBenchmark:
         elapsed_time = measure_time_internal(num_threads, num_times, create_database)
         print(f"QPS: {num_times / elapsed_time} records per second")
         print(f"Elapsed time: {elapsed_time} seconds")
+
+        # Brpc 50051 QPS: 847.045337536328 records per second
+        # Elapsed time: 18.889189622997947 seconds  # 16  16 * 1000
+
+        # Grpc 50052 QPS: 1494.8521525110273 records per second
+        # Elapsed time: 10.703399645994068 seconds  # 16  16 * 1000
+
+        # Thrift 9090 QPS: 1493.8897080949398 records per second
+        # Elapsed time: 10.710295354001573 seconds  # 16  16 * 1000
+
+        def get_database(infinity_obj, thread_id, num_iteration):
+            infinity_obj.get_database(f"my_database_{thread_id}_{num_iteration}")
+
+        elapsed_time = measure_time_internal(num_threads, num_times, get_database, 9090)
+        print(f"Thrift Get Database QPS: {num_times / elapsed_time} records per second")
+
+        elapsed_time = measure_time_internal(num_threads, num_times, get_database, 50051)
+        print(f"Brpc Get Database QPS: {num_times / elapsed_time} records per second")
+
+        elapsed_time = measure_time_internal(num_threads, num_times, get_database, 50052)
+        print(f"Grpc Get Database QPS: {num_times / elapsed_time} records per second")

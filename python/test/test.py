@@ -19,6 +19,7 @@ import infinity
 from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
+
 class TestCase:
 
     def test_version(self):
@@ -86,13 +87,12 @@ class TestCase:
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
         assert res.success
-        
+
         res = db_obj.list_tables()
         assert res.success
 
         res = db_obj.drop_table("my_table1")
         assert res.success
-
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
@@ -119,7 +119,7 @@ class TestCase:
         res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         assert res.success
         # search
-        res = table_obj.search().output(["c1", "c2"]).filter("c1 > 1").to_list()
+        res = table_obj.search().output(["c1 + 0.1"]).filter("c1 > 1").to_list()
         print(res)
 
         res = db_obj.drop_table("my_table3")
@@ -174,7 +174,6 @@ class TestCase:
 
         res = db_obj.drop_table("my_table1")
         assert res.success
-
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
@@ -256,7 +255,6 @@ class TestCase:
 
         res = db_obj.drop_table("my_table1")
         assert res.success
-
 
         # index
         res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
