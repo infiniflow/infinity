@@ -91,11 +91,13 @@ class TestSelect:
              {"c1": 9, "c2": 9}])
         assert res.success
 
-        # res = table_obj.search().output(["*"]).to_list()
-        # print(res)
+        res = table_obj.search().output(["*"]).to_list()
+        assert res == {'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                       'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}
 
-        # res = table_obj.search().output(["c1", "c2"]).to_list()
-        # print(res)
+        res = table_obj.search().output(["c1", "c2"]).to_list()
+        assert res == {'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                       'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}
 
         res = table_obj.search().output(["c1 + c2"]).filter("c1 = 3").to_list()
         assert res == {'(c1 + c2)': (6,)}

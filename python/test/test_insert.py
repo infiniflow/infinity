@@ -23,7 +23,7 @@ class TestInsert:
 
     def test_infinity_thrift(self):
         """
-        target: test table select apis
+        target: test table insert apis
         method:
         1. create tables
             - 'table_2'
