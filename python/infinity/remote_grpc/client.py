@@ -24,7 +24,6 @@ class GrpcInfinityClient:
 
     def __init__(self, uri: URI):
         self.url = uri.ip + ":" + str(uri.port)
-        self.db_name = "default"
         self.channel = grpc.insecure_channel(self.url)
         self.stub = InfinityGrpcServiceStub(self.channel)
         res = self.stub.Connect(Empty())

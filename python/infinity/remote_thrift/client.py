@@ -24,7 +24,6 @@ from thrift.protocol import TBinaryProtocol
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
-        self.db_name = "default"
         self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port))
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)

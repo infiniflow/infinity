@@ -359,11 +359,12 @@ private:
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        auto it = infinity_session_map_.find(session_id);
-        if (it == infinity_session_map_.end()) {
+        std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+        if (infinity_session_map_.count(session_id) > 0) {
+            return infinity_session_map_[session_id];
+        } else {
             Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
         }
-        return it->second;
     }
 
     static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {

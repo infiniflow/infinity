@@ -672,11 +672,12 @@ ParsedExpr *GrpcServiceImpl::GetParsedExprFromProto(const infinity_grpc_proto::P
 }
 
 SharedPtr<Infinity> GrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
-    auto it = infinity_session_map_.find(session_id);
-    if (it == infinity_session_map_.end()) {
+    std::lock_guard<Mutex> lock (infinity_session_map_mutex_);
+    if (infinity_session_map_.count(session_id) > 0) {
+        return infinity_session_map_[session_id];
+    } else {
         Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
     }
-    return it->second;
 }
 
 } // namespace infinity

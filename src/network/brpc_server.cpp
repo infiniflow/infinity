@@ -39,8 +39,8 @@ void infinity::BrpcServiceImpl::Connect(google::protobuf::RpcController *cntl_ba
     } else {
         infinity_session_map_mutex_.lock();
         infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
-        infinity_session_map_mutex_.unlock();
         response->set_session_id(infinity->GetSessionId());
+        infinity_session_map_mutex_.unlock();
         response->set_success(true);
     }
 }
@@ -699,11 +699,12 @@ ParsedExpr *BrpcServiceImpl::GetParsedExprFromProto(const infinity_brpc_proto::P
 }
 
 SharedPtr<Infinity> BrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
-    auto it = infinity_session_map_.find(session_id);
-    if (it == infinity_session_map_.end()) {
+    std::lock_guard<Mutex> lock (infinity_session_map_mutex_);
+    if (infinity_session_map_.count(session_id) > 0) {
+        return infinity_session_map_[session_id];
+    } else {
         Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
     }
-    return it->second;
 }
 
 brpc::Controller *BrpcServiceImpl::SetUpController(google::protobuf::RpcController *cntl_base) {
