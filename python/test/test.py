@@ -122,6 +122,9 @@ class TestCase:
         res = table_obj.search().output(["c1 + 0.1"]).filter("c1 > 1").to_list()
         print(res)
 
+        res = table_obj.search().output(["*"]).filter("c1 > 1").to_list()
+        print(res)
+
         res = db_obj.drop_table("my_table3")
         assert res.success
 

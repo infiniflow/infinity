@@ -6,7 +6,7 @@ from sqlglot import condition, expressions as exp
 
 from infinity.query import Query, InfinityVectorQueryBuilder
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.table import Table
+from infinity.table import Table, binary_exp_to_paser_exp
 
 
 class RemoteTable(Table, ABC):
@@ -103,8 +103,19 @@ class RemoteTable(Table, ABC):
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
         select_list: List[ParsedExpr] = []
+
         for column in query.columns:
-            select_list.append(traverse_conditions(condition(column)))
+            match column:
+                case "*":
+                    column_expr = ColumnExpr()
+                    column_expr.star = True
+                    paser_expr_type = ParsedExprType()
+                    paser_expr_type.column_expr = column_expr
+                    parsed_expr = ParsedExpr()
+                    parsed_expr.type = paser_expr_type
+                    select_list.append(parsed_expr)
+                case _:
+                    select_list.append(traverse_conditions(condition(column)))
 
         # process where_expr
         where_expr = ParsedExpr()
@@ -228,32 +239,3 @@ def traverse_conditions(cons) -> ParsedExpr:
             traverse_conditions(value)
     else:
         raise Exception(f"unknown condition: {cons}")
-
-
-def binary_exp_to_paser_exp(binary_expr_key) -> str:
-    if binary_expr_key == "eq":
-        return "="
-    elif binary_expr_key == "gt":
-        return ">"
-    elif binary_expr_key == "lt":
-        return "<"
-    elif binary_expr_key == "gte":
-        return ">="
-    elif binary_expr_key == "lte":
-        return "<="
-    elif binary_expr_key == "neq":
-        return "!="
-    elif binary_expr_key == "and":
-        return "and"
-    elif binary_expr_key == "or":
-        return "or"
-    elif binary_expr_key == "add":
-        return "+"
-    elif binary_expr_key == "sub":
-        return "-"
-    elif binary_expr_key == "mul":
-        return "*"
-    elif binary_expr_key == "div":
-        return "/"
-    else:
-        raise Exception(f"unknown binary expression: {binary_expr_key}")

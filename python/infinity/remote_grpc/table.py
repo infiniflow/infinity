@@ -15,7 +15,7 @@
 from abc import ABC
 import struct
 from infinity.query import Query, InfinityVectorQueryBuilder
-from infinity.table import Table
+from infinity.table import Table, binary_exp_to_paser_exp
 from infinity.remote_grpc.grpc_pb.infinity_grpc_pb2_grpc import *
 from infinity.remote_grpc.grpc_pb.infinity_grpc_pb2 import *
 from typing import Optional, Union, Dict, Any
@@ -229,24 +229,3 @@ def traverse_conditions(cons) -> ParsedExpr:
             traverse_conditions(value)
     else:
         raise Exception(f"unknown condition: {cons}")
-
-
-def binary_exp_to_paser_exp(binary_expr_key) -> str:
-    if binary_expr_key == "eq":
-        return "="
-    elif binary_expr_key == "gt":
-        return ">"
-    elif binary_expr_key == "lt":
-        return "<"
-    elif binary_expr_key == "gte":
-        return ">="
-    elif binary_expr_key == "lte":
-        return "<="
-    elif binary_expr_key == "neq":
-        return "!="
-    elif binary_expr_key == "and":
-        return "and"
-    elif binary_expr_key == "or":
-        return "or"
-    else:
-        raise Exception(f"unknown binary expression: {binary_expr_key}")
