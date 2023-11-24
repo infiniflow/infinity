@@ -20,23 +20,16 @@ export module dist_func;
 
 namespace infinity {
 
-export template <typename DataType, typename DataType2 = const DataType *>
-using DistFunc = DataType(*)(const DataType *, DataType2, SizeT);
+export template <typename DataType, typename DataType2>
+using DistFunc = DataType(*)(const DataType2 &, const DataType2 &, SizeT);
 
-export template<typename DataType, typename DataType2>
-using DistFunc2 = DataType(*)(DataType2, DataType2, SizeT);
-
-export template <typename DataType, typename DataType2 = const DataType *>
+export template <typename DataType, typename DataType2>
 class SpaceBase {
 protected:
     DistFunc<DataType, DataType2> fstdistfunc_ = nullptr;
 
-    DistFunc2<DataType, DataType2> fstdistfunc2_ = nullptr;
-
 public:
     DistFunc<DataType, DataType2> DistFuncPtr() const { return fstdistfunc_; }
-
-    DistFunc2<DataType, DataType2> DistFuncPtr2() const { return fstdistfunc2_; }
 
     virtual ~SpaceBase() = default;
 };

@@ -27,7 +27,7 @@ int main() {
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
     int dim = 16;
-    int element_size = 300;
+    int element_size = 1000;
 
     auto data = std::make_unique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
@@ -40,12 +40,12 @@ int main() {
     int ef_construction = 200;
     FloatLVQ8L2Space space(dim);
     {
-        auto hnsw_index = Hnsw::Make(element_size, dim, space, M, ef_construction, {element_size, true});
+        auto hnsw_index = Hnsw::Make(element_size, dim, space, M, ef_construction, {0, true});
 
         auto labels = std::make_unique<LabelT[]>(element_size);
         std::iota(labels.get(), labels.get() + element_size, 0);
         hnsw_index->Insert(data.get(), labels.get(), element_size);
-        // hnsw_index->Dump(std::cout);
+        hnsw_index->Dump(std::cout);
         hnsw_index->Check();
 
         hnsw_index->SetEf(ef_construction);

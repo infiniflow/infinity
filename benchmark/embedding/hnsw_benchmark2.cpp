@@ -46,7 +46,7 @@ int main() {
     std::unique_ptr<HNSW> knn_hnsw = nullptr;
 
     std::ifstream f(save_place);
-    if (!f.good()) {
+    if (!f.good() || true) {
         std::cout << "Build index" << std::endl;
 
         size_t dim = -1;
@@ -82,14 +82,14 @@ int main() {
         delete[] input_embeddings;
 
         uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + save_place, file_flags, FileLockType::kWriteLock);
+        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kWriteLock);
         knn_hnsw->SaveIndex(*file_handler);
         file_handler->Close();
     } else {
         std::cout << "Load index from " << save_place << std::endl;
 
         uint8_t file_flags = FileFlags::READ_FLAG;
-        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + save_place, file_flags, FileLockType::kReadLock);
+        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kReadLock);
 
         knn_hnsw = HNSW::LoadIndex(*file_handler, space, init_args);
     }
@@ -149,7 +149,6 @@ int main() {
         printf("ef = %d, Spend: %s\n", ef, profiler.ElapsedToString().c_str());
         printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));
         // hnsw_profiler->PrintResult();
-        // std::cout << "Avg low degree: " << knn_hnsw->GetAvgDegree() << std::endl;
         std::cout << "----------------------------" << std::endl;
     }
 

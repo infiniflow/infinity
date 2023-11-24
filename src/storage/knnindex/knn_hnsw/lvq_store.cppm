@@ -31,20 +31,14 @@ namespace infinity {
 export template <typename T, typename CompressType>
 class LVQStore;
 
-export template <typename T, typename CompressType>
-struct LVQ {
-    const SizeT vec_idx_;
-    const LVQStore<T, CompressType> *const data_store_;
+export template <typename BoundType, typename CompressType>
+class LVQ {
+public:
+    BoundType alpha_;
+    BoundType lower_;
+    CompressType *const c_;
 
-    void DecompressForTest(T *result) const {
-        SizeT compressed_n = data_store_->base_.cur_vec_num();
-        if (vec_idx_ < compressed_n) {
-            data_store_->Decompress(vec_idx_, result);
-        } else {
-            const T *p = data_store_->plain_data_.GetVec(vec_idx_ - compressed_n);
-            std::copy(p, p + data_store_->dim(), result);
-        }
-    }
+    LVQ(BoundType alpha, BoundType lower, CompressType *c) : alpha_(alpha), lower_(lower), c_(c) {}
 };
 
 export template <typename T, typename CompressType>
@@ -55,32 +49,35 @@ public:
 
     friend class LVQ<T, CompressType>;
 
+    using MeanType = double;
+    using BoundType = double;
+
     using This = LVQStore<T, CompressType>;
     using InitArgs = Pair<SizeT, bool>; // first is buffer size, second is whether to make padding
     using DataType = T;
-    using RtnType = const LVQ<T, CompressType>;
+    using RtnType = const LVQ<BoundType, CompressType>;
 
-    static constexpr SizeT ERR_IDX = IndexAllocator<T>::ERR_IDX;
+    static constexpr SizeT ERR_IDX = IndexAllocator::ERR_IDX;
 
 private:
     constexpr static SizeT MAX_BUCKET_IDX = std::numeric_limits<CompressType>::max(); // 255 for u8
 
-    IndexAllocator<T> base_;
+    IndexAllocator base_;
 
     const SizeT buffer_plain_size_;
 
     const SizeT mean_offset_;
+    const SizeT compressed_vecs_offset_;
     const SizeT min_offset_;
     const SizeT max_offset_;
     const SizeT compressed_vec_size_;
-    const SizeT compressed_vecs_offset_;
 
     char *const ptr_;
     PlainStore<T> plain_data_;
 
-private:
-    const DataType *GetMean() const { return reinterpret_cast<const DataType *>(ptr_ + mean_offset_); }
-    DataType *GetMeanMut() { return reinterpret_cast<DataType *>(ptr_ + mean_offset_); }
+public:
+    const MeanType *GetMean() const { return reinterpret_cast<const MeanType *>(ptr_ + mean_offset_); }
+    MeanType *GetMeanMut() { return reinterpret_cast<MeanType *>(ptr_ + mean_offset_); }
 
     const CompressType *GetCompressedVec(SizeT vec_idx) const {
         return reinterpret_cast<const CompressType *>(ptr_ + compressed_vecs_offset_ + vec_idx * compressed_vec_size_);
@@ -89,45 +86,56 @@ private:
         return reinterpret_cast<CompressType *>(ptr_ + compressed_vecs_offset_ + vec_idx * compressed_vec_size_);
     }
 
-    Pair<DataType, DataType> GetLowerUpper(SizeT vec_idx) const {
+    Pair<BoundType, BoundType> GetLowerRange(SizeT vec_idx) const {
         const char *compressed_vec = ptr_ + compressed_vecs_offset_ + vec_idx * compressed_vec_size_;
-        return {*reinterpret_cast<const DataType *>(compressed_vec + min_offset_), *reinterpret_cast<const DataType *>(compressed_vec + max_offset_)};
+        return {*reinterpret_cast<const BoundType *>(compressed_vec + min_offset_),
+                *reinterpret_cast<const BoundType *>(compressed_vec + max_offset_)};
     }
-    Pair<DataType *, DataType *> GetLowerUpperMut(SizeT vec_idx) {
+    Pair<BoundType *, BoundType *> GetLowerRangeMut(SizeT vec_idx) {
         char *compressed_vec = ptr_ + compressed_vecs_offset_ + vec_idx * compressed_vec_size_;
-        return {reinterpret_cast<DataType *>(compressed_vec + min_offset_), reinterpret_cast<DataType *>(compressed_vec + max_offset_)};
+        return {reinterpret_cast<BoundType *>(compressed_vec + min_offset_), reinterpret_cast<BoundType *>(compressed_vec + max_offset_)};
+    }
+
+    void DecompressForTest(const LVQ<BoundType, CompressType> &lvq, T *result) const {
+        const MeanType *mean = GetMean();
+        for (SizeT j = 0; j < dim(); ++j) {
+            result[j] = lvq.alpha_ * lvq.c_[j] + lvq.lower_ + mean[j];
+        }
     }
 
 private:
     // the caller is responsible for allocate the `result`
     void Decompress(SizeT idx, T *result) const {
-        const T *mean = GetMean();
+        const MeanType *mean = GetMean();
         const CompressType *compressed_vec = GetCompressedVec(idx);
-        auto [lower, upper] = GetLowerUpper(idx);
-        DataType bucket_range = (upper - lower) / MAX_BUCKET_IDX;
+        auto [lower, range] = GetLowerRange(idx);
         for (SizeT j = 0; j < dim(); ++j) {
-            result[j] = bucket_range * compressed_vec[j] + lower + mean[j];
+            result[j] = range * compressed_vec[j] + lower + mean[j];
         }
     }
 
-    void CompressVec(const T *vec, const T *mean, SizeT idx) {
-        T lower = std::numeric_limits<T>::max();
-        T upper = -std::numeric_limits<T>::max();
+    void CompressVec(const T *vec, const MeanType *mean, SizeT idx) {
+        auto [lower, range] = GetLowerRangeMut(idx);
+        CompressType *compressed_vec = GetCompressedVecMut(idx);
+        CompressVec(vec, mean, compressed_vec, lower, range);
+    }
+
+    void CompressVec(const T *vec, const MeanType *mean, CompressType *tgt, BoundType *lp, BoundType *rp) const {
+        BoundType lower = std::numeric_limits<BoundType>::max();
+        BoundType upper = -std::numeric_limits<BoundType>::max();
         for (SizeT j = 0; j < dim(); ++j) {
-            T x = vec[j] - mean[j];
+            BoundType x = vec[j] - mean[j];
             lower = std::min(lower, x);
             upper = std::max(upper, x);
         }
-        auto [lp, up] = GetLowerUpperMut(idx);
         *lp = lower;
-        *up = upper;
+        BoundType range = (upper - lower) / MAX_BUCKET_IDX;
+        *rp = range;
 
-        CompressType *tgt = GetCompressedVecMut(idx);
-        DataType bucket_range = (upper - lower) / MAX_BUCKET_IDX;
         for (SizeT j = 0; j < dim(); ++j) {
-            DataType tmp = bucket_range == 0 ? 0 : std::floor((vec[j] - mean[j] - lower) / bucket_range + 0.5);
-            assert(tmp <= std::numeric_limits<CompressType>::max() && tmp >= 0);
-            tgt[j] = tmp;
+            auto res = static_cast<CompressType>((range == 0) ? 0 : std::floor((vec[j] - mean[j] - lower) / range + 0.5));// use multiple here
+            assert(res <= std::numeric_limits<CompressType>::max() && res >= 0);
+            tgt[j] = res;
         }
     }
 
@@ -140,7 +148,7 @@ private:
         for (SizeT i = 0; i < compressed_n; ++i) {
             Decompress(i, decompressed.get() + i * dim());
         }
-        T *mean = GetMeanMut();
+        MeanType *mean = GetMeanMut();
         for (SizeT i = 0; i < dim(); ++i) {
             mean[i] *= compressed_n;
         }
@@ -174,18 +182,18 @@ private:
         return start_idx;
     }
 
-    LVQStore(IndexAllocator<T> base, This::InitArgs init_args)
-        : base_(Move(base)),                                                                 //
-          buffer_plain_size_(init_args.first),                                               //
-          mean_offset_(0),                                                                   //
-          min_offset_(AlignTo(sizeof(CompressType) * dim(), sizeof(T))),                     //
-          max_offset_(AlignTo(min_offset_ + sizeof(T), sizeof(T))),                          //
-          compressed_vec_size_(AlignTo(max_offset_ + sizeof(T), init_args.second ? 32 : 1)), //
-          compressed_vecs_offset_(AlignTo(dim() * sizeof(T), init_args.second ? 32 : 1)),    //
-          ptr_(new char[compressed_vecs_offset_ + compressed_vec_size_ * max_vec_num()]),    //
-          plain_data_(PlainStore<T>::Make(0, dim()))                                         //
+    LVQStore(IndexAllocator base, This::InitArgs init_args)
+        : base_(Move(base)),                                                                         //
+          buffer_plain_size_(init_args.first),                                                       //
+          mean_offset_(0),                                                                           //
+          compressed_vecs_offset_(AlignTo(dim() * sizeof(MeanType), init_args.second ? 32 : 1)),     //
+          min_offset_(AlignTo(sizeof(CompressType) * dim(), sizeof(MeanType))),                      //
+          max_offset_(AlignTo(min_offset_ + sizeof(BoundType), sizeof(BoundType))),                  //
+          compressed_vec_size_(AlignTo(max_offset_ + sizeof(BoundType), init_args.second ? 32 : 1)), //
+          ptr_(new char[compressed_vecs_offset_ + compressed_vec_size_ * max_vec_num()]),            //
+          plain_data_(PlainStore<T>::Make(0, dim()))                                                 //
     {
-        T *mean = GetMeanMut();
+        MeanType *mean = GetMeanMut();
         std::fill(mean, mean + dim(), 0);
     }
 
@@ -194,10 +202,10 @@ public:
     SizeT max_vec_num() const { return base_.max_vec_num_; }
     SizeT dim() const { return base_.dim_; }
 
-    static SizeT err_idx() { return IndexAllocator<T>::ERR_IDX; }
+    static SizeT err_idx() { return IndexAllocator::ERR_IDX; }
 
     static LVQStore Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
-        IndexAllocator<T> data_store(max_vec_num, dim);
+        IndexAllocator data_store(max_vec_num, dim);
         return LVQStore(Move(data_store), Move(init_args));
     }
 
@@ -227,9 +235,9 @@ public:
     SizeT AddVec(const DataType *vec) { return AddBatchVec(vec, 1); }
 
     SizeT AddBatchVec(const DataType *vecs, SizeT vec_num) {
-        if (SizeT idx = plain_data_.AddBatchVec(vecs, vec_num); idx != IndexAllocator<T>::ERR_IDX) {
+        if (SizeT idx = plain_data_.AddBatchVec(vecs, vec_num); idx != IndexAllocator::ERR_IDX) {
             return base_.cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != IndexAllocator<T>::ERR_IDX) {
+        } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != IndexAllocator::ERR_IDX) {
             return idx;
         } else {
             return err_idx();
@@ -238,12 +246,21 @@ public:
 
     const RtnType GetVec(SizeT vec_idx) const {
         assert(vec_idx < cur_vec_num());
-        return LVQ<T, CompressType>{vec_idx, this};
+        auto [lower, range] = GetLowerRange(vec_idx);
+        const CompressType *compressed_vec = GetCompressedVec(vec_idx);
+        return LVQ<BoundType, CompressType>(range, lower, const_cast<CompressType *>(compressed_vec));
+    }
+
+    const RtnType GetVec(const T *vec, CompressType *space) const {
+        const MeanType *mean = GetMean();
+        BoundType lower, range;
+        CompressVec(vec, mean, space, &lower, &range);
+        return LVQ<BoundType, CompressType>(range, lower, space);
     }
 
     void Compress() {
         SizeT ret = MergeCompress(nullptr, 0);
-        assert(ret != IndexAllocator<T>::ERR_IDX);
+        assert(ret != IndexAllocator::ERR_IDX);
     }
 
     void Save(FileHandler &file_handler) {
@@ -253,7 +270,7 @@ public:
     }
 
     static LVQStore Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
-        IndexAllocator<T> base = IndexAllocator<T>::Load(file_handler, max_vec_num);
+        IndexAllocator base = IndexAllocator::Load(file_handler, max_vec_num);
         LVQStore ret(Move(base), Move(init_args));
         file_handler.Read(ret.ptr_, ret.compressed_vecs_offset_ + ret.compressed_vec_size_ * ret.cur_vec_num());
         return ret;

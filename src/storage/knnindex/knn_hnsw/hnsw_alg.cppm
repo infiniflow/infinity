@@ -48,8 +48,7 @@ private:
     const SizeT Mmax0_;
     const SizeT ef_construction_;
     SizeT ef_;
-    const DistFunc<DataType, DataRtnType> dist_func_;
-    const DistFunc2<DataType, DataRtnType> dist_func2_;
+    const DistFunc<DataType, DataRtnType> dist_func2_;
 
     // 1 / log(1.0 * M_)
     const double mult_;
@@ -71,8 +70,7 @@ private:
             SizeT ef,
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
-          dist_func_(space.DistFuncPtr()),                                               //
-          dist_func2_(space.DistFuncPtr2()),                                             //
+          dist_func2_(space.DistFuncPtr()),                                              //
           mult_(1 / std::log(1.0 * M_)),                                                 //
           data_store_(Move(data_store)),                                                 //
           graph_(Move(graph_store)),                                                     //
@@ -118,11 +116,11 @@ private:
 public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataType *query, i32 layer_idx, SizeT candidate_n, HnswProfiler *profiler) const {
+    DistHeap SearchLayer(VertexType enter_point, const DataRtnType &query, i32 layer_idx, SizeT candidate_n, HnswProfiler *profiler) const {
         DistHeap result;
         DistHeap candidate;
 
-        DataType dist = dist_func_(query, data_store_.GetVec(enter_point), data_store_.dim());
+        DataType dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
         SizeT cal_num = 1;
 
         candidate.emplace(-dist, enter_point);
@@ -138,13 +136,13 @@ public:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(c_idx, layer_idx);
-#ifndef USE_SSE
+#ifdef USE_SSE1
             if (neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-#ifndef USE_SSE
+#ifdef USE_SSE1
                 if (i - 1 >= 0) [[likely]]
                     _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
@@ -153,7 +151,7 @@ public:
                 }
                 visited[n_idx] = true;
                 // TODO:: store result.top(), result.size() in variable
-                dist = dist_func_(query, data_store_.GetVec(n_idx), data_store_.dim());
+                dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
@@ -170,25 +168,25 @@ public:
         return result;
     }
 
-    VertexType SearchLayerNearest(VertexType enter_point, const DataType *query, i32 layer_idx, HnswProfiler *profiler) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const DataRtnType &query, i32 layer_idx, HnswProfiler *profiler) const {
         VertexType cur_p = enter_point;
-        DataType cur_dist = dist_func_(query, data_store_.GetVec(enter_point), data_store_.dim());
+        DataType cur_dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
         SizeT cal_num = 1;
         bool check = true;
         while (check) {
             check = false;
             const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(cur_p, layer_idx);
-#ifndef USE_SSE
+#ifdef USE_SSE1
             if (neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
 #endif
             for (int i = neighbor_size - 1; i >= 0; --i) {
-#ifndef USE_SSE
+#ifdef USE_SSE1
                 if (i - 1 >= 0) [[likely]]
                     _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
 #endif
                 VertexType n_idx = neighbors_p[i];
-                DataType n_dist = dist_func_(query, data_store_.GetVec(n_idx), data_store_.dim());
+                DataType n_dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
@@ -217,18 +215,19 @@ public:
         } else {
             while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
                 const auto &[minus_c_dist, c_idx] = candidates.top();
+                auto c_data = data_store_.GetVec(c_idx);
                 bool check = true;
-#ifndef USE_SSE
+#ifdef USE_SSE1
                 if (result_size) [[likely]]
                     _mm_prefetch(data_store_.GetVec(result_p[0]), _MM_HINT_T0);
 #endif
                 for (SizeT i = 0; i < result_size; ++i) {
-#ifndef USE_SSE
+#ifdef USE_SSE1
                     if (i + 1 < result_size) [[likely]]
                         _mm_prefetch(data_store_.GetVec(result_p[i + 1]), _MM_HINT_T0);
 #endif
                     VertexType r_idx = result_p[i];
-                    DataType cr_dist = dist_func2_(data_store_.GetVec(c_idx), data_store_.GetVec(r_idx), data_store_.dim());
+                    DataType cr_dist = dist_func2_(c_data, data_store_.GetVec(r_idx), data_store_.dim());
                     if (cr_dist < -minus_c_dist) {
                         check = false;
                         break;
@@ -254,22 +253,22 @@ public:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            // const DataType *n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = dist_func2_(data_store_.GetVec(n_idx), data_store_.GetVec(vertex_idx), data_store_.dim());
+            auto n_data = data_store_.GetVec(n_idx);
+            DataType n_dist = dist_func2_(n_data, data_store_.GetVec(vertex_idx), data_store_.dim());
 
             Vector<PDV> tmp;
             tmp.reserve(n_neighbor_size + 1);
             tmp.emplace_back(-n_dist, vertex_idx);
-#ifndef USE_SSE
+#ifdef USE_SSE1
             if (n_neighbor_size) [[likely]]
                 _mm_prefetch(data_store_.GetVec(n_neighbors_p[0]), _MM_HINT_T0);
 #endif
             for (int i = 0; i < n_neighbor_size; ++i) {
-#ifndef USE_SSE
+#ifdef USE_SSE1
                 if (i + 1 < n_neighbor_size) [[likely]]
                     _mm_prefetch(data_store_.GetVec(n_neighbors_p[i + 1]), _MM_HINT_T0);
 #endif
-                tmp.emplace_back(-dist_func2_(data_store_.GetVec(n_idx), data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
+                tmp.emplace_back(-dist_func2_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
             }
 
             DistHeap candidates(tmp.begin(), tmp.end());
@@ -282,7 +281,7 @@ public:
     void Insert(const DataType *queries, const LabelType *label, SizeT insert_n) {
         VertexType vertex_idx = StoreData(queries, label, insert_n);
         for (SizeT i = 0; i < insert_n; ++i) {
-            const DataType *query = queries + i * data_store_.dim();
+            DataRtnType query = data_store_.GetVec(vertex_idx + i);
             i32 q_layer = GenerateRandomLayer();
             i32 max_layer = graph_.max_layer();
             VertexType ep = graph_.enterpoint();
@@ -309,9 +308,12 @@ public:
                 std::cout << "Inserted " << i << " / " << insert_n << std::endl;
             }
         }
-    }   
+    }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *query, SizeT k, HnswProfiler *profiler = nullptr) const {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, HnswProfiler *profiler = nullptr) const {
+        auto space = MakeUnique<uint8_t[]>(data_store_.dim()); // TODO: fix it
+        DataRtnType query = data_store_.GetVec(q, space.get());
+        // DataRtnType query = q;
         VertexType ep = graph_.enterpoint();
         for (i32 cur_layer = graph_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer, profiler);

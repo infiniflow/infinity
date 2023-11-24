@@ -5,7 +5,7 @@
 #include <random>
 
 import dist_func;
-import dist_func_l2;
+import dist_func_l2_2;
 import hnsw_alg;
 import file_system;
 import file_system_type;
@@ -24,7 +24,7 @@ int main() {
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
     int dim = 16;
-    int element_size = 20;
+    int element_size = 300;
 
     auto data = std::make_unique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
@@ -35,7 +35,7 @@ int main() {
 
     int M = 16;
     int ef_construction = 200;
-    DistFuncL2<float> space(dim);
+    FloatL2Space space(dim);
     {
         auto hnsw_index = KnnHnsw<float, LabelT>::Make(element_size, dim, space, M, ef_construction, {});
 
@@ -44,15 +44,18 @@ int main() {
                 const float *query = data.get() + i * dim;
                 hnsw_index->Insert(query, unsigned(i));
                 // hnsw_index->Dump(std::cout);
-                hnsw_index->Check();
+                // hnsw_index->Check();
             }
         } else {
             auto labels = std::make_unique<LabelT[]>(element_size);
             std::iota(labels.get(), labels.get() + element_size, 0);
             hnsw_index->Insert(data.get(), labels.get(), element_size);
             // hnsw_index->Dump(std::cout);
-            hnsw_index->Check();
+            // hnsw_index->Check();
         }
+
+        hnsw_index->Dump(std::cout);
+        hnsw_index->Check();
 
         hnsw_index->SetEf(ef_construction);
         int correct = 0;
