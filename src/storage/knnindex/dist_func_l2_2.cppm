@@ -60,15 +60,14 @@ export uint32_t U8IPSIMD16ExtAVX(const uint8_t *v1, const uint8_t *v2, size_t di
 }
 
 export float L2Sqr3(const LVQ8 &v1, const LVQ8 &v2, SizeT dim) {
-    double alpha1 = v1.alpha_;
-    double alpha2 = v2.alpha_;
-    double beta = v1.lower_ - v2.lower_;
-    const uint8_t *c1 = v1.c_;
-    const uint8_t *c2 = v2.c_;
-
-    uint32_t c1c2_ip = U8IPSIMD16ExtAVX(c1, c2, dim);
-    double dist = alpha1 * alpha1 * v1.norm2sq_ + alpha2 * alpha2 * v2.norm2sq_ + beta * beta * dim - 2 * alpha1 * alpha2 * c1c2_ip +
-                  2 * alpha1 * beta * v1.norm1_ - 2 * alpha2 * beta * v2.norm1_;
+    uint32_t c1c2_ip = U8IPSIMD16ExtAVX(v1.GetCompressVec(), v2.GetCompressVec(), dim);
+    auto [scale1, bias1] = v1.GetScalar();
+    auto [scale2, bias2] = v2.GetScalar();
+    auto beta = bias1 - bias2;
+    auto [norm1_scale_1, norm2sq_scalesq_1] = v1.GetConstant();
+    auto [norm1_scale_2, norm2sq_scalesq_2] = v2.GetConstant();
+    double dist = norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
+                  2 * beta * norm1_scale_2;
 
     return dist;
 }
@@ -76,8 +75,8 @@ export float L2Sqr3(const LVQ8 &v1, const LVQ8 &v2, SizeT dim) {
 export class FloatLVQ8L2Space : public SpaceBase<float, LVQ8> {
 public:
     FloatLVQ8L2Space(SizeT dim) {
-        assert(dim <= 256);
-        assert(dim % 16 == 0);
+        // assert(dim <= 256);
+        // assert(dim % 16 == 0);
         this->fstdistfunc_ = L2Sqr3;
     }
 };

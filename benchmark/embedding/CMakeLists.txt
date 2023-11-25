@@ -68,18 +68,6 @@ target_link_libraries(
     benchmark_profiler
 )
 
-add_executable(test_lvq
-    test_lvq.cpp
-    helper.cpp
-    helper.h
-)
-target_include_directories(test_lvq PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-    test_lvq
-    infinity_core
-    benchmark_profiler
-)
-
 add_executable(ann_ivfflat_benchmark
         ann_ivfflat_benchmark.cpp
         helper.cpp

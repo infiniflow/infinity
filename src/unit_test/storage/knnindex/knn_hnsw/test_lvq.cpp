@@ -1,160 +1,187 @@
-// #include "unit_test/base_test.h"
-// #include <iostream>
-// #include <random>
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-// import lvq_store;
-// import local_file_system;
-// import file_system;
-// import file_system_type;
+#include "unit_test/base_test.h"
+#include <iostream>
+#include <random>
 
-// using namespace infinity;
+import lvq_store;
+import local_file_system;
+import file_system;
+import file_system_type;
 
-// class HnswLVQTest : public BaseTest {
-// public:
-//     using LVQ8Store = LVQStore<float, uint8_t>;
-//     using LVQ8 = LVQ<float, uint8_t>;
+using namespace infinity;
 
-//     static constexpr size_t dim_ = 16;
-//     static constexpr size_t vec_n_ = 20;
-//     static constexpr size_t buffer_size_ = 4;
-//     const std::string file_dir_ = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
+class HnswLVQTest : public BaseTest {
+public:
+    using LVQ8Store = LVQStore<float, uint8_t>;
+    using LVQ8Data = LVQ8Store::RtnType;
 
-//     bool dump_ = false;
+    static constexpr size_t dim_ = 16;
+    static constexpr size_t vec_n_ = 20;
+    static constexpr size_t buffer_size_ = 4;
+    const std::string file_dir_ = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
-//     void DumpStore(const LVQ8Store &store, const float *data) {
-//         if (!dump_) {
-//             return;
-//         }
-//         std::cout.widen(8);
-//         std::cout.fill('0');
-//         for (size_t i = 0; i < store.cur_vec_num(); ++i) {
-//             std::cout << i << std::endl;
-//             LVQ8 lvq = store.GetVec(i);
-//             auto res = std::make_unique<float[]>(dim_);
-//             lvq.DecompressForTest(res.get());
+    bool dump_ = false;
 
-//             std::cout << "LVQ:\t";
-//             for (size_t j = 0; j < 16; ++j) {
-//                 std::cout << res[j] << " ";
-//             }
-//             std::cout << std::endl;
+    void CheckStore(LVQ8Store &store, const float *vecs) {
 
-//             std::cout << "Old:\t";
-//             for (size_t j = 0; j < 16; ++j) {
-//                 std::cout << data[i * dim_ + j] << " ";
-//             }
-//             std::cout << std::endl;
-//         }
-//         std::cout << "---------------" << std::endl;
-//     }
-// };
+        std::cout.widen(8);
+        std::cout.fill('0');
+        auto mean = store.GetMean();
+        store.Compress();
+        for (size_t i = 0; i < store.cur_vec_num(); ++i) {
+            const float *vec = vecs + dim_ * i;
+            LVQ8Data lvq = store.GetVec(i);
+            auto c = lvq.GetCompressVec();
+            auto res = std::make_unique<float[]>(dim_);
+            for (size_t j = 0; j < dim_; ++j) {
+                auto [scale, bias] = lvq.GetScalar();
+                res[j] = scale * c[j] + bias + mean[j];
+                float error = std::abs((res[j] - vec[j]) / vec[j]);
+                EXPECT_LE(error, 1e-2);
+            }
 
-// TEST_F(HnswLVQTest, test1) {
-//     using namespace infinity;
+            if (!dump_) {
+                continue;
+            }
+            std::cout << i << std::endl;
+            std::cout << "LVQ:\t";
+            for (size_t j = 0; j < 16; ++j) {
+                std::cout << res[j] << " ";
+            }
+            std::cout << std::endl;
 
-//     auto data = std::make_unique<float[]>(dim_ * vec_n_);
+            std::cout << "Old:\t";
+            for (size_t j = 0; j < 16; ++j) {
+                std::cout << vec[i] << " ";
+            }
+            std::cout << std::endl;
+        }
+        if (dump_) {
+            std::cout << "---------------" << std::endl;
+        }
+    }
+};
 
-//     // randomize the data from 0 to 1
-//     std::default_random_engine rng;
-//     std::uniform_real_distribution<float> distrib_real;
-//     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
-//         data[i] = distrib_real(rng);
-//     }
+TEST_F(HnswLVQTest, test1) {
+    using namespace infinity;
 
-//     {
-//         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
-//         auto ret = lvq_store.AddBatchVec(data.get(), vec_n_);
-//         EXPECT_NE(ret, LVQ8Store::err_idx());
-//         DumpStore(lvq_store, data.get());
-//     }
+    auto data = std::make_unique<float[]>(dim_ * vec_n_);
 
-//     {
-//         size_t idx = 0;
-//         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
-//         auto ret = lvq_store.AddBatchVec(data.get(), vec_n_ / 2);
-//         EXPECT_NE(ret, LVQ8Store::err_idx());
-//         idx += vec_n_ / 2;
+    // randomize the data from 0 to 1
+    std::default_random_engine rng;
+    std::uniform_real_distribution<float> distrib_real(100, 200);
+    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+        data[i] = distrib_real(rng);
+    }
 
-//         ret = lvq_store.AddBatchVec(data.get() + idx * dim_, vec_n_ - idx);
-//         EXPECT_NE(ret, LVQ8Store::err_idx());
-//         DumpStore(lvq_store, data.get());
-//     }
+    // dump_ = true;
+    {
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        auto ret = lvq_store.AddVec(data.get(), vec_n_);
+        EXPECT_NE(ret, LVQ8Store::err_idx());
+        CheckStore(lvq_store, data.get());
+    }
 
-//     {
-//         size_t idx = 0;
-//         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
-//         auto ret = lvq_store.AddBatchVec(data.get(), vec_n_ / 2);
-//         EXPECT_NE(ret, LVQ8Store::err_idx());
-//         idx += vec_n_ / 2;
+    {
+        size_t idx = 0;
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
+        EXPECT_NE(ret, LVQ8Store::err_idx());
+        idx += vec_n_ / 2;
 
-//         for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
-//             ret = lvq_store.AddVec(data.get() + idx * dim_);
-//             EXPECT_NE(ret, LVQ8Store::err_idx());
-//             ++idx;
-//         }
-//         ret = lvq_store.AddBatchVec(data.get() + idx * dim_, vec_n_ - idx);
-//         EXPECT_NE(ret, LVQ8Store::err_idx());
+        ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
+        EXPECT_NE(ret, LVQ8Store::err_idx());
+        CheckStore(lvq_store, data.get());
+    }
 
-//         DumpStore(lvq_store, data.get());
-//     }
+    {
+        size_t idx = 0;
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
+        EXPECT_NE(ret, LVQ8Store::err_idx());
+        idx += vec_n_ / 2;
 
-//     {
-//         std::string file_path = file_dir_ + "/lvq_store1.bin";
-//         LocalFileSystem fs;
+        for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
+            ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
+            EXPECT_NE(ret, LVQ8Store::err_idx());
+            ++idx;
+        }
+        ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
+        EXPECT_NE(ret, LVQ8Store::err_idx());
 
-//         size_t idx = 0;
-//         {
-//             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-//             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        CheckStore(lvq_store, data.get());
+    }
 
-//             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
-//             auto ret = lvq_store.AddBatchVec(data.get(), vec_n_ / 2);
-//             EXPECT_NE(ret, LVQ8Store::err_idx());
-//             idx += vec_n_ / 2;
+    {
+        std::string file_path = file_dir_ + "/lvq_store1.bin";
+        LocalFileSystem fs;
 
-//             lvq_store.Save(*file_handler);
-//         }
-//         {
-//             uint8_t file_flags = FileFlags::READ_FLAG;
-//             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        size_t idx = 0;
+        {
+            uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
 
-//             LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, buffer_size_);
+            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+            auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
+            EXPECT_NE(ret, LVQ8Store::err_idx());
+            idx += vec_n_ / 2;
 
-//             DumpStore(lvq_store, data.get());
-//         }
-//     }
+            lvq_store.Save(*file_handler);
+        }
+        {
+            uint8_t file_flags = FileFlags::READ_FLAG;
+            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
 
-//     {
-//         std::string file_path = file_dir_ + "/lvq_store2.bin";
-//         LocalFileSystem fs;
+            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, {buffer_size_, true});
 
-//         size_t idx = 0;
-//         {
-//             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-//             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+            CheckStore(lvq_store, data.get());
+        }
+    }
 
-//             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
-//             auto ret = lvq_store.AddBatchVec(data.get(), vec_n_ / 2);
-//             EXPECT_NE(ret, LVQ8Store::err_idx());
-//             idx += vec_n_ / 2;
+    {
+        std::string file_path = file_dir_ + "/lvq_store2.bin";
+        LocalFileSystem fs;
 
-//             for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
-//                 ret = lvq_store.AddVec(data.get() + idx * dim_);
-//                 EXPECT_NE(ret, LVQ8Store::err_idx());
-//                 ++idx;
-//             }
-//             lvq_store.Save(*file_handler);
-//         }
-//         {
-//             uint8_t file_flags = FileFlags::READ_FLAG;
-//             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        size_t idx = 0;
+        {
+            uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
 
-//             LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, buffer_size_);
+            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+            auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
+            EXPECT_NE(ret, LVQ8Store::err_idx());
+            idx += vec_n_ / 2;
 
-//             auto ret = lvq_store.AddBatchVec(data.get() + idx * dim_, vec_n_ - idx);
-//             EXPECT_NE(ret, LVQ8Store::err_idx());
+            for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
+                ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
+                EXPECT_NE(ret, LVQ8Store::err_idx());
+                ++idx;
+            }
+            lvq_store.Save(*file_handler);
+        }
+        {
+            uint8_t file_flags = FileFlags::READ_FLAG;
+            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
 
-//             DumpStore(lvq_store, data.get());
-//         }
-//     }
-// }
+            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, {buffer_size_, true});
+
+            auto ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
+            EXPECT_NE(ret, LVQ8Store::err_idx());
+
+            CheckStore(lvq_store, data.get());
+        }
+    }
+}

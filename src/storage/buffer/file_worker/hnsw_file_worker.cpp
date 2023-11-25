@@ -75,8 +75,8 @@ void HnswFileWorker::FreeInMemory() {
     }
     switch (GetType()) {
         case kElemFloat: {
-            auto hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
-            delete hnsw_index_ptr;
+            // auto hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
+            // delete hnsw_index_ptr;
             break;
         }
         default: {
@@ -89,8 +89,8 @@ void HnswFileWorker::FreeInMemory() {
 void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
     switch (GetType()) {
         case kElemFloat: {
-            auto *hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
-            hnsw_index_ptr->SaveIndex(*file_handler_);
+            // auto *hnsw_index_ptr = static_cast<KnnHnsw<f32, u64, PlainStore<f32>> *>(data_);
+            // hnsw_index_ptr->SaveIndex(*file_handler_);
             break;
         }
         default: {
@@ -106,9 +106,8 @@ void HnswFileWorker::ReadFromFileImpl() {
         case kElemFloat: {
             // auto dist_func = GetDistFunc<f32>(dimension);
             // UniquePtr<KnnHnsw<f32, u64>> hnsw_index = KnnHnsw<f32, u64>::LoadIndexInner(*file_handler_, *dist_func);
-            UniquePtr<KnnHnsw<f32, u64, PlainStore<f32>>> hnsw_index = nullptr;
             // TODO!! not save index parameter in index file.
-            data_ = static_cast<void *>(hnsw_index.release());
+            // data_ = static_cast<void *>(hnsw_index.release());
             break;
         }
         default: {

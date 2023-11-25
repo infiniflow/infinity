@@ -32,6 +32,7 @@ public:
     using InitArgs = std::tuple<>;
     using DataType = T;
     using RtnType = const T *;
+    using QueryCtx = const T *;
 
     static constexpr SizeT ERR_IDX = IndexAllocator::ERR_IDX;
 
@@ -63,9 +64,7 @@ public:
     static SizeT err_idx() { return IndexAllocator::ERR_IDX; }
 
 public:
-    SizeT AddVec(const DataType *vec) { return AddBatchVec(vec, 1); }
-
-    SizeT AddBatchVec(const DataType *vecs, SizeT vec_num) {
+    SizeT AddVec(const DataType *vecs, SizeT vec_num) {
         SizeT new_idx = base_.AllocateVec(vec_num);
         if (new_idx != err_idx()) {
             T *ptr = ptr_.get() + new_idx * dim();
@@ -74,12 +73,12 @@ public:
         return new_idx;
     }
 
-    RtnType GetVec(SizeT vec_idx) const {
-        assert(vec_idx < cur_vec_num());
-        return ptr_.get() + vec_idx * dim();
+    RtnType GetVec(SizeT vec_i) const {
+        assert(vec_i < cur_vec_num());
+        return ptr_.get() + vec_i * dim();
     }
 
-    RtnType Convert(const DataType *vec) const { return vec; }
+    RtnType GetVec(const QueryCtx &ctx) const { return ctx; }
 
     void Save(FileHandler &file_handler) const {
         base_.Save(file_handler);

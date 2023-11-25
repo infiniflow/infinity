@@ -106,7 +106,7 @@ private:
     }
 
     VertexType StoreData(const DataType *data, const LabelType *labels, SizeT insert_n) {
-        VertexType ret = data_store_.AddBatchVec(data, insert_n);
+        VertexType ret = data_store_.AddVec(data, insert_n);
         if (ret == DataStore::ERR_IDX) {
             Error<StorageException>("Data index is not enough.");
         }

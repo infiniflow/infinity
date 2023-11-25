@@ -29,11 +29,9 @@ export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
 export template <typename Store, typename DataType>
 concept DataStoreConcept = requires(Store s) {
     { std::same_as<typename Store::DataType, DataType> };
-    typename Store::RtnType;
-    typename Store::InitArgs;
-    { s.AddVec(std::declval<const typename Store::DataType *>()) } -> std::same_as<SizeT>;
-    { s.AddBatchVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
+    { s.AddVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
     { s.GetVec(std::declval<SizeT>()) } -> std::same_as<typename Store::RtnType>;
+    { s.GetVec(std::declval<const typename Store::QueryCtx &>()) } -> std::same_as<typename Store::RtnType>;
     { Store::ERR_IDX };
     { s.cur_vec_num() } -> std::same_as<SizeT>;
     { s.dim() } -> std::same_as<SizeT>;
@@ -41,7 +39,6 @@ concept DataStoreConcept = requires(Store s) {
     { s.Save(std::declval<FileHandler &>()) };
     { Store::Load(std::declval<FileHandler &>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
     { Store::Make(std::declval<SizeT>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
-    { s.Convert(std::declval<const DataType *>()) } -> std::same_as<typename Store::RtnType>;
 };
 
 export class IndexAllocator {
