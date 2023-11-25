@@ -33,7 +33,7 @@ import logger;
 import txn_store;
 import status;
 import infinity_exception;
-import ivfflat_def;
+import index_ivfflat;
 import table_index_meta;
 import txn_manager;
 import segment_column_index_entry;

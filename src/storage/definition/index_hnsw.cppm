@@ -17,42 +17,45 @@ module;
 import stl;
 import index_def;
 import parser;
-import base_index;
 import third_party;
+import index_base;
 
-export module ivfflat_def;
+export module index_hnsw;
 
 namespace infinity {
-export class IVFFlatDef : public BaseIndex {
+
+export class IndexHnsw : public IndexBase {
 public:
-    static SharedPtr<BaseIndex> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IVFFlatDef(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : BaseIndex(file_name, IndexType::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+    IndexHnsw(String file_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
+        : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction), ef_(ef) {}
 
-    ~IVFFlatDef() = default;
+    ~IndexHnsw() = default;
 
-    bool operator==(const IVFFlatDef &other) const;
+    bool operator==(const IndexHnsw &other) const;
 
-    bool operator!=(const IVFFlatDef &other) const;
+    bool operator!=(const IndexHnsw &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
 
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
 
-    static SharedPtr<IVFFlatDef> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexHnsw> Deserialize(const Json &index_def_json);
 
 public:
-    const SizeT centroids_count_{};
-
     const MetricType metric_type_{MetricType::kInvalid};
+
+    const SizeT M_{};
+    const SizeT ef_construction_{};
+    const SizeT ef_{};
 };
 
 } // namespace infinity

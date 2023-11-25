@@ -49,12 +49,12 @@ struct InitParameter {
 struct IfExistsInfo {
     bool exists_{false};
     bool if_exists_{false};
-    std::string info_{""};
+    std::string info_{};
 };
 
 struct IfNotExistsInfo {
     bool exists_{false};
     bool if_not_exists_{false};
-    std::string info_{""};
+    std::string info_{};
 };
 } // namespace infinity

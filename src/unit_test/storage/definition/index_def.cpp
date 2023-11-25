@@ -16,8 +16,9 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import ivfflat_def;
-import hnsw_def;
+import index_base;
+import index_ivfflat;
+import index_hnsw;
 import index_def;
 import parser;
 
@@ -31,7 +32,7 @@ TEST_F(IndexDefTest, ivfflat_readwrite) {
     parameters.emplace_back(new InitParameter("centroids_count", "100"));
     parameters.emplace_back(new InitParameter("metric", "l2"));
 
-    auto index_def = IVFFlatDef::Make("idx1", columns, parameters);
+    auto index_def = IndexIVFFlat::Make("idx1", columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
     for(auto parameter: parameters) {
         delete parameter;
@@ -46,11 +47,11 @@ TEST_F(IndexDefTest, ivfflat_readwrite) {
 
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexDef> index_def1 = IndexDef::ReadAdv(ptr, maxbytes);
-    std::cout << "index_def1: " << index_def1->ToString() << std::endl;
+    SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, maxbytes);
+    std::cout << "index_def1: " << index_base->ToString() << std::endl;
     EXPECT_EQ(ptr - buf_beg, exp_size);
-    EXPECT_NE(index_def1.get(), nullptr);
-    EXPECT_EQ(*index_def, *index_def1);
+    EXPECT_NE(index_base.get(), nullptr);
+    EXPECT_EQ(*index_def, *index_base);
 }
 
 TEST_F(IndexDefTest, hnsw_readwrite) {
@@ -63,8 +64,8 @@ TEST_F(IndexDefTest, hnsw_readwrite) {
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("ef", "200"));
 
-    auto index_def = HnswDef::Make("idx1", columns, parameters);
-    std::cout << "index_def: " << index_def->ToString() << std::endl;
+    auto index_def = IndexHnsw::Make("idx1", columns, parameters);
+    std::cout << "index_base: " << index_def->ToString() << std::endl;
 
     for(auto parameter: parameters) {
         delete parameter;
@@ -79,9 +80,9 @@ TEST_F(IndexDefTest, hnsw_readwrite) {
 
     ptr = buf_beg;
     int32_t maxbytes = exp_size;
-    SharedPtr<IndexDef> index_def1 = IndexDef::ReadAdv(ptr, maxbytes);
-    std::cout << "index_def1: " << index_def1->ToString() << std::endl;
+    SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, maxbytes);
+    std::cout << "index_base: " << index_base->ToString() << std::endl;
     EXPECT_EQ(ptr - buf_beg, exp_size);
-    EXPECT_NE(index_def1.get(), nullptr);
-    EXPECT_EQ(*index_def, *index_def1);
+    EXPECT_NE(index_base.get(), nullptr);
+    EXPECT_EQ(*index_def, *index_base);
 }

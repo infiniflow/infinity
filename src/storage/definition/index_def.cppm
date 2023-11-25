@@ -16,7 +16,7 @@ module;
 
 import stl;
 import third_party;
-import base_index;
+import index_base;
 
 export module index_def;
 
@@ -50,6 +50,6 @@ public:
 
 public:
     SharedPtr<String> index_name_{};
-    Vector<SharedPtr<BaseIndex>> index_array_{};
+    Vector<SharedPtr<IndexBase>> index_array_{};
 };
 } // namespace infinity

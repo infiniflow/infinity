@@ -24,7 +24,7 @@ module;
 import stl;
 import infinity_exception;
 import search_top_k;
-import base_index;
+import index_base;
 import vector_distance;
 
 export module kmeans_partition;

@@ -63,10 +63,10 @@ import parser;
 import index_def;
 import status;
 import default_values;
-import base_index;
-import ivfflat_def;
-import hnsw_def;
-import full_text_def;
+import index_base;
+import index_ivfflat;
+import index_hnsw;
+import index_full_text;
 
 module logical_planner;
 
@@ -428,6 +428,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
+    if(table_name->empty()) {
+        Error<PlannerException>("No index name.");
+    }
     //    if (create_index_info->column_names_->size() != 1) {
     //        Error<NotImplementException>("Creating index only support single column now.");
     //    }
@@ -438,10 +441,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
     index_def_ptr->index_array_.reserve(index_info_list.size());
     for (IndexInfo *index_info : index_info_list) {
-        SharedPtr<BaseIndex> base_index_ptr{nullptr};
+        SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {
             case IndexType::kIRSFullText: {
-                base_index_ptr = FullTextDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                base_index_ptr = IndexFullText::Make(create_index_info->table_name_ + "_" + *index_name,
                                                    {index_info->column_name_},
                                                    *(index_info->index_param_list_));
                 break;
@@ -453,19 +456,19 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             //                break;
             //            }
             case IndexType::kHnsw: {
-                base_index_ptr = HnswDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                base_index_ptr = IndexHnsw::Make(create_index_info->table_name_ + "_" + *index_name,
                                                {index_info->column_name_},
                                                *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kIVFFlat: {
-                base_index_ptr = IVFFlatDef::Make(create_index_info->table_name_ + "_" + *index_name,
+                base_index_ptr = IndexIVFFlat::Make(create_index_info->table_name_ + "_" + *index_name,
                                                   {index_info->column_name_},
                                                   *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kInvalid: {
-                PlannerException("Invalid index type.");
+                Error<PlannerException>("Invalid index type.");
                 break;
             }
         }

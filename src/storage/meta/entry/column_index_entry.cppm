@@ -16,11 +16,11 @@ module;
 
 import stl;
 import parser;
-import base_index;
+import index_base;
 import base_entry;
 import third_party;
 import segment_column_index_entry;
-import base_index;
+import index_base;
 
 export module column_index_entry;
 
@@ -32,13 +32,13 @@ class TableIndexEntry;
 
 export struct ColumnIndexEntry : public BaseEntry {
 public:
-    explicit ColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+    explicit ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                               TableIndexEntry *table_index_entry,
                               SharedPtr<String> index_dir,
                               u64 txn_id,
                               TxnTimeStamp begin_ts);
 
-    static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+    static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
                                                            u64 txn_id,
@@ -62,7 +62,7 @@ public:
 
     TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};
-    const SharedPtr<BaseIndex> base_index_{};
+    const SharedPtr<IndexBase> index_base_{};
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment{};
 };
 } // namespace infinity

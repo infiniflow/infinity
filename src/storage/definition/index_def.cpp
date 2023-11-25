@@ -20,9 +20,9 @@ module;
 
 import stl;
 import serialize;
-import ivfflat_def;
-import hnsw_def;
-import base_index;
+import index_ivfflat;
+import index_hnsw;
+import index_base;
 import third_party;
 
 import infinity_exception;
@@ -57,9 +57,9 @@ int32_t IndexDef::GetSizeInBytes() const {
     int32_t size = 0;
     size += sizeof(int32_t) + index_name_->length();
     size += sizeof(int32_t); // for the length of index_array_
-    for (const SharedPtr<BaseIndex> &base_index : index_array_) {
+    for (const SharedPtr<IndexBase> &index_base : index_array_) {
         size += sizeof(int32_t); // each base index size
-        size += base_index->GetSizeInBytes();
+        size += index_base->GetSizeInBytes();
     }
     return size;
 }
@@ -67,9 +67,9 @@ int32_t IndexDef::GetSizeInBytes() const {
 void IndexDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, *index_name_);
     WriteBufAdv(ptr, static_cast<int32_t>(index_array_.size()));
-    for (const SharedPtr<BaseIndex> &base_index : index_array_) {
-        WriteBufAdv(ptr, base_index->GetSizeInBytes());
-        base_index->WriteAdv(ptr);
+    for (const SharedPtr<IndexBase> &index_base : index_array_) {
+        WriteBufAdv(ptr, index_base->GetSizeInBytes());
+        index_base->WriteAdv(ptr);
     }
 }
 
@@ -85,7 +85,7 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
 
     for (int32_t i = 0; i < index_array_count; ++i) {
         int32_t index_size = ReadBufAdv<int32_t>(ptr);
-        index_def->index_array_.emplace_back(BaseIndex::ReadAdv(ptr, index_size));
+        index_def->index_array_.emplace_back(IndexBase::ReadAdv(ptr, index_size));
     }
     return index_def;
 }
@@ -116,8 +116,8 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
     SharedPtr<IndexDef> res = nullptr;
     res->index_name_ = MakeShared<String>(index_def_json["index_name"]);
     for (const auto &index : index_def_json["indexes"]) {
-        SharedPtr<BaseIndex> base_index = BaseIndex::Deserialize(index);
-        res->index_array_.emplace_back(Move(base_index));
+        SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index);
+        res->index_array_.emplace_back(Move(index_base));
     }
     return res;
 }

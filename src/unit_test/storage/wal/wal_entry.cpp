@@ -23,7 +23,6 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-// import data_table;
 import table_def;
 import wal_entry;
 import value;
@@ -31,7 +30,8 @@ import parser;
 import data_block;
 import default_values;
 import wal_manager;
-import ivfflat_def;
+import index_ivfflat;
+import index_def;
 
 class WalEntryTest : public BaseTest {};
 
@@ -161,7 +161,9 @@ TEST_F(WalEntryTest, ReadWrite) {
 
     Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
 
-    auto index_def = IVFFlatDef::Make("idx1", Vector<String>{"col1", "col2"}, parameters);
+    SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(MakeShared<String>("idx1"));
+
+    auto index_base = IndexIVFFlat::Make("idx1", Vector<String>{"col1", "col2"}, parameters);
     for (auto parameter : parameters) {
         delete parameter;
     }

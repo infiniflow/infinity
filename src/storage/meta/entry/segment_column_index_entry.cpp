@@ -130,10 +130,10 @@ void SegmentColumnIndexEntry::MergeFrom(BaseEntry &other) {
 UniquePtr<IndexFileWorker>
 SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam* param, u32 segment_id) {
     UniquePtr<IndexFileWorker> file_worker = nullptr;
-    auto base_index = param->base_index_;
+    auto index_base = param->index_base_;
     auto column_def = param->column_def_;
-    auto file_name = MakeShared<String>(SegmentColumnIndexEntry::IndexFileName(base_index->file_name_, segment_id));
-    switch (base_index->index_type_) {
+    auto file_name = MakeShared<String>(SegmentColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
+    switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
@@ -141,7 +141,7 @@ SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, 
                 case kElemFloat: {
                     file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(column_index_entry->index_dir_,
                                                                              file_name,
-                                                                             base_index,
+                                                                             index_base,
                                                                              column_def,
                                                                              create_annivfflat_param->row_count_);
                     break;
@@ -155,7 +155,7 @@ SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, 
         case IndexType::kHnsw: {
             auto create_hnsw_para = static_cast<CreateHnswParam *>(param);
             file_worker =
-                MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, base_index, column_def, create_hnsw_para->max_element_);
+                MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_para->max_element_);
             break;
         }
         default: {

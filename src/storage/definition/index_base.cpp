@@ -20,13 +20,13 @@ module;
 
 import stl;
 import serialize;
-import ivfflat_def;
-import hnsw_def;
+import index_ivfflat;
+import index_hnsw;
 import third_party;
 import parser;
 import infinity_exception;
 
-module base_index;
+module index_base;
 
 namespace infinity {
 
@@ -59,13 +59,13 @@ MetricType StringToMetricType(const String &str) {
 
 namespace infinity {
 
-bool BaseIndex::operator==(const BaseIndex &other) const {
+bool IndexBase::operator==(const IndexBase &other) const {
     return index_type_ == other.index_type_ && column_names_ == other.column_names_;
 }
 
-bool BaseIndex::operator!=(const BaseIndex &other) const { return !(*this == other); }
+bool IndexBase::operator!=(const IndexBase &other) const { return !(*this == other); }
 
-int32_t BaseIndex::GetSizeInBytes() const {
+int32_t IndexBase::GetSizeInBytes() const {
     int32_t size = 0;
     size += sizeof(int32_t);
     size += sizeof(index_type_);
@@ -76,7 +76,7 @@ int32_t BaseIndex::GetSizeInBytes() const {
     return size;
 }
 
-void BaseIndex::WriteAdv(char *&ptr) const {
+void IndexBase::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, index_type_);
     WriteBufAdv(ptr, static_cast<int32_t>(column_names_.size()));
     for (const String &column_name : column_names_) {
@@ -84,9 +84,9 @@ void BaseIndex::WriteAdv(char *&ptr) const {
     }
 }
 
-SharedPtr<BaseIndex> BaseIndex::ReadAdv(char *&ptr, int32_t maxbytes) {
+SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
     char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading BaseIndex");
+    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexBase");
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
     String file_name = ReadBufAdv<String>(ptr);
@@ -94,13 +94,13 @@ SharedPtr<BaseIndex> BaseIndex::ReadAdv(char *&ptr, int32_t maxbytes) {
     for (int32_t i = 0; i < column_names_size; ++i) {
         column_names.emplace_back(ReadBufAdv<String>(ptr));
     }
-    SharedPtr<BaseIndex> res = nullptr;
+    SharedPtr<IndexBase> res = nullptr;
     switch (index_type) {
         case IndexType::kIVFFlat: {
             size_t centroids_count = ReadBufAdv<size_t>(ptr);
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
-            auto res1 = MakeShared<IVFFlatDef>(file_name, column_names, centroids_count, metric_type);
-            res = std::static_pointer_cast<BaseIndex>(res1);
+            auto res1 = MakeShared<IndexIVFFlat>(file_name, column_names, centroids_count, metric_type);
+            res = std::static_pointer_cast<IndexBase>(res1);
             break;
         }
         case IndexType::kHnsw: {
@@ -108,8 +108,8 @@ SharedPtr<BaseIndex> BaseIndex::ReadAdv(char *&ptr, int32_t maxbytes) {
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT ef = ReadBufAdv<SizeT>(ptr);
-            auto res1 = MakeShared<HnswDef>(file_name, column_names, metric_type, M, ef_construction, ef);
-            res = std::static_pointer_cast<BaseIndex>(res1);
+            auto res1 = MakeShared<IndexHnsw>(file_name, column_names, metric_type, M, ef_construction, ef);
+            res = std::static_pointer_cast<IndexBase>(res1);
             break;
         }
         case IndexType::kInvalid: {
@@ -119,13 +119,13 @@ SharedPtr<BaseIndex> BaseIndex::ReadAdv(char *&ptr, int32_t maxbytes) {
             Error<StorageException>("Not implemented");
         }
     }
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading BaseIndex");
+    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexBase");
     return res;
 }
 
-String BaseIndex::ToString() const {
+String IndexBase::ToString() const {
     std::stringstream ss;
-    ss << "BaseIndex: " << IndexInfo::IndexTypeToString(index_type_) << ", [";
+    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", [";
     for (size_t i = 0; i < column_names_.size(); ++i) {
         ss << column_names_[i];
         if (i != column_names_.size() - 1) {
@@ -136,7 +136,7 @@ String BaseIndex::ToString() const {
     return ss.str();
 }
 
-Json BaseIndex::Serialize() const {
+Json IndexBase::Serialize() const {
     Json res;
     res["file_name"] = file_name_;
     res["index_type"] = IndexInfo::IndexTypeToString(index_type_);
@@ -144,8 +144,8 @@ Json BaseIndex::Serialize() const {
     return res;
 }
 
-SharedPtr<BaseIndex> BaseIndex::Deserialize(const Json &index_def_json) {
-    SharedPtr<BaseIndex> res = nullptr;
+SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
+    SharedPtr<IndexBase> res = nullptr;
     IndexType index_type = IndexInfo::StringToIndexType(index_def_json["index_type"]);
     String file_name = index_def_json["file_name"];
     Vector<String> column_names = index_def_json["column_names"];
@@ -153,8 +153,8 @@ SharedPtr<BaseIndex> BaseIndex::Deserialize(const Json &index_def_json) {
         case IndexType::kIVFFlat: {
             size_t centroids_count = index_def_json["centroids_count"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IVFFlatDef>(file_name, Move(column_names), centroids_count, metric_type);
-            res = std::static_pointer_cast<BaseIndex>(ptr);
+            auto ptr = MakeShared<IndexIVFFlat>(file_name, Move(column_names), centroids_count, metric_type);
+            res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
         case IndexType::kHnsw: {
@@ -162,8 +162,8 @@ SharedPtr<BaseIndex> BaseIndex::Deserialize(const Json &index_def_json) {
             SizeT ef_construction = index_def_json["ef_construction"];
             SizeT ef = index_def_json["ef"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<HnswDef>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
-            res = std::static_pointer_cast<BaseIndex>(ptr);
+            auto ptr = MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
+            res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
         case IndexType::kInvalid: {

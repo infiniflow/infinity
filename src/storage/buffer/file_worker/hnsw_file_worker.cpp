@@ -19,9 +19,9 @@ import stl;
 import index_file_worker;
 import dist_func;
 import knn_hnsw;
-import hnsw_def;
+import index_hnsw;
 import parser;
-import base_index;
+import index_base;
 import dist_func_l2;
 import dist_func_ip;
 
@@ -49,7 +49,7 @@ void HnswFileWorker::AllocateInMemory() {
     }
 
     SizeT dimension = GetDimension();
-    auto hnsw_index_def = static_cast<HnswDef*>(index_def_);
+    auto hnsw_index_def = static_cast<IndexHnsw*>(index_def_);
     switch (GetType()) {
         case kElemFloat: {
             auto dist_func = GetDistFunc<f32>(dimension);
@@ -131,7 +131,7 @@ SizeT HnswFileWorker::GetDimension() const {
 template <typename DataType>
 UniquePtr<SpaceBase<DataType>> HnswFileWorker::GetDistFunc(SizeT dimension) const {
     UniquePtr<SpaceBase<f32>> space = nullptr;
-    auto hnsw_index_def = static_cast<HnswDef *>(index_def_);
+    auto hnsw_index_def = static_cast<IndexHnsw *>(index_def_);
     switch (hnsw_index_def->metric_type_) {
         case MetricType::kMerticInnerProduct: {
             space = MakeUnique<DistFuncIP<f32>>(dimension);

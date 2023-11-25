@@ -31,7 +31,7 @@ enum class IndexType {
 
 struct IndexInfo {
     ~IndexInfo();
-    IndexType index_type_{IndexType::kIVFFlat};
+    IndexType index_type_{IndexType::kInvalid};
     std::string column_name_{};
     std::vector<InitParameter *> *index_param_list_{nullptr};
 

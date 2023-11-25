@@ -190,7 +190,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-        switch (segment_column_index_entry->column_index_entry_->base_index_->index_type_) {
+        switch (segment_column_index_entry->column_index_entry_->index_base_->index_type_) {
             case IndexType::kIVFFlat: {
                 BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());

@@ -20,7 +20,7 @@ module;
 
 import stl;
 import base_entry;
-import base_index;
+import index_base;
 import third_party;
 import segment_column_index_entry;
 import table_index_entry;
@@ -33,25 +33,25 @@ module column_index_entry;
 
 namespace infinity {
 
-ColumnIndexEntry::ColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                    TableIndexEntry *table_index_entry,
                                    SharedPtr<String> index_dir,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), index_dir_(index_dir), base_index_(base_index) {
+    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), index_dir_(index_dir), index_base_(index_base) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
 
-SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                                   u64 column_id,
                                                                   TableIndexEntry *table_index_entry,
                                                                   u64 txn_id,
                                                                   SharedPtr<String> index_dir,
                                                                   TxnTimeStamp begin_ts) {
     //    SharedPtr<String> index_dir =
-    //        DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, base_index->file_name_);
-    return MakeShared<ColumnIndexEntry>(base_index, table_index_entry, index_dir, txn_id, begin_ts);
+    //        DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
+    return MakeShared<ColumnIndexEntry>(index_base, table_index_entry, index_dir, txn_id, begin_ts);
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
@@ -67,7 +67,7 @@ Json ColumnIndexEntry::Serialize(const ColumnIndexEntry *column_index_entry, Txn
     json["deleted"] = column_index_entry->deleted_;
     if (!column_index_entry->deleted_) {
         json["index_dir"] = *column_index_entry->index_dir_;
-        json["base_index"] = column_index_entry->base_index_->Serialize();
+        json["index_base"] = column_index_entry->index_base_->Serialize();
         for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
             SegmentColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
             json["indexes"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
@@ -93,9 +93,9 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_ind
     }
 
     auto index_dir = MakeShared<String>(column_index_entry_json["index_dir"]);
-    SharedPtr<BaseIndex> base_index = BaseIndex::Deserialize(column_index_entry_json["base_index"]);
+    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(column_index_entry_json["index_base"]);
 
-    auto column_index_entry = MakeUnique<ColumnIndexEntry>(base_index, table_index_entry, index_dir, txn_id, begin_ts);
+    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, index_dir, txn_id, begin_ts);
     column_index_entry->commit_ts_.store(commit_ts);
     column_index_entry->deleted_ = deleted;
 

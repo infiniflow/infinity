@@ -19,7 +19,7 @@ import index_file_worker;
 import dist_func;
 import knn_hnsw;
 import parser;
-import base_index;
+import index_base;
 import dist_func;
 
 export module hnsw_file_worker;
@@ -29,8 +29,8 @@ namespace infinity {
 export struct CreateHnswParam : public CreateIndexParam {
     const SizeT max_element_{};
 
-    CreateHnswParam(BaseIndex *base_index, ColumnDef *column_def, SizeT max_element)
-        : CreateIndexParam(base_index, column_def), max_element_(max_element) {}
+    CreateHnswParam(IndexBase *index_base, ColumnDef *column_def, SizeT max_element)
+        : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
 };
 
 export class HnswFileWorker : public IndexFileWorker {
@@ -39,10 +39,10 @@ export class HnswFileWorker : public IndexFileWorker {
 public:
     explicit HnswFileWorker(SharedPtr<String> file_dir,
                             SharedPtr<String> file_name,
-                            BaseIndex* base_index,
+                            IndexBase* index_base,
                             ColumnDef* column_def,
                             SizeT max_element)
-        : IndexFileWorker(file_dir, file_name, base_index, column_def), max_element_(max_element) {}
+        : IndexFileWorker(file_dir, file_name, index_base, column_def), max_element_(max_element) {}
 
     virtual ~HnswFileWorker() override;
 

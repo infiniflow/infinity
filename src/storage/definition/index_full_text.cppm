@@ -18,44 +18,40 @@ import stl;
 import index_def;
 import parser;
 import third_party;
-import base_index;
+import index_base;
 
-export module hnsw_def;
+export module index_full_text;
 
 namespace infinity {
 
-export class HnswDef : public BaseIndex {
+export class IndexFullText : public IndexBase {
 public:
-    static SharedPtr<BaseIndex> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    HnswDef(String file_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
-        : BaseIndex(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction), ef_(ef) {}
+    IndexFullText(String file_name, Vector<String> column_names, String analyzer)
+        : IndexBase(file_name, IndexType::kIRSFullText, Move(column_names)), analyzer_(Move(analyzer)) {}
 
-    ~HnswDef() = default;
+    ~IndexFullText() = default;
 
-    bool operator==(const HnswDef &other) const;
+    bool operator==(const IndexFullText &other) const;
 
-    bool operator!=(const HnswDef &other) const;
+    bool operator!=(const IndexFullText &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
 
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
 
-    static SharedPtr<HnswDef> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexFullText> Deserialize(const Json &index_def_json);
 
 public:
-    const MetricType metric_type_{MetricType::kInvalid};
-
-    const SizeT M_{};
-    const SizeT ef_construction_{};
-    const SizeT ef_{};
+    String analyzer_{};
 };
 
 } // namespace infinity

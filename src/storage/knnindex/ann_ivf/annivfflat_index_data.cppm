@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import base_index;
+import index_base;
 import file_system;
 import file_system_type;
 import search_top_k;

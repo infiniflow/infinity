@@ -71,6 +71,7 @@ CreateIndexInfo::~CreateIndexInfo() {
             delete index_info;
             index_info = nullptr;
         }
+        delete index_info_list_;
         index_info_list_ = nullptr;
     }
 }

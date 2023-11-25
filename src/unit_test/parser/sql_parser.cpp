@@ -510,24 +510,31 @@ TEST_F(SQLParserTest, good_create_index_1) {
         String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat;";
         parser->Parse(input_sql, result.get());
 
-        EXPECT_TRUE(result->error_message_.empty());
-        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_FALSE(result->error_message_.empty());
+//        BaseStatement *statement = (*result->statements_ptr_)[0];
+//
+//        EXPECT_EQ(statement->type_, StatementType::kCreate);
+//        auto create_statement = static_cast<CreateStatement *>(statement);
+//        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+//        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+//
+//        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+//        EXPECT_EQ(create_index_info->index_name_, "");
+//        EXPECT_EQ(create_index_info->schema_name_, "default");
+//        EXPECT_EQ(create_index_info->table_name_, "t1");
+//
+//        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+//        EXPECT_EQ(index_info_list.size(), 1);
+//        IndexInfo * index_info = index_info_list[0];
+//        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+//        EXPECT_EQ(index_info->column_name_, "a");
+//        EXPECT_TRUE(index_info->index_param_list_->empty());
+//        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
+//        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
 
-        EXPECT_EQ(statement->type_, StatementType::kCreate);
-        auto create_statement = static_cast<CreateStatement *>(statement);
-        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
-
-        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
-        EXPECT_EQ(create_index_info->index_name_, "");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
-        EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 1);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
+
     {
         String input_sql = "CREATE INDEX idx1 ON t1 (a) USING IVFFlat;";
         parser->Parse(input_sql, result.get());
@@ -544,12 +551,19 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->index_name_, "idx1");
         EXPECT_EQ(create_index_info->schema_name_, "default");
         EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 1);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_param_list_->empty());
+
+        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+        EXPECT_EQ(index_info_list.size(), 1);
+        IndexInfo * index_info = index_info_list[0];
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->column_name_, "a");
+        EXPECT_TRUE(index_info->index_param_list_->empty());
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+
         result->Reset();
     }
+
     {
         String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (a) USING IVFFlat;";
         parser->Parse(input_sql, result.get());
@@ -566,79 +580,112 @@ TEST_F(SQLParserTest, good_create_index_1) {
         EXPECT_EQ(create_index_info->index_name_, "idx1");
         EXPECT_EQ(create_index_info->schema_name_, "default");
         EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 1);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_param_list_->empty());
+
+        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+        EXPECT_EQ(index_info_list.size(), 1);
+        IndexInfo * index_info = index_info_list[0];
+        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info->column_name_, "a");
+        EXPECT_TRUE(index_info->index_param_list_->empty());
+        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
+        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+
         result->Reset();
     }
+
     {
         String input_sql = "CREATE INDEX ON db1.t1 (a) USING IVFFlat;";
         parser->Parse(input_sql, result.get());
 
-        EXPECT_TRUE(result->error_message_.empty());
-        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_FALSE(result->error_message_.empty());
+//        BaseStatement *statement = (*result->statements_ptr_)[0];
+//
+//        EXPECT_EQ(statement->type_, StatementType::kCreate);
+//        auto create_statement = static_cast<CreateStatement *>(statement);
+//        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+//        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+//
+//        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+//        EXPECT_EQ(create_index_info->index_name_, "");
+//        EXPECT_EQ(create_index_info->schema_name_, "db1");
+//        EXPECT_EQ(create_index_info->table_name_, "t1");
+//
+//        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+//        EXPECT_EQ(index_info_list.size(), 1);
+//        IndexInfo * index_info = index_info_list[0];
+//        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+//        EXPECT_EQ(index_info->column_name_, "a");
+//        EXPECT_TRUE(index_info->index_param_list_->empty());
+//        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
+//        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
 
-        EXPECT_EQ(statement->type_, StatementType::kCreate);
-        auto create_statement = static_cast<CreateStatement *>(statement);
-        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
-
-        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
-        EXPECT_EQ(create_index_info->index_name_, "");
-        EXPECT_EQ(create_index_info->schema_name_, "db1");
-        EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 1);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
+
     {
         String input_sql = "CREATE INDEX ON t1 (a, b) USING IVFFlat;";
         parser->Parse(input_sql, result.get());
 
-        EXPECT_TRUE(result->error_message_.empty());
-        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_FALSE(result->error_message_.empty());
+//        BaseStatement *statement = (*result->statements_ptr_)[0];
+//
+//        EXPECT_EQ(statement->type_, StatementType::kCreate);
+//        auto create_statement = static_cast<CreateStatement *>(statement);
+//        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+//        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+//
+//        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+//        EXPECT_EQ(create_index_info->index_name_, "");
+//        EXPECT_EQ(create_index_info->schema_name_, "default");
+//        EXPECT_EQ(create_index_info->table_name_, "t1");
+//
+//        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+//        EXPECT_EQ(index_info_list.size(), 2);
+//        IndexInfo * index_info1 = index_info_list[0];
+//        EXPECT_EQ(index_info1->index_type_, IndexType::kIVFFlat);
+//        EXPECT_EQ(index_info1->column_name_, "a");
+//        EXPECT_TRUE(index_info1->index_param_list_->empty());
+//        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info1->index_type_), "IVFFlat");
+//        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
+//
+//        IndexInfo * index_info2 = index_info_list[1];
+//        EXPECT_EQ(index_info2->index_type_, IndexType::kIVFFlat);
+//        EXPECT_EQ(index_info2->column_name_, "b");
+//        EXPECT_TRUE(index_info2->index_param_list_->empty());
+//        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info2->index_type_), "IVFFlat");
 
-        EXPECT_EQ(statement->type_, StatementType::kCreate);
-        auto create_statement = static_cast<CreateStatement *>(statement);
-        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
-
-        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
-        EXPECT_EQ(create_index_info->index_name_, "");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
-        EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 2);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_EQ((*create_index_info->column_names_)[1], "b");
-        EXPECT_TRUE(create_index_info->index_param_list_->empty());
         result->Reset();
     }
+
     {
         String input_sql = "CREATE INDEX ON t1 (a) USING IVFFlat WITH (metric = l2);";
         parser->Parse(input_sql, result.get());
 
-        EXPECT_TRUE(result->error_message_.empty());
-        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_FALSE(result->error_message_.empty());
+//        BaseStatement *statement = (*result->statements_ptr_)[0];
+//
+//        EXPECT_EQ(statement->type_, StatementType::kCreate);
+//        auto create_statement = static_cast<CreateStatement *>(statement);
+//        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
+//        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
+//
+//        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
+//        EXPECT_EQ(create_index_info->index_name_, "");
+//        EXPECT_EQ(create_index_info->schema_name_, "default");
+//        EXPECT_EQ(create_index_info->table_name_, "t1");
+//
+//        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+//        EXPECT_EQ(index_info_list.size(), 1);
+//        IndexInfo * index_info = index_info_list[0];
+//        EXPECT_EQ(index_info->index_type_, IndexType::kIVFFlat);
+//        EXPECT_EQ(index_info->column_name_, "a");
+//        EXPECT_EQ(index_info->index_param_list_->size(), 1);
+//        EXPECT_EQ((*index_info->index_param_list_)[0]->param_name_, "metric");
+//        EXPECT_EQ((*index_info->index_param_list_)[0]->param_value_, "l2");
+//
+//        EXPECT_EQ(IndexInfo::IndexTypeToString(index_info->index_type_), "IVFFlat");
+//        EXPECT_EQ(IndexInfo::StringToIndexType("IVFFlat"), IndexType::kIVFFlat);
 
-        EXPECT_EQ(statement->type_, StatementType::kCreate);
-        auto create_statement = static_cast<CreateStatement *>(statement);
-        EXPECT_EQ(create_statement->create_info_->type_, DDLType::kIndex);
-        EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kIgnore);
-
-        auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
-        EXPECT_EQ(create_index_info->index_name_, "");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
-        EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 1);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "a");
-        EXPECT_EQ(create_index_info->index_param_list_->size(), 1);
-        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_name_, "metric");
-        EXPECT_EQ((*create_index_info->index_param_list_)[0]->param_value_, "l2");
         result->Reset();
     }
 }

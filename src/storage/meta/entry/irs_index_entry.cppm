@@ -16,11 +16,11 @@ module;
 
 import stl;
 // import parser;
-import base_index;
+import index_base;
 import base_entry;
 import third_party;
 // import segment_column_index_entry;
-// import base_index;
+// import index_base;
 
 export module irs_index_entry;
 
@@ -38,14 +38,14 @@ public:
                            u64 txn_id,
                            TxnTimeStamp begin_ts);
 
-    static UniquePtr<IrsIndexEntry> NewIrsIndexEntry(Vector<SharedPtr<BaseIndex>> base_index,
+    static UniquePtr<IrsIndexEntry> NewIrsIndexEntry(Vector<SharedPtr<IndexBase>> index_base,
                                                      Vector<u64> column_ids,
                                                      TableIndexEntry *table_index_entry,
                                                      u64 txn_id,
                                                      SharedPtr<String> index_dir,
                                                      TxnTimeStamp begin_ts);
 
-    void AddColumn(SharedPtr<BaseIndex> base_index, u64 column_id);
+    void AddColumn(SharedPtr<IndexBase> index_base, u64 column_id);
 
     static Json Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp max_commit_ts);
 
@@ -60,7 +60,7 @@ public:
 
     const TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};
-    Vector<SharedPtr<BaseIndex>> index_descs_{};
+    Vector<SharedPtr<IndexBase>> index_descs_{};
     SharedPtr<IRSDataStore> irs_index_{};
 };
 } // namespace infinity

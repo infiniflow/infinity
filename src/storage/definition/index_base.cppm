@@ -18,7 +18,7 @@ import stl;
 import parser;
 import third_party;
 
-export module base_index;
+export module index_base;
 
 namespace infinity {
 
@@ -33,17 +33,17 @@ export String MetricTypeToString(MetricType metric_type);
 
 export MetricType StringToMetricType(const String &str);
 
-export class BaseIndex {
+export class IndexBase {
 protected:
-    explicit BaseIndex(String file_name, IndexType index_type, Vector<String> column_names)
+    explicit IndexBase(String file_name, IndexType index_type, Vector<String> column_names)
         : file_name_(Move(file_name)), index_type_(index_type), column_names_(Move(column_names)){};
 
 public:
-    virtual ~BaseIndex() = default;
+    virtual ~IndexBase() = default;
 
-    bool operator==(const BaseIndex &other) const;
+    bool operator==(const IndexBase &other) const;
 
-    bool operator!=(const BaseIndex &other) const;
+    bool operator!=(const IndexBase &other) const;
 
 public:
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
@@ -53,13 +53,13 @@ public:
     virtual void WriteAdv(char *&ptr) const;
 
     // Read char from buffer
-    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
 
     virtual String ToString() const;
 
     virtual Json Serialize() const;
 
-    static SharedPtr<BaseIndex> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexBase> Deserialize(const Json &index_def_json);
 
     inline String column_name() { return column_names_[0]; }
 

@@ -592,7 +592,6 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 // TODO shenyushi 4: should support default index name if the name does not exist
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
 | CREATE INDEX if_not_exists_info ON table_name index_info_list {
-    $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
     if($5->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $5->schema_name_ptr_;
@@ -612,6 +611,12 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 
     create_index_info->index_info_list_ = $6;
 
+    if(create_index_info->index_name_.empty()) {
+        yyerror(&yyloc, scanner, result, "No index name");
+        YYERROR;
+    }
+
+    $$ = new infinity::CreateStatement();
     $$->create_info_ = create_index_info;
 };
 
@@ -2532,13 +2537,15 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         index_type = infinity::IndexType::kIVFFlat;
     } else {
         free($5);
+        delete $2;
+        delete $6;
         yyerror(&yyloc, scanner, result, "Unknown index type");
         YYERROR;
     }
+    free($5);
 
     size_t index_count = $2->size();
     if(index_count == 0) {
-        free($5);
         delete $2;
         delete $6;
     }
@@ -2549,6 +2556,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     index_info->index_type_ = index_type;
     index_info->column_name_ = (*$2)[0];
     index_info->index_param_list_ = $6;
+    $$->emplace_back(index_info);
 
     for(size_t idx = 1; idx < index_count; ++ idx) {
         infinity::IndexInfo* index_info = new infinity::IndexInfo();
@@ -2565,6 +2573,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         }
         $$->emplace_back(index_info);
     }
+    delete $2;
 }
 | index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
     ParserHelper::ToLower($6);
@@ -2579,13 +2588,15 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         index_type = infinity::IndexType::kIVFFlat;
     } else {
         free($6);
+        delete $3;
+        delete $7;
         yyerror(&yyloc, scanner, result, "Unknown index type");
         YYERROR;
     }
+    free($6);
 
     size_t index_count = $3->size();
     if(index_count == 0) {
-        free($6);
         delete $1;
         delete $3;
         delete $7;
@@ -2597,6 +2608,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     index_info->index_type_ = index_type;
     index_info->column_name_ = (*$3)[0];
     index_info->index_param_list_ = $7;
+    $$->emplace_back(index_info);
 
     for(size_t idx = 1; idx < index_count; ++ idx) {
         infinity::IndexInfo* index_info = new infinity::IndexInfo();
@@ -2613,7 +2625,9 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         }
         $$->emplace_back(index_info);
     }
+    delete $3;
 }
+
 %%
 
 void

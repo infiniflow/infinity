@@ -40,12 +40,12 @@ import table_def;
 import data_table;
 import third_party;
 import index_def;
-import ivfflat_def;
+import index_ivfflat;
 import table_index_meta;
 import table_index_entry;
-import base_index;
-import hnsw_def;
-import full_text_def;
+import index_base;
+import index_hnsw;
+import index_full_text;
 import database_detail;
 import default_values;
 import defer_op;
@@ -1092,7 +1092,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
         auto table_index_entry = static_cast<TableIndexEntry *>(base_entry);
         auto index_def = table_index_entry->index_def_.get();
 
-        for (const SharedPtr<BaseIndex> &base_index : index_def->index_array_) {
+        for (const SharedPtr<IndexBase> &index_base : index_def->index_array_) {
             SizeT column_id = 0;
             {
                 // Append index name to the first column
@@ -1103,7 +1103,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index method type to the second column
-                Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(base_index->index_type_));
+                Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(index_base->index_type_));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -1112,9 +1112,9 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 // Append index column names to the third column
                 String column_names;
                 SizeT idx = 0;
-                for (auto &column_name : base_index->column_names_) {
+                for (auto &column_name : index_base->column_names_) {
                     column_names += column_name;
-                    if (idx < base_index->column_names_.size() - 1) {
+                    if (idx < index_base->column_names_.size() - 1) {
                         column_names += ",";
                     }
                     idx++;
@@ -1127,11 +1127,11 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             {
                 // Append index other parameters to the fourth column
                 String other_parameters;
-                switch (base_index->index_type_) {
+                switch (index_base->index_type_) {
                     case IndexType::kIVFFlat: {
-                        const IVFFlatDef *ivfflat_def = static_cast<const IVFFlatDef *>(base_index.get());
+                        const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base.get());
                         other_parameters =
-                            Format("metric = {}, centroids_count = {}", MetricTypeToString(ivfflat_def->metric_type_), ivfflat_def->centroids_count_);
+                            Format("metric = {}, centroids_count = {}", MetricTypeToString(index_ivfflat->metric_type_), index_ivfflat->centroids_count_);
                         break;
                     }
                     case IndexType::kInvalid: {

@@ -25,7 +25,7 @@ import third_party;
 import local_file_system;
 import default_values;
 import random;
-import base_index;
+import index_base;
 import parser;
 import infinity_exception;
 import column_index_entry;
@@ -48,14 +48,14 @@ TableIndexEntry::TableIndexEntry(SharedPtr<IndexDef> index_def,
     SizeT index_count = index_def->index_array_.size();
     column_index_map_.reserve(index_count);
     for (SizeT idx = 0; idx < index_count; ++idx) {
-        SharedPtr<BaseIndex> &base_index = index_def->index_array_[idx];
+        SharedPtr<IndexBase> &index_base = index_def->index_array_[idx];
 
         // Get column info
-        Assert<StorageException>(base_index->column_names_.size() == 1, "Currently, composite index doesn't supported.");
-        u64 column_id = TableIndexMeta::GetTableCollectionEntry(table_index_meta)->GetColumnIdByName(base_index->column_names_[0]);
-        SharedPtr<String> column_index_path = MakeShared<String>(Format("{}/{}", *index_dir_, base_index->column_names_[0]));
+        Assert<StorageException>(index_base->column_names_.size() == 1, "Currently, composite index doesn't supported.");
+        u64 column_id = TableIndexMeta::GetTableCollectionEntry(table_index_meta)->GetColumnIdByName(index_base->column_names_[0]);
+        SharedPtr<String> column_index_path = MakeShared<String>(Format("{}/{}", *index_dir_, index_base->column_names_[0]));
         SharedPtr<ColumnIndexEntry> column_index_entry =
-            ColumnIndexEntry::NewColumnIndexEntry(base_index, column_id, this, txn_id, column_index_path, begin_ts);
+            ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
         column_index_map_[idx] = column_index_entry;
     }
 }
@@ -88,7 +88,7 @@ Json TableIndexEntry::Serialize(const TableIndexEntry *table_index_entry, TxnTim
     json["deleted"] = table_index_entry->deleted_;
     if (!table_index_entry->deleted_) {
         json["index_dir"] = *table_index_entry->index_dir_;
-        //        json["base_index"] = table_index_entry->base_index_->Serialize();
+        //        json["index_base"] = table_index_entry->index_base_->Serialize();
         //        for (const auto &[segment_id, index_entry] : table_index_entry->index_by_segment) {
         //            ColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
         //            json["indexes"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
@@ -114,9 +114,9 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     }
 
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
-    //    SharedPtr<BaseIndex> base_index = BaseIndex::Deserialize(index_def_entry_json["base_index"]);
+    //    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_entry_json["index_base"]);
     //
-    //    auto table_index_entry = MakeUnique<TableIndexEntry>(base_index, table_index_meta, index_dir, txn_id, begin_ts);
+    //    auto table_index_entry = MakeUnique<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
     //    table_index_entry->commit_ts_.store(commit_ts);
     //    table_index_entry->deleted_ = deleted;
     //
@@ -125,13 +125,13 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     //            u32 segment_id = index_entry_json["segment_id"];
     //            SegmentEntry *segment_entry = table_entry->segment_map_.at(segment_id).get();
     //
-    //            if (base_index->column_names_.size() > 1) {
+    //            if (index_base->column_names_.size() > 1) {
     //                StorageException("Not implemented.");
     //            }
-    //            u64 column_id = table_entry->GetColumnIdByName(base_index->column_names_[0]);
+    //            u64 column_id = table_entry->GetColumnIdByName(index_base->column_names_[0]);
     //            SharedPtr<ColumnDef> column_def = table_entry->column_map_[column_id];
     //
-    //            UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, base_index, column_def);
+    //            UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def);
     //
     //            auto index_entry =
     //                SegmentColumnIndexEntry::Deserialize(index_entry_json, table_index_entry.get(), segment_entry, buffer_mgr,

@@ -20,10 +20,10 @@ import stl;
 import index_file_worker;
 import file_worker;
 import parser;
-import base_index;
+import index_base;
 import annivfflat_index_data;
 import infinity_exception;
-import ivfflat_def;
+import index_ivfflat;
 
 export module annivfflat_index_file_worker;
 
@@ -33,8 +33,8 @@ export struct CreateAnnIVFFlatParam : public CreateIndexParam {
     // used when ivfflat_index_def->centroids_count_ == 0
     const SizeT row_count_{};
 
-    CreateAnnIVFFlatParam(BaseIndex *base_index, ColumnDef *column_def, SizeT row_count)
-        : CreateIndexParam(base_index, column_def), row_count_(row_count) {}
+    CreateAnnIVFFlatParam(IndexBase *index_base, ColumnDef *column_def, SizeT row_count)
+        : CreateIndexParam(index_base, column_def), row_count_(row_count) {}
 };
 
 export template <typename DataType>
@@ -44,10 +44,10 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
-                                       BaseIndex *base_index,
+                                       IndexBase *index_base,
                                        ColumnDef *column_def,
                                        SizeT row_count)
-        : IndexFileWorker(file_dir, file_name, base_index, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
+        : IndexFileWorker(file_dir, file_name, index_base, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -89,7 +89,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    auto ivfflat_index_def = static_cast<IVFFlatDef *>(index_def_);
+    auto ivfflat_index_def = static_cast<IndexIVFFlat *>(index_def_);
     auto centroids_count = ivfflat_index_def->centroids_count_;
     if (centroids_count == 0) {
         centroids_count = default_centroid_num_;

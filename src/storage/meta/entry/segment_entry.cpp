@@ -30,8 +30,8 @@ import base_entry;
 
 import infinity_exception;
 import defer_op;
-import ivfflat_def;
-import hnsw_def;
+import index_ivfflat;
+import index_hnsw;
 import buffer_handle;
 import annivfflat_index_data;
 import annivfflat_index_file_worker;
@@ -46,7 +46,7 @@ import txn_store;
 import table_index_entry;
 import segment_column_index_entry;
 import column_index_entry;
-import base_index;
+import index_base;
 
 import knn_hnsw;
 import dist_func;
@@ -171,14 +171,14 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
                                                                  TxnTableStore *txn_store) {
     u64 column_id = column_def->id();
     //    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-    BaseIndex *base_index = column_index_entry->base_index_.get();
-    UniquePtr<CreateIndexParam> create_index_param = MakeUnique<CreateIndexParam>(base_index, column_def.get());
+    IndexBase *index_base = column_index_entry->index_base_.get();
+    UniquePtr<CreateIndexParam> create_index_param = MakeUnique<CreateIndexParam>(index_base, column_def.get());
     SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
         SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, segment_entry->segment_id_, create_ts, buffer_mgr, create_index_param.get());
     //    SharedPtr<IndexEntry> index_entry =
     //        IndexEntry::NewIndexEntry(index_def_entry, segment_entry, create_ts, buffer_mgr, GetCreateIndexParam(segment_entry, index_def,
     //        column_def));
-    switch (base_index->index_type_) {
+    switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Error<StorageException>("AnnIVFFlat supports embedding type.");

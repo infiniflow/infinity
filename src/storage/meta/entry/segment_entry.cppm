@@ -21,7 +21,7 @@ import block_entry;
 import third_party;
 import txn;
 import buffer_manager;
-import base_index;
+import index_base;
 import data_access_state;
 import parser;
 import segment_column_index_entry;
@@ -96,7 +96,7 @@ private:
 
 public:
     static UniquePtr<CreateIndexParam>
-    GetCreateIndexParam(const SegmentEntry *segment_entry, SharedPtr<BaseIndex> base_index, SharedPtr<ColumnDef> column_def);
+    GetCreateIndexParam(const SegmentEntry *segment_entry, SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def);
 };
 
 } // namespace infinity
