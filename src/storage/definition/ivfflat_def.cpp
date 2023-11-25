@@ -15,6 +15,8 @@
 module;
 
 #include <memory>
+#include <string>
+#include <vector>
 
 import stl;
 import index_def;
@@ -45,16 +47,14 @@ SharedPtr<BaseIndex> IVFFlatDef::Make(String file_name, Vector<String> column_na
     return MakeShared<IVFFlatDef>(Move(file_name), Move(column_names), centroids_count, metric_type);
 }
 
-bool IVFFlatDef::operator==(const BaseIndex &other) const {
-    try {
-        auto other1 = dynamic_cast<const IVFFlatDef &>(other);
-        return BaseIndex::operator==(other) && centroids_count_ == other1.centroids_count_ && metric_type_ == other1.metric_type_;
-    } catch (std::bad_cast exception) {
+bool IVFFlatDef::operator==(const IVFFlatDef &other) const {
+    if(this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
+    return centroids_count_ == other.centroids_count_ && metric_type_ == other.metric_type_;
 }
 
-bool IVFFlatDef::operator!=(const BaseIndex &other) const { return !(*this == other); }
+bool IVFFlatDef::operator!=(const IVFFlatDef &other) const { return !(*this == other); }
 
 i32 IVFFlatDef::GetSizeInBytes() const {
     SizeT size = BaseIndex::GetSizeInBytes();
@@ -69,6 +69,10 @@ void IVFFlatDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, metric_type_);
 }
 
+SharedPtr<BaseIndex> IVFFlatDef::ReadAdv(char *&ptr, int32_t maxbytes) {
+    Error<StorageException>("Not implemented");
+}
+
 String IVFFlatDef::ToString() const {
     std::stringstream ss;
     ss << BaseIndex::ToString() << ", " << centroids_count_ << ", " << MetricTypeToString(metric_type_);
@@ -80,6 +84,10 @@ Json IVFFlatDef::Serialize() const {
     res["centroids_count"] = centroids_count_;
     res["metric_type"] = MetricTypeToString(metric_type_);
     return res;
+}
+
+SharedPtr<IVFFlatDef> IVFFlatDef::Deserialize(const Json &index_def_json) {
+    Error<StorageException>("Not implemented");
 }
 
 } // namespace infinity

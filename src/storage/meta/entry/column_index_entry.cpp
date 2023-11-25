@@ -22,28 +22,12 @@ import stl;
 import base_entry;
 import base_index;
 import third_party;
-//import table_index_meta;
-//import buffer_manager;
-//import txn_store;
 import segment_column_index_entry;
-//import parser;
-//import infinity_exception;
-//import buffer_handle;
-//import txn_store;
-//
-//import ivfflat_def;
-//import hnsw_def;
-//import index_file_worker;
-//import faiss_index_file_worker;
-//import hnsw_file_worker;
-//import knn_hnsw;
-//import dist_func;
-//import table_collection_entry;
-//import segment_entry;
+import table_index_entry;
 import local_file_system;
 import default_values;
 import random;
-//import table_index_meta;
+import buffer_manager;
 
 module column_index_entry;
 
@@ -59,7 +43,7 @@ ColumnIndexEntry::ColumnIndexEntry(SharedPtr<BaseIndex> base_index,
     txn_id_ = txn_id;
 }
 
-UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
                                                                   u64 column_id,
                                                                   TableIndexEntry *table_index_entry,
                                                                   u64 txn_id,
@@ -67,7 +51,7 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Base
                                                                   TxnTimeStamp begin_ts) {
     //    SharedPtr<String> index_dir =
     //        DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, base_index->file_name_);
-    return MakeUnique<ColumnIndexEntry>(base_index, table_index_entry, index_dir, txn_id, begin_ts);
+    return MakeShared<ColumnIndexEntry>(base_index, table_index_entry, index_dir, txn_id, begin_ts);
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {

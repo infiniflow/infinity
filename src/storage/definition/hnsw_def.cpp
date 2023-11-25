@@ -16,6 +16,7 @@ module;
 
 #include <memory>
 #include <string>
+#include <vector>
 
 import stl;
 import parser;
@@ -54,17 +55,14 @@ SharedPtr<BaseIndex> HnswDef::Make(String file_name, Vector<String> column_names
     return MakeShared<HnswDef>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
 }
 
-bool HnswDef::operator==(const BaseIndex &other) const {
-    try {
-        auto other1 = dynamic_cast<const HnswDef &>(other);
-        return BaseIndex::operator==(other) && metric_type_ == other1.metric_type_ && M_ == other1.M_ && ef_construction_ == other1.ef_construction_ &&
-               ef_ == other1.ef_;
-    } catch (std::bad_cast exception) {
+bool HnswDef::operator==(const HnswDef &other) const {
+    if (this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
+    return metric_type_ == other.metric_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ && ef_ == other.ef_;
 }
 
-bool HnswDef::operator!=(const BaseIndex &other) const { return !(*this == other); }
+bool HnswDef::operator!=(const HnswDef &other) const { return !(*this == other); }
 
 i32 HnswDef::GetSizeInBytes() const {
     SizeT size = BaseIndex::GetSizeInBytes();
@@ -83,6 +81,10 @@ void HnswDef::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, ef_);
 }
 
+SharedPtr<BaseIndex> HnswDef::ReadAdv(char *&ptr, int32_t maxbytes) {
+    Error<StorageException>("Not implemented");
+}
+
 String HnswDef::ToString() const {
     std::stringstream ss;
     ss << BaseIndex::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_;
@@ -97,4 +99,9 @@ Json HnswDef::Serialize() const {
     res["ef"] = ef_;
     return res;
 }
+
+SharedPtr<HnswDef> HnswDef::Deserialize(const Json &index_def_json) {
+    Error<StorageException>("Not implemented");
+}
+
 } // namespace infinity

@@ -16,6 +16,9 @@ module;
 
 #include <iostream>
 #include <string>
+
+#include "statement/extra/create_index_info.h"
+
 import stl;
 import txn;
 import query_context;
@@ -36,11 +39,13 @@ import table_collection_entry;
 import table_def;
 import data_table;
 import third_party;
-import index_def_meta;
-import index_def_entry;
 import index_def;
-import index_entry;
-import ivfflat_index_def;
+import ivfflat_def;
+import table_index_meta;
+import table_index_entry;
+import base_index;
+import hnsw_def;
+import full_text_def;
 import database_detail;
 import default_values;
 import defer_op;
@@ -112,7 +117,7 @@ void PhysicalShow::Init() {
             output_types_->reserve(4);
 
             output_names_->emplace_back("index_name");
-            output_names_->emplace_back("method_type");
+            output_names_->emplace_back("index_type");
             output_names_->emplace_back("column_names");
             output_names_->emplace_back("other_parameters");
 
@@ -169,7 +174,7 @@ void PhysicalShow::Init() {
 }
 
 void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    auto show_operator_state = (ShowOperatorState *)(operator_state);
+    ShowOperatorState *show_operator_state = (ShowOperatorState *)(operator_state);
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
     switch (scan_type_) {
@@ -1077,68 +1082,70 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Vector<SharedPtr<DataType>> column_types(4, varchar_type);
     output_block_ptr->Init(column_types);
 
-    for (const auto &[index_name, index_def_meta] : table_collection_entry->indexes_) {
-        BaseEntry* base_entry{nullptr};
-        Status status = IndexDefMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS(), base_entry);
+    for (const auto &[index_name, index_def_meta] : table_collection_entry->index_meta_map_) {
+        BaseEntry *base_entry{nullptr};
+        Status status = TableIndexMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS(), base_entry);
         if (!status.ok()) {
             // Index isn't found.
             continue;
         }
-        auto index_def_entry = static_cast<IndexDefEntry *>(base_entry);
-        auto index_def = index_def_entry->index_def_.get();
-        SizeT column_id = 0;
-        {
-            // Append index name to the first column
-            Value value = Value::MakeVarchar(*index_def->index_name_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-        ++column_id;
-        {
-            // Append index method type to the second column
-            Value value = Value::MakeVarchar(IndexMethodToString(index_def->method_type_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-        ++column_id;
-        {
-            // Append index column names to the third column
-            String column_names;
-            SizeT idx = 0;
-            for (auto &column_name : index_def->column_names_) {
-                column_names += column_name;
-                if (idx < index_def->column_names_.size() - 1) {
-                    column_names += ",";
-                }
-                idx++;
+        auto table_index_entry = static_cast<TableIndexEntry *>(base_entry);
+        auto index_def = table_index_entry->index_def_.get();
+
+        for (const SharedPtr<BaseIndex> &base_index : index_def->index_array_) {
+            SizeT column_id = 0;
+            {
+                // Append index name to the first column
+                Value value = Value::MakeVarchar(index_name);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
-            Value value = Value::MakeVarchar(column_names);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-        ++column_id;
-        {
-            // Append index other parameters to the fourth column
-            String other_parameters;
-            switch (index_def->method_type_) {
-                case IndexMethod::kIVFFlat: {
-                    auto ivfflat_index_def = static_cast<IVFFlatIndexDef *>(index_def);
-                    other_parameters = Format("metric = {}, centroids_count = {}",
-                                              MetricTypeToString(ivfflat_index_def->metric_type_),
-                                              ivfflat_index_def->centroids_count_);
-                    break;
-                }
-                case IndexMethod::kInvalid: {
-                    Error<ExecutorException>("Invalid index method type");
-                }
-                default: {
-                    Error<NotImplementException>("Not implemented");
-                    break;
-                }
+            ++column_id;
+            {
+                // Append index method type to the second column
+                Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(base_index->index_type_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
-            Value value = Value::MakeVarchar(other_parameters);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            ++column_id;
+            {
+                // Append index column names to the third column
+                String column_names;
+                SizeT idx = 0;
+                for (auto &column_name : base_index->column_names_) {
+                    column_names += column_name;
+                    if (idx < base_index->column_names_.size() - 1) {
+                        column_names += ",";
+                    }
+                    idx++;
+                }
+                Value value = Value::MakeVarchar(column_names);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
+                // Append index other parameters to the fourth column
+                String other_parameters;
+                switch (base_index->index_type_) {
+                    case IndexType::kIVFFlat: {
+                        const IVFFlatDef *ivfflat_def = static_cast<const IVFFlatDef *>(base_index.get());
+                        other_parameters =
+                            Format("metric = {}, centroids_count = {}", MetricTypeToString(ivfflat_def->metric_type_), ivfflat_def->centroids_count_);
+                        break;
+                    }
+                    case IndexType::kInvalid: {
+                        Error<ExecutorException>("Invalid index method type");
+                    }
+                    default: {
+                        Error<NotImplementException>("Not implemented");
+                        break;
+                    }
+                }
+                Value value = Value::MakeVarchar(other_parameters);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
         }
     }
     output_block_ptr->Finalize();
@@ -1365,7 +1372,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
     TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
 
-    BaseEntry* base_entry{nullptr};
+    BaseEntry *base_entry{nullptr};
     status = txn->GetViewByName(db_name_, object_name_, base_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());

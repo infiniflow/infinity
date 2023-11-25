@@ -15,7 +15,6 @@
 module;
 
 import stl;
-// import parser;
 import index_def;
 import base_entry;
 import third_party;
@@ -29,8 +28,6 @@ namespace infinity {
 
 class TableIndexMeta;
 class BufferManager;
-// class TxnTableStore;
-// class CreateIndexParam;
 class TableCollectionEntry;
 
 export class TableIndexEntry : public BaseEntry {

@@ -15,18 +15,17 @@
 module;
 
 import stl;
-import segment_entry;
+import base_entry;
+//import segment_entry;
 import buffer_manager;
 import buffer_handle;
 import buffer_obj;
 import logger;
 import third_party;
-import index_def;
 import parser;
 import infinity_exception;
-import base_entry;
+
 import index_file_worker;
-import faiss_index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import column_index_entry;

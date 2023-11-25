@@ -31,7 +31,7 @@ import parser;
 import data_block;
 import default_values;
 import wal_manager;
-import ivfflat_index_def;
+import ivfflat_def;
 
 class WalEntryTest : public BaseTest {};
 
@@ -161,10 +161,8 @@ TEST_F(WalEntryTest, ReadWrite) {
 
     Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
 
-    auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"),
-                                           Vector<String>{"col1", "col2"},
-                                           parameters);
-    for(auto parameter: parameters) {
+    auto index_def = IVFFlatDef::Make("idx1", Vector<String>{"col1", "col2"}, parameters);
+    for (auto parameter : parameters) {
         delete parameter;
     }
 

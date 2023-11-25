@@ -235,6 +235,7 @@ void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
                                   infinity_proto::CommonResponse *response,
                                   google::protobuf::Closure *done) {
 
+    Error<NetworkException>("Due to the create index interface is update, this API need to re-implemented.");
     brpc::ClosureGuard done_guard(done);
     brpc::Controller *cntl = SetUpController(cntl_base);
 
@@ -251,14 +252,14 @@ void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
     const String &method_type = request->method_type();
     auto *index_param_list = new Vector<InitParameter *>();
 
-    for (auto &index_para : request->index_param_list()) {
+    for (auto &index_para : request->index_para_list()) {
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = index_para.para_name();
         init_parameter->param_value_ = index_para.para_value();
         index_param_list->emplace_back(init_parameter);
     }
 
-    auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_param_list, (CreateIndexOptions &)request->options());
+    auto result = table->CreateIndex(request->index_name(), nullptr, (CreateIndexOptions &)request->options());
 
     ProcessResult(result, response);
 }

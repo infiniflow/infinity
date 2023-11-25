@@ -16,8 +16,8 @@
 #include "unit_test/base_test.h"
 
 import stl;
-import ivfflat_index_def;
-import hnsw_index_def;
+import ivfflat_def;
+import hnsw_def;
 import index_def;
 import parser;
 
@@ -31,7 +31,7 @@ TEST_F(IndexDefTest, ivfflat_readwrite) {
     parameters.emplace_back(new InitParameter("centroids_count", "100"));
     parameters.emplace_back(new InitParameter("metric", "l2"));
 
-    auto index_def = IVFFlatIndexDef::Make(MakeShared<String>("idx1"), columns, parameters);
+    auto index_def = IVFFlatDef::Make("idx1", columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
     for(auto parameter: parameters) {
         delete parameter;
@@ -63,7 +63,7 @@ TEST_F(IndexDefTest, hnsw_readwrite) {
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("ef", "200"));
 
-    auto index_def = HnswIndexDef::Make(MakeShared<String>("idx1"), columns, parameters);
+    auto index_def = HnswDef::Make("idx1", columns, parameters);
     std::cout << "index_def: " << index_def->ToString() << std::endl;
 
     for(auto parameter: parameters) {

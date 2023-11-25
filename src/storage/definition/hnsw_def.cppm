@@ -23,6 +23,7 @@ import base_index;
 export module hnsw_def;
 
 namespace infinity {
+
 export class HnswDef : public BaseIndex {
 public:
     static SharedPtr<BaseIndex> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
@@ -32,18 +33,22 @@ public:
 
     ~HnswDef() = default;
 
-    virtual bool operator==(const BaseIndex &other) const override;
+    bool operator==(const HnswDef &other) const;
 
-    virtual bool operator!=(const BaseIndex &other) const override;
+    bool operator!=(const HnswDef &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
+    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
+
+    static SharedPtr<HnswDef> Deserialize(const Json &index_def_json);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};

@@ -31,7 +31,7 @@ export module physical_knn_scan;
 namespace infinity {
 
 class BlockColumnEntry;
-class IndexEntry;
+class SegmentColumnIndexEntry;
 
 export class PhysicalKnnScan final : public PhysicalOperator {
 public:
@@ -68,7 +68,7 @@ public:
 
     SizeT BlockEntryCount() const;
 
-    Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PlanWithIndex(QueryContext *query_context);
+    Pair<Vector<BlockColumnEntry *>, Vector<SegmentColumnIndexEntry *>> PlanWithIndex(QueryContext *query_context);
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};

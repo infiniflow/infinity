@@ -32,18 +32,22 @@ public:
 
     ~IVFFlatDef() = default;
 
-    virtual bool operator==(const BaseIndex &other) const override;
+    bool operator==(const IVFFlatDef &other) const;
 
-    virtual bool operator!=(const BaseIndex &other) const override;
+    bool operator!=(const IVFFlatDef &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
+    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
+
+    static SharedPtr<IVFFlatDef> Deserialize(const Json &index_def_json);
 
 public:
     const SizeT centroids_count_{};

@@ -33,18 +33,22 @@ public:
 
     ~FullTextDef() = default;
 
-    virtual bool operator==(const BaseIndex &other) const override;
+    bool operator==(const FullTextDef &other) const;
 
-    virtual bool operator!=(const BaseIndex &other) const override;
+    bool operator!=(const FullTextDef &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
+    static SharedPtr<BaseIndex> ReadAdv(char *&ptr, i32 maxbytes);
+
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
+
+    static SharedPtr<FullTextDef> Deserialize(const Json &index_def_json);
 
 public:
     String analyzer_{};

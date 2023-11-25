@@ -22,13 +22,13 @@ import base_entry;
 import table_index_meta;
 import table_collection_entry;
 import third_party;
-import column_index_entry;
 import local_file_system;
 import default_values;
 import random;
 import base_index;
 import parser;
 import infinity_exception;
+import column_index_entry;
 import segment_column_index_entry;
 import irs_index_entry;
 
@@ -46,8 +46,9 @@ TableIndexEntry::TableIndexEntry(SharedPtr<IndexDef> index_def,
     txn_id_ = txn_id;
 
     SizeT index_count = index_def->index_array_.size();
+    column_index_map_.reserve(index_count);
     for (SizeT idx = 0; idx < index_count; ++idx) {
-        SharedPtr<BaseIndex> &base_index = index_def->index_array_[index_count];
+        SharedPtr<BaseIndex> &base_index = index_def->index_array_[idx];
 
         // Get column info
         Assert<StorageException>(base_index->column_names_.size() == 1, "Currently, composite index doesn't supported.");

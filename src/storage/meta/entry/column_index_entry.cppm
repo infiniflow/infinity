@@ -26,11 +26,9 @@ export module column_index_entry;
 
 namespace infinity {
 
-class TableIndexEntry;
 class BufferManager;
-class TxnTableStore;
-class CreateIndexParam;
 class TableCollectionEntry;
+class TableIndexEntry;
 
 export struct ColumnIndexEntry : public BaseEntry {
 public:
@@ -40,7 +38,7 @@ public:
                               u64 txn_id,
                               TxnTimeStamp begin_ts);
 
-    static UniquePtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
+    static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<BaseIndex> base_index,
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
                                                            u64 txn_id,

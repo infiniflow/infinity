@@ -41,9 +41,9 @@ protected:
 public:
     virtual ~BaseIndex() = default;
 
-    virtual bool operator==(const BaseIndex &other) const;
+    bool operator==(const BaseIndex &other) const;
 
-    virtual bool operator!=(const BaseIndex &other) const;
+    bool operator!=(const BaseIndex &other) const;
 
 public:
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
