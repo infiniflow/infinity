@@ -16,6 +16,7 @@ module;
 
 #include <memory>
 #include <string>
+#include <sstream>
 #include <vector>
 
 import stl;
@@ -78,7 +79,6 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
     Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexDef");
     SharedPtr<String> index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
     SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(index_name);
-    index_def->index_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
 
     int32_t index_array_count = ReadBufAdv<int32_t>(ptr);
     index_def->index_array_.reserve(index_array_count);
@@ -92,9 +92,9 @@ SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
 
 String IndexDef::ToString() const {
     std::stringstream ss;
-    ss << "IndexDef(" << index_name_ << ", [";
+    ss << "IndexDef(" << *index_name_ << ", [";
     for (size_t i = 0; i < index_array_.size(); ++i) {
-        ss << index_array_[i];
+        ss << index_array_[i]->ToString();
         if (i != index_array_.size() - 1) {
             ss << ", ";
         }

@@ -2565,8 +2565,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
 
         size_t param_count = $6->size();
         index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->reserve(param_count);
-
+        index_info->index_param_list_->resize(param_count);
         for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
             (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
             *(*(index_info->index_param_list_))[param_idx] = *(*$6)[param_idx];
@@ -2617,8 +2616,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
 
         size_t param_count = $7->size();
         index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->reserve(param_count);
-
+        index_info->index_param_list_->resize(param_count);
         for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
             (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
             *(*(index_info->index_param_list_))[param_idx] = *(*$7)[param_idx];

@@ -48,7 +48,7 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
 }
 
 bool IndexIVFFlat::operator==(const IndexIVFFlat &other) const {
-    if(this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
+    if (this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
     return centroids_count_ == other.centroids_count_ && metric_type_ == other.metric_type_;
@@ -69,9 +69,7 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, metric_type_);
 }
 
-SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&ptr, int32_t maxbytes) {
-    Error<StorageException>("Not implemented");
-}
+SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&ptr, int32_t maxbytes) { Error<StorageException>("Not implemented"); }
 
 String IndexIVFFlat::ToString() const {
     std::stringstream ss;
@@ -86,8 +84,6 @@ Json IndexIVFFlat::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &index_def_json) {
-    Error<StorageException>("Not implemented");
-}
+SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &index_def_json) { Error<StorageException>("Not implemented"); }
 
 } // namespace infinity

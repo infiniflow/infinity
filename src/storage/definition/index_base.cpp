@@ -22,6 +22,7 @@ import stl;
 import serialize;
 import index_ivfflat;
 import index_hnsw;
+import index_full_text;
 import third_party;
 import parser;
 import infinity_exception;
@@ -67,8 +68,9 @@ bool IndexBase::operator!=(const IndexBase &other) const { return !(*this == oth
 
 int32_t IndexBase::GetSizeInBytes() const {
     int32_t size = 0;
-    size += sizeof(int32_t);
     size += sizeof(index_type_);
+    size += sizeof(int32_t);
+    size += file_name_.length();
     size += sizeof(int32_t);
     for (const String &column_name : column_names_) {
         size += sizeof(int32_t) + column_name.length();
@@ -78,6 +80,7 @@ int32_t IndexBase::GetSizeInBytes() const {
 
 void IndexBase::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, index_type_);
+    WriteBufAdv(ptr, file_name_);
     WriteBufAdv(ptr, static_cast<int32_t>(column_names_.size()));
     for (const String &column_name : column_names_) {
         WriteBufAdv(ptr, column_name);
@@ -99,8 +102,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
         case IndexType::kIVFFlat: {
             size_t centroids_count = ReadBufAdv<size_t>(ptr);
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
-            auto res1 = MakeShared<IndexIVFFlat>(file_name, column_names, centroids_count, metric_type);
-            res = std::static_pointer_cast<IndexBase>(res1);
+            res = MakeShared<IndexIVFFlat>(file_name, column_names, centroids_count, metric_type);
             break;
         }
         case IndexType::kHnsw: {
@@ -108,8 +110,16 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT ef = ReadBufAdv<SizeT>(ptr);
-            auto res1 = MakeShared<IndexHnsw>(file_name, column_names, metric_type, M, ef_construction, ef);
-            res = std::static_pointer_cast<IndexBase>(res1);
+            res = MakeShared<IndexHnsw>(file_name, column_names, metric_type, M, ef_construction, ef);
+            break;
+        }
+        case IndexType::kHnswLVQ: {
+            Error<StorageException>("Index HnswLVQ isn't implemented");
+            break;
+        }
+        case IndexType::kIRSFullText: {
+            String analyzer = ReadBufAdv<String>(ptr);
+            res = MakeShared<IndexFullText>(file_name, column_names, analyzer);
             break;
         }
         case IndexType::kInvalid: {

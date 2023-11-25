@@ -812,7 +812,7 @@ static const yytype_int16 yyrline[] =
     2322,  2327,  2333,  2339,  2345,  2351,  2357,  2363,  2369,  2375,
     2381,  2387,  2393,  2404,  2408,  2413,  2432,  2438,  2444,  2448,
     2449,  2451,  2452,  2454,  2455,  2467,  2475,  2480,  2483,  2487,
-    2491,  2496,  2501,  2509,  2516,  2527,  2578
+    2491,  2496,  2501,  2509,  2516,  2527,  2577
 };
 #endif
 
@@ -6349,8 +6349,7 @@ yyreduce:
 
         size_t param_count = (yyvsp[0].with_index_param_list_t)->size();
         index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->reserve(param_count);
-
+        index_info->index_param_list_->resize(param_count);
         for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
             (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
             *(*(index_info->index_param_list_))[param_idx] = *(*(yyvsp[0].with_index_param_list_t))[param_idx];
@@ -6359,11 +6358,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6363 "parser.cpp"
+#line 6362 "parser.cpp"
     break;
 
   case 336: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 2578 "parser.y"
+#line 2577 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -6406,8 +6405,7 @@ yyreduce:
 
         size_t param_count = (yyvsp[0].with_index_param_list_t)->size();
         index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->reserve(param_count);
-
+        index_info->index_param_list_->resize(param_count);
         for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
             (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
             *(*(index_info->index_param_list_))[param_idx] = *(*(yyvsp[0].with_index_param_list_t))[param_idx];
@@ -6416,11 +6414,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6420 "parser.cpp"
+#line 6418 "parser.cpp"
     break;
 
 
-#line 6424 "parser.cpp"
+#line 6422 "parser.cpp"
 
       default: break;
     }
@@ -6649,7 +6647,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 2631 "parser.y"
+#line 2629 "parser.y"
 
 
 void

@@ -64,8 +64,8 @@ public:
     inline String column_name() { return column_names_[0]; }
 
 public:
-    const String file_name_{};
     const IndexType index_type_{IndexType::kInvalid};
+    const String file_name_{};
     const Vector<String> column_names_{};
 };
 } // namespace infinity

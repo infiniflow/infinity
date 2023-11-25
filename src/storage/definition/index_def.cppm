@@ -28,9 +28,9 @@ public:
 
     virtual ~IndexDef() = default;
 
-    virtual bool operator==(const IndexDef &other) const;
+    bool operator==(const IndexDef &other) const;
 
-    virtual bool operator!=(const IndexDef &other) const;
+    bool operator!=(const IndexDef &other) const;
 
 public:
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.

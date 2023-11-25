@@ -67,11 +67,11 @@ SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&ptr, int32_t maxbytes) {
 
 String IndexFullText::ToString() const {
     std::stringstream ss;
-    ss << IndexBase::ToString();
+    String output_str = IndexBase::ToString();
     if(!analyzer_.empty()) {
-        ss << ", " << analyzer_;
+        output_str += ", " + analyzer_;
     }
-    return ss.str();
+    return output_str;
 }
 
 Json IndexFullText::Serialize() const {
