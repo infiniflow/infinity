@@ -133,7 +133,7 @@ auto main(int argc, char **argv) -> int {
     threaded_thrift_server.Init(9080);
     threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
 
-    pool_thrift_server.Init(9090, 16);
+    pool_thrift_server.Init(9090, 128);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
     grpc_thread = infinity::Thread([]() { GrpcServiceImpl::Run(); });
