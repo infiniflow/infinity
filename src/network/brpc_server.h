@@ -111,7 +111,8 @@ public:
                    google::protobuf::Closure *done) override;
 
 public:
-    static void Run();
+    static void Run(brpc::Server& server);
+    static void Stop(brpc::Server& server);
 
 private:
     static ColumnDef *GetColumnDefFromProto(const infinity_proto::ColumnDef &column_defs);

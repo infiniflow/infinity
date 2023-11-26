@@ -420,9 +420,9 @@ void BrpcServiceImpl::Insert(google::protobuf::RpcController *cntl_base,
     ProcessResult(result, response);
 }
 
-void BrpcServiceImpl::Run() {
+void BrpcServiceImpl::Run(brpc::Server& server) {
 
-    brpc::Server server;
+//    brpc::Server server;
 
     BrpcServiceImpl service;
     if (server.AddService(&service, brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
@@ -439,7 +439,7 @@ void BrpcServiceImpl::Run() {
 
     // Wait until Ctrl-C is pressed, then Stop() and Join() the server.
     LOG(INFO) << "0.0.0.0:50051 Start BRPC";
-    server.RunUntilAskedToQuit();
+//    server.RunUntilAskedToQuit();
 }
 
 ColumnDef *BrpcServiceImpl::GetColumnDefFromProto(const infinity_proto::ColumnDef &column_def) {
