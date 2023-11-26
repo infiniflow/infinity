@@ -28,7 +28,7 @@ namespace infinity {
 export class CastExpression : public BaseExpression {
 public:
     CastExpression(BoundCastFunc cast_function, const SharedPtr<BaseExpression> &argument, DataType target_type)
-        : BaseExpression(ExpressionType::kCast, {argument}), target_type_(Move(target_type)), func_(cast_function) {}
+        : BaseExpression(ExpressionType::kCast, {argument}), func_(cast_function), target_type_(Move(target_type)) {}
 
     inline DataType Type() const override { return target_type_; }
 

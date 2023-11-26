@@ -20,9 +20,9 @@ import parser;
 import global_block_id;
 import knn_distance; // delete this
 import block_index;
-import index_entry;
 import block_column_entry;
 import merge_knn;
+import segment_column_index_entry;
 
 import base_table_ref;
 
@@ -34,7 +34,7 @@ export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                       Vector<BlockColumnEntry *> block_column_entries,
-                      Vector<IndexEntry *> index_entries,
+                      Vector<SegmentColumnIndexEntry *> index_entries,
                       i64 topk,
                       i64 dimension,
                       i64 query_embedding_count,
@@ -49,7 +49,7 @@ public:
     const SharedPtr<BaseTableRef> table_ref_{};
 
     const Vector<BlockColumnEntry *> block_column_entries_{};
-    const Vector<IndexEntry *> index_entries_{};
+    const Vector<SegmentColumnIndexEntry *> index_entries_{};
 
     const i64 topk_;
     const i64 dimension_;

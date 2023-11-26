@@ -15,7 +15,7 @@
 module;
 
 import parser;
-import index_def;
+import index_base;
 import file_worker;
 import stl;
 
@@ -23,21 +23,21 @@ export module index_file_worker;
 
 namespace infinity {
 
-export struct CreateIndexPara {
-    const SharedPtr<IndexDef> index_def_;
-    const SharedPtr<ColumnDef> column_def_;
+export struct CreateIndexParam {
+    const IndexBase *index_base_{};
+    const ColumnDef *column_def_{};
 
-    CreateIndexPara(SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def) : index_def_(index_def), column_def_(column_def) {}
+    CreateIndexParam(const IndexBase *index_base, const ColumnDef *column_def) : index_base_(index_base), column_def_(column_def) {}
 };
 
 export class IndexFileWorker : public FileWorker {
 protected:
-    SharedPtr<ColumnDef> column_def_;
-    SharedPtr<IndexDef> index_def_;
+    const ColumnDef *column_def_{};
+    const IndexBase *index_base_{};
 
 public:
-    explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SharedPtr<IndexDef> index_def, SharedPtr<ColumnDef> column_def)
-        : FileWorker(file_dir, file_name, 0), column_def_(column_def), index_def_(index_def) {}
+    explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, const IndexBase *index_base, const ColumnDef *column_def)
+        : FileWorker(file_dir, file_name, 0), column_def_(column_def), index_base_(index_base) {}
 
     ~IndexFileWorker() override = default;
 };

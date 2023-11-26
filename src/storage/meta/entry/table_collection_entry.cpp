@@ -33,12 +33,14 @@ import logger;
 import txn_store;
 import status;
 import infinity_exception;
-import ivfflat_index_def;
-import index_def_meta;
+import index_ivfflat;
+import table_index_meta;
 import txn_manager;
-import index_entry;
-import index_def_entry;
+import segment_column_index_entry;
+import table_index_entry;
 import iresearch_datastore;
+import column_index_entry;
+import irs_index_entry;
 
 module table_collection_entry;
 
@@ -64,52 +66,44 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
 }
 
 Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
-                                         SharedPtr<IndexDef> index_def,
+                                         const SharedPtr<IndexDef>& index_def,
                                          ConflictType conflict_type,
                                          u64 txn_id,
                                          TxnTimeStamp begin_ts,
                                          TxnManager *txn_mgr,
                                          BaseEntry *&new_index_entry) {
+    if(index_def->index_name_->empty()) {
+        // Index name shouldn't be empty
+        Error<StorageException>("Attempt to create no name index.");
+    }
+
+    TableIndexMeta *table_index_meta{nullptr};
+
     // TODO: lock granularity can be narrowed.
     table_entry->rw_locker_.lock_shared();
-
-    IndexDefMeta *index_def_meta{nullptr};
-    if (index_def->index_name_->empty()) {
-        // set default index name
-        i32 index_id = 0;
-        String index_name_base = "idx";
-        for (const auto &column_name : index_def->column_names_) {
-            index_name_base += "_" + column_name;
-        }
-        while (true) {
-            auto index_name = index_id > 0 ? (index_name_base + "_" + ToStr(index_id)) : index_name_base;
-            if (auto iter = table_entry->indexes_.find(index_name); iter == table_entry->indexes_.end()) {
-                index_def->index_name_ = MakeShared<String>(Move(index_name));
-                break;
-            }
-            ++index_id;
-        }
-    } else if (auto iter = table_entry->indexes_.find(*index_def->index_name_); iter != table_entry->indexes_.end()) {
-        index_def_meta = iter->second.get();
+    if (auto iter = table_entry->index_meta_map_.find(*index_def->index_name_); iter != table_entry->index_meta_map_.end()) {
+        table_index_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
 
-    if (index_def_meta == nullptr) {
-        LOG_TRACE(Format("Create new index: {}", *index_def->index_name_));
-        auto new_index_def_meta = MakeUnique<IndexDefMeta>(table_entry);
-        index_def_meta = new_index_def_meta.get();
+    if (table_index_meta == nullptr) {
+
+        auto new_table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_def->index_name_);
+        table_index_meta = new_table_index_meta.get();
 
         table_entry->rw_locker_.lock();
-        // Insert index_def meta here
-        table_entry->indexes_[*index_def->index_name_] = Move(new_index_def_meta);
-        table_entry->rw_locker_.unlock();
 
-        LOG_TRACE(Format("Add new index entry for {} in new index meta of table_entry {} ", *index_def->index_name_, *table_entry->table_entry_dir_));
-    } else {
-        LOG_TRACE(
-            Format("Add new index entry for {} in existed index meta of table_entry {}", *index_def->index_name_, *table_entry->table_entry_dir_));
+        if (auto iter = table_entry->index_meta_map_.find(*index_def->index_name_); iter != table_entry->index_meta_map_.end()) {
+            table_index_meta = iter->second.get();
+        } else {
+
+            table_entry->index_meta_map_[*index_def->index_name_] = Move(new_table_index_meta);
+        }
+        table_entry->rw_locker_.unlock();
     }
-    return IndexDefMeta::CreateNewEntry(index_def_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
+
+    LOG_TRACE(Format("Creating new index: {}", *index_def->index_name_));
+    return TableIndexMeta::CreateTableIndexEntry(table_index_meta, index_def, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
 Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
@@ -121,8 +115,8 @@ Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
                                        BaseEntry *&new_index_entry) {
     table_entry->rw_locker_.lock_shared();
 
-    IndexDefMeta *index_meta{nullptr};
-    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
+    TableIndexMeta *index_meta{nullptr};
+    if (auto iter = table_entry->index_meta_map_.find(index_name); iter != table_entry->index_meta_map_.end()) {
         index_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
@@ -144,12 +138,16 @@ Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,
         Error<StorageException>("Should not reach here.");
     }
     LOG_TRACE(Format("Drop index entry {}", index_name));
-    return IndexDefMeta::DropNewEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
+    return TableIndexMeta::DropTableIndexEntry(index_meta, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
-Status TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
-    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
-        return IndexDefMeta::GetEntry(iter->second.get(), txn_id, begin_ts, base_entry);
+Status TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry,
+                                      const String &index_name,
+                                      u64 txn_id,
+                                      TxnTimeStamp begin_ts,
+                                      BaseEntry *&base_entry) {
+    if (auto iter = table_entry->index_meta_map_.find(index_name); iter != table_entry->index_meta_map_.end()) {
+        return TableIndexMeta::GetEntry(iter->second.get(), txn_id, begin_ts, base_entry);
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
     LOG_ERROR(*err_msg);
@@ -159,14 +157,14 @@ Status TableCollectionEntry::GetIndex(TableCollectionEntry *table_entry, const S
 void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
     table_entry->rw_locker_.lock_shared();
 
-    IndexDefMeta *index_def_meta{nullptr};
-    if (auto iter = table_entry->indexes_.find(index_name); iter != table_entry->indexes_.end()) {
-        index_def_meta = iter->second.get();
+    TableIndexMeta *table_index_meta{nullptr};
+    if (auto iter = table_entry->index_meta_map_.find(index_name); iter != table_entry->index_meta_map_.end()) {
+        table_index_meta = iter->second.get();
     }
     table_entry->rw_locker_.unlock_shared();
 
     LOG_TRACE(Format("Remove index entry: {}", index_name));
-    IndexDefMeta::DeleteNewEntry(index_def_meta, txn_id, txn_mgr);
+    TableIndexMeta::DeleteNewEntry(table_index_meta, txn_id, txn_mgr);
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
@@ -185,7 +183,7 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
                 // unsealed_segment_ is unpopulated or full
                 SharedPtr<SegmentEntry> new_segment =
                     SegmentEntry::MakeNewSegmentEntry(table_entry, TableCollectionEntry::GetNextSegmentID(table_entry), buffer_mgr);
-                table_entry->segments_.emplace(new_segment->segment_id_, new_segment);
+                table_entry->segment_map_.emplace(new_segment->segment_id_, new_segment);
                 table_entry->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(Format("Created a new segment {}", new_segment->segment_id_));
             }
@@ -198,25 +196,27 @@ void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_pt
 
 void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            void *txn_store,
-                                           IndexDefEntry *index_def_entry,
+                                           TableIndexEntry *table_index_entry,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
-    if (index_def_entry->index_def_->method_type_ == IndexMethod::kIRSFullText) {
-        IndexDefMeta *index_def_meta = table_entry->indexes_[*(index_def_entry->index_def_->index_name_)].get();
-        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-            index_def_meta->irs_index_->BatchInsert(table_entry, index_def_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
-        }
-    } else {
-        SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-        auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-        if (index_def->column_names_.size() != 1) {
-            StorageException("Not implemented");
-        }
-        const String &column_name = index_def->column_names_[0];
-        u64 column_id = table_entry->GetColumnIdByName(column_name);
-        SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
-        for (const auto &[_segment_id, segment_entry] : table_entry->segments_) {
-            SegmentEntry::CreateIndexFile(segment_entry.get(), index_def_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+
+    auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
+    for(const auto& base_index_pair: table_index_entry->column_index_map_) {
+        u64 column_id = base_index_pair.first;
+        BaseEntry* base_entry = base_index_pair.second.get();
+        if(base_entry->entry_type_ == EntryType::kColumnIndex) {
+            ColumnIndexEntry* column_index_entry = (ColumnIndexEntry*)(base_entry);
+            SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
+            for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
+                SegmentEntry::CreateIndexFile(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+            }
+        } else if(base_entry->entry_type_ == EntryType::kIRSIndex) {
+            IrsIndexEntry* irs_index_entry = (IrsIndexEntry*)(base_entry);
+            for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
+                irs_index_entry->irs_index_->BatchInsert(table_entry, table_index_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
+            }
+        } else {
+            Error<StorageException>("Invalid entry type");
         }
     }
 }
@@ -242,7 +242,7 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
                          range.block_id_,
                          range.start_offset_,
                          range.row_count_));
-        SegmentEntry *segment_ptr = table_entry->segments_[range.segment_id_].get();
+        SegmentEntry *segment_ptr = table_entry->segment_map_[range.segment_id_].get();
         SegmentEntry::CommitAppend(segment_ptr, txn_ptr, range.block_id_, range.start_offset_, range.row_count_);
         row_count += range.row_count_;
     }
@@ -251,11 +251,17 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
 
 void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        IndexDefEntry *index_def_entry = txn_index_store.index_def_entry_;
-        for (auto &[segment_id, index_entry] : txn_index_store.index_entry_map_) {
-            IndexDefEntry::CommitCreatedIndex(index_def_entry, segment_id, index_entry);
+        TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
+        for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
+            for(auto &[segment_id, segment_column_index] : segment_index_map) {
+                TableIndexEntry::CommitCreateIndex(table_index_entry, column_id, segment_id, segment_column_index);
+            }
+        }
+        if(table_index_entry->irs_index_entry_.get() != nullptr) {
+            TableIndexEntry::CommitCreateIndex(table_index_entry, table_index_entry->irs_index_entry_);
         }
     }
+
 }
 
 void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store) {
@@ -302,13 +308,13 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     table_entry->row_count_ += row_count;
 
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);
-    table_entry->segments_.emplace(segment->segment_id_, Move(segment));
+    table_entry->segment_map_.emplace(segment->segment_id_, Move(segment));
     return nullptr;
 }
 
 SegmentEntry *TableCollectionEntry::GetSegmentByID(const TableCollectionEntry *table_entry, u32 segment_id) {
-    auto iter = table_entry->segments_.find(segment_id);
-    if (iter != table_entry->segments_.end()) {
+    auto iter = table_entry->segment_map_.find(segment_id);
+    if (iter != table_entry->segment_map_.end()) {
         return iter->second.get();
     } else {
         return nullptr;
@@ -329,9 +335,9 @@ SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     SharedLock<RWMutex> rw_locker(table_collection_entry->rw_locker_);
-    result->Reserve(table_collection_entry->segments_.size());
+    result->Reserve(table_collection_entry->segment_map_.size());
 
-    for (const auto &segment_pair : table_collection_entry->segments_) {
+    for (const auto &segment_pair : table_collection_entry->segment_map_) {
         result->Insert(segment_pair.second.get(), begin_ts);
     }
 
@@ -367,14 +373,14 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
         json_res["next_segment_id"] = next_segment_id;
     }
 
-    for (const auto &[segment_id, segment_entry] : table_entry->segments_) {
+    for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
         json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_entry.get(), max_commit_ts, is_full_checkpoint));
     }
 
-    for (const auto &[index_name, index_entry] : table_entry->indexes_) {
-        Json index_def_meta_json = IndexDefMeta::Serialize(index_entry.get(), max_commit_ts);
+    for (const auto &[index_name, index_entry] : table_entry->index_meta_map_) {
+        Json index_def_meta_json = TableIndexMeta::Serialize(index_entry.get(), max_commit_ts);
         index_def_meta_json["index_name"] = index_name;
-        json_res["indexes"].emplace_back(index_def_meta_json);
+        json_res["table_indexes"].emplace_back(index_def_meta_json);
     }
 
     return json_res;
@@ -423,26 +429,26 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
         u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
-            table_entry->segments_.emplace(segment_entry->segment_id_, segment_entry);
+            table_entry->segment_map_.emplace(segment_entry->segment_id_, segment_entry);
             max_segment_id = Max(max_segment_id, segment_entry->segment_id_);
         }
-        table_entry->unsealed_segment_ = table_entry->segments_[max_segment_id].get();
+        table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get();
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
 
     if (table_entry->deleted_)
-        Assert<StorageException>(table_entry->segments_.empty(), "deleted table should have no segment");
+        Assert<StorageException>(table_entry->segment_map_.empty(), "deleted table should have no segment");
     else
-        Assert<StorageException>(table_entry->segments_.empty() || table_entry->segments_[0].get() != nullptr, "table segment 0 should be valid");
+        Assert<StorageException>(table_entry->segment_map_.empty() || table_entry->segment_map_[0].get() != nullptr, "table segment 0 should be valid");
 
-    if (table_entry_json.contains("indexes")) {
-        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
+    if (table_entry_json.contains("table_indexes")) {
+        for (const auto &index_def_meta_json : table_entry_json["table_indexes"]) {
 
-            UniquePtr<IndexDefMeta> index_def_meta = IndexDefMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
+            UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
             String index_name = index_def_meta_json["index_name"];
-            table_entry->indexes_.emplace(Move(index_name), Move(index_def_meta));
+            table_entry->index_meta_map_.emplace(Move(index_name), Move(table_index_meta));
         }
     }
 
@@ -470,22 +476,22 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     this->row_count_.store(Max(this->row_count_, table_entry2->row_count_));
     u32 max_segment_id = 0;
-    for (auto &[seg_id, sgement_entry] : this->segments_) {
+    for (auto &[seg_id, sgement_entry] : this->segment_map_) {
         max_segment_id = Max(max_segment_id, seg_id);
     }
-    for (auto &[seg_id, sgement_entry2] : table_entry2->segments_) {
+    for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
         max_segment_id = Max(max_segment_id, seg_id);
-        auto it = this->segments_.find(seg_id);
-        if (it == this->segments_.end()) {
+        auto it = this->segment_map_.find(seg_id);
+        if (it == this->segment_map_.end()) {
             sgement_entry2->table_entry_ = this;
-            this->segments_.emplace(seg_id, sgement_entry2);
+            this->segment_map_.emplace(seg_id, sgement_entry2);
         } else {
             it->second->MergeFrom(*sgement_entry2.get());
         }
     }
-    if (this->unsealed_segment_ == nullptr && !this->segments_.empty()) {
-        auto seg_it = this->segments_.find(max_segment_id);
-        Assert<StorageException>(seg_it != this->segments_.end(), Format("max_segment_id {} is invalid", max_segment_id));
+    if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
+        auto seg_it = this->segment_map_.find(max_segment_id);
+        Assert<StorageException>(seg_it != this->segment_map_.end(), Format("max_segment_id {} is invalid", max_segment_id));
         this->unsealed_segment_ = seg_it->second.get();
     }
 }

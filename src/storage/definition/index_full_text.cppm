@@ -18,36 +18,40 @@ import stl;
 import index_def;
 import parser;
 import third_party;
+import index_base;
 
-export module ivfflat_index_def;
+export module index_full_text;
 
 namespace infinity {
-export class IVFFlatIndexDef : public IndexDef {
+
+export class IndexFullText : public IndexBase {
 public:
-    static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IVFFlatIndexDef(SharedPtr<String> index_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexDef(Move(index_name), IndexMethod::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+    IndexFullText(String file_name, Vector<String> column_names, String analyzer)
+        : IndexBase(file_name, IndexType::kIRSFullText, Move(column_names)), analyzer_(Move(analyzer)) {}
 
-    ~IVFFlatIndexDef() = default;
+    ~IndexFullText() = default;
 
-    virtual bool operator==(const IndexDef &other) const override;
+    bool operator==(const IndexFullText &other) const;
 
-    virtual bool operator!=(const IndexDef &other) const override;
+    bool operator!=(const IndexFullText &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
+    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
+
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
 
-public:
-    const SizeT centroids_count_{};
+    static SharedPtr<IndexFullText> Deserialize(const Json &index_def_json);
 
-    const MetricType metric_type_{MetricType::kInvalid};
+public:
+    String analyzer_{};
 };
 
 } // namespace infinity

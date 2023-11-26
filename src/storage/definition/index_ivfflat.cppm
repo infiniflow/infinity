@@ -17,40 +17,42 @@ module;
 import stl;
 import index_def;
 import parser;
+import index_base;
 import third_party;
 
-export module hnsw_index_def;
+export module index_ivfflat;
 
 namespace infinity {
-export class HnswIndexDef : public IndexDef {
+export class IndexIVFFlat : public IndexBase {
 public:
-    static SharedPtr<IndexDef> Make(SharedPtr<String> index_name, Vector<String> column_names, const Vector<InitParameter *> &index_para_list);
+    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    HnswIndexDef(SharedPtr<String> index_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
-        : IndexDef(Move(index_name), IndexMethod::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction),
-          ef_(ef) {}
+    IndexIVFFlat(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
+        : IndexBase(file_name, IndexType::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
-    ~HnswIndexDef() = default;
+    ~IndexIVFFlat() = default;
 
-    virtual bool operator==(const IndexDef &other) const override;
+    bool operator==(const IndexIVFFlat &other) const;
 
-    virtual bool operator!=(const IndexDef &other) const override;
+    bool operator!=(const IndexIVFFlat &other) const;
 
 public:
     virtual i32 GetSizeInBytes() const override;
 
     virtual void WriteAdv(char *&ptr) const override;
 
+    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
+
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
 
-public:
-    const MetricType metric_type_{MetricType::kInvalid};
+    static SharedPtr<IndexIVFFlat> Deserialize(const Json &index_def_json);
 
-    const SizeT M_{};
-    const SizeT ef_construction_{};
-    const SizeT ef_{};
+public:
+    const SizeT centroids_count_{};
+
+    const MetricType metric_type_{MetricType::kInvalid};
 };
 
 } // namespace infinity

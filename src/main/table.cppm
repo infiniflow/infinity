@@ -29,9 +29,7 @@ public:
         : table_name_(Move(table_name)), session_(Move(session)) {}
 
     QueryResult CreateIndex(const String &index_name,
-                            Vector<String> *column_names,
-                            const String &method_type,
-                            Vector<InitParameter *> *index_para_list,
+                            Vector<IndexInfo *> *index_info_list,
                             CreateIndexOptions create_index_options);
 
     QueryResult DropIndex(const String &index_name);
