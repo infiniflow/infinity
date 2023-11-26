@@ -16,7 +16,7 @@ module;
 
 import stl;
 import base_entry;
-//import segment_entry;
+// import segment_entry;
 import buffer_manager;
 import buffer_handle;
 import buffer_obj;
@@ -29,6 +29,8 @@ import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import column_index_entry;
+import table_collection_entry;
+import segment_entry;
 
 module segment_column_index_entry;
 
@@ -40,7 +42,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
                                                                           u32 segment_id,
                                                                           TxnTimeStamp create_ts,
                                                                           BufferManager *buffer_manager,
-                                                                          CreateIndexParam* param) {
+                                                                          CreateIndexParam *param) {
     // FIXME: estimate index size.
     UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param, segment_id);
     auto buffer = buffer_manager->Allocate(Move(file_worker));
@@ -53,8 +55,8 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
 UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(ColumnIndexEntry *column_index_entry,
                                                                            u32 segment_id,
                                                                            BufferManager *buffer_manager,
-                                                                           UniquePtr<CreateIndexParam> param) {
-    UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param.get(), segment_id);
+                                                                           CreateIndexParam* param) {
+    UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param, segment_id);
     auto buffer = buffer_manager->Get(Move(file_worker));
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
@@ -103,10 +105,18 @@ Json SegmentColumnIndexEntry::Serialize(const SegmentColumnIndexEntry *segment_c
     return index_entry_json;
 }
 
-UniquePtr<SegmentColumnIndexEntry>
-SegmentColumnIndexEntry::Deserialize(const Json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr) {
+UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const Json &index_entry_json,
+                                                                        ColumnIndexEntry *column_index_entry,
+                                                                        BufferManager *buffer_mgr,
+                                                                        TableCollectionEntry *table_collection_entry) {
     u32 segment_id = index_entry_json["segment_id"];
-    auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, nullptr);
+    SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_collection_entry, segment_id);
+    u64 column_id = column_index_entry->column_id_;
+    UniquePtr<CreateIndexParam> create_index_param =
+        SegmentEntry::GetCreateIndexParam(segment_entry, column_index_entry->index_base_.get(), table_collection_entry->columns_[column_id].get());
+    // TODO: need to get create index param;
+    //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
+    auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());
     Assert<StorageException>(segment_column_index_entry.get() != nullptr, "Failed to load index entry");
     segment_column_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_column_index_entry->max_ts_ = index_entry_json["max_ts"];
@@ -127,11 +137,10 @@ void SegmentColumnIndexEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-UniquePtr<IndexFileWorker>
-SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam* param, u32 segment_id) {
+UniquePtr<IndexFileWorker> SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam *param, u32 segment_id) {
     UniquePtr<IndexFileWorker> file_worker = nullptr;
-    const auto* index_base = param->index_base_;
-    const auto* column_def = param->column_def_;
+    const auto *index_base = param->index_base_;
+    const auto *column_def = param->column_def_;
     auto file_name = MakeShared<String>(SegmentColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {

@@ -32,11 +32,12 @@ class TableIndexEntry;
 
 export struct ColumnIndexEntry : public BaseEntry {
 public:
-    explicit ColumnIndexEntry(SharedPtr<IndexBase> index_base,
-                              TableIndexEntry *table_index_entry,
-                              SharedPtr<String> index_dir,
-                              u64 txn_id,
-                              TxnTimeStamp begin_ts);
+    ColumnIndexEntry(SharedPtr<IndexBase> index_base,
+                     TableIndexEntry *table_index_entry,
+                     u64 column_id,
+                     SharedPtr<String> index_dir,
+                     u64 txn_id,
+                     TxnTimeStamp begin_ts);
 
     static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                            u64 column_id,
@@ -52,7 +53,7 @@ public:
     static UniquePtr<ColumnIndexEntry> Deserialize(const Json &column_index_entry_json,
                                                    TableIndexEntry *table_index_entry,
                                                    BufferManager *buffer_mgr,
-                                                   TableCollectionEntry *table_entry);
+                                                   TableCollectionEntry *table_collection_entry);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
@@ -61,6 +62,7 @@ public:
     RWMutex rw_locker_{};
 
     TableIndexEntry *table_index_entry_{};
+    u64 column_id_{};
     SharedPtr<String> index_dir_{};
     const SharedPtr<IndexBase> index_base_{};
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment{};

@@ -38,6 +38,7 @@ struct TxnSegmentIndexStore {
 export struct TxnIndexStore {
 public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
+    TxnIndexStore() = default;
 
     TableIndexEntry *const table_index_entry_{};
 

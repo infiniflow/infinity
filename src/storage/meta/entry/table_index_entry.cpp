@@ -36,7 +36,7 @@ module table_index_entry;
 
 namespace infinity {
 
-TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef>& index_def,
+TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                  TableIndexMeta *table_index_meta,
                                  SharedPtr<String> index_dir,
                                  u64 txn_id,
@@ -60,23 +60,20 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef>& index_def,
     }
 }
 
-TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta,
-                                 u64 txn_id,
-                                 TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta) {
+TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts)
+    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
 
 UniquePtr<TableIndexEntry>
-TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexDef>& index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexDef> &index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<String> index_dir =
         DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, *index_def->index_name_);
     return MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
 }
 
-UniquePtr<TableIndexEntry>
-TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+UniquePtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
     return MakeUnique<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
 }
 
@@ -85,7 +82,7 @@ void TableIndexEntry::CommitCreateIndex(TableIndexEntry *table_index_entry,
                                         u32 segment_id,
                                         SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
     UniqueLock<RWMutex> w_locker(table_index_entry->rw_locker_);
-    ColumnIndexEntry* column_index_entry = table_index_entry->column_index_map_[column_id].get();
+    ColumnIndexEntry *column_index_entry = table_index_entry->column_index_map_[column_id].get();
     column_index_entry->index_by_segment.emplace(segment_id, segment_column_index_entry);
 }
 
@@ -99,13 +96,17 @@ Json TableIndexEntry::Serialize(const TableIndexEntry *table_index_entry, TxnTim
     json["begin_ts"] = table_index_entry->begin_ts_;
     json["commit_ts"] = table_index_entry->commit_ts_.load();
     json["deleted"] = table_index_entry->deleted_;
-    if (!table_index_entry->deleted_) {
-        json["index_dir"] = *table_index_entry->index_dir_;
-        //        json["index_base"] = table_index_entry->index_base_->Serialize();
-        //        for (const auto &[segment_id, index_entry] : table_index_entry->index_by_segment) {
-        //            ColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
-        //            json["indexes"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
-        //        }
+    if (table_index_entry->deleted_) {
+        return json;
+    }
+
+    json["index_dir"] = *table_index_entry->index_dir_;
+    json["index_def"] = table_index_entry->index_def_->Serialize();
+    for (const auto &[index_name, column_index_entry] : table_index_entry->column_index_map_) {
+        json["column_indexes"].emplace_back(ColumnIndexEntry::Serialize(column_index_entry.get(), max_commit_ts));
+    }
+    if (table_index_entry->irs_index_entry_.get() != nullptr) {
+        json["irs_index_entry"] = IrsIndexEntry::Serialize(table_index_entry->irs_index_entry_.get(), max_commit_ts);
     }
     return json;
 }
@@ -120,40 +121,32 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = MakeUnique<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
+        auto table_index_entry = NewDropTableIndexEntry(table_index_meta, txn_id, begin_ts);
         table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
+        table_index_entry->begin_ts_ = begin_ts;
         return table_index_entry;
     }
 
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
-    //    SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index_def_entry_json["index_base"]);
-    //
-    //    auto table_index_entry = MakeUnique<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
-    //    table_index_entry->commit_ts_.store(commit_ts);
-    //    table_index_entry->deleted_ = deleted;
-    //
-    //    if (index_def_entry_json.contains("indexes")) {
-    //        for (const auto &index_entry_json : index_def_entry_json["indexes"]) {
-    //            u32 segment_id = index_entry_json["segment_id"];
-    //            SegmentEntry *segment_entry = table_entry->segment_map_.at(segment_id).get();
-    //
-    //            if (index_base->column_names_.size() > 1) {
-    //                StorageException("Not implemented.");
-    //            }
-    //            u64 column_id = table_entry->GetColumnIdByName(index_base->column_names_[0]);
-    //            SharedPtr<ColumnDef> column_def = table_entry->column_map_[column_id];
-    //
-    //            UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def);
-    //
-    //            auto index_entry =
-    //                SegmentColumnIndexEntry::Deserialize(index_entry_json, table_index_entry.get(), segment_entry, buffer_mgr,
-    //                Move(create_index_param));
-    //            table_index_entry->index_by_segment.emplace(index_entry->segment_entry_->segment_id_, index_entry);
-    //        }
-    //    }
+    auto index_def = IndexDef::Deserialize(index_def_entry_json["index_def"]);
 
-    //    return table_index_entry;
+    UniquePtr<TableIndexEntry> table_index_entry = MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+    table_index_entry->commit_ts_.store(commit_ts);
+    table_index_entry->begin_ts_ = begin_ts;
+
+    for (const auto &column_index_entry_json : index_def_entry_json["column_indexes"]) {
+        UniquePtr<ColumnIndexEntry> column_index_entry =
+            ColumnIndexEntry::Deserialize(column_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
+        u64 column_id = column_index_entry->column_id_;
+        table_index_entry->column_index_map_.emplace(column_id, Move(column_index_entry));
+    }
+
+    if (index_def_entry_json.contains("irs_index_entry")) {
+        table_index_entry->irs_index_entry_ =
+            IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
+    }
+    return table_index_entry;
 }
 
 SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {

@@ -28,7 +28,7 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
             return "HnswLVQ";
         }
         case IndexType::kHnsw: {
-            return "Hnsw";
+            return "HNSW";
         }
         case IndexType::kIRSFullText: {
             return "FULLTEXT";

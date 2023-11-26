@@ -26,6 +26,7 @@ export module segment_column_index_entry;
 
 namespace infinity {
 
+class TableCollectionEntry;
 class ColumnIndexEntry;
 class FaissIndexPtr;
 class BufferManager;
@@ -41,14 +42,14 @@ public:
                                                             u32 segment_id,
                                                             TxnTimeStamp create_ts,
                                                             BufferManager *buffer_manager,
-                                                            CreateIndexParam* create_index_param);
+                                                            CreateIndexParam *create_index_param);
 
 private:
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry> LoadIndexEntry(ColumnIndexEntry *column_index_entry,
                                                              u32 segment_id,
                                                              BufferManager *buffer_manager,
-                                                             UniquePtr<CreateIndexParam> create_index_param);
+                                                             CreateIndexParam* create_index_param);
 
 public:
     [[nodiscard]] static BufferHandle GetIndex(SegmentColumnIndexEntry *segment_column_index_entry, BufferManager *buffer_mgr);
@@ -60,13 +61,15 @@ public:
 
     static Json Serialize(const SegmentColumnIndexEntry *segment_column_index_entry);
 
-    static UniquePtr<SegmentColumnIndexEntry>
-    Deserialize(const Json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr);
+    static UniquePtr<SegmentColumnIndexEntry> Deserialize(const Json &index_entry_json,
+                                                          ColumnIndexEntry *column_index_entry,
+                                                          BufferManager *buffer_mgr,
+                                                          TableCollectionEntry *table_collection_entry);
 
     void MergeFrom(BaseEntry &other);
 
 private:
-    static UniquePtr<IndexFileWorker> CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam* param, u32 segment_id);
+    static UniquePtr<IndexFileWorker> CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam *param, u32 segment_id);
 
     static String IndexFileName(const String &index_name, u32 segment_id);
 

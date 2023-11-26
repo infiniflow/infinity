@@ -14,7 +14,7 @@
 
 module;
 
-//#include "faiss/index_io.h"
+// #include "faiss/index_io.h"
 #include <ctime>
 #include <string>
 
@@ -28,6 +28,8 @@ import local_file_system;
 import default_values;
 import random;
 import buffer_manager;
+import infinity_exception;
+import table_collection_entry;
 
 module column_index_entry;
 
@@ -35,10 +37,12 @@ namespace infinity {
 
 ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                    TableIndexEntry *table_index_entry,
+                                   u64 column_id,
                                    SharedPtr<String> index_dir,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), index_dir_(index_dir), index_base_(index_base) {
+    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), column_id_(column_id), index_dir_(index_dir),
+      index_base_(index_base) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
@@ -51,7 +55,7 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
                                                                   TxnTimeStamp begin_ts) {
     //    SharedPtr<String> index_dir =
     //        DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
-    return MakeShared<ColumnIndexEntry>(index_base, table_index_entry, index_dir, txn_id, begin_ts);
+    return MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
@@ -60,18 +64,21 @@ void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, 
 }
 
 Json ColumnIndexEntry::Serialize(const ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts) {
+    if (column_index_entry->deleted_) {
+        Error<StorageException>("Column index entry can't be deleted.");
+    }
+
     Json json;
     json["txn_id"] = column_index_entry->txn_id_.load();
     json["begin_ts"] = column_index_entry->begin_ts_;
     json["commit_ts"] = column_index_entry->commit_ts_.load();
     json["deleted"] = column_index_entry->deleted_;
-    if (!column_index_entry->deleted_) {
-        json["index_dir"] = *column_index_entry->index_dir_;
-        json["index_base"] = column_index_entry->index_base_->Serialize();
-        for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
-            SegmentColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
-            json["indexes"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
-        }
+    json["column_id"] = column_index_entry->column_id_;
+    json["index_dir"] = *column_index_entry->index_dir_;
+    json["index_base"] = column_index_entry->index_base_->Serialize();
+    for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
+        SegmentColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
+        json["index_by_segment"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
     }
     return json;
 }
@@ -79,30 +86,29 @@ Json ColumnIndexEntry::Serialize(const ColumnIndexEntry *column_index_entry, Txn
 UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_index_entry_json,
                                                           TableIndexEntry *table_index_entry,
                                                           BufferManager *buffer_mgr,
-                                                          TableCollectionEntry *table_entry) {
+                                                          TableCollectionEntry *table_collection_entry) {
+    bool deleted = column_index_entry_json["deleted"];
+    if (deleted) {
+        Error<StorageException>("Column index entry can't be deleted.");
+    }
+
     u64 txn_id = column_index_entry_json["txn_id"];
     TxnTimeStamp begin_ts = column_index_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = column_index_entry_json["commit_ts"];
-    bool deleted = column_index_entry_json["deleted"];
-
-    if (deleted) {
-        auto column_index_entry = MakeUnique<ColumnIndexEntry>(nullptr, table_index_entry, nullptr, txn_id, begin_ts);
-        column_index_entry->deleted_ = true;
-        column_index_entry->commit_ts_.store(commit_ts);
-        return column_index_entry;
-    }
-
+    u64 column_id = column_index_entry_json["column_id"];
     auto index_dir = MakeShared<String>(column_index_entry_json["index_dir"]);
     SharedPtr<IndexBase> index_base = IndexBase::Deserialize(column_index_entry_json["index_base"]);
 
-    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, index_dir, txn_id, begin_ts);
+    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
     column_index_entry->commit_ts_.store(commit_ts);
     column_index_entry->deleted_ = deleted;
 
-    for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
-        UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
-            SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr);
-        column_index_entry->index_by_segment.emplace(segment_column_index_entry->segment_id_, Move(segment_column_index_entry));
+    if (column_index_entry_json.contains("index_by_segment")) {
+        for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
+            UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
+                SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_collection_entry);
+            column_index_entry->index_by_segment.emplace(segment_column_index_entry->segment_id_, Move(segment_column_index_entry));
+        }
     }
 
     return column_index_entry;

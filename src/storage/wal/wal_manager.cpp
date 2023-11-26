@@ -662,7 +662,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     BaseEntry *base_entry{nullptr};
     auto index_def_entry_status =
-        TableCollectionEntry::CreateIndex(table_entry, cmd.index_def_, ConflictType::kReplace, txn_id, commit_ts, nullptr, base_entry);
+        TableCollectionEntry::CreateIndex(table_entry, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr, base_entry);
     if (!index_def_entry_status.ok()) {
         Error<StorageException>("Wal Replay: Create index failed");
     }

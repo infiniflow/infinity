@@ -113,8 +113,8 @@ Json IndexDef::Serialize() const {
 }
 
 SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
-    SharedPtr<IndexDef> res = nullptr;
-    res->index_name_ = MakeShared<String>(index_def_json["index_name"]);
+    SharedPtr<String> index_name = MakeShared<String>(index_def_json["index_name"]);
+    SharedPtr<IndexDef> res = MakeShared<IndexDef>(index_name);
     for (const auto &index : index_def_json["indexes"]) {
         SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index);
         res->index_array_.emplace_back(Move(index_base));

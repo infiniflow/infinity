@@ -156,7 +156,8 @@ Json IndexBase::Serialize() const {
 
 SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
     SharedPtr<IndexBase> res = nullptr;
-    IndexType index_type = IndexInfo::StringToIndexType(index_def_json["index_type"]);
+    String index_type_name = index_def_json["index_type"];
+    IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
     String file_name = index_def_json["file_name"];
     Vector<String> column_names = index_def_json["column_names"];
     switch (index_type) {

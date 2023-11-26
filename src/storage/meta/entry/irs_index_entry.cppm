@@ -15,12 +15,9 @@
 module;
 
 import stl;
-// import parser;
 import index_base;
 import base_entry;
 import third_party;
-// import segment_column_index_entry;
-// import index_base;
 
 export module irs_index_entry;
 
@@ -33,13 +30,9 @@ class IRSDataStore;
 
 export struct IrsIndexEntry : public BaseEntry {
 public:
-    explicit IrsIndexEntry(TableIndexEntry *table_index_entry,
-                           SharedPtr<String> index_dir,
-                           u64 txn_id,
-                           TxnTimeStamp begin_ts);
+    IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<IrsIndexEntry> NewIrsIndexEntry(Vector<SharedPtr<IndexBase>> index_base,
-                                                     Vector<u64> column_ids,
+    static UniquePtr<IrsIndexEntry> NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexBase>> index_info_map,
                                                      TableIndexEntry *table_index_entry,
                                                      u64 txn_id,
                                                      SharedPtr<String> index_dir,
@@ -49,8 +42,7 @@ public:
 
     static Json Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<IrsIndexEntry>
-    Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableCollectionEntry *table_entry);
+    static SharedPtr<IrsIndexEntry> Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
@@ -60,7 +52,7 @@ public:
 
     const TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};
-    Vector<SharedPtr<IndexBase>> index_descs_{};
+    HashMap<u64, SharedPtr<IndexBase>> index_info_map_{};
     SharedPtr<IRSDataStore> irs_index_{};
 };
 } // namespace infinity

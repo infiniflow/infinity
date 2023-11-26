@@ -380,7 +380,7 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
     for (const auto &[index_name, index_entry] : table_entry->index_meta_map_) {
         Json index_def_meta_json = TableIndexMeta::Serialize(index_entry.get(), max_commit_ts);
         index_def_meta_json["index_name"] = index_name;
-        json_res["indexes"].emplace_back(index_def_meta_json);
+        json_res["table_indexes"].emplace_back(index_def_meta_json);
     }
 
     return json_res;
@@ -443,8 +443,8 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     else
         Assert<StorageException>(table_entry->segment_map_.empty() || table_entry->segment_map_[0].get() != nullptr, "table segment 0 should be valid");
 
-    if (table_entry_json.contains("indexes")) {
-        for (const auto &index_def_meta_json : table_entry_json["indexes"]) {
+    if (table_entry_json.contains("table_indexes")) {
+        for (const auto &index_def_meta_json : table_entry_json["table_indexes"]) {
 
             UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
             String index_name = index_def_meta_json["index_name"];

@@ -567,8 +567,8 @@ void Txn::CommitBottom() {
     }
 
     //  Commit indexes in catalog
-    for (const auto &[index_name, index_def_entry] : txn_indexes_) {
-        index_def_entry->Commit(commit_ts);
+    for (const auto &[index_name, table_index_entry] : txn_indexes_) {
+        table_index_entry->Commit(commit_ts);
     }
     LOG_TRACE(Format("Txn: {} is committed.", txn_id_));
 
