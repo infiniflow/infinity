@@ -71,10 +71,10 @@ void FaissIndexFileWorker::AllocateInMemory() {
     }
     SizeT dimension = embedding_info->Dimension();
 
-    if (index_def_->index_type_ != IndexType::kIVFFlat) {
+    if (index_base_->index_type_ != IndexType::kIVFFlat) {
         Error<StorageException>("Not implemented.");
     }
-    auto ivfflat_index_def = static_cast<IndexIVFFlat *>(index_def_);
+    const auto* ivfflat_index_def = static_cast<const IndexIVFFlat *>(index_base_);
     faiss::IndexFlat *quantizer = nullptr;
     faiss::MetricType metric = faiss::MetricType::METRIC_L2;
 

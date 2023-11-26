@@ -66,7 +66,7 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
 }
 
 Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
-                                         SharedPtr<IndexDef> index_def,
+                                         const SharedPtr<IndexDef>& index_def,
                                          ConflictType conflict_type,
                                          u64 txn_id,
                                          TxnTimeStamp begin_ts,
@@ -103,7 +103,7 @@ Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
     }
 
     LOG_TRACE(Format("Creating new index: {}", *index_def->index_name_));
-    return TableIndexMeta::CreateTableIndexEntry(table_index_meta, Move(index_def), conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
+    return TableIndexMeta::CreateTableIndexEntry(table_index_meta, index_def, conflict_type, txn_id, begin_ts, txn_mgr, new_index_entry);
 }
 
 Status TableCollectionEntry::DropIndex(TableCollectionEntry *table_entry,

@@ -96,7 +96,7 @@ private:
 
 public:
     static UniquePtr<CreateIndexParam>
-    GetCreateIndexParam(const SegmentEntry *segment_entry, SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def);
+    GetCreateIndexParam(const SegmentEntry *segment_entry, const IndexBase* index_base, const ColumnDef* column_def);
 };
 
 } // namespace infinity

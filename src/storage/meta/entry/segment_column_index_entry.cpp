@@ -130,8 +130,8 @@ void SegmentColumnIndexEntry::MergeFrom(BaseEntry &other) {
 UniquePtr<IndexFileWorker>
 SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam* param, u32 segment_id) {
     UniquePtr<IndexFileWorker> file_worker = nullptr;
-    auto index_base = param->index_base_;
-    auto column_def = param->column_def_;
+    const auto* index_base = param->index_base_;
+    const auto* column_def = param->column_def_;
     auto file_name = MakeShared<String>(SegmentColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
@@ -153,9 +153,9 @@ SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, 
             break;
         }
         case IndexType::kHnsw: {
-            auto create_hnsw_para = static_cast<CreateHnswParam *>(param);
+            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
             file_worker =
-                MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_para->max_element_);
+                MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_param->max_element_);
             break;
         }
         default: {

@@ -36,7 +36,7 @@ module table_index_entry;
 
 namespace infinity {
 
-TableIndexEntry::TableIndexEntry(SharedPtr<IndexDef> index_def,
+TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef>& index_def,
                                  TableIndexMeta *table_index_meta,
                                  SharedPtr<String> index_dir,
                                  u64 txn_id,
@@ -56,15 +56,28 @@ TableIndexEntry::TableIndexEntry(SharedPtr<IndexDef> index_def,
         SharedPtr<String> column_index_path = MakeShared<String>(Format("{}/{}", *index_dir_, index_base->column_names_[0]));
         SharedPtr<ColumnIndexEntry> column_index_entry =
             ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
-        column_index_map_[idx] = column_index_entry;
+        column_index_map_[column_id] = column_index_entry;
     }
 }
 
+TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts)
+        : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta) {
+    begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
+    txn_id_ = txn_id;
+}
+
 UniquePtr<TableIndexEntry>
-TableIndexEntry::NewTableIndexEntry(SharedPtr<IndexDef> index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexDef>& index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<String> index_dir =
         DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, *index_def->index_name_);
-    return MakeUnique<TableIndexEntry>(Move(index_def), table_index_meta, Move(index_dir), txn_id, begin_ts);
+    return MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+}
+
+UniquePtr<TableIndexEntry>
+TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+    return MakeUnique<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
 }
 
 void TableIndexEntry::CommitCreateIndex(TableIndexEntry *table_index_entry,

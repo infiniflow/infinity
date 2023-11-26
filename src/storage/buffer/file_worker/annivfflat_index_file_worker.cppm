@@ -33,7 +33,7 @@ export struct CreateAnnIVFFlatParam : public CreateIndexParam {
     // used when ivfflat_index_def->centroids_count_ == 0
     const SizeT row_count_{};
 
-    CreateAnnIVFFlatParam(IndexBase *index_base, ColumnDef *column_def, SizeT row_count)
+    CreateAnnIVFFlatParam(const IndexBase *index_base, const ColumnDef *column_def, SizeT row_count)
         : CreateIndexParam(index_base, column_def), row_count_(row_count) {}
 };
 
@@ -44,8 +44,8 @@ class AnnIVFFlatIndexFileWorker : public IndexFileWorker {
 public:
     explicit AnnIVFFlatIndexFileWorker(SharedPtr<String> file_dir,
                                        SharedPtr<String> file_name,
-                                       IndexBase *index_base,
-                                       ColumnDef *column_def,
+                                       const IndexBase *index_base,
+                                       const ColumnDef *column_def,
                                        SizeT row_count)
         : IndexFileWorker(file_dir, file_name, index_base, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
 
@@ -80,7 +80,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
         Error<StorageException>("Data is already allocated.");
     }
-    if (index_def_->index_type_ != IndexType::kIVFFlat) {
+    if (index_base_->index_type_ != IndexType::kIVFFlat) {
         Error<StorageException>("Bug.");
     }
     auto data_type = column_def_->type();
@@ -89,14 +89,14 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    auto ivfflat_index_def = static_cast<IndexIVFFlat *>(index_def_);
-    auto centroids_count = ivfflat_index_def->centroids_count_;
+    const auto* index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
+    auto centroids_count = index_ivfflat->centroids_count_;
     if (centroids_count == 0) {
         centroids_count = default_centroid_num_;
     }
     switch (GetType()) {
         case kElemFloat: {
-            data_ = static_cast<void *>(new AnnIVFFlatIndexData<DataType>(ivfflat_index_def->metric_type_, dimension, centroids_count));
+            data_ = static_cast<void *>(new AnnIVFFlatIndexData<DataType>(index_ivfflat->metric_type_, dimension, centroids_count));
             break;
         }
         default: {

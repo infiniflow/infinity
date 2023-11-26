@@ -24,20 +24,20 @@ export module index_file_worker;
 namespace infinity {
 
 export struct CreateIndexParam {
-    IndexBase *index_base_{};
-    ColumnDef *column_def_{};
+    const IndexBase *index_base_{};
+    const ColumnDef *column_def_{};
 
-    CreateIndexParam(IndexBase *index_base, ColumnDef *column_def) : index_base_(index_base), column_def_(column_def) {}
+    CreateIndexParam(const IndexBase *index_base, const ColumnDef *column_def) : index_base_(index_base), column_def_(column_def) {}
 };
 
 export class IndexFileWorker : public FileWorker {
 protected:
-    ColumnDef *column_def_{};
-    IndexBase *index_def_{};
+    const ColumnDef *column_def_{};
+    const IndexBase *index_base_{};
 
 public:
-    explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, IndexBase *index_def, ColumnDef *column_def)
-        : FileWorker(file_dir, file_name, 0), column_def_(column_def), index_def_(index_def) {}
+    explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, const IndexBase *index_base, const ColumnDef *column_def)
+        : FileWorker(file_dir, file_name, 0), column_def_(column_def), index_base_(index_base) {}
 
     ~IndexFileWorker() override = default;
 };

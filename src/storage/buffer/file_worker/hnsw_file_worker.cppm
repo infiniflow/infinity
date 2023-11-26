@@ -29,18 +29,18 @@ namespace infinity {
 export struct CreateHnswParam : public CreateIndexParam {
     const SizeT max_element_{};
 
-    CreateHnswParam(IndexBase *index_base, ColumnDef *column_def, SizeT max_element)
+    CreateHnswParam(const IndexBase *index_base, const ColumnDef *column_def, SizeT max_element)
         : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
 };
 
 export class HnswFileWorker : public IndexFileWorker {
-    const SizeT max_element_;
+    const SizeT max_element_{};
 
 public:
     explicit HnswFileWorker(SharedPtr<String> file_dir,
                             SharedPtr<String> file_name,
-                            IndexBase* index_base,
-                            ColumnDef* column_def,
+                            const IndexBase* index_base,
+                            const ColumnDef* column_def,
                             SizeT max_element)
         : IndexFileWorker(file_dir, file_name, index_base, column_def), max_element_(max_element) {}
 

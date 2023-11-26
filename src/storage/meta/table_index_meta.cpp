@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <algorithm>
+#include <vector>
 
 import base_entry;
 import stl;
@@ -32,6 +32,7 @@ import table_collection_entry;
 import status;
 import iresearch_datastore;
 import table_index_entry;
+import base_meta;
 
 module table_index_meta;
 
@@ -43,13 +44,22 @@ TableIndexMeta::TableIndexMeta(TableCollectionEntry *table_collection_entry, Sha
     : table_collection_entry_(table_collection_entry), index_name_(Move(index_name)) {}
 
 Status TableIndexMeta::CreateTableIndexEntry(TableIndexMeta *table_index_meta,
-                                             SharedPtr<IndexDef> index_def,
+                                             const SharedPtr<IndexDef> &index_def,
                                              ConflictType conflict_type,
                                              u64 txn_id,
                                              TxnTimeStamp begin_ts,
                                              TxnManager *txn_mgr,
                                              BaseEntry *&new_index_entry) {
+    return BaseMeta::CheckDDLResult(CreateTableIndexEntryInternal(table_index_meta, index_def, txn_id, begin_ts, txn_mgr, new_index_entry),
+                                    conflict_type);
+}
 
+Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index_meta,
+                                                     const SharedPtr<IndexDef> &index_def,
+                                                     u64 txn_id,
+                                                     TxnTimeStamp begin_ts,
+                                                     TxnManager *txn_mgr,
+                                                     BaseEntry *&new_index_entry) {
     UniqueLock<RWMutex> rw_locker(table_index_meta->rw_locker_);
 
     if (table_index_meta->entry_list_.empty()) {
@@ -161,6 +171,14 @@ Status TableIndexMeta::DropTableIndexEntry(TableIndexMeta *table_index_meta,
                                            TxnTimeStamp begin_ts,
                                            TxnManager *txn_mgr,
                                            BaseEntry *&dropped_index_entry) {
+    return BaseMeta::CheckDDLResult(DropTableIndexEntryInternal(table_index_meta, txn_id, begin_ts, txn_mgr, dropped_index_entry), conflict_type);
+}
+
+Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_meta,
+                                                   u64 txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   BaseEntry *&dropped_index_entry) {
     UniqueLock<RWMutex> w_locker(table_index_meta->rw_locker_);
 
     if (table_index_meta->entry_list_.empty()) {
@@ -187,7 +205,7 @@ Status TableIndexMeta::DropTableIndexEntry(TableIndexMeta *table_index_meta,
             }
 
             // Append new one to drop index
-            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(nullptr, table_index_meta, txn_id, begin_ts);
+            auto table_index_entry = TableIndexEntry::NewDropTableIndexEntry(table_index_meta, txn_id, begin_ts);
             dropped_index_entry = table_index_entry.get();
             dropped_index_entry->deleted_ = true;
             table_index_meta->entry_list_.emplace_front(Move(table_index_entry));

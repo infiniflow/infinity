@@ -37,7 +37,7 @@ public:
 
 public:
     static Status CreateTableIndexEntry(TableIndexMeta *table_index_meta,
-                                        SharedPtr<IndexDef> index_def,
+                                        const SharedPtr<IndexDef> &index_def,
                                         ConflictType conflict_type,
                                         u64 txn_id,
                                         TxnTimeStamp begin_ts,
@@ -61,9 +61,24 @@ public:
 
     static UniquePtr<TableIndexMeta> Deserialize(const Json &index_def_meta_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 
-    static Status GetEntry(TableIndexMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry);
+    static Status GetEntry(TableIndexMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&base_entry);
 
     static void DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager *txn_mgr);
+
+private:
+    static Status CreateTableIndexEntryInternal(TableIndexMeta *table_index_meta,
+                                                const SharedPtr<IndexDef> &index_def,
+                                                u64 txn_id,
+                                                TxnTimeStamp begin_ts,
+                                                TxnManager *txn_mgr,
+                                                BaseEntry *&new_index_entry);
+
+    static Status DropTableIndexEntryInternal(TableIndexMeta *table_index_meta,
+                                              u64 txn_id,
+                                              TxnTimeStamp begin_ts,
+                                              TxnManager *txn_mgr,
+                                              BaseEntry *&new_index_entry);
+
 private:
     //    RWMutex rw_locker_{};
     SharedPtr<String> index_name_{};

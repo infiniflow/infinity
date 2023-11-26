@@ -33,14 +33,18 @@ class TableCollectionEntry;
 export class TableIndexEntry : public BaseEntry {
 
 public:
-    explicit TableIndexEntry(SharedPtr<IndexDef> index_def,
-                             TableIndexMeta *table_index_meta,
-                             SharedPtr<String> index_dir,
-                             u64 txn_id,
-                             TxnTimeStamp begin_ts);
+    TableIndexEntry(const SharedPtr<IndexDef> &index_def,
+                    TableIndexMeta *table_index_meta,
+                    SharedPtr<String> index_dir,
+                    u64 txn_id,
+                    TxnTimeStamp begin_ts);
+
+    TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static UniquePtr<TableIndexEntry>
-    NewTableIndexEntry(SharedPtr<IndexDef> index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    NewTableIndexEntry(const SharedPtr<IndexDef> &index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
+
+    static UniquePtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static void CommitCreateIndex(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry);
     static void CommitCreateIndex(TableIndexEntry *table_index_entry, SharedPtr<IrsIndexEntry> irs_index_entry);

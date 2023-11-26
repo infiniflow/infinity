@@ -377,7 +377,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 }
 
 
-Status Txn::CreateIndex(const String &db_name, const String &table_name, SharedPtr<IndexDef> index_def, ConflictType conflict_type) {
+Status Txn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef>& index_def, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {

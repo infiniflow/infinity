@@ -52,7 +52,7 @@ public:
 
 public:
     static Status CreateIndex(TableCollectionEntry *table_entry,
-                              SharedPtr<IndexDef> index_def,
+                              const SharedPtr<IndexDef>& index_def,
                               ConflictType conflict_type,
                               u64 txn_id,
                               TxnTimeStamp begin_ts,
