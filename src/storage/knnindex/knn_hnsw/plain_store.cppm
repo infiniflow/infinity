@@ -79,6 +79,8 @@ public:
         return ptr_.get() + vec_i * dim();
     }
 
+    QueryCtx MakeCtx(const DataType *vecs) const { return vecs; }
+
     RtnType GetVec(const QueryCtx &ctx) const { return ctx; }
 
     void Save(FileHandler &file_handler) const {

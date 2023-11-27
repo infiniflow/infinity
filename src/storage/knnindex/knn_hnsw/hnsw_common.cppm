@@ -31,6 +31,7 @@ concept DataStoreConcept = requires(Store s) {
     { std::same_as<typename Store::DataType, DataType> };
     { s.AddVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
     { s.GetVec(std::declval<SizeT>()) } -> std::same_as<typename Store::RtnType>;
+    { s.MakeCtx(std::declval<const typename Store::DataType *>()) } -> std::same_as<typename Store::QueryCtx>;
     { s.GetVec(std::declval<const typename Store::QueryCtx &>()) } -> std::same_as<typename Store::RtnType>;
     { Store::ERR_IDX };
     { s.cur_vec_num() } -> std::same_as<SizeT>;

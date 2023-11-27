@@ -268,17 +268,16 @@ public:
         return LVQData(GetCompressData(vec_i));
     }
 
-    class QueryCtx {
-        friend This;
-        const char *const compress_query_;
-
-    public:
-        QueryCtx(const DataT *query, SizeT dim, const This &lvq_store)
-            : compress_query_(new(std::align_val_t(PADDING_SIZE)) char[compress_vec_offset_ + sizeof(CompressT) * dim]) {
-            LVQDataMut lvq(const_cast<char *>(compress_query_));
-            lvq_store.CompressVec(query, lvq);
-        }
+    struct QueryCtx {
+        const char *compress_query_;
     };
+
+    QueryCtx MakeCtx(const DataType *vecs) const {
+        char *compress_query_ = new (std::align_val_t(PADDING_SIZE)) char[compress_vec_offset_ + sizeof(CompressT) * dim()];
+        LVQDataMut lvq(compress_query_);
+        CompressVec(vecs, lvq);
+        return QueryCtx{compress_query_};
+    }
 
     RtnType GetVec(const QueryCtx &query_ctx) const { return LVQData(query_ctx.compress_query_); }
 

@@ -44,7 +44,13 @@ public:
     using DistHeap = Heap<PDV, CMP>;
 
     constexpr static int prefetch_offset_ = 0;
-    constexpr static int prefetch_step_ = 2; 
+    constexpr static int prefetch_step_ = 2;
+
+    struct QueryCtx {
+        typename DataStore::QueryCtx datastore_ctx_;
+    };
+
+    QueryCtx MakeQueryCtx(const DataType *query) const { return QueryCtx{.datastore_ctx_ = data_store_.MakeCtx(query)}; }
 
 private:
     const SizeT M_;
@@ -284,10 +290,8 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
-        typename DataStore::QueryCtx ctx(q, data_store_.dim(), data_store_);
-        DataRtnType query = data_store_.GetVec(ctx);
-        // DataRtnType query = q;
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const QueryCtx &ctx, SizeT k) const {
+        DataRtnType query = data_store_.GetVec(ctx.datastore_ctx_);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
