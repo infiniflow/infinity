@@ -21,15 +21,15 @@ int main() {
     using RetHeap = std::priority_queue<std::pair<float, LabelT>>;
 
     // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>>;
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, uint8_t>>;
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t>>;
 
     std::default_random_engine rng;
     std::uniform_real_distribution<float> distrib_real;
 
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
-    int dim = 1;
-    int element_size = 50;
+    int dim = 128;
+    int element_size = 1000;
 
     auto data = std::make_unique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
@@ -62,7 +62,7 @@ int main() {
             // hnsw_index->Check();
         }
 
-        hnsw_index->Dump(std::cout);
+        // hnsw_index->Dump(std::cout);
         hnsw_index->Check();
 
         hnsw_index->SetEf(ef_construction);

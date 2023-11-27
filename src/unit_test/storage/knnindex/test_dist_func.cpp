@@ -22,18 +22,10 @@ using namespace infinity;
 
 class DistFuncTest : public BaseTest {};
 
-uint32_t U8IPTest(const uint8_t *v1, const uint8_t *v2, size_t dim) {
-    uint32_t res = 0;
+int32_t I8IPTest(const int8_t *v1, const int8_t *v2, size_t dim) {
+    int32_t res = 0;
     for (size_t i = 0; i < dim; ++i) {
-        res += uint16_t(v1[i]) * v2[i];
-    }
-    return res;
-}
-
-uint16_t U8L1Test(const uint8_t *v, size_t dim) {
-    uint16_t res = 0;
-    for (size_t i = 0; i < dim; ++i) {
-        res += v[i];
+        res += int16_t(v1[i]) * v2[i];
     }
     return res;
 }
@@ -51,14 +43,14 @@ TEST_F(DistFuncTest, test1) {
     size_t dim = 32;
     size_t vec_n = 10000;
 
-    auto vecs1 = std::make_unique<uint8_t[]>(dim * vec_n);
-    auto vecs2 = std::make_unique<uint8_t[]>(dim * vec_n);
+    auto vecs1 = std::make_unique<int8_t[]>(dim * vec_n);
+    auto vecs2 = std::make_unique<int8_t[]>(dim * vec_n);
 
     assert(dim % 32 == 0);
 
-    // generate a random vector of uint8_t
+    // generate a random vector of int8_t
     std::default_random_engine rng;
-    std::uniform_int_distribution<uint8_t> dist(0, 255);
+    std::uniform_int_distribution<int8_t> dist(-128, 127);
     for (size_t i = 0; i < vec_n; ++i) {
         for (size_t j = 0; j < dim; ++j) {
             vecs1[i * dim + j] = dist(rng);
@@ -69,17 +61,17 @@ TEST_F(DistFuncTest, test1) {
     for (size_t i = 0; i < vec_n; ++i) {
         auto v1 = vecs1.get() + i * dim;
         auto v2 = vecs2.get() + i * dim;
-        uint32_t res = U8IPSIMD16ExtAVX(v1, v2, dim);
-        uint32_t res2 = U8IPTest(v1, v2, dim);
+        int32_t res = I8IPSIMD16ExtAVX(v1, v2, dim);
+        int32_t res2 = I8IPTest(v1, v2, dim);
         EXPECT_EQ(res, res2);
     }
 }
 
 TEST_F(DistFuncTest, test2) {
-    using LVQ8Store = LVQStore<float, uint8_t>;
+    using LVQ8Store = LVQStore<float, int8_t>;
     using LVQ8 = LVQ8Store::RtnType;
 
-    size_t dim = 128;
+    size_t dim = 32;
     size_t vec_n = 10000;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
@@ -98,7 +90,6 @@ TEST_F(DistFuncTest, test2) {
     auto lvq_store = LVQ8Store::Make(vec_n, dim, {0, true});
     lvq_store.AddVec(vecs1.get(), vec_n);
 
-    auto space = std::make_unique<uint8_t[]>(dim);
     for (size_t i = 0; i < vec_n; ++i) {
         const float *v1 = vecs1.get() + i * dim;
         const float *v2 = vecs2.get() + i * dim;

@@ -25,7 +25,7 @@ using namespace infinity;
 
 class HnswLVQTest : public BaseTest {
 public:
-    using LVQ8Store = LVQStore<float, uint8_t>;
+    using LVQ8Store = LVQStore<float, int8_t>;
     using LVQ8Data = LVQ8Store::RtnType;
 
     static constexpr size_t dim_ = 16;

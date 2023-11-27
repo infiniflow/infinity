@@ -16,6 +16,7 @@ module;
 
 #include "header.h"
 #include <cassert>
+#include <iostream>
 
 import stl;
 import dist_func;
@@ -25,28 +26,43 @@ export module dist_func_l2_2;
 
 namespace infinity {
 
-using LVQ8 = LVQStore<float, uint8_t>::RtnType;
+using LVQ8 = LVQStore<float, int8_t>::RtnType;
 
-export uint32_t U8IPSIMD16ExtAVX(const uint8_t *v1, const uint8_t *v2, size_t dim) {
-    __m256i sum = _mm256_setzero_si256();
+template <typename T>
+void log_m256(const __m256i &value) {
+    const size_t n = sizeof(__m256i) / sizeof(T);
+    T buffer[n];
+    _mm256_storeu_si256((__m256i_u *)buffer, value);
+    std::cout << "[";
+    for (size_t i = 0; i < n; i++) {
+        std::cout << (int)buffer[i];
+        if (i != n - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]" << std::endl;
+}
 
-    for (size_t i = 0; i < dim; i += 32) {
-        __m256i a_vec = _mm256_loadu_si256((__m256i_u *)(v1 + i));
-        __m256i b_vec = _mm256_loadu_si256((__m256i_u *)(v2 + i));
+export int32_t I8IPSIMD16ExtAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    size_t dim32 = dim >> 5;
+    const int8_t *pend1 = pv1 + (dim32 << 5);
 
-        // Extend u8 vectors to u16
-        __m256i a_vec_lo = _mm256_unpacklo_epi8(a_vec, _mm256_setzero_si256());
-        __m256i a_vec_hi = _mm256_unpackhi_epi8(a_vec, _mm256_setzero_si256());
-        __m256i b_vec_lo = _mm256_unpacklo_epi8(b_vec, _mm256_setzero_si256());
-        __m256i b_vec_hi = _mm256_unpackhi_epi8(b_vec, _mm256_setzero_si256());
+    __m256i v1, v2, msb, low7;
+    __m256i sum = _mm256_set1_ps(0);
+    const __m256 highest_bit = _mm256_set1_epi8(0x80);
+    while (pv1 < pend1) {
+        v1 = _mm256_loadu_si256((__m256i_u *)pv1);
+        pv1 += 32;
+        v2 = _mm256_loadu_si256((__m256i_u *)pv2);
+        pv2 += 32;
 
-        // Multiply and add
-        __m256i prod_lo = _mm256_madd_epi16(a_vec_lo, b_vec_lo);
-        __m256i prod_hi = _mm256_madd_epi16(a_vec_hi, b_vec_hi);
+        msb = _mm256_maddubs_epi16(_mm256_and_si256(v1, highest_bit), v2);
+        low7 = _mm256_maddubs_epi16(_mm256_andnot_si256(highest_bit, v1), v2);
 
-        // Accumulate sum
-        sum = _mm256_add_epi32(sum, prod_lo);
-        sum = _mm256_add_epi32(sum, prod_hi);
+        low7 = _mm256_madd_epi16(low7, _mm256_set1_epi16(1));
+        msb = _mm256_madd_epi16(msb, _mm256_set1_epi16(1));
+
+        sum = _mm256_add_epi32(sum, _mm256_sub_epi32(low7, msb));
     }
 
     // Horizontal add
@@ -54,13 +70,11 @@ export uint32_t U8IPSIMD16ExtAVX(const uint8_t *v1, const uint8_t *v2, size_t di
     sum = _mm256_hadd_epi32(sum, sum);
 
     // Extract the result
-    uint32_t result = _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
-
-    return result;
+    return _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
 }
 
 export float L2Sqr3(const LVQ8 &v1, const LVQ8 &v2, SizeT dim) {
-    uint32_t c1c2_ip = U8IPSIMD16ExtAVX(v1.GetCompressVec(), v2.GetCompressVec(), dim);
+    int32_t c1c2_ip = I8IPSIMD16ExtAVX(v1.GetCompressVec(), v2.GetCompressVec(), dim);
     auto [scale1, bias1] = v1.GetScalar();
     auto [scale2, bias2] = v2.GetScalar();
     auto beta = bias1 - bias2;
@@ -76,7 +90,7 @@ export class FloatLVQ8L2Space : public SpaceBase<float, LVQ8> {
 public:
     FloatLVQ8L2Space(SizeT dim) {
         // assert(dim <= 256);
-        // assert(dim % 16 == 0);
+        assert(dim % 32 == 0);
         this->fstdistfunc_ = L2Sqr3;
     }
 };
