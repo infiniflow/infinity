@@ -18,6 +18,7 @@ import stl;
 import file_worker;
 import third_party;
 import local_file_system;
+import logger;
 
 import infinity_exception;
 import buffer_obj;
@@ -43,7 +44,9 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     auto res = buffer_obj.get();
     UniqueLock<RWMutex> w_locker(rw_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        throw StorageException(Format("BufferManager::Allocate: file %s already exists.", file_path.c_str()));
+        UniquePtr<String> err_msg = MakeUnique<String>(Format("BufferManager::Allocate: file %s already exists.", file_path.c_str()));
+        LOG_ERROR(*err_msg);
+        Error<StorageException>(*err_msg);
     }
     buffer_map_.emplace(file_path, Move(buffer_obj));
     return res;
