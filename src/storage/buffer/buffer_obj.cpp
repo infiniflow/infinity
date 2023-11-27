@@ -19,6 +19,7 @@ import file_worker;
 import buffer_handle;
 import buffer_manager;
 import infinity_exception;
+import logger;
 
 module buffer_obj;
 
@@ -145,7 +146,9 @@ bool BufferObj::Save() {
             break;
         }
         default: {
-            Error<StorageException>("Invalid call.");
+            UniquePtr<String> err_msg = MakeUnique<String>("Invalid buffer status.");
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
         }
     }
     type_ = BufferType::kPersistent;

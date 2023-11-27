@@ -73,14 +73,15 @@ void FragmentTask::OnExecute(i64 worker_id) {
         err_msg = MakeUnique<String>(e.what());
     }
     profiler.End();
-    if (sink_state_->error_message_.get() == nullptr and err_msg.get() != nullptr) {
-        sink_state_->error_message_ = Move(err_msg);
-    } else {
-        PhysicalSink *sink_op = fragment_context->GetSinkOperator();
 
-        fragment_context->FlushProfiler(profiler);
-        sink_op->Execute(query_context, sink_state_.get());
+    if(err_msg.get() != nullptr) {
+        sink_state_->error_message_ = Move(err_msg);
     }
+
+    PhysicalSink *sink_op = fragment_context->GetSinkOperator();
+
+    fragment_context->FlushProfiler(profiler);
+    sink_op->Execute(query_context, sink_state_.get());
 
     //    prof.End();
 }
@@ -97,9 +98,7 @@ bool FragmentTask::Ready() const {
 }
 
 bool FragmentTask::IsComplete() const {
-//    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-//    PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-    return sink_state_->prev_op_state_->Complete();
+    return sink_state_->prev_op_state_->Complete() or sink_state_->error_message_.get() != nullptr;
 }
 
 TaskBinding FragmentTask::TaskBinding() const {

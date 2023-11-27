@@ -334,7 +334,11 @@ void PhysicalImport::CSVRowHandler(void *context) {
     }
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
-    column_count = Min(column_count, last_block_entry->columns_.size());
+    if(column_count != last_block_entry->columns_.size()) {
+        UniquePtr<String> err_msg = MakeUnique<String>("CSV file row count isn't match with table schema, row id: {}.");
+        LOG_ERROR(*err_msg);
+        Error<StorageException>(*err_msg);
+    }
     // append data to segment entry
     SizeT write_row = last_block_entry->row_count_;
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {

@@ -87,6 +87,7 @@ void TaskScheduler::Schedule(const Vector<FragmentTask *> &tasks) {
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
 
+    LOG_TRACE(Format("Schedule {} tasks into scheduler", tasks.size()));
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task);
     }
@@ -146,7 +147,6 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
     task_list.reserve(DEFAULT_BLOCKING_QUEUE_SIZE);
     bool running{true};
     while (running) {
-//        task_queue->Dequeue(fragment_task);
         task_queue->DequeueBulk(task_list);
         SizeT list_size = task_list.size();
         for(SizeT idx = 0; idx < list_size; ++ idx) {
