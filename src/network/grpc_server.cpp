@@ -434,6 +434,7 @@ void GrpcAsyncServiceImpl::Run() {
     std::cout << "GRPC async server listening on " << server_address << std::endl;
 
     new ConnectCallData(&service);
+    new DisConnectCallData(&service);
 
     void* tag;
     bool ok;
@@ -466,6 +467,35 @@ void GrpcAsyncServiceImpl::ConnectCallData::Proceed() {
         } else {
             service_->RegisterSession(infinity);
             response_.set_session_id(infinity->GetSessionId());
+            response_.set_success(true);
+            responder_.Finish(response_, grpc::Status::OK, this);
+        }
+
+        status_ = FINISH;
+    } else {
+        delete this;
+    }
+}
+
+void GrpcAsyncServiceImpl::DisConnectCallData::Proceed() {
+    if (status_ == CREATE) {
+        service_->service_.RequestDisConnect(&ctx_, &request_, &responder_, service_->cq_.get(), service_->cq_.get(), this);
+
+        status_ = PROCESS;
+    } else if (status_ == PROCESS) {
+        new DisConnectCallData(service_);
+
+        auto infinity = service_->GetInfinityBySessionID(request_.session_id());
+        if (infinity == nullptr) {
+            response_.set_success(false);
+            response_.set_error_msg("Disconnect failed");
+            responder_.Finish(response_, grpc::Status::CANCELLED, this);
+        } else {
+            auto session_id = infinity->GetSessionId();
+            infinity->RemoteDisconnect();
+            service_->infinity_session_map_mutex_.lock();
+            service_->infinity_session_map_.erase(session_id);
+            service_->infinity_session_map_mutex_.unlock();
             response_.set_success(true);
             responder_.Finish(response_, grpc::Status::OK, this);
         }
@@ -734,6 +764,59 @@ SharedPtr<Infinity> GrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
     } else {
         Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
     }
+}
+
+SharedPtr<Infinity> GrpcAsyncServiceImpl::GetInfinityBySessionID(u64 session_id) {
+    std::lock_guard<Mutex> lock (infinity_session_map_mutex_);
+    if (infinity_session_map_.count(session_id) > 0) {
+        return infinity_session_map_[session_id];
+    } else {
+        Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
+    }
+}
+
+infinity_grpc_proto::CommonResponse GrpcAsyncClient::Connect() {
+    infinity_grpc_proto::Empty request;
+    infinity_grpc_proto::CommonResponse response;
+    grpc::ClientContext context;
+    grpc::CompletionQueue cq;
+    grpc::Status status;
+
+    UniquePtr<grpc::ClientAsyncResponseReader<infinity_grpc_proto::CommonResponse>> rpc(
+        stub_->AsyncConnect(&context, request, &cq));
+
+    rpc->Finish(&response, &status, (void*)1);
+
+    void* got_tag;
+    bool ok = false;
+    GPR_ASSERT(cq.Next(&got_tag, &ok));
+    GPR_ASSERT(got_tag == (void*)1);
+    GPR_ASSERT(ok);
+
+    return response;
+}
+
+infinity_grpc_proto::CommonResponse GrpcAsyncClient::DisConnect(u64 session_id){
+    infinity_grpc_proto::DisConnectRequest request;
+    request.set_session_id(session_id);
+
+    infinity_grpc_proto::CommonResponse response;
+    grpc::ClientContext context;
+    grpc::CompletionQueue cq;
+    grpc::Status status;
+
+    UniquePtr<grpc::ClientAsyncResponseReader<infinity_grpc_proto::CommonResponse>> rpc(
+        stub_->AsyncDisConnect(&context, request, &cq));
+
+    rpc->Finish(&response, &status, (void*)2);
+
+    void* got_tag;
+    bool ok = false;
+    GPR_ASSERT(cq.Next(&got_tag, &ok));
+    GPR_ASSERT(got_tag == (void*)2);
+    GPR_ASSERT(ok);
+
+    return response;
 }
 
 } // namespace infinity

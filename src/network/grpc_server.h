@@ -130,12 +130,28 @@ public:
         grpc::ServerAsyncResponseWriter<infinity_grpc_proto::CommonResponse> responder_;
     };
 
+    class DisConnectCallData: public CallData {
+    public:
+        DisConnectCallData(GrpcAsyncServiceImpl *service)
+            : CallData(service), responder_(&ctx_) {
+            Proceed();
+        }
+
+        void Proceed() final;
+
+    private:
+        infinity_grpc_proto::DisConnectRequest request_;
+        infinity_grpc_proto::CommonResponse response_;
+        grpc::ServerAsyncResponseWriter<infinity_grpc_proto::CommonResponse> responder_;
+    };
+
 private:
     void RegisterSession(SharedPtr<Infinity> instance) {
         infinity_session_map_mutex_.lock();
         infinity_session_map_.emplace(instance->GetSessionId(), instance);
         infinity_session_map_mutex_.unlock();
     };
+    SharedPtr<Infinity> GetInfinityBySessionID(u64 session_id);
 
     Mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
@@ -150,27 +166,9 @@ public:
     explicit GrpcAsyncClient(SharedPtr<grpc::Channel> channel)
         : stub_(infinity_grpc_proto::InfinityGrpcService::NewStub(channel)) {}
 
-    infinity_grpc_proto::CommonResponse Connect() {
-        infinity_grpc_proto::Empty request;
-        infinity_grpc_proto::CommonResponse response;
-        grpc::ClientContext context;
-        grpc::CompletionQueue cq;
-        grpc::Status status;
+    infinity_grpc_proto::CommonResponse Connect();
 
-        UniquePtr<grpc::ClientAsyncResponseReader<infinity_grpc_proto::CommonResponse>> rpc(
-            stub_->AsyncConnect(&context, request, &cq));
-
-        rpc->Finish(&response, &status, (void*)1);
-
-        void* got_tag;
-        bool ok = false;
-        GPR_ASSERT(cq.Next(&got_tag, &ok));
-        GPR_ASSERT(got_tag == (void*)1);
-        GPR_ASSERT(ok);
-
-        return response;
-    }
-
+    infinity_grpc_proto::CommonResponse DisConnect(u64 session_id);
 private:
     UniquePtr<infinity_grpc_proto::InfinityGrpcService::Stub> stub_;
 };

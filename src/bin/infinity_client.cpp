@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "network/grpc_server.h"
+#include "network/grpc_server.cpp"
 #include <grpcpp/grpcpp.h>
 #include <grpc++/grpc++.h>
 
@@ -20,7 +21,9 @@ int main() {
     infinity::GrpcAsyncClient client(
         grpc::CreateChannel("localhost:50059", grpc::InsecureChannelCredentials()));
 
-    auto resp = client.Connect();
+    auto resp_0 = client.Connect();
+
+    auto resp_1 =  client.DisConnect(resp_0.session_id());
 
     return 0;
 }

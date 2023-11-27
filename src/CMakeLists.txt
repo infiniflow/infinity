@@ -412,6 +412,13 @@ add_executable(infinity_client
 target_link_libraries(infinity_client
         infinity_core
         sql_parser
+        faiss
+        onnxruntime_mlas
+        zsv_parser
+        roaring
+        fastpfor
+        newpfor
+        openfst
 
         protobuf
         grpc
@@ -420,17 +427,17 @@ target_link_libraries(infinity_client
         absl_synchronization
         #        iresearch
 
-#        thrift
-#        thriftnb
-#        iresearch
-#        lz4
-#        atomic
+        thrift
+        thriftnb
+        iresearch
+        lz4
+        atomic
         #        profiler
 
-#        leveldb
-#        protobuf
-#        ssl
-#        brpc-static
-#        gflags
-#        crypto
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
 )
