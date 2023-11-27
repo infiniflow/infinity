@@ -115,7 +115,8 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             // FIXME
             auto inline_p = reinterpret_cast<VarcharLayout *>(dst_p);
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
-            {
+            SizeT row_n = data_size / sizeof(VarcharT);
+            for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr;
                 VarcharLayout *varchar_layout = inline_p;
                 if (varchar_type->IsInlined()) {

@@ -333,6 +333,8 @@ void PhysicalImport::CSVRowHandler(void *context) {
         last_block_entry = segment_entry->block_entries_.back().get();
     }
 
+    // if column count is larger than columns defined from schema, extra columns are abandoned
+    column_count = Min(column_count, last_block_entry->columns_.size());
     // append data to segment entry
     SizeT write_row = last_block_entry->row_count_;
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
