@@ -280,7 +280,7 @@ public:
         }
     };
 
-    RtnType GetVec(const QueryCtx &query_ctx) { return LVQData(query_ctx.compress_query_); }
+    RtnType GetVec(const QueryCtx &query_ctx) const { return LVQData(query_ctx.compress_query_); }
 
     void Compress() {
         SizeT ret = MergeCompress(nullptr, 0);

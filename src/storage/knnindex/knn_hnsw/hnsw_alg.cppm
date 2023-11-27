@@ -43,6 +43,9 @@ public:
     using CMP = CompareByFirst<DataType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
 
+    constexpr static int prefetch_offset_ = 0;
+    constexpr static int prefetch_step_ = 2; 
+
 private:
     const SizeT M_;
     const SizeT Mmax_;
@@ -121,6 +124,7 @@ public:
         DistHeap result;
         DistHeap candidate;
 
+        data_store_.Prefetch(enter_point);
         DataType dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
         SizeT cal_num = 1;
 
@@ -137,16 +141,20 @@ public:
                 break;
             }
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
+            int prefetch_start = neighbor_size - 1 - prefetch_offset_;
             for (int i = neighbor_size - 1; i >= 0; --i) {
-                data_store_.Prefetch(neighbors_p[i]);
-                if (i - 1 >= 0) {
-                    data_store_.Prefetch(neighbors_p[i - 1]);
-                }
                 VertexType n_idx = neighbors_p[i];
                 if (visited[n_idx]) {
                     continue;
                 }
                 visited[n_idx] = true;
+                if (prefetch_start >= 0) {
+                    int lower = Max(0, prefetch_start - prefetch_step_);
+                    for (int i = prefetch_start; i >= lower; --i) {
+                        data_store_.Prefetch(neighbors_p[i]);
+                    }
+                    prefetch_start -= prefetch_step_;
+                }
                 dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
@@ -170,10 +178,6 @@ public:
             check = false;
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
-                data_store_.Prefetch(neighbors_p[i]);
-                if (i - 1 >= 0) {
-                    data_store_.Prefetch(neighbors_p[i - 1]);
-                }
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
@@ -280,9 +284,10 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
         typename DataStore::QueryCtx ctx(q, data_store_.dim(), data_store_);
         DataRtnType query = data_store_.GetVec(ctx);
+        // DataRtnType query = q;
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);

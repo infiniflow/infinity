@@ -26,12 +26,15 @@ auto main() -> int {
     size_t M = 16;
     size_t ef_construction = 200;
     float *input_embeddings = nullptr;
+    size_t max_elements = 1000000; // create index
+    const int thread_n = 8;
+
     {
         infinity::BaseProfiler profiler;
         profiler.Begin();
         input_embeddings = fvecs_read(base_file, &dimension, &embedding_count);
         profiler.End();
-        std::cout << "Load sift1M base data: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load gist1M base data: " << profiler.ElapsedToString() << std::endl;
     }
 
     // assert(dimension == 128 || !"embedding dimension isn't 128");
@@ -45,7 +48,6 @@ auto main() -> int {
         std::cout << "Found index file ... " << std::endl;
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
     } else {
-        size_t max_elements = 1000000; // create index
         hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
 
         infinity::BaseProfiler profiler;
@@ -71,7 +73,7 @@ auto main() -> int {
         queries = fvecs_read(query_file, &dim, &number_of_queries);
         assert(dimension == dim || !"query does not have same dimension as train set");
         profiler.End();
-        std::cout << "Load sift1M query data: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load gist1M query data: " << profiler.ElapsedToString() << std::endl;
     }
 
     size_t top_k;                                           // nb of results per query in the GT
@@ -93,22 +95,36 @@ auto main() -> int {
         }
         delete[] gt_int;
         profiler.End();
-        std::cout << "Load sift1M ground truth and load row id: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load gist1M ground truth and load row id: " << profiler.ElapsedToString() << std::endl;
     }
 
     infinity::BaseProfiler profiler;
     int round = 10;
     std::vector<std::priority_queue<std::pair<float, unsigned long>>> results(number_of_queries);
+    std::cout << "thread number: " << thread_n << std::endl;
     for (int ef = 100; ef <= 300; ef += 25) {
         hnsw_index->setEf(ef);
         int correct = 0;
         int sum_time = 0;
         for (size_t i = 0; i < round; ++i) {
+            std::atomic_int idx(0);
+            std::vector<std::thread> threads;
             profiler.Begin();
-            for (int idx = 0; idx < number_of_queries; ++idx) {
-                const float *query = queries + idx * dimension;
-                auto result = hnsw_index->searchKnn(query, top_k);
-                results[idx] = std::move(result);
+            for (int j = 0; j < thread_n; ++j) {
+                threads.emplace_back([&]() {
+                    while (true) {
+                        int cur_idx = idx.fetch_add(1);
+                        if (cur_idx >= number_of_queries) {
+                            break;
+                        }
+                        const float *query = queries + cur_idx * dimension;
+                        auto result = hnsw_index->searchKnn(query, top_k);
+                        results[cur_idx] = std::move(result);
+                    }
+                });
+            }
+            for (auto &thread : threads) {
+                thread.join();
             }
             profiler.End();
             if (i == 0) {

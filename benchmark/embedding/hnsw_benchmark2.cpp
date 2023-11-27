@@ -31,6 +31,7 @@ int main() {
     size_t ef_construction = 200;
     size_t embedding_count = 1000000;
     size_t test_top = 100;
+    const int thread_n = 8;
 
     using LabelT = uint64_t;
 
@@ -126,16 +127,30 @@ int main() {
     int round = 10;
     Vector<MaxHeap<Pair<float, LabelT>>> results;
     results.reserve(number_of_queries);
+    std::cout << "thread number: " << thread_n << std::endl;
     for (int ef = 100; ef <= 300; ef += 25) {
         knn_hnsw->SetEf(ef);
         int correct = 0;
         int sum_time = 0;
         for (size_t i = 0; i < round; ++i) {
+            std::atomic_int idx(0);
+            std::vector<std::thread> threads;
             profiler.Begin();
-            for (int idx = 0; idx < number_of_queries; ++idx) {
-                const float *query = queries + idx * dimension;
-                MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
-                results[idx] = std::move(result);
+            for (int i = 0; i < thread_n; ++i) {
+                threads.emplace_back([&]() {
+                    while (true) {
+                        int cur_idx = idx.fetch_add(1);
+                        if (cur_idx >= number_of_queries) {
+                            break;
+                        }
+                        const float *query = queries + cur_idx * dimension;
+                        MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
+                        results[cur_idx] = std::move(result);
+                    }
+                });
+            }
+            for (auto &thread : threads) {
+                thread.join();
             }
             profiler.End();
             if (i == 0) {
