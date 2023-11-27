@@ -62,11 +62,8 @@ public:
 
     static UniquePtr<BlockColumnEntry> Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 
-    static SharedPtr<String> OutlineFilename(SizeT file_idx, u64 column_id = -1) {
-        if (u64(-1) == column_id)
-            return MakeShared<String>(Format("out_{}", file_idx));
-        else
-            return MakeShared<String>(Format("col_{}_out_{}", column_id, file_idx));
+    static SharedPtr<String> OutlineFilename(u64 column_id, SizeT file_idx) {
+        return MakeShared<String>(Format("col_{}_out_{}", column_id, file_idx));
     }
 };
 

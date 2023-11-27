@@ -330,7 +330,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                         doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
                     } break;
                     case kVarchar: {
-                        ColumnBuffer column_buffer(buffer_handle, buffer_mgr);
+                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr);
                         auto field = MakeShared<TextField>(index_base->column_names_[0].c_str(),
                                                            irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
                                                            text_features,
