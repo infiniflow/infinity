@@ -23,26 +23,42 @@ namespace infinity {
 export {
     constexpr SizeT COLUMN_IDENTIFIER_ROW_ID = (SizeT)(-1);
 
-    constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
-    constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
-    // constexpr i64 MAX_VARCHAR_SIZE = 65535;
+    // type related constants
+    constexpr i64 MAX_VARCHAR_SIZE = 65536;
     constexpr i64 MAX_BLOB_SIZE = 65536L * 65536L;
     constexpr i64 MAX_BITMAP_SIZE = 65536;
     constexpr i64 EMBEDDING_LIMIT = 65536;
     constexpr auto PG_MSG_BUFFER_SIZE = 4096u;
 
+    // column vector related constants
+    constexpr i64 MAX_BLOCK_CAPACITY = 65536L;
+    constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
+    constexpr i64 MIN_BLOCK_CAPACITY = 8192;
+    constexpr i16 INVALID_BLOCK_ID = i16_max;
+    constexpr i64 MAX_BLOCK_COUNT_IN_SEGMENT = 65536L;
+
+    // column vector related constants
+    constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
+    constexpr u64 INITIAL_VECTOR_CHUNK_ID = u64_max;
+    constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
+    constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
+    constexpr u64 MAX_VECTOR_CHUNK_COUNT = u64_max; // Each row has one chunk.
+
+    // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 16384;
+    constexpr i32 INVALID_SEGMENT_ID = i32_max;
+
+    // queue related constants, TODO: double check the necessary
     constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;
     constexpr SizeT DEFAULT_WRITER_PREPARE_QUEUE_SIZE = 1024;
     constexpr SizeT DEFAULT_READER_COMMIT_QUEUE_SIZE = 1024;
     constexpr SizeT DEFAULT_WRITER_COMMIT_QUEUE_SIZE = 1024;
+    constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 
+    // transaction related constants
     constexpr u64 MAX_TXN_ID = u64_max;
     constexpr u64 MAX_TIMESTAMP = u64_max;
-
     constexpr TxnTimeStamp UNCOMMIT_TS = u64_max;
-    constexpr i32 INVALID_SEGMENT_ID = i32_max;
-    constexpr i16 INVALID_BLOCK_ID = i16_max;
 
     constexpr SizeT KB = 1024;
     constexpr SizeT MB = 1024 * KB;
@@ -66,8 +82,6 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
-
-    constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

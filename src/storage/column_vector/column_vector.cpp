@@ -2101,10 +2101,14 @@ void ColumnVector::WriteAdv(char *&ptr) const {
             ptr += this->tail_index_ * this->data_type_size_;
             break;
         }
-            // FIXME: Move Varchar on here
-        default:
-            // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
+        case kVarchar: {
             Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
+            break;
+        }
+        default: {
+            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
+            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
+        }
     }
     this->nulls_ptr_->WriteAdv(ptr);
     return;
@@ -2146,10 +2150,14 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
             ptr += tail_index * data_type_size;
             break;
         }
-            // FIXME: Move Varchar on here
-        default:
-            // TODO: add support for kVarchar, kPath, kPolygon, kArray, kBlob, kMix etc.
+        case kVarchar: {
             Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
+            break;
+        }
+        default: {
+            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
+            Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
+        }
     }
     maxbytes = ptr_end - ptr;
     Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading ColumnVector");
