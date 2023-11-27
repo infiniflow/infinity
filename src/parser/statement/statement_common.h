@@ -42,19 +42,19 @@ struct TableName {
 };
 
 struct InitParameter {
-    std::string para_name_{};
-    std::string para_value_{};
+    std::string param_name_{};
+    std::string param_value_{};
 };
 
 struct IfExistsInfo {
     bool exists_{false};
     bool if_exists_{false};
-    std::string info_{""};
+    std::string info_{};
 };
 
 struct IfNotExistsInfo {
     bool exists_{false};
     bool if_not_exists_{false};
-    std::string info_{""};
+    std::string info_{};
 };
 } // namespace infinity

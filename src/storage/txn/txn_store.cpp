@@ -28,8 +28,8 @@ import data_block;
 import logger;
 import data_access_state;
 import txn;
-import index_entry;
-import index_def_entry;
+import segment_column_index_entry;
+import table_index_entry;
 import default_values;
 
 module txn_store;
@@ -88,13 +88,20 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
-UniquePtr<String> TxnTableStore::CreateIndexFile(IndexDefEntry *index_def_entry, u32 segment_id, SharedPtr<IndexEntry> index) {
-    const String &index_name = *index_def_entry->index_def_->index_name_;
-    if (auto iter = txn_indexes_store_.find(index_name); iter != txn_indexes_store_.end()) {
-        iter->second.index_entry_map_.emplace(segment_id, index);
+UniquePtr<String> TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
+    const String &index_name = *table_index_entry->index_def_->index_name_;
+    if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
+        TxnIndexStore *txn_index_store = &(column_index_iter->second);
+        if (auto segment_column_index_iter = txn_index_store->index_entry_map_.find(column_id);
+            segment_column_index_iter != txn_index_store->index_entry_map_.end()) {
+            segment_column_index_iter->second.emplace(segment_id, index);
+            column_index_iter->second.index_entry_map_[column_id].emplace(segment_id, index);
+        } else {
+            column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
+        }
     } else {
-        TxnIndexStore index_store(index_def_entry);
-        index_store.index_entry_map_.emplace(segment_id, index);
+        TxnIndexStore index_store(table_index_entry);
+        index_store.index_entry_map_[column_id][segment_id] = index;
         txn_indexes_store_.emplace(index_name, Move(index_store));
     }
     return nullptr;

@@ -15,6 +15,8 @@
 #include <csignal>
 #include <cstdlib>
 
+#include "network/brpc_server.h"
+
 import compilation_config;
 import stl;
 import third_party;
@@ -24,11 +26,18 @@ namespace {
 
 infinity::DBServer db_server;
 
+brpc::Server server;
+
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
+
+//            brpc_thread_.join();
+            server.Stop(0/*not used now*/);
+            server.Join();
+
             db_server.Shutdown();
             break;
         }
@@ -105,6 +114,9 @@ auto main(int argc, char **argv) -> int {
 
     db_server.Init(parameters);
     RegisterSignal();
+
+    BrpcServiceImpl::Run(server);
+
     db_server.Run();
 
     return 0;

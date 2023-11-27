@@ -25,15 +25,15 @@ export enum EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
-    kIndexDef,
-    kIndex,
+    kTableIndex,
+    kColumnIndex,
+    kIRSIndex,
+    kSegmentColumnIndex,
     kView,
     kColumn,
     kSegment,
-    kSegmentColumn,
     kBlock,
     kBlockColumn,
-    kDeleteFile,
 };
 
 export struct BaseEntry {
@@ -61,7 +61,6 @@ public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-
     bool deleted_{false};
 
     EntryType entry_type_{EntryType::kDummy};

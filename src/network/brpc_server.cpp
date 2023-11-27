@@ -235,6 +235,7 @@ void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
                                   infinity_proto::CommonResponse *response,
                                   google::protobuf::Closure *done) {
 
+    Error<NetworkException>("Due to the create index interface is update, this API need to re-implemented.");
     brpc::ClosureGuard done_guard(done);
     brpc::Controller *cntl = SetUpController(cntl_base);
 
@@ -249,16 +250,16 @@ void BrpcServiceImpl::CreateIndex(google::protobuf::RpcController *cntl_base,
     }
 
     const String &method_type = request->method_type();
-    auto *index_para_list = new Vector<InitParameter *>();
+    auto *index_param_list = new Vector<InitParameter *>();
 
     for (auto &index_para : request->index_para_list()) {
         auto init_parameter = new InitParameter();
-        init_parameter->para_name_ = index_para.para_name();
-        init_parameter->para_value_ = index_para.para_value();
-        index_para_list->emplace_back(init_parameter);
+        init_parameter->param_name_ = index_para.para_name();
+        init_parameter->param_value_ = index_para.para_value();
+        index_param_list->emplace_back(init_parameter);
     }
 
-    auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_para_list, (CreateIndexOptions &)request->options());
+    auto result = table->CreateIndex(request->index_name(), nullptr, (CreateIndexOptions &)request->options());
 
     ProcessResult(result, response);
 }
@@ -419,9 +420,9 @@ void BrpcServiceImpl::Insert(google::protobuf::RpcController *cntl_base,
     ProcessResult(result, response);
 }
 
-void BrpcServiceImpl::Run() {
+void BrpcServiceImpl::Run(brpc::Server& server) {
 
-    brpc::Server server;
+//    brpc::Server server;
 
     BrpcServiceImpl service;
     if (server.AddService(&service, brpc::SERVER_DOESNT_OWN_SERVICE) != 0) {
@@ -438,7 +439,7 @@ void BrpcServiceImpl::Run() {
 
     // Wait until Ctrl-C is pressed, then Stop() and Join() the server.
     LOG(INFO) << "0.0.0.0:50051 Start BRPC";
-    server.RunUntilAskedToQuit();
+//    server.RunUntilAskedToQuit();
 }
 
 ColumnDef *BrpcServiceImpl::GetColumnDefFromProto(const infinity_proto::ColumnDef &column_def) {

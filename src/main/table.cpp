@@ -26,9 +26,7 @@ import parser;
 namespace infinity {
 
 QueryResult Table::CreateIndex(const String &index_name,
-                               Vector<String> *column_names,
-                               const String &method_type,
-                               Vector<InitParameter *> *index_para_list,
+                               Vector<IndexInfo *> *index_info_list,
                                CreateIndexOptions create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -41,9 +39,7 @@ QueryResult Table::CreateIndex(const String &index_name,
     create_index_info->schema_name_ = session_->current_database();
     create_index_info->table_name_ = table_name_;
     create_index_info->index_name_ = index_name;
-    create_index_info->column_names_ = column_names;
-    create_index_info->method_type_ = method_type;
-    create_index_info->index_para_list_ = index_para_list;
+    create_index_info->index_info_list_ = index_info_list;
 
     create_statement->create_info_ = create_index_info;
     create_statement->create_info_->conflict_type_ = ConflictType::kIgnore;

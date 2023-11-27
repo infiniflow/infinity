@@ -623,7 +623,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             TableCollectionEntry *table_collection_entry = nullptr;
             txn->GetTableEntry("default", "tbl1", table_collection_entry);
             EXPECT_NE(table_collection_entry, nullptr);
-            auto segment_entry = table_collection_entry->segments_[0].get();
+            auto segment_entry = table_collection_entry->segment_map_[0].get();
             EXPECT_EQ(segment_entry->segment_id_, 0);
             auto block_id = segment_entry->block_entries_[0]->block_id_;
             EXPECT_EQ(block_id, 0);
