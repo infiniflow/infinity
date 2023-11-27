@@ -56,7 +56,7 @@ private:
     std::default_random_engine level_rng_{};
 
     DataStore data_store_;
-    GraphStore graph_;
+    GraphStore graph_store_;
     const UniquePtr<LabelType[]> labels_;
 
 private:
@@ -74,7 +74,7 @@ private:
           dist_func2_(space.DistFuncPtr()),                                              //
           mult_(1 / std::log(1.0 * M_)),                                                 //
           data_store_(Move(data_store)),                                                 //
-          graph_(Move(graph_store)),                                                     //
+          graph_store_(Move(graph_store)),                                               //
           labels_(Move(labels)) {
         if (ef == 0) {
             ef = ef_construction_;
@@ -136,17 +136,9 @@ public:
             if (-minus_c_dist > result.top().first && result.size() == candidate_n) {
                 break;
             }
-            const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(c_idx, layer_idx);
-#ifdef USE_SSE1
-            if (neighbor_size) [[likely]]
-                _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
-#endif
+            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-#ifdef USE_SSE1
-                if (i - 1 >= 0) [[likely]]
-                    _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
-#endif
                 if (visited[n_idx]) {
                     continue;
                 }
@@ -173,16 +165,8 @@ public:
         bool check = true;
         while (check) {
             check = false;
-            const auto [neighbors_p, neighbor_size] = graph_.GetNeighbors(cur_p, layer_idx);
-#ifdef USE_SSE1
-            if (neighbor_size) [[likely]]
-                _mm_prefetch(data_store_.GetVec(neighbors_p[neighbor_size - 1]), _MM_HINT_T0);
-#endif
+            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
-#ifdef USE_SSE1
-                if (i - 1 >= 0) [[likely]]
-                    _mm_prefetch(data_store_.GetVec(neighbors_p[i - 1]), _MM_HINT_T0);
-#endif
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
@@ -212,15 +196,7 @@ public:
                 const auto &[minus_c_dist, c_idx] = candidates.top();
                 auto c_data = data_store_.GetVec(c_idx);
                 bool check = true;
-#ifdef USE_SSE1
-                if (result_size) [[likely]]
-                    _mm_prefetch(data_store_.GetVec(result_p[0]), _MM_HINT_T0);
-#endif
                 for (SizeT i = 0; i < result_size; ++i) {
-#ifdef USE_SSE1
-                    if (i + 1 < result_size) [[likely]]
-                        _mm_prefetch(data_store_.GetVec(result_p[i + 1]), _MM_HINT_T0);
-#endif
                     VertexType r_idx = result_p[i];
                     DataType cr_dist = dist_func2_(c_data, data_store_.GetVec(r_idx), data_store_.dim());
                     if (cr_dist < -minus_c_dist) {
@@ -237,32 +213,24 @@ public:
         *result_size_p = result_size;
     }
 
-    void ConnectNeighbors(VertexType vertex_idx, const VertexType *q_neighbors_p, VertexListSize q_neighbor_size, i32 layer_idx) {
+    void ConnectNeighbors(VertexType vertex_i, const VertexType *q_neighbors_p, VertexListSize q_neighbor_size, i32 layer_idx) {
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
-            auto [n_neighbors_p, n_neighbor_size_p] = graph_.GetNeighborsMut(n_idx, layer_idx);
+            auto [n_neighbors_p, n_neighbor_size_p] = graph_store_.GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
             SizeT Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
             if (n_neighbor_size < Mmax) {
-                *(n_neighbors_p + n_neighbor_size) = vertex_idx;
+                *(n_neighbors_p + n_neighbor_size) = vertex_i;
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
             auto n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = dist_func2_(n_data, data_store_.GetVec(vertex_idx), data_store_.dim());
+            DataType n_dist = dist_func2_(n_data, data_store_.GetVec(vertex_i), data_store_.dim());
 
             Vector<PDV> tmp;
             tmp.reserve(n_neighbor_size + 1);
-            tmp.emplace_back(-n_dist, vertex_idx);
-#ifdef USE_SSE1
-            if (n_neighbor_size) [[likely]]
-                _mm_prefetch(data_store_.GetVec(n_neighbors_p[0]), _MM_HINT_T0);
-#endif
+            tmp.emplace_back(-n_dist, vertex_i);
             for (int i = 0; i < n_neighbor_size; ++i) {
-#ifdef USE_SSE1
-                if (i + 1 < n_neighbor_size) [[likely]]
-                    _mm_prefetch(data_store_.GetVec(n_neighbors_p[i + 1]), _MM_HINT_T0);
-#endif
                 tmp.emplace_back(-dist_func2_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
             }
 
@@ -274,14 +242,14 @@ public:
     void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
 
     void Insert(const DataType *queries, const LabelType *label, SizeT insert_n) {
-        VertexType vertex_idx = StoreData(queries, label, insert_n);
+        VertexType vertex_i1 = StoreData(queries, label, insert_n);
         for (SizeT i = 0; i < insert_n; ++i) {
-            DataRtnType query = data_store_.GetVec(vertex_idx + i);
+            DataRtnType query = data_store_.GetVec(vertex_i1 + i);
             i32 q_layer = GenerateRandomLayer();
-            i32 max_layer = graph_.max_layer();
-            VertexType ep = graph_.enterpoint();
-            VertexType q_vertex = vertex_idx + i;
-            graph_.AddVertex(q_vertex, q_layer);
+            i32 max_layer = graph_store_.max_layer();
+            VertexType ep = graph_store_.enterpoint();
+            VertexType vertex_i = vertex_i1 + i;
+            graph_store_.AddVertex(vertex_i, q_layer);
 
             for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
                 ep = SearchLayerNearest(ep, query, cur_layer);
@@ -294,10 +262,10 @@ public:
                     candidates.emplace(-dist, idx);
                     search_result.pop();
                 }
-                const auto [q_neighbors_p, q_neighbor_size_p] = graph_.GetNeighborsMut(q_vertex, cur_layer);
+                const auto [q_neighbors_p, q_neighbor_size_p] = graph_store_.GetNeighborsMut(vertex_i, cur_layer);
                 SelectNeighborsHeuristic(candidates, M_, q_neighbors_p, q_neighbor_size_p);
                 ep = q_neighbors_p[0];
-                ConnectNeighbors(q_vertex, q_neighbors_p, *q_neighbor_size_p, cur_layer);
+                ConnectNeighbors(vertex_i, q_neighbors_p, *q_neighbor_size_p, cur_layer);
             }
             if (i && i % 10000 == 0) {
                 std::cout << "Inserted " << i << " / " << insert_n << std::endl;
@@ -306,9 +274,10 @@ public:
     }
 
     MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) {
-        DataRtnType query = data_store_.Convert(q);
-        VertexType ep = graph_.enterpoint();
-        for (i32 cur_layer = graph_.max_layer(); cur_layer > 0; --cur_layer) {
+        typename DataStore::QueryCtx ctx(q, data_store_.dim(), data_store_);
+        DataRtnType query = data_store_.GetVec(ctx);
+        VertexType ep = graph_store_.enterpoint();
+        for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
         }
         DistHeap search_result = SearchLayer(ep, query, 0, Max(k, ef_));
@@ -331,7 +300,7 @@ public:
         file_handler.Write(&M_, sizeof(M_));
         file_handler.Write(&ef_construction_, sizeof(ef_construction_));
         data_store_.Save(file_handler);
-        graph_.SaveGraph(file_handler, data_store_.cur_vec_num());
+        graph_store_.SaveGraph(file_handler, data_store_.cur_vec_num());
         file_handler.Write(labels_.get(), sizeof(LabelType) * data_store_.cur_vec_num());
     }
 
@@ -349,12 +318,12 @@ public:
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
-    void Check() const { graph_.CheckGraph(data_store_.cur_vec_num(), Mmax0_, Mmax_); }
+    void Check() const { graph_store_.CheckGraph(data_store_.cur_vec_num(), Mmax0_, Mmax_); }
 
     void Dump(std::ostream &os) {
         os << std::endl << "---------------------------------------------" << std::endl;
         os << "max_vec_n: " << data_store_.max_vec_num() << std::endl;
-        graph_.Dump(os, data_store_.cur_vec_num());
+        graph_store_.Dump(os, data_store_.cur_vec_num());
         os << "---------------------------------------------" << std::endl;
     }
 };

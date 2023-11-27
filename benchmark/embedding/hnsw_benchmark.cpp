@@ -12,15 +12,15 @@
 #include <iostream>
 #include <thread>
 
-static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/groundtruth.ivecs";
+static const char *base_file = "/home/shenyushi/Documents/data/gist/base.fvecs";
+static const char *query_file = "/home/shenyushi/Documents/data/gist/query.fvecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/gist/groundtruth.ivecs";
 
 using namespace infinity;
 
 auto main() -> int {
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
-    std::string hnsw_index_l2_name = save_dir + "/the_sift_lvq8.hnsw";
+    std::string hnsw_index_l2_name = save_dir + "/the_gist.hnsw";
     size_t dimension;
     size_t embedding_count;
     size_t M = 16;
@@ -98,7 +98,7 @@ auto main() -> int {
 
     infinity::BaseProfiler profiler;
     int round = 10;
-    std::vector<std::priority_queue<std::pair<float, unsigned long>>> results;
+    std::vector<std::priority_queue<std::pair<float, unsigned long>>> results(number_of_queries);
     for (int ef = 100; ef <= 300; ef += 25) {
         hnsw_index->setEf(ef);
         int correct = 0;
@@ -108,7 +108,7 @@ auto main() -> int {
             for (int idx = 0; idx < number_of_queries; ++idx) {
                 const float *query = queries + idx * dimension;
                 auto result = hnsw_index->searchKnn(query, top_k);
-                results.emplace_back(std::move(result));
+                results[idx] = std::move(result);
             }
             profiler.End();
             if (i == 0) {

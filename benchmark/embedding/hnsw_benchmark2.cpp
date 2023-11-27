@@ -16,9 +16,9 @@ import plain_store;
 import lvq_store;
 import dist_func_l2_2;
 
-static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/groundtruth.ivecs";
+static const char *base_file = "/home/shenyushi/Documents/data/gist/base.fvecs";
+static const char *query_file = "/home/shenyushi/Documents/data/gist/query.fvecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/gist/groundtruth.ivecs";
 
 using namespace infinity;
 
@@ -26,7 +26,7 @@ int main() {
     LocalFileSystem fs;
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
-    size_t dimension = 128;
+    size_t dimension = 960;
     size_t M = 16;
     size_t ef_construction = 200;
     size_t embedding_count = 1000000;
@@ -37,12 +37,12 @@ int main() {
     // using HNSW = KnnHnsw<float, LabelT, PlainStore<float>>;
     // std::tuple<> init_args = {};
     // FloatL2Space space(dimension);
-    // std::string save_place = save_dir + "/my_sift_plain.hnsw";
+    // std::string save_place = save_dir + "/my_gist_plain.hnsw";
 
     using HNSW = KnnHnsw<float, LabelT, LVQStore<float, int8_t>>;
     Pair<SizeT, bool> init_args = {0, true};
     FloatLVQ8L2Space space(dimension);
-    std::string save_place = save_dir + "/my_sift_lvq8.hnsw";
+    std::string save_place = save_dir + "/my_gist_lvq8.hnsw";
 
     std::unique_ptr<HNSW> knn_hnsw = nullptr;
 

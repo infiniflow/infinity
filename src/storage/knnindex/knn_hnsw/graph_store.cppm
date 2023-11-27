@@ -26,97 +26,128 @@ export module graph_store;
 namespace infinity {
 
 export class GraphStore {
-public:
-    const char *GetLayers(VertexType vertex_idx) const {
-        return *reinterpret_cast<const char **>(graph_ + vertex_idx * level0_size_ + layers_offset_);
-    }
-    char **GetLayersMut(VertexType vertex_idx) { return reinterpret_cast<char **>(graph_ + vertex_idx * level0_size_ + layers_offset_); }
+private:
+    constexpr static SizeT layer_n_offset_ = 0;
+    constexpr static SizeT layers_p_offset_ = AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(char *));
+    constexpr static SizeT l0_neighbor_n_offset_ = AlignTo(layers_p_offset_ + sizeof(char *), sizeof(VertexListSize));
+    constexpr static SizeT l0_neighbors_offset_ = AlignTo(l0_neighbor_n_offset_ + sizeof(VertexListSize), sizeof(VertexType));
+    const SizeT level0_size_;
 
-    Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_idx, i32 layer_idx) const {
-        char *vertex_p = graph_ + vertex_idx * level0_size_;
-        if (layer_idx) {
-            const char *layer = GetLayers(vertex_idx) + (layer_idx - 1) * layer_size_;
-            return {reinterpret_cast<const VertexType *>(layer + neighbors1_offset_),
-                    *reinterpret_cast<const VertexListSize *>(layer + neighbor_n1_offset_)};
-        } else {
-            return {reinterpret_cast<const VertexType *>(vertex_p + neighbors0_offset_),
-                    *reinterpret_cast<const VertexListSize *>(vertex_p + neighbor_n0_offset_)};
+    constexpr static SizeT lx_neighbor_n_offset_ = 0;
+    constexpr static SizeT lx_neighbors_offset_ = AlignTo(lx_neighbor_n_offset_ + sizeof(VertexListSize), sizeof(VertexType));
+    const SizeT levelx_size_;
+
+    const SizeT max_vertex_num_;
+    char *const graph_;
+    const SizeT loaded_vertex_n_;
+    char *const loaded_layers_;
+
+    i32 max_layer_{};
+    VertexType enterpoint_{};
+
+private:
+    class VertexL0Mut {
+        char *const ptr_;
+
+    public:
+        VertexL0Mut(char *ptr) : ptr_(ptr) {}
+        Pair<char **, LayerSize *> GetLayers() {
+            return {reinterpret_cast<char **>(ptr_ + layers_p_offset_), reinterpret_cast<LayerSize *>(ptr_ + layer_n_offset_)};
         }
-    }
-    Pair<VertexType *, VertexListSize *> GetNeighborsMut(VertexType vertex_idx, i32 layer_idx) {
-        char *vertex_p = graph_ + vertex_idx * level0_size_;
-        if (layer_idx) {
-            char *layer = *GetLayersMut(vertex_idx) + (layer_idx - 1) * layer_size_;
-            return {reinterpret_cast<VertexType *>(layer + neighbors1_offset_), reinterpret_cast<VertexListSize *>(layer + neighbor_n1_offset_)};
-        } else {
-            return {reinterpret_cast<VertexType *>(vertex_p + neighbors0_offset_),
-                    reinterpret_cast<VertexListSize *>(vertex_p + neighbor_n0_offset_)};
+        Pair<VertexType *, VertexListSize *> GetNeighbors() {
+            return {reinterpret_cast<VertexType *>(ptr_ + l0_neighbors_offset_), reinterpret_cast<VertexListSize *>(ptr_ + l0_neighbor_n_offset_)};
         }
+    };
+    class VertexLXMut {
+        char *const ptr_;
+
+    public:
+        VertexLXMut(char *ptr) : ptr_(ptr) {}
+        Pair<VertexType *, VertexListSize *> GetNeighbors() {
+            return {reinterpret_cast<VertexType *>(ptr_ + lx_neighbors_offset_), reinterpret_cast<VertexListSize *>(ptr_ + lx_neighbor_n_offset_)};
+        }
+    };
+    class VertexL0 {
+        const char *const ptr_;
+
+    public:
+        VertexL0(const char *ptr) : ptr_(ptr) {}
+        Pair<const char *, LayerSize> GetLayers() const {
+            return {*reinterpret_cast<char *const *>(ptr_ + layers_p_offset_), *reinterpret_cast<const LayerSize *>(ptr_ + layer_n_offset_)};
+        }
+        Pair<const VertexType *, VertexListSize> GetNeighbors() const {
+            return {reinterpret_cast<const VertexType *>(ptr_ + l0_neighbors_offset_),
+                    *reinterpret_cast<const VertexListSize *>(ptr_ + l0_neighbor_n_offset_)};
+        }
+    };
+    class VertexLX {
+        const char *const ptr_;
+
+    public:
+        VertexLX(const char *ptr) : ptr_(ptr) {}
+        Pair<const VertexType *, VertexListSize> GetNeighbors() const {
+            return {reinterpret_cast<const VertexType *>(ptr_ + lx_neighbors_offset_),
+                    *reinterpret_cast<const VertexListSize *>(ptr_ + lx_neighbor_n_offset_)};
+        }
+    };
+    VertexL0Mut GetLevel0Mut(VertexType vertex_i) { return VertexL0Mut(graph_ + level0_size_ * vertex_i); }
+    VertexLXMut GetLevelXMut(VertexL0Mut &level0, LayerSize layer_i) {
+        return VertexLXMut(*level0.GetLayers().first + levelx_size_ * (layer_i - 1));
     }
-
-    LayerSize GetLayerN(VertexType vertex_idx) const {
-        return *reinterpret_cast<const LayerSize *>(graph_ + vertex_idx * level0_size_ + layer_n_offset_);
+    VertexL0 GetLevel0(VertexType vertex_i) const { return VertexL0(graph_ + level0_size_ * vertex_i); }
+    VertexLX GetLevelX(const VertexL0 &level0, LayerSize layer_i) const {
+        return VertexLX(level0.GetLayers().first + levelx_size_ * (layer_i - 1));
     }
-    LayerSize *GetLayerNMut(VertexType vertex_idx) { return reinterpret_cast<LayerSize *>(graph_ + vertex_idx * level0_size_ + layer_n_offset_); }
-
-    i32 max_layer() const { return max_layer_; }
-
-    VertexType enterpoint() const { return enterpoint_; }
 
 private:
     GraphStore(SizeT max_vertex, SizeT Mmax, SizeT Mmax0, SizeT loaded_vertex_n, char *loaded_layers)
-        : max_vertex_(max_vertex),                                                                       //
-          neighbor_n0_offset_(0),                                                                        //
-          neighbors0_offset_(AlignTo(neighbor_n0_offset_ + sizeof(VertexListSize), sizeof(VertexType))), //
-          layer_n_offset_(AlignTo(neighbors0_offset_ + sizeof(VertexType) * Mmax0, sizeof(LayerSize))),  //
-          layers_offset_(AlignTo(layer_n_offset_ + sizeof(LayerSize), sizeof(void *))),                  //
-          level0_size_(AlignTo(layers_offset_ + sizeof(void *), 8)),                                     //
-          neighbor_n1_offset_(0),                                                                        //
-          neighbors1_offset_(AlignTo(sizeof(VertexListSize), sizeof(VertexType))),                       //
-          layer_size_(AlignTo(neighbors1_offset_ + sizeof(VertexType) * Mmax, sizeof(VertexListSize))),  //
-          loaded_vertex_n_(loaded_vertex_n),                                                             //
-          graph_(new char[max_vertex * level0_size_]),                                                   //
-          loaded_layers_(loaded_layers)                                                                  //
-    {
+        : level0_size_(AlignTo(l0_neighbors_offset_ + sizeof(VertexType) * Mmax0, 8)), //
+          levelx_size_(AlignTo(lx_neighbors_offset_ + sizeof(VertexType) * Mmax, 8)),  //
+          max_vertex_num_(max_vertex),                                                    //
+          graph_(new(std::align_val_t(8)) char[max_vertex * level0_size_]),               //
+          loaded_vertex_n_(loaded_vertex_n),                                              //
+          loaded_layers_(loaded_layers)                                                   //
+    {}
+
+    void Init() {
         max_layer_ = -1;
         enterpoint_ = -1;
-        for (VertexType vertex_idx = 0; vertex_idx < max_vertex_; ++vertex_idx) {
-            *GetNeighborsMut(vertex_idx, 0).second = 0;
-            *GetLayersMut(vertex_idx) = nullptr;
+        for (VertexType vertex_i = 0; vertex_i < max_vertex_num_; ++vertex_i) {
+            VertexL0Mut vertex = GetLevel0Mut(vertex_i);
+            *vertex.GetNeighbors().second = 0;
+            *vertex.GetLayers().first = nullptr;
         }
     }
 
 public:
-    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) { return GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr); }
+    static GraphStore Make(SizeT max_vertex, SizeT Mmax, SizeT Mmax0) {
+        auto ret = GraphStore(max_vertex, Mmax, Mmax0, 0, nullptr);
+        ret.Init();
+        return ret;
+    }
 
     GraphStore(const GraphStore &) = delete;
     GraphStore &operator=(const GraphStore &) = delete;
+    GraphStore &operator=(GraphStore &&) = delete;
 
     GraphStore(GraphStore &&other)
-        : max_vertex_(other.max_vertex_),                 //
-          neighbor_n0_offset_(other.neighbor_n0_offset_), //
-          neighbors0_offset_(other.neighbors0_offset_),   //
-          layer_n_offset_(other.layer_n_offset_),         //
-          layers_offset_(other.layers_offset_),           //
-          level0_size_(other.level0_size_),               //
-          neighbor_n1_offset_(other.neighbor_n1_offset_), //
-          neighbors1_offset_(other.neighbors1_offset_),   //
-          layer_size_(other.layer_size_),                 //
-          loaded_vertex_n_(other.loaded_vertex_n_),       //
-          graph_(other.graph_),                           //
-          loaded_layers_(other.loaded_layers_)            //
+        : level0_size_(other.level0_size_),         //
+          levelx_size_(other.levelx_size_),         //
+          max_vertex_num_(other.max_vertex_num_),   //
+          graph_(other.graph_),                     //
+          loaded_vertex_n_(other.loaded_vertex_n_), //
+          loaded_layers_(other.loaded_layers_),     //
+          max_layer_(other.max_layer_),             //
+          enterpoint_(other.enterpoint_)            //
     {
-        max_layer_ = other.max_layer_;
-        enterpoint_ = other.enterpoint_;
         const_cast<char *&>(other.graph_) = nullptr;
         const_cast<char *&>(other.loaded_layers_) = nullptr;
     }
-    GraphStore &operator=(GraphStore &&) = delete;
 
     ~GraphStore() {
         if (graph_) {
-            for (VertexType vertex_idx = loaded_vertex_n_; vertex_idx < max_vertex_; ++vertex_idx) {
-                delete[] GetLayers(vertex_idx);
+            for (VertexType vertex_i = loaded_vertex_n_; vertex_i < max_vertex_num_; ++vertex_i) {
+                delete[] GetLevel0(vertex_i).GetLayers().first;
             }
             delete[] graph_;
         }
@@ -125,56 +156,57 @@ public:
         }
     }
 
-private:
-    const SizeT max_vertex_;
-
-    const SizeT neighbor_n0_offset_;
-    const SizeT neighbors0_offset_;
-    const SizeT layer_n_offset_;
-    const SizeT layers_offset_;
-    const SizeT level0_size_;
-
-    const SizeT neighbor_n1_offset_;
-    const SizeT neighbors1_offset_;
-    const SizeT layer_size_;
-
-    const SizeT loaded_vertex_n_;
-
-    char *const graph_;
-    char *const loaded_layers_;
-
-    i32 max_layer_{};
-    VertexType enterpoint_{};
-
-public:
-    void AddVertex(VertexType vertex_idx, i32 layer_n, SizeT add_n = 1) {
-        *GetNeighborsMut(vertex_idx, 0).second = 0;
-        *GetLayerNMut(vertex_idx) = layer_n;
+    void AddVertex(VertexType vertex_i, i32 layer_n) {
+        VertexL0Mut vertex = GetLevel0Mut(vertex_i);
+        *vertex.GetNeighbors().second = 0;
+        auto [layers, layer_n_p] = vertex.GetLayers();
+        *layer_n_p = layer_n;
+        *layers = nullptr;
         if (layer_n) {
-            *GetLayersMut(vertex_idx) = new char[layer_size_ * layer_n];
-            for (i32 layer_idx = 1; layer_idx <= layer_n; ++layer_idx) {
-                *GetNeighborsMut(vertex_idx, layer_idx).second = 0;
+            *layers = new char[levelx_size_ * layer_n];
+            for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
+                *GetLevelXMut(vertex, layer_i).GetNeighbors().second = 0;
             }
         }
         if (layer_n > max_layer_) {
             max_layer_ = layer_n;
-            enterpoint_ = vertex_idx;
+            enterpoint_ = vertex_i;
         }
+    }
+
+    i32 max_layer() const { return max_layer_; }
+
+    VertexType enterpoint() const { return enterpoint_; }
+
+    Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
+        VertexL0 vertex = GetLevel0(vertex_i);
+        if (layer_i == 0) {
+            return vertex.GetNeighbors();
+        }
+        return GetLevelX(vertex, layer_i).GetNeighbors();
+    }
+    Pair<VertexType *, VertexListSize *> GetNeighborsMut(VertexType vertex_i, i32 layer_i) {
+        VertexL0Mut vertex = GetLevel0Mut(vertex_i);
+        if (layer_i == 0) {
+            return vertex.GetNeighbors();
+        }
+        return GetLevelXMut(vertex, layer_i).GetNeighbors();
     }
 
     void SaveGraph(FileHandler &file_handler, VertexType cur_vertex_n) const {
         file_handler.Write(&max_layer_, sizeof(max_layer_));
         file_handler.Write(&enterpoint_, sizeof(enterpoint_));
-        file_handler.Write(graph_, cur_vertex_n * level0_size_);
         SizeT layer_sum = 0;
-        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
-            layer_sum += GetLayerN(vertex_idx);
+        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+            layer_sum += GetLevel0(vertex_i).GetLayers().second;
         }
         file_handler.Write(&layer_sum, sizeof(layer_sum));
-        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
-            LayerSize layer_n = GetLayerN(vertex_idx);
+        file_handler.Write(graph_, cur_vertex_n * level0_size_);
+        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+            VertexL0 vertex = GetLevel0(vertex_i);
+            auto [layers, layer_n] = vertex.GetLayers();
             if (layer_n) {
-                file_handler.Write(GetLayers(vertex_idx), layer_size_ * layer_n);
+                file_handler.Write(layers, levelx_size_ * layer_n);
             }
         }
     }
@@ -184,26 +216,24 @@ public:
         file_handler.Read(&max_layer, sizeof(max_layer));
         VertexType enterpoint;
         file_handler.Read(&enterpoint, sizeof(enterpoint));
-
-        GraphStore graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n, nullptr);
-        graph_store.max_layer_ = max_layer;
-        graph_store.enterpoint_ = enterpoint;
-
-        file_handler.Read(graph_store.graph_, cur_vertex_n * graph_store.level0_size_);
-
         SizeT layer_sum;
         file_handler.Read(&layer_sum, sizeof(layer_sum));
+        GraphStore graph_store(max_vertex, Mmax, Mmax0, cur_vertex_n, nullptr);
+        const_cast<char *&>(graph_store.loaded_layers_) = new char[graph_store.levelx_size_ * layer_sum];
 
-        const_cast<char *&>(graph_store.loaded_layers_) = new char[layer_sum * graph_store.layer_size_];
+        graph_store.max_layer_ = max_layer;
+        graph_store.enterpoint_ = enterpoint;
+        file_handler.Read(graph_store.graph_, cur_vertex_n * graph_store.level0_size_);
         char *loaded_layers_p = graph_store.loaded_layers_;
-        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
-            LayerSize layer_n = graph_store.GetLayerN(vertex_idx);
+        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+            VertexL0Mut vertex = graph_store.GetLevel0Mut(vertex_i);
+            LayerSize layer_n = *vertex.GetLayers().second;
             if (layer_n) {
-                file_handler.Read(loaded_layers_p, layer_n * graph_store.layer_size_);
-                *graph_store.GetLayersMut(vertex_idx) = loaded_layers_p;
-                loaded_layers_p += layer_n * graph_store.layer_size_;
+                file_handler.Read(loaded_layers_p, graph_store.levelx_size_ * layer_n);
+                *vertex.GetLayers().first = loaded_layers_p;
+                loaded_layers_p += graph_store.levelx_size_ * layer_n;
             } else {
-                *graph_store.GetLayersMut(vertex_idx) = nullptr;
+                *vertex.GetLayers().first = nullptr;
             }
         }
         return graph_store;
@@ -213,22 +243,27 @@ public:
 
     // check invariant of graph
     void CheckGraph(VertexType cur_vertex_n, SizeT Mmax0, SizeT Mmax) const {
-        assert(cur_vertex_n <= max_vertex_);
+        assert(cur_vertex_n <= max_vertex_num_);
         int max_layer = -1;
-        for (VertexType vertex_idx = 0; vertex_idx < cur_vertex_n; ++vertex_idx) {
-            int cur_max_layer = GetLayerN(vertex_idx);
+        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+            VertexL0 vertex = GetLevel0(vertex_i);
+            int cur_max_layer = vertex.GetLayers().second;
             max_layer = Max(cur_max_layer, max_layer);
             assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
-            for (int layer_idx = 0; layer_idx <= cur_max_layer; ++layer_idx) {
-                auto [neighbors, neighbor_n] = GetNeighbors(vertex_idx, layer_idx);
-                VertexType Mmax = layer_idx == 0 ? Mmax0 : Mmax;
+            auto [neighbors, neighbor_n] = vertex.GetNeighbors();
+            assert(neighbor_n <= Mmax0);
+            for (int i = 0; i < neighbor_n; ++i) {
+                VertexType neighbor_idx = neighbors[i];
+                assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
+                assert(neighbor_idx != vertex_i);
+            }
+            for (int layer_i = 1; layer_i <= cur_max_layer; ++layer_i) {
+                auto [neighbors, neighbor_n] = GetLevelX(vertex, layer_i).GetNeighbors();
                 assert(neighbor_n <= Mmax);
                 for (int i = 0; i < neighbor_n; ++i) {
                     VertexType neighbor_idx = neighbors[i];
                     assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
-                    assert(neighbor_idx != vertex_idx);
-                    auto [n_neighbors, n_neighbor_n] = GetNeighbors(neighbor_idx, layer_idx);
-                    assert(n_neighbor_n <= Mmax);
+                    assert(neighbor_idx != vertex_i);
                 }
             }
         }
@@ -241,17 +276,17 @@ public:
         os << std::endl;
 
         Vector<Vector<VertexType>> layer2vertex(max_layer_ + 1);
-        for (VertexType v = 0; v < cur_vertex_n; ++v) {
-            i32 layer_n = GetLayerN(v);
-            for (i32 layer_idx = 0; layer_idx <= layer_n; ++layer_idx) {
-                layer2vertex[layer_idx].emplace_back(v);
+        for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
+            int layer_n = GetLevel0(vertex_i).GetLayers().second;
+            for (i32 layer_i = 0; layer_i <= layer_n; ++layer_i) {
+                layer2vertex[layer_i].emplace_back(vertex_i);
             }
         }
         for (i32 layer = max_layer_; layer >= 0; --layer) {
             os << "layer " << layer << std::endl;
-            for (VertexType v : layer2vertex[layer]) {
-                os << v << ": ";
-                auto [neighbors, neighbor_n] = GetNeighbors(v, layer);
+            for (VertexType vertex_i : layer2vertex[layer]) {
+                os << vertex_i << ": ";
+                auto [neighbors, neighbor_n] = GetLevel0(vertex_i).GetNeighbors();
                 for (int i = 0; i < neighbor_n; ++i) {
                     os << neighbors[i] << ", ";
                 }

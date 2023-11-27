@@ -34,19 +34,19 @@ public:
     using RtnType = const T *;
     using QueryCtx = const T *;
 
-    static constexpr SizeT ERR_IDX = IndexAllocator::ERR_IDX;
+    static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
 
 private:
-    IndexAllocator base_;
+    DataStoreMeta base_;
     const UniquePtr<T[]> ptr_;
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs = {}) {
-        IndexAllocator data_store(max_vec_num, dim);
+        DataStoreMeta data_store(max_vec_num, dim);
         return This(Move(data_store));
     }
 
-    PlainStore(IndexAllocator base) : base_(Move(base)), ptr_(MakeUnique<T[]>(base_.max_vec_num_ * base_.dim_)) {}
+    PlainStore(DataStoreMeta base) : base_(Move(base)), ptr_(MakeUnique<T[]>(base_.max_vec_num_ * base_.dim_)) {}
 
     PlainStore(PlainStore &&other) : base_(Move(other.base_)), ptr_(Move(const_cast<UniquePtr<T[]> &>(other.ptr_))) {}
     PlainStore &operator=(PlainStore &&other) {
@@ -61,7 +61,7 @@ public:
     SizeT max_vec_num() const { return base_.max_vec_num_; }
     SizeT dim() const { return base_.dim_; }
 
-    static SizeT err_idx() { return IndexAllocator::ERR_IDX; }
+    static SizeT err_idx() { return DataStoreMeta::ERR_IDX; }
 
 public:
     SizeT AddVec(const DataType *vecs, SizeT vec_num) {
@@ -86,7 +86,7 @@ public:
     }
 
     static PlainStore Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs = {}) {
-        IndexAllocator data_store = IndexAllocator::Load(file_handler, max_vec_num);
+        DataStoreMeta data_store = DataStoreMeta::Load(file_handler, max_vec_num);
         PlainStore ret(Move(data_store));
         file_handler.Read(ret.ptr_.get(), sizeof(T) * ret.cur_vec_num() * ret.dim());
         return ret;
