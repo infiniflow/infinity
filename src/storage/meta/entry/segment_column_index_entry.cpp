@@ -55,7 +55,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
 UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(ColumnIndexEntry *column_index_entry,
                                                                            u32 segment_id,
                                                                            BufferManager *buffer_manager,
-                                                                           CreateIndexParam* param) {
+                                                                           CreateIndexParam *param) {
     UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param, segment_id);
     auto buffer = buffer_manager->Get(Move(file_worker));
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
@@ -167,12 +167,31 @@ UniquePtr<IndexFileWorker> SegmentColumnIndexEntry::CreateFileWorker(ColumnIndex
                 MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_param->max_element_);
             break;
         }
+        case IndexType::kHnswLVQ: {
+            UniquePtr<String> err_msg =
+                    MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+        }
+        case IndexType::kIRSFullText: {
+            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
+            UniquePtr<String> err_msg =
+                    MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+            break;
+        }
         default: {
-            NotImplementException("Not implemented.");
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
         }
     }
     if (file_worker.get() == nullptr) {
-        throw StorageException("Failed to create index file worker");
+        UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
+        LOG_ERROR(*err_msg);
+        Error<StorageException>(*err_msg);
     }
     return file_worker;
 }

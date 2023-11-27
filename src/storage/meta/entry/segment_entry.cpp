@@ -245,8 +245,20 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
             }
             break;
         }
+        case IndexType::kHnswLVQ: {
+            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+        }
+        case IndexType::kIRSFullText: {
+            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+        }
         default: {
-            throw NotImplementException("Not implemented.");
+            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
         }
     }
     txn_store->CreateIndexFile(column_index_entry->table_index_entry_, column_id, segment_entry->segment_id_, segment_column_index_entry);
@@ -423,8 +435,18 @@ SegmentEntry::GetCreateIndexParam(const SegmentEntry *segment_entry, const Index
             SizeT max_element = segment_entry->row_capacity_;
             return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
         }
+        case IndexType::kIRSFullText: {
+            return MakeUnique<CreateFullTextParam>(index_base, column_def);
+        }
+        case IndexType::kHnswLVQ: {
+            UniquePtr<String> err_msg = MakeUnique<String>(Format("Not implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+        }
         default: {
-            throw NotImplementException("Not implemented.");
+            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
         }
     }
 }

@@ -26,6 +26,17 @@ export module hnsw_file_worker;
 
 namespace infinity {
 
+export struct CreateFullTextParam : public CreateIndexParam {
+    CreateFullTextParam(const IndexBase *index_base, const ColumnDef *column_def) : CreateIndexParam(index_base, column_def) {}
+};
+
+export struct CreateHnswLVQParam : public CreateIndexParam {
+    const SizeT max_element_{};
+
+    CreateHnswLVQParam(const IndexBase *index_base, const ColumnDef *column_def, SizeT max_element)
+            : CreateIndexParam(index_base, column_def), max_element_(max_element) {}
+};
+
 export struct CreateHnswParam : public CreateIndexParam {
     const SizeT max_element_{};
 
@@ -39,8 +50,8 @@ export class HnswFileWorker : public IndexFileWorker {
 public:
     explicit HnswFileWorker(SharedPtr<String> file_dir,
                             SharedPtr<String> file_name,
-                            const IndexBase* index_base,
-                            const ColumnDef* column_def,
+                            const IndexBase *index_base,
+                            const ColumnDef *column_def,
                             SizeT max_element)
         : IndexFileWorker(file_dir, file_name, index_base, column_def), max_element_(max_element) {}
 
