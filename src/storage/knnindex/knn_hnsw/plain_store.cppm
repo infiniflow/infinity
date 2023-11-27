@@ -16,6 +16,7 @@ module;
 
 #include <algorithm>
 #include <cassert>
+#include "storage/knnindex/header.h"
 
 import stl;
 import file_system;
@@ -91,5 +92,7 @@ public:
         file_handler.Read(ret.ptr_.get(), sizeof(T) * ret.cur_vec_num() * ret.dim());
         return ret;
     }
+
+    void Prefetch(SizeT vec_i) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i)), _MM_HINT_T0); }
 };
 } // namespace infinity

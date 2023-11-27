@@ -138,12 +138,15 @@ public:
             }
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
+                data_store_.Prefetch(neighbors_p[i]);
+                if (i - 1 >= 0) {
+                    data_store_.Prefetch(neighbors_p[i - 1]);
+                }
                 VertexType n_idx = neighbors_p[i];
                 if (visited[n_idx]) {
                     continue;
                 }
                 visited[n_idx] = true;
-                // TODO:: store result.top(), result.size() in variable
                 dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
@@ -167,6 +170,10 @@ public:
             check = false;
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
+                data_store_.Prefetch(neighbors_p[i]);
+                if (i - 1 >= 0) {
+                    data_store_.Prefetch(neighbors_p[i - 1]);
+                }
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
                 ++cal_num;

@@ -39,6 +39,7 @@ concept DataStoreConcept = requires(Store s) {
     { s.Save(std::declval<FileHandler &>()) };
     { Store::Load(std::declval<FileHandler &>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
     { Store::Make(std::declval<SizeT>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
+    { s.Prefetch(std::declval<SizeT>()) };
 };
 
 export class DataStoreMeta {

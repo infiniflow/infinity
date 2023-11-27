@@ -14,6 +14,7 @@
 
 module;
 
+#include "storage/knnindex/header.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -99,17 +100,16 @@ public:
     constexpr const MeanType *GetMean() const { return reinterpret_cast<const MeanType *>(ptr_ + mean_offset_); }
 
     class LVQData {
+        friend This;
         const char *const ptr_;
 
     public:
         LVQData(const char *c) : ptr_(c) {}
         Pair<ScalarType, ScalarType> GetScalar() const {
-            return {*reinterpret_cast<const ScalarType *>(ptr_ + scale_offset_),
-                    *reinterpret_cast<const ScalarType *>(ptr_ + bias_offset_)};
+            return {*reinterpret_cast<const ScalarType *>(ptr_ + scale_offset_), *reinterpret_cast<const ScalarType *>(ptr_ + bias_offset_)};
         }
         Pair<Const1Type, Const2Type> GetConstant() const {
-            return {*reinterpret_cast<const Const1Type *>(ptr_ + const1_offset_),
-                    *reinterpret_cast<const Const2Type *>(ptr_ + const2_offset_)};
+            return {*reinterpret_cast<const Const1Type *>(ptr_ + const1_offset_), *reinterpret_cast<const Const2Type *>(ptr_ + const2_offset_)};
         }
         const CompressT *GetCompressVec() const { return reinterpret_cast<const CompressT *>(ptr_ + compress_vec_offset_); }
     };
@@ -298,6 +298,14 @@ public:
         LVQStore ret(Move(meta), Move(init_args));
         file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
         return ret;
+    }
+
+    void Prefetch(SizeT vec_i) const {
+        if (vec_i < meta_.cur_vec_num()) {
+            _mm_prefetch(GetVec(vec_i).ptr_, _MM_HINT_T0);
+        } else {
+            plain_data_.Prefetch(vec_i - meta_.cur_vec_num());
+        }
     }
 };
 
