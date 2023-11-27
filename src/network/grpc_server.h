@@ -89,4 +89,60 @@ private:
     Mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 };
+
+class GrpcAsyncServiceImpl {
+public:
+    ~GrpcAsyncServiceImpl() {
+        server_->Shutdown();
+        cq_->Shutdown();
+    }
+
+    static void Run();
+    void Shutdown();
+
+    class CallData {
+    public:
+        CallData(GrpcAsyncServiceImpl *service)
+            : service_(service), status_(CREATE) { }
+
+        virtual void Proceed() = 0;
+
+    protected:
+        GrpcAsyncServiceImpl* service_;
+        grpc::ServerContext ctx_;
+
+        enum CallStatus { CREATE, PROCESS, FINISH };
+        CallStatus status_;  // The current serving state.
+    };
+
+    class ConnectCallData: public CallData {
+    public:
+        ConnectCallData(GrpcAsyncServiceImpl *service)
+            : CallData(service), responder_(&ctx_) {
+            Proceed();
+        }
+
+        void Proceed() final;
+
+    private:
+        infinity_grpc_proto::Empty request_;
+        infinity_grpc_proto::CommonResponse response_;
+        grpc::ServerAsyncResponseWriter<infinity_grpc_proto::CommonResponse> responder_;
+    };
+
+private:
+    void RegisterSession(SharedPtr<Infinity> instance) {
+        infinity_session_map_mutex_.lock();
+        infinity_session_map_.emplace(instance->GetSessionId(), instance);
+        infinity_session_map_mutex_.unlock();
+    };
+
+    Mutex infinity_session_map_mutex_{};
+    HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
+
+    UniquePtr<grpc::ServerCompletionQueue> cq_;
+    infinity_grpc_proto::InfinityGrpcService::AsyncService service_{};
+    UniquePtr<grpc::Server> server_{};
+};
+
 } // end namespace infinity

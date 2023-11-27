@@ -35,6 +35,7 @@ infinity::PoolThriftServer pool_thrift_server;
 infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 infinity::Thread grpc_thread;
+infinity::Thread grpc_async_thread;
 //std::unique_ptr<grpc::Server> grpc_server;
 
 infinity::Thread brpc_thread{};
@@ -53,6 +54,7 @@ void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
             non_block_pool_thrift_server.Shutdown();
 
             grpc_thread.join();
+            grpc_async_thread.join();
 
             brpc_thread.join();
 
@@ -143,6 +145,7 @@ auto main(int argc, char **argv) -> int {
     non_block_pool_thrift_server.Start();
 
     grpc_thread = infinity::Thread([]() { GrpcServiceImpl::Run(); });
+    grpc_async_thread =infinity::Thread([]() { GrpcAsyncServiceImpl::Run(); });
 
     brpc_thread = infinity::Thread([]() { BrpcServiceImpl::Run(); });
 

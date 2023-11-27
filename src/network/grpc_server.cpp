@@ -420,6 +420,62 @@ void GrpcServiceImpl::Shutdown() {
     // TODO:
 }
 
+void GrpcAsyncServiceImpl::Run() {
+    std::string server_address("0.0.0.0:50059");
+    GrpcAsyncServiceImpl service;
+    grpc::ServerBuilder builder;
+
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&service.service_);
+
+    service.cq_ = builder.AddCompletionQueue();
+    service.server_ = builder.BuildAndStart();
+
+    std::cout << "GRPC async server listening on " << server_address << std::endl;
+
+    new ConnectCallData(&service);
+
+    void* tag;
+    bool ok;
+    while(true)
+    {
+        GPR_ASSERT(service.cq_->Next(&tag, &ok));
+        GPR_ASSERT(ok);
+        CallData* calldata = static_cast<CallData*>(tag);
+        calldata->Proceed();
+    }
+}
+
+void GrpcAsyncServiceImpl::Shutdown() {
+    // TODO:
+}
+
+void GrpcAsyncServiceImpl::ConnectCallData::Proceed() {
+    if (status_ == CREATE) {
+        service_->service_.RequestConnect(&ctx_, &request_, &responder_, service_->cq_.get(), service_->cq_.get(), this);
+
+        status_ = PROCESS;
+    } else if (status_ == PROCESS) {
+        new ConnectCallData(service_);
+
+        auto infinity = Infinity::RemoteConnect();
+        if (infinity == nullptr) {
+            response_.set_success(false);
+            response_.set_error_msg("Connect failed");
+            responder_.Finish(response_, grpc::Status::CANCELLED, this);
+        } else {
+            service_->RegisterSession(infinity);
+            response_.set_session_id(infinity->GetSessionId());
+            response_.set_success(true);
+            responder_.Finish(response_, grpc::Status::OK, this);
+        }
+
+        status_ = FINISH;
+    } else {
+        delete this;
+    }
+}
+
 ColumnDef *GrpcServiceImpl::GetColumnDefFromProto(const infinity_grpc_proto::ColumnDef &column_def) {
     auto column_def_data_type_ptr = GetColumnTypeFromProto(column_def.column_type());
     auto constraints = HashSet<ConstraintType>();
