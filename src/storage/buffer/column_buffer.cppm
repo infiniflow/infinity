@@ -39,22 +39,24 @@ struct OutlineBuffer {
 };
 
 export class ColumnBuffer {
+    u64 column_id_{0};
+
     BufferHandle inline_col_{};
 
     // is null, if the column is inline
     UniquePtr<OutlineBuffer> outline_buffer_{};
 
 public:
-    ColumnBuffer(BufferObj *buffer, BufferManager *buffer_mgr){};
+    ColumnBuffer(u64 column_id, BufferObj *buffer, BufferManager *buffer_mgr) : column_id_(column_id){};
 
-    ColumnBuffer(const BufferHandle &buffer_handle, BufferManager *buffer_mgr) : inline_col_(buffer_handle) {
+    ColumnBuffer(u64 column_id, const BufferHandle &buffer_handle, BufferManager *buffer_mgr) : column_id_(column_id), inline_col_(buffer_handle) {
         if (buffer_mgr) {
             outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr);
         }
     }
 
-    explicit ColumnBuffer(BufferObj *buffer, BufferManager *buffer_mgr = nullptr, SharedPtr<String> base_dir = nullptr)
-        : inline_col_(buffer->Load()) {
+    ColumnBuffer(u64 column_id, BufferObj *buffer, BufferManager *buffer_mgr = nullptr, SharedPtr<String> base_dir = nullptr)
+        : column_id_(column_id), inline_col_(buffer->Load()) {
         if (buffer_mgr) {
             outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr, Move(base_dir));
         }

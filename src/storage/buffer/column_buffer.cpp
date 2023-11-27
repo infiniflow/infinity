@@ -47,7 +47,7 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     }
     auto &long_info = varchar_layout->u.long_info_;
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
-        auto filename = BlockColumnEntry::OutlineFilename(long_info.file_idx_);
+        auto filename = BlockColumnEntry::OutlineFilename(column_id_, long_info.file_idx_);
         auto base_dir = outline_buffer_->base_dir_;
         auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_OUTLINE_FILE_MAX_SIZE);
         auto buffer_obj = outline_buffer_->buffer_mgr_->Get(Move(file_worker));
@@ -110,7 +110,7 @@ Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
     }
     auto &long_info = varchar_layout->u.long_info_;
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
-        auto filename = BlockColumnEntry::OutlineFilename(long_info.file_idx_);
+        auto filename = BlockColumnEntry::OutlineFilename(column_id_, long_info.file_idx_);
         auto base_dir = outline_buffer_->base_dir_;
         auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_OUTLINE_FILE_MAX_SIZE);
         auto buffer_obj = outline_buffer_->buffer_mgr_->Get(Move(file_worker));

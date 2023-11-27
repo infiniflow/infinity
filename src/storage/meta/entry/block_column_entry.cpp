@@ -74,8 +74,8 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BlockColumnEntry *block_column_entr
     }
 
     bool outline = block_column_entry->column_type_->type() == kVarchar;
-    return outline ? ColumnBuffer(block_column_entry->buffer_, buffer_manager, block_column_entry->base_dir_)
-                   : ColumnBuffer(block_column_entry->buffer_);
+    return outline ? ColumnBuffer(block_column_entry->column_id_, block_column_entry->buffer_, buffer_manager, block_column_entry->base_dir_)
+                   : ColumnBuffer(block_column_entry->column_id_, block_column_entry->buffer_);
 }
 
 void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
@@ -128,7 +128,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                     auto outline_info = block_column_entry->outline_info_.get();
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
-                        auto file_name = BlockColumnEntry::OutlineFilename(outline_info->next_file_idx++, block_column_entry->column_id_);
+                        auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
                         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
                         BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
