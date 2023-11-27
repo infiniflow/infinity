@@ -117,8 +117,8 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);
             for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
-                auto varchar_type = src_ptr;
-                VarcharLayout *varchar_layout = inline_p;
+                auto varchar_type = src_ptr + row_idx;
+                VarcharLayout *varchar_layout = inline_p + row_idx;
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length;
