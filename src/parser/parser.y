@@ -2432,7 +2432,11 @@ copy_option : FORMAT IDENTIFIER {
 | DELIMITER STRING {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kDelimiter;
-    $$->delimiter_ = $2[0];
+    if(strlen($2) > 1 && $2[0] == '\\') {
+        if($2[1] == 't') $$->delimiter_ = '\t';
+    }else {
+        $$->delimiter_ = $2[0];
+    }
     free($2);
 }
 | HEADER {

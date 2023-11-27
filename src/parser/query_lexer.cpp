@@ -1,6 +1,6 @@
-#line 2 "query_lexer.cpp"
+#line 1 "query_lexer.cpp"
 
-#line 4 "query_lexer.cpp"
+#line 3 "query_lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -560,10 +560,10 @@ using token = infinity::QueryParser::token;
 /* for temporary storage of quoted string */
 static thread_local std::stringstream string_buffer;
 
-#line 564 "query_lexer.cpp"
+#line 563 "query_lexer.cpp"
 #define YY_NO_INPUT 1
 
-#line 567 "query_lexer.cpp"
+#line 566 "query_lexer.cpp"
 
 #define INITIAL 0
 #define SINGLE_QUOTED_STRING 1
@@ -766,7 +766,7 @@ YY_DECL
             /* Note: special characters in pattern shall be double-quoted or escaped with backslash: " <^.+|/()[]{}" */
 
 
-#line 770 "query_lexer.cpp"
+#line 769 "query_lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1039,7 +1039,7 @@ YY_RULE_SETUP
 #line 125 "query_lexer.l"
 ECHO;
 	YY_BREAK
-#line 1043 "query_lexer.cpp"
+#line 1042 "query_lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 

@@ -810,9 +810,9 @@ static const yytype_int16 yyrline[] =
     2210,  2218,  2225,  2232,  2237,  2247,  2252,  2257,  2262,  2267,
     2272,  2277,  2280,  2292,  2295,  2299,  2303,  2308,  2313,  2317,
     2322,  2327,  2333,  2339,  2345,  2351,  2357,  2363,  2369,  2375,
-    2381,  2387,  2393,  2404,  2408,  2413,  2432,  2438,  2444,  2448,
-    2449,  2451,  2452,  2454,  2455,  2467,  2475,  2480,  2483,  2487,
-    2491,  2496,  2501,  2509,  2516,  2527,  2577
+    2381,  2387,  2393,  2404,  2408,  2413,  2432,  2442,  2448,  2452,
+    2453,  2455,  2456,  2458,  2459,  2471,  2479,  2484,  2487,  2491,
+    2495,  2500,  2505,  2513,  2520,  2531,  2581
 };
 #endif
 
@@ -6156,56 +6156,60 @@ yyreduce:
                    {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kDelimiter;
-    (yyval.copy_option_t)->delimiter_ = (yyvsp[0].str_value)[0];
+    if(strlen((yyvsp[0].str_value)) > 1 && (yyvsp[0].str_value)[0] == '\\') {
+        if((yyvsp[0].str_value)[1] == 't') (yyval.copy_option_t)->delimiter_ = '\t';
+    }else {
+        (yyval.copy_option_t)->delimiter_ = (yyvsp[0].str_value)[0];
+    }
     free((yyvsp[0].str_value));
 }
-#line 6163 "parser.cpp"
+#line 6167 "parser.cpp"
     break;
 
   case 317: /* copy_option: HEADER  */
-#line 2438 "parser.y"
+#line 2442 "parser.y"
          {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kHeader;
     (yyval.copy_option_t)->header_ = true;
 }
-#line 6173 "parser.cpp"
+#line 6177 "parser.cpp"
     break;
 
   case 318: /* file_path: STRING  */
-#line 2444 "parser.y"
+#line 2448 "parser.y"
                    {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
-#line 6181 "parser.cpp"
+#line 6185 "parser.cpp"
     break;
 
   case 319: /* if_exists: IF EXISTS  */
-#line 2448 "parser.y"
+#line 2452 "parser.y"
                      { (yyval.bool_value) = true; }
-#line 6187 "parser.cpp"
+#line 6191 "parser.cpp"
     break;
 
   case 320: /* if_exists: %empty  */
-#line 2449 "parser.y"
+#line 2453 "parser.y"
   { (yyval.bool_value) = false; }
-#line 6193 "parser.cpp"
+#line 6197 "parser.cpp"
     break;
 
   case 321: /* if_not_exists: IF NOT EXISTS  */
-#line 2451 "parser.y"
+#line 2455 "parser.y"
                               { (yyval.bool_value) = true; }
-#line 6199 "parser.cpp"
+#line 6203 "parser.cpp"
     break;
 
   case 322: /* if_not_exists: %empty  */
-#line 2452 "parser.y"
+#line 2456 "parser.y"
   { (yyval.bool_value) = false; }
-#line 6205 "parser.cpp"
+#line 6209 "parser.cpp"
     break;
 
   case 325: /* if_not_exists_info: if_not_exists IDENTIFIER  */
-#line 2467 "parser.y"
+#line 2471 "parser.y"
                                               {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
     (yyval.if_not_exists_info_t)->exists_ = true;
@@ -6214,63 +6218,63 @@ yyreduce:
     (yyval.if_not_exists_info_t)->info_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 6218 "parser.cpp"
+#line 6222 "parser.cpp"
     break;
 
   case 326: /* if_not_exists_info: %empty  */
-#line 2475 "parser.y"
+#line 2479 "parser.y"
   {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
 }
-#line 6226 "parser.cpp"
+#line 6230 "parser.cpp"
     break;
 
   case 327: /* with_index_param_list: WITH '(' index_param_list ')'  */
-#line 2480 "parser.y"
+#line 2484 "parser.y"
                                                       {
     (yyval.with_index_param_list_t) = std::move((yyvsp[-1].index_param_list_t));
 }
-#line 6234 "parser.cpp"
+#line 6238 "parser.cpp"
     break;
 
   case 328: /* with_index_param_list: %empty  */
-#line 2483 "parser.y"
+#line 2487 "parser.y"
   {
     (yyval.with_index_param_list_t) = new std::vector<infinity::InitParameter*>();
 }
-#line 6242 "parser.cpp"
+#line 6246 "parser.cpp"
     break;
 
   case 329: /* index_param_list: index_param  */
-#line 2487 "parser.y"
+#line 2491 "parser.y"
                                {
     (yyval.index_param_list_t) = new std::vector<infinity::InitParameter*>();
     (yyval.index_param_list_t)->push_back((yyvsp[0].index_param_t));
 }
-#line 6251 "parser.cpp"
+#line 6255 "parser.cpp"
     break;
 
   case 330: /* index_param_list: index_param_list ',' index_param  */
-#line 2491 "parser.y"
+#line 2495 "parser.y"
                                    {
     (yyvsp[-2].index_param_list_t)->push_back((yyvsp[0].index_param_t));
     (yyval.index_param_list_t) = (yyvsp[-2].index_param_list_t);
 }
-#line 6260 "parser.cpp"
+#line 6264 "parser.cpp"
     break;
 
   case 331: /* index_param: IDENTIFIER  */
-#line 2496 "parser.y"
+#line 2500 "parser.y"
                          {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 6270 "parser.cpp"
+#line 6274 "parser.cpp"
     break;
 
   case 332: /* index_param: IDENTIFIER '=' IDENTIFIER  */
-#line 2501 "parser.y"
+#line 2505 "parser.y"
                             {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -6279,11 +6283,11 @@ yyreduce:
     (yyval.index_param_t)->param_value_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 6283 "parser.cpp"
+#line 6287 "parser.cpp"
     break;
 
   case 333: /* index_param: IDENTIFIER '=' LONG_VALUE  */
-#line 2509 "parser.y"
+#line 2513 "parser.y"
                             {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -6291,11 +6295,11 @@ yyreduce:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].long_value));
 }
-#line 6295 "parser.cpp"
+#line 6299 "parser.cpp"
     break;
 
   case 334: /* index_param: IDENTIFIER '=' DOUBLE_VALUE  */
-#line 2516 "parser.y"
+#line 2520 "parser.y"
                               {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -6303,11 +6307,11 @@ yyreduce:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].double_value));
 }
-#line 6307 "parser.cpp"
+#line 6311 "parser.cpp"
     break;
 
   case 335: /* index_info_list: '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 2527 "parser.y"
+#line 2531 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -6358,11 +6362,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6362 "parser.cpp"
+#line 6366 "parser.cpp"
     break;
 
   case 336: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 2577 "parser.y"
+#line 2581 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -6414,11 +6418,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6418 "parser.cpp"
+#line 6422 "parser.cpp"
     break;
 
 
-#line 6422 "parser.cpp"
+#line 6426 "parser.cpp"
 
       default: break;
     }
@@ -6647,7 +6651,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 2629 "parser.y"
+#line 2633 "parser.y"
 
 
 void
