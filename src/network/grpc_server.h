@@ -145,4 +145,34 @@ private:
     UniquePtr<grpc::Server> server_{};
 };
 
+class GrpcAsyncClient {
+public:
+    explicit GrpcAsyncClient(SharedPtr<grpc::Channel> channel)
+        : stub_(infinity_grpc_proto::InfinityGrpcService::NewStub(channel)) {}
+
+    infinity_grpc_proto::CommonResponse Connect() {
+        infinity_grpc_proto::Empty request;
+        infinity_grpc_proto::CommonResponse response;
+        grpc::ClientContext context;
+        grpc::CompletionQueue cq;
+        grpc::Status status;
+
+        UniquePtr<grpc::ClientAsyncResponseReader<infinity_grpc_proto::CommonResponse>> rpc(
+            stub_->AsyncConnect(&context, request, &cq));
+
+        rpc->Finish(&response, &status, (void*)1);
+
+        void* got_tag;
+        bool ok = false;
+        GPR_ASSERT(cq.Next(&got_tag, &ok));
+        GPR_ASSERT(got_tag == (void*)1);
+        GPR_ASSERT(ok);
+
+        return response;
+    }
+
+private:
+    UniquePtr<infinity_grpc_proto::InfinityGrpcService::Stub> stub_;
+};
+
 } // end namespace infinity
