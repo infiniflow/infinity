@@ -23,6 +23,8 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
+#include <thrift/transport/TNonblockingServerSocket.h>
+#include <thrift/server/TNonblockingServer.h>
 #include <memory>
 #include <stdexcept>
 
@@ -666,7 +668,7 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << std::endl;
+    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
 
     server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                            MakeShared<TServerSocket>(port_no),
@@ -678,5 +680,37 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 void PoolThriftServer::Start() { server->serve(); }
 
 void PoolThriftServer::Shutdown() { server->stop(); }
+
+void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
+
+    SharedPtr<ThreadFactory> thread_factory = MakeShared<ThreadFactory>();
+    service_handler_ = MakeShared<InfinityServiceHandler>();
+    SharedPtr<InfinityServiceProcessor> service_processor = MakeShared<InfinityServiceProcessor>(service_handler_);
+    SharedPtr<TProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
+
+
+    SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    threadManager->threadFactory(thread_factory);
+    threadManager->start();
+
+    std::cout << "Non-block pooled thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
+
+    SharedPtr<TNonblockingServerSocket> non_block_socket =  MakeShared<TNonblockingServerSocket>(port_no);
+
+//    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
+//        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));
+
+    server_thread_ = thread_factory->newThread(MakeShared<TNonblockingServer>(service_processor, protocol_factory, non_block_socket, threadManager));
+
+//    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+//                                           MakeShared<TServerSocket>(port_no),
+//                                           MakeShared<TBufferedTransportFactory>(),
+//                                           MakeShared<TBinaryProtocolFactory>(),
+//                                           threadManager);
+}
+
+void NonBlockPoolThriftServer::Start() { server_thread_->start(); }
+
+void NonBlockPoolThriftServer::Shutdown() { server_thread_->join(); }
 
 } // namespace infinity

@@ -235,6 +235,7 @@ target_link_libraries(infinity
 #        iresearch
 
         thrift
+        thriftnb
         iresearch
         lz4
         atomic
