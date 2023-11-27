@@ -21,7 +21,7 @@ export module dist_func;
 namespace infinity {
 
 export template <typename DataType, typename DataType2>
-using DistFunc = DataType(*)(const DataType2 &, const DataType2 &, SizeT);
+using DistFunc = DataType(*)(DataType2, DataType2, SizeT);
 
 export template <typename DataType, typename DataType2>
 class SpaceBase {
