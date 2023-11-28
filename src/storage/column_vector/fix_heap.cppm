@@ -63,7 +63,7 @@ private:
 
 private:
     Vector<UniquePtr<VectorHeapChunk>> chunks_{};
-    u64 current_chunk_size_{MIN_VECTOR_CHUNK_SIZE};
+    u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
     u64 current_chunk_idx_{INITIAL_VECTOR_CHUNK_ID};
     u64 current_chunk_offset_{0};
 };
