@@ -123,13 +123,11 @@ bool segmentation_token_stream::next() {
         term_buf_.clear();
         to_lower(begin, begin, end, from_utf32_back_inserter(term_buf_));
         term.value = irs::ViewCast<byte_type>(std::string_view{term_buf_});
-        std::cout << "term " << term_buf_ << std::endl;
         break;
       case options_t::case_convert_t::UPPER:
         term_buf_.clear();
         to_upper(begin, begin, end, from_utf32_back_inserter(term_buf_));
         term.value = irs::ViewCast<byte_type>(std::string_view{term_buf_});
-        std::cout << "term " << term_buf_ << std::endl;
         break;
     }
 

@@ -192,6 +192,9 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     }
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
+
+    AnalyzerPool::instance().Set(SEGMENT);
+
     StoreSnapshot(data);
 }
 
@@ -244,7 +247,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
     for (const auto &block_entry : segment_entry->block_entries_) {
         auto ctx = index_writer_->GetBatch();
 
-        for (SizeT i = 0; block_entry->row_count_; ++i) {
+        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
             auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id_, i));
 
             for (const auto &index_base : index_def->index_array_) {
@@ -330,11 +333,12 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                         doc.Insert<irs::Action::INDEX | irs::Action::STORE>(*field);
                     } break;
                     case kVarchar: {
-                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr);
-                        auto field = MakeShared<TextField>(index_base->column_names_[0].c_str(),
+                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr, block_column_entry->base_dir_);
+                        IRSAnalyzer *stream = AnalyzerPool::instance().Get(SEGMENT);
+                        auto field = MakeShared<TextField>(index_base->column_name().c_str(),
                                                            irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
                                                            text_features,
-                                                           AnalyzerPool::instance().Get("jieba"));
+                                                           stream);
                         auto [src_ptr, data_size] = column_buffer.GetVarcharAt(i);
                         field->f_ = String(src_ptr, data_size);
                         doc.Insert<irs::Action::INDEX>(*field);
