@@ -223,7 +223,7 @@ class TestBenchmark:
         async_thrift = ("AsyncThrift", ip, 9070)
         num_processes = 16
         num_threads = 16
-        num_times = 16 * 16 * 1
+        num_times = 16 * 16 * 10
         protocols = [thread_pool_thrift]
 
         database_functions = [create_database, get_database, list_databases, drop_database]
