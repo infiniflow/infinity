@@ -3,3 +3,5 @@ pydantic
 thrift
 setuptools
 pytest
+pandas
+openpyxl
