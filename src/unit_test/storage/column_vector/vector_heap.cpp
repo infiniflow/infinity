@@ -17,7 +17,8 @@
 import infinity_exception;
 
 import logger;
-import vector_heap;
+import var_heap;
+import fix_heap;
 import third_party;
 import stl;
 import global_resource_usage;
@@ -26,9 +27,9 @@ import default_values;
 
 class VectorHeapTest : public BaseTest {};
 
-TEST_F(VectorHeapTest, vector_heap) {
+TEST_F(VectorHeapTest, var_heap1) {
     using namespace infinity;
-    VectorHeapManager vector_heap_mgr_;
+    VarHeapManager vector_heap_mgr_;
 
     SizeT size_count = 20;
     SizeT allocate_size = 1;
@@ -59,6 +60,108 @@ TEST_F(VectorHeapTest, vector_heap) {
 
     EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
 
-    std::cout << "total size: " << total_size << std::endl;
+    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
     std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
+
+TEST_F(VectorHeapTest, var_heap2) {
+    using namespace infinity;
+    VarHeapManager vector_heap_mgr_;
+
+    SizeT size_count = 5000;
+    SizeT allocate_size = 260;
+    SizeT total_size = 0;
+
+    for (SizeT i = 0; i < size_count; ++i) {
+        String data;
+        data.reserve(allocate_size);
+        for (u64 j = 0; j < allocate_size; ++j) {
+            data.push_back(j % 26 + 'a');
+        }
+        auto [last_chunk_id, last_chunk_offset] = vector_heap_mgr_.AppendToHeap(data.c_str(), allocate_size);
+        if(total_size < MAX_VECTOR_CHUNK_SIZE) {
+            EXPECT_EQ(last_chunk_id, 0);
+            EXPECT_EQ(last_chunk_offset, total_size);
+        } else {
+            EXPECT_EQ(last_chunk_id, total_size / MAX_VECTOR_CHUNK_SIZE);
+            EXPECT_EQ(last_chunk_offset, total_size % MAX_VECTOR_CHUNK_SIZE);
+        }
+
+        String buffer;
+        buffer.resize(allocate_size);
+        vector_heap_mgr_.ReadFromHeap(buffer.data(), last_chunk_id, last_chunk_offset, allocate_size);
+        EXPECT_EQ(data, buffer);
+        total_size += allocate_size;
+    }
+
+    EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
+
+    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+    std::cout << vector_heap_mgr_.Stats() << std::endl;
+}
+
+
+TEST_F(VectorHeapTest, fix_heap1) {
+    using namespace infinity;
+    FixHeapManager vector_heap_mgr_;
+
+    SizeT size_count = 20;
+    SizeT allocate_size = 1;
+    SizeT total_size = 0;
+
+    for (SizeT i = 0; i < size_count; ++i) {
+        allocate_size <<= 1;
+        String data;
+        data.reserve(allocate_size);
+        for (u64 j = 0; j < allocate_size; ++j) {
+            data.push_back(j % 26 + 'a');
+        }
+        auto [last_chunk_id, last_chunk_offset] = vector_heap_mgr_.AppendToHeap(data.c_str(), allocate_size);
+        EXPECT_EQ(last_chunk_id, total_size / DEFAULT_FIXLEN_CHUNK_SIZE);
+        EXPECT_EQ(last_chunk_offset, total_size % DEFAULT_FIXLEN_CHUNK_SIZE);
+
+        String buffer;
+        buffer.resize(allocate_size);
+        vector_heap_mgr_.ReadFromHeap(buffer.data(), last_chunk_id, last_chunk_offset, allocate_size);
+        EXPECT_EQ(data, buffer);
+        total_size += allocate_size;
+    }
+
+    EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
+
+    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+    std::cout << vector_heap_mgr_.Stats() << std::endl;
+}
+
+TEST_F(VectorHeapTest, fix_heap2) {
+    using namespace infinity;
+    FixHeapManager vector_heap_mgr_;
+
+    SizeT size_count = 5000;
+    SizeT allocate_size = 260;
+    SizeT total_size = 0;
+
+    for (SizeT i = 0; i < size_count; ++i) {
+        String data;
+        data.reserve(allocate_size);
+        for (u64 j = 0; j < allocate_size; ++j) {
+            data.push_back(j % 26 + 'a');
+        }
+        auto [last_chunk_id, last_chunk_offset] = vector_heap_mgr_.AppendToHeap(data.c_str(), allocate_size);
+        EXPECT_EQ(last_chunk_id, total_size / DEFAULT_FIXLEN_CHUNK_SIZE);
+        EXPECT_EQ(last_chunk_offset, total_size % DEFAULT_FIXLEN_CHUNK_SIZE);
+
+        String buffer;
+        buffer.resize(allocate_size);
+        vector_heap_mgr_.ReadFromHeap(buffer.data(), last_chunk_id, last_chunk_offset, allocate_size);
+        EXPECT_EQ(data, buffer);
+        total_size += allocate_size;
+    }
+
+    EXPECT_EQ(total_size, vector_heap_mgr_.total_size());
+
+    std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
+    std::cout << vector_heap_mgr_.Stats() << std::endl;
+}
+
+

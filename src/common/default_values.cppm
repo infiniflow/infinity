@@ -43,6 +43,7 @@ export {
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = u64_max; // Each row has one chunk.
+    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 16384;

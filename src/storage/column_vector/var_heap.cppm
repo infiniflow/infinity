@@ -18,40 +18,23 @@ import global_resource_usage;
 import stl;
 import allocator;
 import default_values;
+import vector_heap_chunk;
 
-export module vector_heap;
+export module var_heap;
 
 namespace infinity {
 
-export struct VectorHeapChunk {
-public:
-    inline explicit VectorHeapChunk(u64 capacity) : capacity_(capacity) {
-        GlobalResourceUsage::IncrObjectCount();
-        ptr_ = Allocator::allocate(capacity);
-    }
-
-    inline ~VectorHeapChunk() {
-        Allocator::deallocate(ptr_);
-        ptr_ = nullptr;
-        capacity_ = 0;
-        GlobalResourceUsage::DecrObjectCount();
-    }
-
-    ptr_t ptr_{nullptr};
-    u64 capacity_{0};
-};
-
-export struct VectorHeapManager {
+export struct VarHeapManager {
     // Use to store string.
     static constexpr u64 CHUNK_COUNT_LIMIT = MAX_VECTOR_CHUNK_COUNT;
     static constexpr u64 INVALID_CHUNK_OFFSET = u64_max;
 
 public:
-    inline explicit VectorHeapManager(u64 chunk_size = MIN_VECTOR_CHUNK_SIZE) : current_chunk_size_(chunk_size) {
+    inline explicit VarHeapManager(u64 chunk_size = MIN_VECTOR_CHUNK_SIZE) : current_chunk_size_(chunk_size) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
-    inline ~VectorHeapManager() { GlobalResourceUsage::DecrObjectCount(); }
+    inline ~VarHeapManager() { GlobalResourceUsage::DecrObjectCount(); }
 
     // return value: start chunk id & chunk offset
     Pair<u64, u64> AppendToHeap(const char* data_ptr, SizeT nbytes);
@@ -72,6 +55,8 @@ public:
     [[nodiscard]] inline u64 current_chunk_size() const { return current_chunk_size_; }
 
     [[nodiscard]] inline u64 total_size() const { return current_chunk_size_ * current_chunk_idx_ + current_chunk_offset_; }
+
+    [[nodiscard]] inline u64 total_mem() const { return current_chunk_size_ * (current_chunk_idx_ + 1); }
 
 private:
     // Allocate new chunk if current chunk is not enough.

@@ -20,12 +20,13 @@ import stl;
 import third_party;
 import infinity_exception;
 import default_values;
+import vector_heap_chunk;
 
-module vector_heap;
+module fix_heap;
 
 namespace infinity {
 
-Pair<u64, u64> VectorHeapManager::Allocate(SizeT nbytes) {
+Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
         Error<ExecutorException>(Format("Attempt to allocate memory with size: {} as the string heap", nbytes));
     }
@@ -39,10 +40,6 @@ Pair<u64, u64> VectorHeapManager::Allocate(SizeT nbytes) {
         // First chunk
         start_chunk_id = 0;
         start_chunk_offset = 0;
-
-        while (current_chunk_size_ < nbytes && current_chunk_size_ < MAX_VECTOR_CHUNK_SIZE) {
-            current_chunk_size_ *= 2;
-        }
 
         while (rest_nbytes > current_chunk_size_) {
             chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
@@ -62,69 +59,30 @@ Pair<u64, u64> VectorHeapManager::Allocate(SizeT nbytes) {
         start_chunk_id = current_chunk_idx_;
         start_chunk_offset = current_chunk_offset_;
 
-        if (current_chunk_size_ < MAX_VECTOR_CHUNK_SIZE) {
-
-            if (current_chunk_offset_ + nbytes > current_chunk_size_) {
-                while (current_chunk_offset_ + nbytes > current_chunk_size_ && current_chunk_size_ < MAX_VECTOR_CHUNK_SIZE) {
-                    current_chunk_size_ *= 2;
-                }
-
-                if (current_chunk_size_ > chunks_[current_chunk_idx_]->capacity_) {
-                    UniquePtr<VectorHeapChunk> new_chunk = MakeUnique<VectorHeapChunk>(current_chunk_size_);
-                    Memcpy(new_chunk->ptr_, chunks_[current_chunk_idx_]->ptr_, current_chunk_offset_);
-                    chunks_[current_chunk_idx_] = Move(new_chunk);
-                }
-
-                if(current_chunk_offset_ + nbytes < current_chunk_size_) {
-                    current_chunk_offset_ += nbytes;
-                    nbytes = 0;
-                    return {start_chunk_id, start_chunk_offset};
-                }
-
-                rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
-
-                while (rest_nbytes > current_chunk_size_) {
-                    chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-                    rest_nbytes -= current_chunk_size_;
-                }
-
-                if (rest_nbytes >= 0) {
-                    chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-                }
-
-                current_chunk_offset_ = rest_nbytes;
-                current_chunk_idx_ = chunks_.size() - 1;
-                return {start_chunk_id, start_chunk_offset};
-            } else {
-                current_chunk_offset_ += nbytes;
-                return {start_chunk_id, start_chunk_offset};
+        // current_chunk_size_ == MAX_VECTOR_CHUNK_SIZE
+        if (current_chunk_offset_ + nbytes > current_chunk_size_) {
+            rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
+            while (rest_nbytes > current_chunk_size_) {
+                chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+                rest_nbytes -= current_chunk_size_;
             }
+
+            if (rest_nbytes >= 0) {
+                chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+            }
+
+            current_chunk_offset_ = rest_nbytes;
+            current_chunk_idx_ = chunks_.size() - 1;
+            return {start_chunk_id, start_chunk_offset};
         } else {
-            // current_chunk_size_ == MAX_VECTOR_CHUNK_SIZE
-            if (current_chunk_offset_ + nbytes > current_chunk_size_) {
-                rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
-                while (rest_nbytes > current_chunk_size_) {
-                    chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-                    rest_nbytes -= current_chunk_size_;
-                }
-
-                if (rest_nbytes >= 0) {
-                    chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-                }
-
-                current_chunk_offset_ = rest_nbytes;
-                current_chunk_idx_ = chunks_.size() - 1;
-                return {start_chunk_id, start_chunk_offset};
-            } else {
-                current_chunk_offset_ += nbytes;
-                return {start_chunk_id, start_chunk_offset};
-            }
+            current_chunk_offset_ += nbytes;
+            return {start_chunk_id, start_chunk_offset};
         }
     }
 }
 
 // return value: start chunk id & chunk offset
-Pair<u64, u64> VectorHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) {
+Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) {
     auto [chunk_id, chunk_offset] = Allocate(nbytes);
 
     u64 start_chunk_id = chunk_id;
@@ -150,7 +108,7 @@ Pair<u64, u64> VectorHeapManager::AppendToHeap(const char *data_ptr, SizeT nbyte
 
 // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
 // the size of data.
-void VectorHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {
+void FixHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {
 //    u64 current_chunk_remain_size = current_chunk_size_ - chunk_offset;
     while (nbytes > 0) {
         char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
@@ -168,7 +126,7 @@ void VectorHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offse
     }
 }
 
-String VectorHeapManager::Stats() const {
+String FixHeapManager::Stats() const {
     std::stringstream ss;
     ss << "Chunk count: " << current_chunk_idx_ << ", Chunk size: " << current_chunk_size_ << ", Current Offset: " << current_chunk_offset_
        << ", Total size: " << total_size() << std::endl;
