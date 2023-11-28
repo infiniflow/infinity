@@ -18,6 +18,7 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
+#include <grpcpp/channel.h>
 #include "network/infinity_grpc/infinity_grpc.grpc.pb.h"
 #include "network/infinity_grpc/infinity_grpc.pb.h"
 
