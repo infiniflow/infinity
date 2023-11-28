@@ -26,6 +26,7 @@ import infinity;
 import database;
 import table;
 import parser;
+import query_result;
 
 namespace infinity {
 
@@ -84,6 +85,7 @@ private:
     static infinity_grpc_proto::ColumnType DataTypeToProtoColumnType (const SharedPtr<DataType>& data_type);
 
     SharedPtr<Infinity> GetInfinityBySessionID(u64 session_id);
+    grpc::Status ProcessResult(infinity_grpc_proto::CommonResponse *response, const QueryResult& result) const;
 
 private:
     Mutex infinity_session_map_mutex_{};

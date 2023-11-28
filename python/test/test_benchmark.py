@@ -20,16 +20,10 @@ import time
 import infinity
 from infinity.infinity import NetworkAddress
 import multiprocessing
-
-
-def print_numbers():
-    for i in range(10):
-        print(i)
-
-
-def print_letters():
-    for letter in 'abcdefghij':
-        print(letter)
+from datetime import datetime
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def worker_external_connection(thread_id, num_iterations, infinity_obj):
@@ -64,18 +58,18 @@ def measure_time_external(num_threads, num_times):
     return elapsed_time
 
 
-def worker_thread(process_id, thread_id, num_iterations, some_function, port=None):
+def worker_thread(process_id, thread_id, num_iterations, some_function, ip='0.0.0.0', port=9090):
     # print(f">>>Process ID: {process_id} Thread ID: {thread_id} <<<")
     for j in range(num_iterations):
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', port))
+        infinity_obj = infinity.connect(NetworkAddress(ip, port))
         some_function(infinity_obj, port, process_id, thread_id, j)
         infinity_obj.disconnect()
 
 
-def worker_internal_connection(process_id, num_threads, num_iterations, some_function, port=None):
+def worker_internal_connection(process_id, num_threads, num_iterations, some_function, ip=None, port=None):
     threads = []
     for j in range(num_threads):
-        thread = threading.Thread(target=worker_thread, args=(process_id, j, num_iterations, some_function, port))
+        thread = threading.Thread(target=worker_thread, args=(process_id, j, num_iterations, some_function, ip, port))
         threads.append(thread)
         thread.start()
 
@@ -84,7 +78,7 @@ def worker_internal_connection(process_id, num_threads, num_iterations, some_fun
         thread.join()
 
 
-def measure_time_internal(num_processes, num_threads, num_times, some_function, port=None):
+def measure_time_internal(num_processes, num_threads, num_times, some_function, ip=None, port=None):
     # Calculate how many iterations each process should do
     num_iterations = num_times // num_processes // num_threads
 
@@ -92,7 +86,7 @@ def measure_time_internal(num_processes, num_threads, num_times, some_function, 
     processes = []
     for i in range(num_processes):
         process = multiprocessing.Process(target=worker_internal_connection,
-                                          args=(i, num_threads, num_iterations, some_function, port))
+                                          args=(i, num_threads, num_iterations, some_function, ip, port))
         processes.append(process)
         process.start()
 
@@ -106,34 +100,48 @@ def measure_time_internal(num_processes, num_threads, num_times, some_function, 
     return elapsed_time
 
 
-def execute(some_functions: list, num_processes, num_threads, num_times):
-    for some_function in some_functions:
-        print(f"\n")
-        print(f"[{some_function.__name__}]")
-        print(f"Number of processes: {num_processes}")
-        print(f"Number of threads: {num_threads}")
-        print(f"Number of times: {num_times}")
-        ports = [('THRIFT  ', 9090)]
-        for (name, port) in ports:
-            elapsed_time = measure_time_internal(num_processes, num_threads, num_times, some_function, port)
-            print(f"{name} {some_function.__name__} QPS: {num_times / elapsed_time} records per second")
+def execute(some_functions: list, protocols: list, num_processes, num_threads, num_times) -> pd.DataFrame:
+    results = pd.DataFrame(
+        columns=['rpc name', 'function', 'qps', 'elapsed_time', 'average_latency', 'num_processes', 'num_threads',
+                 'num_times'])
+    print(f"\n")
+
+    for (protocol, ip, port) in protocols:
+        for some_function in some_functions:
+            elapsed_time = measure_time_internal(num_processes, num_threads, num_times, some_function, ip, port)
+            qps = num_times / elapsed_time  # queries per second
+            avg_latency = (elapsed_time / num_times) * 1000  # in ms
+
+            results.loc[len(results)] = [protocol,
+                                         some_function.__name__,
+                                         qps,
+                                         elapsed_time,
+                                         avg_latency,
+                                         num_processes,
+                                         num_threads,
+                                         num_times]
+
+            # ## kill the infinity server
+            # os.system("pkill -f infinity")
+            # time.sleep(1)
+            # ## remove the database directory
+            # shutil.rmtree("/tmp/infinity")
+            # ## start the infinity server
+            # os.system("infinity --data_path /tmp/infinity &")
+            pd.set_option('display.max_columns', None)
+            pd.set_option('display.width', None)
+
+    return results
 
 
 class TestBenchmark:
 
     def test_measure_time(self):
-        # Using the function
-        num_processes = 16
-        num_threads = 16
-        num_times = 16 * 16 * 100
-
         def create_database(infinity_obj, port, process_id, thread_id, num_iteration):
-            res = infinity_obj.create_database(f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
-            assert res.success
+            infinity_obj.create_database(f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
 
         def get_database(infinity_obj, port, process_id, thread_id, num_iteration):
             db_obj = infinity_obj.get_database(f"default")
-            assert db_obj.db_name == "default"
 
         def list_databases(infinity_obj, port, process_id, thread_id, num_iteration):
             infinity_obj.list_databases()
@@ -154,5 +162,41 @@ class TestBenchmark:
              .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
              .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]))
 
-        functions = [create_database, get_database, create_table, insert_table]
-        execute(functions, num_processes, num_threads, num_times)
+        def list_tables(infinity_obj, port, process_id, thread_id, num_iteration):
+            (infinity_obj
+             .get_database(f"default")
+             .list_tables())
+
+        def select_table(infinity_obj, port, process_id, thread_id, num_iteration):
+            (infinity_obj
+             .get_database(f"default")
+             .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
+             .search()
+             .output(["*"])
+             .filter("c1 > 1").to_list())
+
+        def drop_table(infinity_obj, port, process_id, thread_id, num_iteration):
+            (infinity_obj
+             .get_database(f"default")
+             .drop_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}"))
+
+        ############################################
+        # Using the function
+        ip: str = '0.0.0.0'
+        grpc = ("G RPC", ip, 50052)
+        brpc = ("B RPC", ip, 50051)
+        thrift = ("Thrift", ip, 9090)
+        num_processes = 16
+        num_threads = 16
+        num_times = 16 * 16 * 1
+        protocols = [thrift, brpc, grpc]
+
+        database_functions = [create_database, get_database, list_databases, drop_database]
+        db_df = execute(database_functions, protocols, num_processes, num_threads, num_times)
+
+        table_functions = [create_table, insert_table, select_table, list_tables, drop_table]
+        tbl_df = execute(table_functions, protocols, num_processes, num_threads, num_times)
+
+        df = pd.concat([db_df, tbl_df])
+        print(df)
+        df.to_excel(f"{datetime.now()}_benchmark.xlsx")

@@ -23,6 +23,8 @@ import infinity_exception;
 import data_block;
 import value;
 import column_vector;
+import logger;
+import third_party;
 
 namespace infinity {
 
@@ -31,6 +33,7 @@ grpc::Status GrpcServiceImpl::Connect(grpc::ServerContext *context, const infini
     if (infinity == nullptr) {
         response->set_success(false);
         response->set_error_msg("Connect failed");
+        LOG_ERROR(Format("GRPC ERROR: Connect failed"));
         return grpc::Status::CANCELLED;
     } else {
         infinity_session_map_mutex_.lock();
@@ -48,6 +51,7 @@ grpc::Status GrpcServiceImpl::DisConnect(grpc::ServerContext *context,
     if (infinity == nullptr) {
         response->set_success(false);
         response->set_error_msg("Disconnect failed");
+        LOG_ERROR(Format("GRPC ERROR: Disconnect failed"));
         return grpc::Status::CANCELLED;
     } else {
         auto session_id = infinity->GetSessionId();
@@ -63,12 +67,16 @@ grpc::Status GrpcServiceImpl::DisConnect(grpc::ServerContext *context,
 grpc::Status GrpcServiceImpl::CreateDatabase(grpc::ServerContext *context, const infinity_grpc_proto::CreateDatabaseRequest *request, infinity_grpc_proto::CommonResponse *response) {
     auto infinity = GetInfinityBySessionID(request->session_id());
     auto result = infinity->CreateDatabase(request->db_name(), (const CreateDatabaseOptions &)request->options());
+    return ProcessResult(response, result);
+}
+grpc::Status GrpcServiceImpl::ProcessResult(infinity_grpc_proto::CommonResponse *response, const QueryResult &result) const {
     if (result.IsOk()) {
         response->set_success(true);
         return grpc::Status::OK;
     } else {
         response->set_success(false);
         response->set_error_msg(result.ErrorMsg());
+        LOG_ERROR(Format("GRPC ERROR:", result.ErrorMsg()));
         return grpc::Status::CANCELLED;
     }
 }
@@ -77,14 +85,7 @@ grpc::Status GrpcServiceImpl::DropDatabase(grpc::ServerContext *context, const i
     auto infinity = GetInfinityBySessionID(request->session_id());
     auto result = infinity->DropDatabase(request->db_name(), (const DropDatabaseOptions &)request->options());
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status GrpcServiceImpl::ListDatabase(grpc::ServerContext *context, const infinity_grpc_proto::ListDatabaseRequest *request, infinity_grpc_proto::ListDatabaseResponse *response) {
@@ -111,6 +112,7 @@ grpc::Status GrpcServiceImpl::ListDatabase(grpc::ServerContext *context, const i
     } else {
         response->set_success(false);
         response->set_error_msg(result.ErrorMsg());
+        LOG_ERROR(Format("GRPC ERROR: {}", result.ErrorMsg()));
         return grpc::Status::CANCELLED;
     }
 }
@@ -128,6 +130,8 @@ grpc::Status GrpcServiceImpl::GetDatabase(grpc::ServerContext *context, const in
     } else {
         response->set_success(false);
         response->set_error_msg("Database not found");
+        LOG_ERROR(Format("GRPC ERROR: Database not found"));
+        return grpc::Status::CANCELLED;
     }
 }
 
@@ -145,14 +149,7 @@ grpc::Status GrpcServiceImpl::CreateTable(grpc::ServerContext *context, const in
     Assert<NetworkException>(database != nullptr, "Database is null", __FILE_NAME__, __LINE__);
     auto result = database->CreateTable(request->table_name(), column_defs, Vector<TableConstraint *>(), create_table_opts);
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status GrpcServiceImpl::DropTable(grpc::ServerContext *context, const infinity_grpc_proto::DropTableRequest *request, infinity_grpc_proto::CommonResponse *response) {
@@ -160,14 +157,7 @@ grpc::Status GrpcServiceImpl::DropTable(grpc::ServerContext *context, const infi
     auto database = infinity->GetDatabase(request->db_name());
     auto result = database->DropTable(request->table_name(), (const DropTableOptions &)request->options());
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status GrpcServiceImpl::ListTable(grpc::ServerContext *context, const infinity_grpc_proto::ListTableRequest *request, infinity_grpc_proto::ListTableResponse *response) {
@@ -194,6 +184,7 @@ grpc::Status GrpcServiceImpl::ListTable(grpc::ServerContext *context, const infi
     } else {
         response->set_success(false);
         response->set_error_msg(result.ErrorMsg());
+        LOG_ERROR(Format("GRPC ERROR: {}", result.ErrorMsg()));
         return grpc::Status::CANCELLED;
     }
 }
@@ -239,14 +230,7 @@ grpc::Status GrpcServiceImpl::CreateIndex(grpc::ServerContext *context,
     }
 
     auto result = table->CreateIndex(request->index_name(), column_names, method_type, index_para_list, (CreateIndexOptions &)request->options());
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status
@@ -256,14 +240,7 @@ GrpcServiceImpl::DropIndex(grpc::ServerContext *context, const infinity_grpc_pro
     auto table = database->GetTable(request->table_name());
     auto result = table->DropIndex(request->index_name());
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status
@@ -345,6 +322,7 @@ GrpcServiceImpl::Search(grpc::ServerContext *context, const infinity_grpc_proto:
     } else {
         response->set_success(false);
         response->set_error_msg(result.ErrorMsg());
+        LOG_ERROR(Format("GRPC ERROR: {}", result.ErrorMsg()));
         return grpc::Status::CANCELLED;
     }
 }
@@ -356,14 +334,7 @@ GrpcServiceImpl::Import(grpc::ServerContext *context, const infinity_grpc_proto:
     auto table = database->GetTable(request->table_name());
     auto result = table->Import(request->file_path(), (const ImportOptions &)request->import_options());
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 grpc::Status
@@ -393,14 +364,7 @@ GrpcServiceImpl::Insert(grpc::ServerContext *context, const infinity_grpc_proto:
 
     auto result = table->Insert(columns, values);
 
-    if (result.IsOk()) {
-        response->set_success(true);
-        return grpc::Status::OK;
-    } else {
-        response->set_success(false);
-        response->set_error_msg(result.ErrorMsg());
-        return grpc::Status::CANCELLED;
-    }
+    return ProcessResult(response, result);
 }
 
 void GrpcServiceImpl::Run() {

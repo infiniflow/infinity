@@ -703,6 +703,7 @@ SharedPtr<Infinity> BrpcServiceImpl::GetInfinityBySessionID(u64 session_id) {
     if (infinity_session_map_.count(session_id) > 0) {
         return infinity_session_map_[session_id];
     } else {
+        LOG(ERROR) << "session id not found";
         Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
     }
 }

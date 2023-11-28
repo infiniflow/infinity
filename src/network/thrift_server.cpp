@@ -55,6 +55,7 @@ public:
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Connect failed";
+            LOG_ERROR(Format("THRIFT ERROR: Connect failed"));
         } else {
             infinity_session_map_mutex_.lock();
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
@@ -69,6 +70,7 @@ public:
         if (infinity == nullptr) {
             _return.success = false;
             _return.error_msg = "Disconnect failed";
+            LOG_ERROR(Format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
             infinity->RemoteDisconnect();
@@ -230,6 +232,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -256,6 +259,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -282,6 +286,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -304,6 +309,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg("Database not found");
+            LOG_ERROR(Format("THRIFT ERROR: Database not found"));
         }
     }
 
@@ -316,7 +322,8 @@ public:
             response.__set_success(true);
         } else {
             response.__set_success(false);
-            response.__set_error_msg("Database not found");
+            response.__set_error_msg("Table not found");
+            LOG_ERROR(Format("THRIFT ERROR: Table not found"));
         }
     }
 
@@ -375,6 +382,7 @@ private:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
