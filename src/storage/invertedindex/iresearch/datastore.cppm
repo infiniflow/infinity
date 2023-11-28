@@ -15,6 +15,7 @@
 module;
 
 import stl;
+import parser;
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
@@ -30,6 +31,13 @@ import buffer_manager;
 export module iresearch_datastore;
 
 namespace infinity {
+
+using ScoredId = Pair<float, u32>;
+using ScoredIds = Vector<ScoredId>;
+static const String DEFAULT_SEARCH_MODE("all");
+static const String DEFAULT_SCORER("bm25");
+static const String DEFAULT_SCORER_ARG("");
+static const SizeT DEFAULT_TOPN(100);
 
 export struct ViewSegment {
     ViewSegment(const IRSSubReader &segment) : segment_(&segment) {}
@@ -120,6 +128,8 @@ public:
     void Reset();
 
     ViewSnapshot *GetViewSnapshot();
+
+    int Search(UniquePtr<IrsFilter> flt, const Map<String, String> &options, ScoredIds &result);
 
 private:
     String directory_;
