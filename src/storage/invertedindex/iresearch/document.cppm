@@ -65,9 +65,9 @@ export struct StringField : public IndexField {
 
 export struct TextField : public IndexField {
     String f_;
-    mutable IRSAnalyzer::ptr stream_;
+    mutable IRSAnalyzer *stream_;
 
-    TextField(const StringView &n, IndexFeatures index_features, const Features &flags, IRSAnalyzer::ptr stream)
+    TextField(const StringView &n, IndexFeatures index_features, const Features &flags, IRSAnalyzer *stream)
         : IndexField(n, index_features, flags), stream_(Move(stream)) {}
 
     TokenStream &get_tokens() const override {

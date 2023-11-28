@@ -199,7 +199,12 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                                            TableIndexEntry *table_index_entry,
                                            TxnTimeStamp begin_ts,
                                            BufferManager *buffer_mgr) {
-
+    if (table_index_entry->irs_index_entry_.get() != nullptr) {
+        IrsIndexEntry *irs_index_entry = table_index_entry->irs_index_entry_.get();
+        for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
+            irs_index_entry->irs_index_->BatchInsert(table_entry, table_index_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
+        }
+    }
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
     for(const auto& base_index_pair: table_index_entry->column_index_map_) {
         u64 column_id = base_index_pair.first;
@@ -211,10 +216,7 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
                 SegmentEntry::CreateIndexFile(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
             }
         } else if(base_entry->entry_type_ == EntryType::kIRSIndex) {
-            IrsIndexEntry* irs_index_entry = (IrsIndexEntry*)(base_entry);
-            for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
-                irs_index_entry->irs_index_->BatchInsert(table_entry, table_index_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
-            }
+            continue;
         } else {
             Error<StorageException>("Invalid entry type");
         }

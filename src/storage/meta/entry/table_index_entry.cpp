@@ -47,16 +47,24 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
 
     SizeT index_count = index_def->index_array_.size();
     column_index_map_.reserve(index_count);
+    HashMap<u64, SharedPtr<IndexBase>> index_info_map;
     for (SizeT idx = 0; idx < index_count; ++idx) {
         SharedPtr<IndexBase> &index_base = index_def->index_array_[idx];
 
         // Get column info
         Assert<StorageException>(index_base->column_names_.size() == 1, "Currently, composite index doesn't supported.");
         u64 column_id = TableIndexMeta::GetTableCollectionEntry(table_index_meta)->GetColumnIdByName(index_base->column_names_[0]);
-        SharedPtr<String> column_index_path = MakeShared<String>(Format("{}/{}", *index_dir_, index_base->column_names_[0]));
-        SharedPtr<ColumnIndexEntry> column_index_entry =
-            ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
-        column_index_map_[column_id] = column_index_entry;
+        if (index_base->index_type_ == IndexType::kIRSFullText) {
+            index_info_map.emplace(column_id, index_base);
+        } else {
+            SharedPtr<String> column_index_path = MakeShared<String>(Format("{}/{}", *index_dir_, index_base->column_names_[0]));
+            SharedPtr<ColumnIndexEntry> column_index_entry =
+                ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
+            column_index_map_[column_id] = column_index_entry;
+        }
+    }
+    if (!index_info_map.empty()) {
+        irs_index_entry_ = IrsIndexEntry::NewIrsIndexEntry(index_info_map, this, txn_id, index_dir_, begin_ts);
     }
 }
 

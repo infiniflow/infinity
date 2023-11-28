@@ -35,7 +35,7 @@ struct OutlineBuffer {
 
     OutlineBuffer(BufferManager *buffer_mgr) : buffer_mgr_(buffer_mgr), base_dir_(buffer_mgr->BaseDir()) {}
 
-    OutlineBuffer(BufferManager *buffer_mgr, SharedPtr<String> base_dir) : buffer_mgr_(buffer_mgr), base_dir_(Move(base_dir)) {}
+    OutlineBuffer(BufferManager *buffer_mgr, SharedPtr<String> base_dir) : buffer_mgr_(buffer_mgr), base_dir_(base_dir) {}
 };
 
 export class ColumnBuffer {
@@ -49,16 +49,17 @@ export class ColumnBuffer {
 public:
     ColumnBuffer(u64 column_id, BufferObj *buffer, BufferManager *buffer_mgr) : column_id_(column_id){};
 
-    ColumnBuffer(u64 column_id, const BufferHandle &buffer_handle, BufferManager *buffer_mgr) : column_id_(column_id), inline_col_(buffer_handle) {
+    ColumnBuffer(u64 column_id, const BufferHandle &buffer_handle, BufferManager *buffer_mgr, SharedPtr<String> base_dir = nullptr)
+        : column_id_(column_id), inline_col_(buffer_handle) {
         if (buffer_mgr) {
-            outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr);
+            outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr, base_dir);
         }
     }
 
     ColumnBuffer(u64 column_id, BufferObj *buffer, BufferManager *buffer_mgr = nullptr, SharedPtr<String> base_dir = nullptr)
         : column_id_(column_id), inline_col_(buffer->Load()) {
         if (buffer_mgr) {
-            outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr, Move(base_dir));
+            outline_buffer_ = MakeUnique<OutlineBuffer>(buffer_mgr, base_dir);
         }
     }
 

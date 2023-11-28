@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-
+#include <iostream>
 import stl;
 import third_party;
 
@@ -21,27 +21,24 @@ module iresearch_analyzer;
 
 namespace infinity {
 
-constexpr StringView JIEBA = "jieba";
-constexpr StringView SEGMENT = "segmentation";
-
 constexpr u64 basis = 0xCBF29CE484222325ull;
 constexpr u64 prime = 0x100000001B3ull;
 
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
-void AnalyzerPool::Set(const String &name, const String &args) {
-    if (!Get(name).get()) {
-        switch (Str2Int(name.c_str())) {
+void AnalyzerPool::Set(const StringView &name, const String &args) {
+    if (!Get(name)) {
+        switch (Str2Int(name.data())) {
             case Str2Int(JIEBA.data()): {
                 IRSJiebaAnalyzer::options_t opt;
                 opt.path_ = args;
-                IRSAnalyzer::ptr analyzer = MakeUnique<IRSJiebaAnalyzer>(Move(opt));
-                cache_.emplace(JIEBA, Move(analyzer));
+                SharedPtr<IRSAnalyzer> analyzer = MakeShared<IRSJiebaAnalyzer>(Move(opt));
+                cache_[JIEBA] = analyzer;
             } break;
             case Str2Int(SEGMENT.data()): {
                 IRSSegmentationAnalyzer::options_t opt;
-                IRSAnalyzer::ptr analyzer = MakeUnique<IRSSegmentationAnalyzer>(Move(opt));
-                cache_.emplace(SEGMENT, Move(analyzer));
+                SharedPtr<IRSAnalyzer> analyzer = MakeShared<IRSSegmentationAnalyzer>(Move(opt));
+                cache_[SEGMENT] = analyzer;
             } break;
             default:
                 break;
@@ -49,6 +46,6 @@ void AnalyzerPool::Set(const String &name, const String &args) {
     }
 }
 
-IRSAnalyzer::ptr AnalyzerPool::Get(const String &name) { return Move(cache_[name.c_str()]); }
+IRSAnalyzer *AnalyzerPool::Get(const StringView &name) { return cache_[name].get(); }
 
 } // namespace infinity
