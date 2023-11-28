@@ -16,7 +16,6 @@
 
 #include "type/complex/bitmap_type.h"
 #include "type/complex/blob_type.h"
-#include "type/complex/char_type.h"
 #include "type/complex/embedding_type.h"
 #include "type/complex/uuid_type.h"
 #include "type/complex/varchar_type.h"
