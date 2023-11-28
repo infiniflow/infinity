@@ -26,11 +26,9 @@ def connect(
 ) -> InfinityConnection:
     if isinstance(uri, NetworkAddress) and uri.port == 50052:
         return RemoteGrpcInfinityConnection(uri)
-    elif isinstance(uri, NetworkAddress) and uri.port == 9090:
+    elif isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 9080 or uri.port == 9070):
         return RemoteThriftInfinityConnection(uri)
     elif isinstance(uri, NetworkAddress) and uri.port == 50051:
         return RemoteBrpcInfinityConnection(uri)
     else:
         raise Exception(f"unknown uri: {uri}")
-
-
