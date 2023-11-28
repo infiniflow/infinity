@@ -303,10 +303,9 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
 }
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    const char_t *tmp_buffer = str_view.data();
     auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), 0);
 }
 
 } // namespace
@@ -349,6 +348,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
         BlockColumnEntry *block_column_entry = last_block_entry->columns_[column_idx].get();
         auto column_type = block_column_entry->column_type_.get();
+        // FIXME: Variable length types cannot use type inference addresses
         SizeT dst_offset = write_row * column_type->Size();
         if (column_type->type() == kVarchar) {
             AppendVarcharData(block_column_entry, str_view, dst_offset);
