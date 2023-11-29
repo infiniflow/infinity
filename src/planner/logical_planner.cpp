@@ -828,7 +828,9 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
                                                                   ShowType::kShowSegments,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
-                                                                  bind_context_ptr->GenerateTableIndex());
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_);
 
     this->logical_plan_ = logical_show;
     return Status();

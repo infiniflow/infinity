@@ -260,7 +260,7 @@ void BlockEntry::FlushData(BlockEntry *block_entry, int64_t checkpoint_row_count
 }
 
 void BlockEntry::FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version) {
-    checkpoint_version.SaveToFile(*block_entry->base_dir_ + "/version");
+    checkpoint_version.SaveToFile(block_entry->VersionFilePath());
 }
 
 void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
@@ -341,7 +341,7 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const Json &block_entry_json, Segm
     for (const auto &block_column_json : block_entry_json["columns"]) {
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
-    block_entry->block_version_->LoadFromFile(*block_entry->base_dir_ + "/version");
+    block_entry->block_version_->LoadFromFile(block_entry->VersionFilePath());
     // if not found version file
     if (block_entry->block_version_->created_.empty()) {
         block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);

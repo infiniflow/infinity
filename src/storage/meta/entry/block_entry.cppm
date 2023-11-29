@@ -31,6 +31,8 @@ class SegmentEntry;
 class DataBlock;
 
 export struct BlockVersion {
+    constexpr static const String PATH = "version";
+
     BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
@@ -113,6 +115,12 @@ public:
     static i32 Room(BlockEntry *block_entry);
 
     void MergeFrom(BaseEntry &other) override;
+
+    const String &DirPath() { return *base_dir_; }
+
+    String VersionFilePath() {
+        return ConcatenateFilePath(*base_dir_, BlockVersion::PATH);
+    }
 
 private:
     static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);

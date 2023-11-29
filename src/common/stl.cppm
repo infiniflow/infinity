@@ -423,6 +423,11 @@ export {
         oss << std::fixed << std::setprecision(2) << size << sizeSuffixes[suffixIndex];
         return oss.str();
     }
+
+    String ConcatenateFilePath(const String& dir_path, const String& file_path) {
+        std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
+        return full_path.string();
+    }
 }
 
 } // namespace infinity

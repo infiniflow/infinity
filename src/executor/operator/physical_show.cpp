@@ -53,6 +53,7 @@ import config;
 import session;
 import options;
 import status;
+import block_column_entry;
 
 module physical_show;
 
@@ -576,32 +577,63 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     };
 
     auto output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-    };
-
-    output_block_ptr->Init(column_types);
-
-    for (auto &[_, segment] : table_collection_entry->segment_map_) {
+    auto chuck_filling = [&](const StdFunction<u64(const String &)>& file_size_func, const String &path) {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar(segment->DirPath());
+            Value value = Value::MakeVarchar(path);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            u64 folder_size = GetFolderSize(segment->DirPath());
-            Value value = Value::MakeVarchar(FormatFileSize(folder_size));
+            Value value = Value::MakeVarchar(FormatFileSize(file_size_func(path)));
 
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
-        output_block_ptr->Finalize();
-    }
+    };
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
 
+    if (segment_id_.has_value() && block_id_.has_value()) {
+        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+
+        if (iter != table_collection_entry->segment_map_.end() && iter->second->block_entries_.size() > *block_id_) {
+            auto block = iter->second->block_entries_[*block_id_];
+            auto version_path = block->VersionFilePath();
+
+            chuck_filling(GetFileSize, version_path);
+            for (auto &column: block->columns_) {
+                auto col_file_path = column->FilePath();
+
+                chuck_filling(GetFileSize, col_file_path);
+                for (auto &outline : column->OutlinePaths()) {
+                    chuck_filling(GetFileSize, outline);
+                }
+            }
+        }
+    } else if (segment_id_.has_value()) {
+        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+
+        if (iter != table_collection_entry->segment_map_.end()) {
+            for (auto &entry : iter->second->block_entries_) {
+                auto dir_path = entry->DirPath();
+
+                chuck_filling(GetFolderSize, dir_path);
+            }
+        }
+    } else {
+        for (auto &[_, segment] : table_collection_entry->segment_map_) {
+            auto dir_path = segment->DirPath();
+
+            chuck_filling(GetFolderSize, dir_path);
+        }
+    }
+    output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
