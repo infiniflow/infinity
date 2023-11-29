@@ -178,7 +178,9 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
             break;
         }
         case IndexType::kIRSFullText: {
-
+            String analyzer = index_def_json["analyzer"];
+            auto ptr = MakeShared<IndexFullText>(file_name, Move(column_names), analyzer);
+            res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
         case IndexType::kInvalid: {
