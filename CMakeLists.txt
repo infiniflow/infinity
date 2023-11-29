@@ -96,9 +96,3 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile benchmark
 add_subdirectory(benchmark)
-
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-message("PYTHON_EXECUTABLE: ${PYTHON_EXECUTABLE}")
-
-find_package(Python3 COMPONENTS Interpreter)
-execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_rpc_code.py)
