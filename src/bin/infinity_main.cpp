@@ -25,25 +25,25 @@ namespace {
 
 infinity::DBServer db_server;
 
-infinity::Thread threaded_thrift_thread;
-infinity::ThreadedThriftServer threaded_thrift_server;
+//infinity::Thread threaded_thrift_thread;
+//infinity::ThreadedThriftServer threaded_thrift_server;
 
 infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
-infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
+//infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-            threaded_thrift_server.Shutdown();
-            threaded_thrift_thread.join();
+//            threaded_thrift_server.Shutdown();
+//            threaded_thrift_thread.join();
 
             pool_thrift_server.Shutdown();
             pool_thrift_thread.join();
 
-            non_block_pool_thrift_server.Shutdown();
+//            non_block_pool_thrift_server.Shutdown();
 
             db_server.Shutdown();
             break;
@@ -64,7 +64,7 @@ void RegisterSignal() {
     sig_action.sa_flags = SA_SIGINFO;
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
-//    sigaction(SIGINT, &sig_action, NULL);
+    sigaction(SIGINT, &sig_action, NULL);
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
 }
@@ -122,14 +122,14 @@ auto main(int argc, char **argv) -> int {
     db_server.Init(parameters);
     RegisterSignal();
 
-    threaded_thrift_server.Init(9090);
-    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+//    threaded_thrift_server.Init(9090);
+//    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
 
     pool_thrift_server.Init(9080, 128);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
-    non_block_pool_thrift_server.Init(9070, 64);
-    non_block_pool_thrift_server.Start();
+//    non_block_pool_thrift_server.Init(9070, 64);
+//    non_block_pool_thrift_server.Start();
 
     db_server.Run();
 
