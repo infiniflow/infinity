@@ -23,6 +23,7 @@ import column_buffer;
 import outline_info;
 import buffer_manager;
 import column_vector;
+import local_file_system;
 
 export module block_column_entry;
 
@@ -64,6 +65,21 @@ public:
 
     static SharedPtr<String> OutlineFilename(u64 column_id, SizeT file_idx) {
         return MakeShared<String>(Format("col_{}_out_{}", column_id, file_idx));
+    }
+
+    String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
+
+    Vector<String> OutlinePaths() {
+        Vector<String> outline_paths;
+
+        if (outline_info_.get() != nullptr) {
+            for (int i = 0; i < outline_info_->next_file_idx; ++i) {
+                auto outline_file = BlockColumnEntry::OutlineFilename(column_id_, i);
+
+                outline_paths.push_back(Move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));
+            }
+        }
+        return outline_paths;
     }
 };
 

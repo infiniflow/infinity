@@ -99,6 +99,7 @@ export {
 
     template <typename T>
     using Optional = std::optional<T>;
+    constexpr std::nullopt_t None = std::nullopt;
 
     using StdOfStream = std::ofstream;
 
@@ -386,6 +387,10 @@ export {
 
     SizeT Pow(SizeT x, SizeT y) {
         return std::pow(x, y);
+    }
+
+    u64 Log2(u64 num) {
+        return std::log2(num);
     }
 }
 

@@ -53,6 +53,8 @@ import config;
 import session;
 import options;
 import status;
+import block_column_entry;
+import local_file_system;
 
 module physical_show;
 
@@ -167,6 +169,17 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowSegments: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("size");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Error<NotImplementException>("Not implemented show type");
         }
@@ -200,6 +213,10 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowProfiles: {
             ExecuteShowProfiles(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowSegments: {
+            ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
         default: {
@@ -538,6 +555,86 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
         output_block_ptr->Finalize();
     }
 
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+
+    BaseEntry *base_table_entry{nullptr};
+    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    if (!status.ok()) {
+        show_operator_state->error_message_ = Move(status.msg_);
+        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        return;
+    }
+
+    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "path", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
+    };
+
+    auto output_block_ptr = DataBlock::Make();
+    auto chuck_filling = [&](const StdFunction<u64(const String &)>& file_size_func, const String &path) {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar(path);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(LocalFileSystem::FormatFileSize(file_size_func(path)));
+
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    };
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
+
+    if (segment_id_.has_value() && block_id_.has_value()) {
+        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+
+        if (iter != table_collection_entry->segment_map_.end() && iter->second->block_entries_.size() > *block_id_) {
+            auto block = iter->second->block_entries_[*block_id_];
+            auto version_path = block->VersionFilePath();
+
+            chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
+            for (auto &column: block->columns_) {
+                auto col_file_path = column->FilePath();
+
+                chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
+                for (auto &outline : column->OutlinePaths()) {
+                    chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
+                }
+            }
+        }
+    } else if (segment_id_.has_value()) {
+        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+
+        if (iter != table_collection_entry->segment_map_.end()) {
+            for (auto &entry : iter->second->block_entries_) {
+                auto dir_path = entry->DirPath();
+
+                chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
+            }
+        }
+    } else {
+        for (auto &[_, segment] : table_collection_entry->segment_map_) {
+            auto dir_path = segment->DirPath();
+
+            chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
+        }
+    }
+    output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 

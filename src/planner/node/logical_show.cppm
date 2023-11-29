@@ -33,15 +33,22 @@ export enum class ShowType {
     kShowConfigs,
     kShowProfiles,
     kShowIndexes,
+    kShowSegments,
 };
 
 export String ToString(ShowType type);
 
 export class LogicalShow : public LogicalNode {
 public:
-    explicit LogicalShow(u64 node_id, ShowType type, String schema_name, String object_name, u64 table_index)
+    explicit LogicalShow(u64 node_id,
+                         ShowType type,
+                         String schema_name,
+                         String object_name,
+                         u64 table_index,
+                         Optional<u32> segment_id = None,
+                         Optional<u16> block_id = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(Move(schema_name)), object_name_(Move(object_name)),
-          table_index_(table_index) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -61,11 +68,17 @@ public:
 
     [[nodiscard]] inline const String &object_name() const { return object_name_; }
 
+    [[nodiscard]] inline const Optional<u32> segment_id() const { return segment_id_; }
+
+    [[nodiscard]] inline const Optional<u16> block_id() const { return block_id_; }
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String schema_name_;
     String object_name_; // It could be table/collection/view name
     u64 table_index_{};
+    Optional<u32> segment_id_{};
+    Optional<u16> block_id_{};
 };
 
 } // namespace infinity
