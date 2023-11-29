@@ -235,6 +235,7 @@ target_link_libraries(infinity
 #        iresearch
 
         thrift
+        thriftnb
         iresearch
         lz4
         atomic
@@ -400,3 +401,43 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+
+# infinty client
+add_executable(infinity_client
+        bin/infinity_client.cpp
+        network/infinity_grpc/infinity_grpc.grpc.pb.cc
+        network/infinity_grpc/infinity_grpc.pb.cc
+)
+
+target_link_libraries(infinity_client
+        infinity_core
+        sql_parser
+        faiss
+        onnxruntime_mlas
+        zsv_parser
+        roaring
+        fastpfor
+        newpfor
+        openfst
+
+        protobuf
+        grpc
+        grpc++
+        gpr
+        absl_synchronization
+        #        iresearch
+
+        thrift
+        thriftnb
+        iresearch
+        lz4
+        atomic
+        #        profiler
+
+        leveldb
+        protobuf
+        ssl
+        brpc-static
+        gflags
+        crypto
+)

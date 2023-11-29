@@ -65,4 +65,18 @@ private:
     std::unique_ptr<TServer> server{nullptr};
 };
 
+class InfinityServiceHandler;
+
+class NonBlockPoolThriftServer {
+public:
+    void Init(int32_t port_no, int32_t pool_size);
+    void Start();
+    void Shutdown();
+
+private:
+//    std::unique_ptr<TServer> server{nullptr};
+    std::shared_ptr<InfinityServiceHandler> service_handler_{};
+    std::shared_ptr<apache::thrift::concurrency::Thread> server_thread_{};
+};
+
 } // namespace infinity

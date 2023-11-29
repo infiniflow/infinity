@@ -17,15 +17,18 @@ import typing as tp
 from infinity import URI
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from thrift import Thrift
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
-
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
-        self.db_name = "default"
-        self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port))
+        match uri.port:
+            case 9070:
+                self.transport = TTransport.TFramedTransport(TSocket.TSocket(uri.ip, uri.port)) # async
+            case _:
+                self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port)) # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()

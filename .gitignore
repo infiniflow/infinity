@@ -82,19 +82,22 @@ test/sql/**/*fvecs*.slt
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
 
-#proto
-python/infinity/infinity_pb2.py
-python/infinity/infinity_pb2_grpc.py
-src/network/infinity.grpc.pb.cc
-src/network/infinity.grpc.pb.h
-src/network/infinity.pb.cc
-src/network/infinity.pb.h
-src/network/infinity_thrift/*
-python/infinity/remote_thrift/infinity_thrift_rpc/*
-python/infinity/remote/infinity_grpc/*
-python/infinity/remote/infinity_pb2.py
-python/infinity/remote/infinity_pb2_grpc.py
+# py thrift rpc
+#python/infinity/remote_thrift/infinity_thrift_rpc/constants.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService-remote
+#python/infinity/remote_thrift/infinity_thrift_rpc/ttypes.py
 
+# py grpc rpc
+#python/infinity/remote_grpc/grpc_pb/infinity_grpc_pb2*
+
+# py brpc rpc
+#python/infinity/remote_brpc/brpc_pb/infinity_brpc_pb2*
+
+# cpp rpc
+#src/network/infinity_brpc/*
+#src/network/infinity_grpc/*
+#src/network/infinity_thrift/*
 
 #python sdk
 python/build

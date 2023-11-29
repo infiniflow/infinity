@@ -6,7 +6,7 @@ from sqlglot import condition, expressions as exp
 
 from infinity.query import Query, InfinityVectorQueryBuilder
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.table import Table
+from infinity.table import Table, binary_exp_to_paser_exp
 
 
 class RemoteTable(Table, ABC):
@@ -74,7 +74,6 @@ class RemoteTable(Table, ABC):
                 parse_exprs.append(paser_expr)
             f = Field()
             f.parse_exprs = parse_exprs
-            print(f)
             fields.append(f)
 
         return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
@@ -103,31 +102,22 @@ class RemoteTable(Table, ABC):
 
     def _execute_query(self, query: Query) -> Dict[str, Any]:
         # process select_list
-        global covered_column_vector
         select_list: List[ParsedExpr] = []
 
         for column in query.columns:
-            column_name = []
-            if column == "*":
-                star = True
-            else:
-                star = False
-                column_name.append(column)
-
-            column_expr = ColumnExpr()
-            column_expr.star = star
-            column_expr.column_name = column_name
-            paser_expr_type = ParsedExprType()
-            paser_expr_type.column_expr = column_expr
-            paser_expr = ParsedExpr()
-            paser_expr.type = paser_expr_type
-
-            select_list.append(paser_expr)
+            match column:
+                case "*":
+                    column_expr = ColumnExpr()
+                    column_expr.star = True
+                    paser_expr_type = ParsedExprType()
+                    paser_expr_type.column_expr = column_expr
+                    parsed_expr = ParsedExpr()
+                    parsed_expr.type = paser_expr_type
+                    select_list.append(parsed_expr)
+                case _:
+                    select_list.append(traverse_conditions(condition(column)))
 
         # process where_expr
-
-        # str to ParsedExpr
-        from sqlglot import condition
         where_expr = ParsedExpr()
         if query.filter is not None:
             where_expr = traverse_conditions(condition(query.filter))
@@ -168,8 +158,8 @@ class RemoteTable(Table, ABC):
             column_field = res.column_fields[column_id]
             column_type = column_field.column_type
             column_vector = column_field.column_vector
-            print(column_name, column_type, column_vector)
-            length = len(column_vector)
+            # print(column_name, column_type, column_vector)
+
             if column_type == ColumnType.ColumnInt32:
                 value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
                 results[column_name] = value_list
@@ -213,6 +203,10 @@ def traverse_conditions(cons) -> ParsedExpr:
         parsed_expr = ParsedExpr()
         column_expr = ColumnExpr()
         column_name = [cons.alias_or_name]
+        if cons.alias_or_name == "*":
+            column_expr.star = True
+        else:
+            column_expr.star = False
         column_expr.column_name = column_name
 
         paser_expr_type = ParsedExprType()
@@ -245,24 +239,3 @@ def traverse_conditions(cons) -> ParsedExpr:
             traverse_conditions(value)
     else:
         raise Exception(f"unknown condition: {cons}")
-
-
-def binary_exp_to_paser_exp(binary_expr_key) -> str:
-    if binary_expr_key == "eq":
-        return "="
-    elif binary_expr_key == "gt":
-        return ">"
-    elif binary_expr_key == "lt":
-        return "<"
-    elif binary_expr_key == "gte":
-        return ">="
-    elif binary_expr_key == "lte":
-        return "<="
-    elif binary_expr_key == "neq":
-        return "!="
-    elif binary_expr_key == "and":
-        return "and"
-    elif binary_expr_key == "or":
-        return "or"
-    else:
-        raise Exception(f"unknown binary expression: {binary_expr_key}")

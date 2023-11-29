@@ -23,6 +23,8 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
+#include <thrift/transport/TNonblockingServerSocket.h>
+#include <thrift/server/TNonblockingServer.h>
 #include <memory>
 #include <stdexcept>
 
@@ -53,6 +55,7 @@ public:
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Connect failed";
+            LOG_ERROR(Format("THRIFT ERROR: Connect failed"));
         } else {
             infinity_session_map_mutex_.lock();
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
@@ -67,6 +70,7 @@ public:
         if (infinity == nullptr) {
             _return.success = false;
             _return.error_msg = "Disconnect failed";
+            LOG_ERROR(Format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
             infinity->RemoteDisconnect();
@@ -162,7 +166,7 @@ public:
         output_columns->reserve(request.select_list.size());
 
         for (auto &expr : request.select_list) {
-            auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
+            auto parsed_expr = GetParsedExprFromProto(expr);
             output_columns->emplace_back(parsed_expr);
         }
 
@@ -228,6 +232,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -254,6 +259,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -266,7 +272,7 @@ public:
 
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
-                Value value = data_block->GetValue(0, i);
+                Value value = data_block->GetValue(1, i);
                 if (value.value_.varchar.IsInlined()) {
                     String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
                     response.table_names.emplace_back(prefix);
@@ -280,6 +286,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
         }
     }
 
@@ -302,6 +309,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg("Database not found");
+            LOG_ERROR(Format("THRIFT ERROR: Database not found"));
         }
     }
 
@@ -314,7 +322,8 @@ public:
             response.__set_success(true);
         } else {
             response.__set_success(false);
-            response.__set_error_msg("Database not found");
+            response.__set_error_msg("Table not found");
+            LOG_ERROR(Format("THRIFT ERROR: Table not found"));
         }
     }
 
@@ -359,11 +368,12 @@ private:
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        auto it = infinity_session_map_.find(session_id);
-        if (it == infinity_session_map_.end()) {
+        std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+        if (infinity_session_map_.count(session_id) > 0) {
+            return infinity_session_map_[session_id];
+        } else {
             Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
         }
-        return it->second;
     }
 
     static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {
@@ -372,6 +382,7 @@ private:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -665,7 +676,7 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << std::endl;
+    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
 
     server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                            MakeShared<TServerSocket>(port_no),
@@ -677,5 +688,37 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 void PoolThriftServer::Start() { server->serve(); }
 
 void PoolThriftServer::Shutdown() { server->stop(); }
+
+void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
+
+    SharedPtr<ThreadFactory> thread_factory = MakeShared<ThreadFactory>();
+    service_handler_ = MakeShared<InfinityServiceHandler>();
+    SharedPtr<InfinityServiceProcessor> service_processor = MakeShared<InfinityServiceProcessor>(service_handler_);
+    SharedPtr<TProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
+
+
+    SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
+    threadManager->threadFactory(thread_factory);
+    threadManager->start();
+
+    std::cout << "Non-block pooled thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
+
+    SharedPtr<TNonblockingServerSocket> non_block_socket =  MakeShared<TNonblockingServerSocket>(port_no);
+
+//    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
+//        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));
+
+    server_thread_ = thread_factory->newThread(MakeShared<TNonblockingServer>(service_processor, protocol_factory, non_block_socket, threadManager));
+
+//    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+//                                           MakeShared<TServerSocket>(port_no),
+//                                           MakeShared<TBufferedTransportFactory>(),
+//                                           MakeShared<TBinaryProtocolFactory>(),
+//                                           threadManager);
+}
+
+void NonBlockPoolThriftServer::Start() { server_thread_->start(); }
+
+void NonBlockPoolThriftServer::Shutdown() { server_thread_->join(); }
 
 } // namespace infinity

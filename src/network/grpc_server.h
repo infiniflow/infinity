@@ -18,6 +18,7 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
+#include <grpcpp/channel.h>
 #include "network/infinity_grpc/infinity_grpc.grpc.pb.h"
 #include "network/infinity_grpc/infinity_grpc.pb.h"
 
@@ -26,6 +27,7 @@ import infinity;
 import database;
 import table;
 import parser;
+import query_result;
 
 namespace infinity {
 
@@ -84,9 +86,94 @@ private:
     static infinity_grpc_proto::ColumnType DataTypeToProtoColumnType (const SharedPtr<DataType>& data_type);
 
     SharedPtr<Infinity> GetInfinityBySessionID(u64 session_id);
+    grpc::Status ProcessResult(infinity_grpc_proto::CommonResponse *response, const QueryResult& result) const;
 
 private:
     Mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 };
+
+class GrpcAsyncServiceImpl {
+public:
+    ~GrpcAsyncServiceImpl() {
+        server_->Shutdown();
+        cq_->Shutdown();
+    }
+
+    static void Run();
+    void Shutdown();
+
+    class CallData {
+    public:
+        CallData(GrpcAsyncServiceImpl *service)
+            : service_(service), status_(CREATE) { }
+
+        virtual void Proceed() = 0;
+
+    protected:
+        GrpcAsyncServiceImpl* service_;
+        grpc::ServerContext ctx_;
+
+        enum CallStatus { CREATE, PROCESS, FINISH };
+        CallStatus status_;  // The current serving state.
+    };
+
+    class ConnectCallData: public CallData {
+    public:
+        ConnectCallData(GrpcAsyncServiceImpl *service)
+            : CallData(service), responder_(&ctx_) {
+            Proceed();
+        }
+
+        void Proceed() final;
+
+    private:
+        infinity_grpc_proto::Empty request_;
+        infinity_grpc_proto::CommonResponse response_;
+        grpc::ServerAsyncResponseWriter<infinity_grpc_proto::CommonResponse> responder_;
+    };
+
+    class DisConnectCallData: public CallData {
+    public:
+        DisConnectCallData(GrpcAsyncServiceImpl *service)
+            : CallData(service), responder_(&ctx_) {
+            Proceed();
+        }
+
+        void Proceed() final;
+
+    private:
+        infinity_grpc_proto::DisConnectRequest request_;
+        infinity_grpc_proto::CommonResponse response_;
+        grpc::ServerAsyncResponseWriter<infinity_grpc_proto::CommonResponse> responder_;
+    };
+
+private:
+    void RegisterSession(SharedPtr<Infinity> instance) {
+        infinity_session_map_mutex_.lock();
+        infinity_session_map_.emplace(instance->GetSessionId(), instance);
+        infinity_session_map_mutex_.unlock();
+    };
+    SharedPtr<Infinity> GetInfinityBySessionID(u64 session_id);
+
+    Mutex infinity_session_map_mutex_{};
+    HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
+
+    UniquePtr<grpc::ServerCompletionQueue> cq_;
+    infinity_grpc_proto::InfinityGrpcService::AsyncService service_{};
+    UniquePtr<grpc::Server> server_{};
+};
+
+class GrpcAsyncClient {
+public:
+    explicit GrpcAsyncClient(SharedPtr<grpc::Channel> channel)
+        : stub_(infinity_grpc_proto::InfinityGrpcService::NewStub(channel)) {}
+
+    infinity_grpc_proto::CommonResponse Connect();
+
+    infinity_grpc_proto::CommonResponse DisConnect(u64 session_id);
+private:
+    UniquePtr<infinity_grpc_proto::InfinityGrpcService::Stub> stub_;
+};
+
 } // end namespace infinity
