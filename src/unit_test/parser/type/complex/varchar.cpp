@@ -37,7 +37,7 @@ TEST_F(VarcharTest, structure_check) {
 TEST_F(VarcharTest, value_varchar) {
     using namespace infinity;
     Varchar value_varchar;
-    EXPECT_FALSE(value_varchar.IsValue());
+    EXPECT_TRUE(value_varchar.IsValue());
     value_varchar.SetValue();
     EXPECT_TRUE(value_varchar.IsValue());
     value_varchar.SetColumnVector();

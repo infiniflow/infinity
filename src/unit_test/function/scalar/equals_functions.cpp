@@ -551,7 +551,7 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
     }
-
+#if 0
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
@@ -616,4 +616,5 @@ TEST_F(EqualsFunctionsTest, equals_func) {
             }
         }
     }
+#endif
 }

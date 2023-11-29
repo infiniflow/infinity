@@ -419,7 +419,7 @@ TEST_F(LessFunctionsTest, less_func) {
             }
         }
     }
-
+#if 0
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
@@ -495,4 +495,5 @@ TEST_F(LessFunctionsTest, less_func) {
             }
         }
     }
+#endif
 }

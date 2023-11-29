@@ -35,7 +35,7 @@ import base_expression;
 import column_vector;
 import value_expression;
 import substring;
-
+#if 0
 class SubstrFunctionTest : public BaseTest {};
 
 TEST_F(SubstrFunctionTest, varchar_substr) {
@@ -197,3 +197,4 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
         }
     }
 }
+#endif

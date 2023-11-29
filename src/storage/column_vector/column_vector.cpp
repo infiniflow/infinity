@@ -1007,7 +1007,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             if (varchar.IsInlined()) {
                 return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
             } else {
-                char *varchar_ptr = new char[varchar.length_]{0};
+                char *varchar_ptr = new char[varchar.length_ + 1]{0};
                 this->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr, varchar.vector_.chunk_id_, varchar.vector_.chunk_offset_, varchar.length_);
                 return Value::MakeVarchar(varchar_ptr, true);
             }
@@ -1152,7 +1152,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 Memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
                 auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
                 target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_id;
+                target_ref.vector_.chunk_offset_ = chunk_offset;
             }
             break;
         }
@@ -1352,7 +1352,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
                 Memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
                 auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
                 target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_id;
+                target_ref.vector_.chunk_offset_ = chunk_offset;
             }
             break;
         }
@@ -1858,72 +1858,72 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
     }
 
     SizeT appended_rows = row_count;
-//     if (tail_index_ + row_count > capacity_) {
-//         // attempt to append data rows more than the capacity;
-//         appended_rows = capacity_ - tail_index_;
-//     }
-//
-//     switch (data_type_->type()) {
-//         case kBoolean:
-//         case kTinyInt:
-//         case kSmallInt:
-//         case kInteger:
-//         case kBigInt:
-//         case kHugeInt:
-//         case kDecimal:
-//         case kFloat:
-//         case kDouble:
-//         case kDate:
-//         case kTime:
-//         case kDateTime:
-//         case kTimestamp:
-//         case kInterval:
-//         case kPoint:
-//         case kLine:
-//         case kLineSeg:
-//         case kBox:
-//         case kCircle:
+     if (tail_index_ + row_count > capacity_) {
+         // attempt to append data rows more than the capacity;
+         appended_rows = capacity_ - tail_index_;
+     }
+
+     switch (data_type_->type()) {
+         case kBoolean:
+         case kTinyInt:
+         case kSmallInt:
+         case kInteger:
+         case kBigInt:
+         case kHugeInt:
+         case kDecimal:
+         case kFloat:
+         case kDouble:
+         case kDate:
+         case kTime:
+         case kDateTime:
+         case kTimestamp:
+         case kInterval:
+         case kPoint:
+         case kLine:
+         case kLineSeg:
+         case kBox:
+         case kCircle:
 //         case kBitmap:
-//         case kUuid:
-//         case kEmbedding:
-//         case kRowID: {
-//             const_ptr_t ptr = column_buffer.GetAll();
-//             const_ptr_t src_ptr = ptr + start_row * data_type_size_;
-//             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
-//             Memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
-//             this->tail_index_ += appended_rows;
-//             break;
-//         }
+         case kUuid:
+         case kEmbedding:
+         case kRowID: {
+             const_ptr_t ptr = column_buffer.GetAll();
+             const_ptr_t src_ptr = ptr + start_row * data_type_size_;
+             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
+             Memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
+             this->tail_index_ += appended_rows;
+             break;
+         }
 //
-//         case kVarchar: {
-//             for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
-//                 auto [src_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
+         case kVarchar: {
+             for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
+                 auto [src_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
 //                 auto varchar_type = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
 //                 varchar_type->Initialize(src_ptr, data_size);
-//                 this->tail_index_++;
-//             }
-//             break;
-//         }
-//         case kArray:
-//         case kTuple:
+                 this->tail_index_++;
+             }
+             break;
+         }
+         case kArray:
+         case kTuple:
 //         case kPath:
 //         case kPolygon:
 //         case kBlob:
-//         case kMixed:
-//         case kNull: {
-//             LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
-//             Error<NotImplementException>("Not supported now in append data in column");
-//         }
-//         case kMissing:
-//         case kInvalid: {
-//             LOG_ERROR(Format("Invalid data type {}", data_type_->ToString()));
-//             Error<StorageException>("Invalid data type");
-//         }
-//         default: {
-//             Error<TypeException>("Attempt to store an unaccepted type");
-//             // Null/Missing/Invalid
-//         }
-//     }
+         case kMixed:
+         case kNull: {
+             LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
+             Error<NotImplementException>("Not supported now in append data in column");
+         }
+         case kMissing:
+         case kInvalid: {
+             LOG_ERROR(Format("Invalid data type {}", data_type_->ToString()));
+             Error<StorageException>("Invalid data type");
+         }
+         default: {
+             Error<TypeException>("Attempt to store an unaccepted type");
+             // Null/Missing/Invalid
+         }
+     }
     return appended_rows;
 }
 

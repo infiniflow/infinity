@@ -181,6 +181,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, TinyIntT &target) {
         // No tiny int isn't inline
         return false;
     }
+    if (len != source.length_) {
+        return false;
+    }
     target = static_cast<TinyIntT>(value);
     return true;
 }
@@ -197,7 +200,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
         // No tiny int isn't inline
         return false;
     }
-
+    if (len != source.length_) {
+        return false;
+    }
     target = static_cast<SmallIntT>(value);
     return true;
 }
@@ -213,7 +218,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
     } else {
         return false;
     }
-
+    if (len != source.length_) {
+        return false;
+    }
     target = static_cast<IntegerT>(value);
     return true;
 }

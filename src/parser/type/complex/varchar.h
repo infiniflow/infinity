@@ -123,9 +123,9 @@ public:
 
     void InitAsValue(const std::string &str);
 
-    void InitAsValue(const char *ptr, bool is_move);
+    void InitAsValue(const char *ptr, bool is_move = false);
 
-    void InitAsValue(const char *ptr, size_t len, bool is_move);
+    void InitAsValue(const char *ptr, size_t len, bool is_move = false);
 
 //    void InitializeAsEmptyStr();
 //
@@ -145,7 +145,7 @@ public:
     };
 };
 
-
+#pragma pack()
 
 
 } // namespace infinity

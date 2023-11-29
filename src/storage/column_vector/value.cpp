@@ -111,6 +111,7 @@ Value Value::MakeVarchar(VarcharT &input) {
             Error<StorageException>("Can't make varchar from column vector");
         }
     }
+    value.value_.varchar.is_value_ = true;
     value.is_null_ = false;
     return value;
 }

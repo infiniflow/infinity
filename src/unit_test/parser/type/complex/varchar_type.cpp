@@ -98,15 +98,16 @@ TEST_F(VarcharTypeTest, TestConstructor2) {
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
-    // Constructor from char*
     {
 
-        VarcharT v1(s1.c_str());
+        VarcharT v1;
+        v1.InitAsValue(s1);
         EXPECT_EQ(v1.length_, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
         v1.Reset();
 
-        VarcharT v2(s2.c_str());
+        VarcharT v2;
+        v2.InitAsValue(s2);
         EXPECT_EQ(v2.length_, s2.length());
         EXPECT_EQ(v2.ToString(), s2);
         v2.Reset();
@@ -119,15 +120,16 @@ TEST_F(VarcharTypeTest, TestConstructor3) {
     String s1 = "Hello World";
     String s2 = "Hello World, welcome to c++";
 
-    // Constructor from char* and length
     {
 
-        VarcharT v1(s1.c_str(), s1.length());
+        VarcharT v1;
+        v1.InitAsValue(s1.c_str(), s1.length());
         EXPECT_EQ(v1.length_, s1.length());
         EXPECT_EQ(v1.ToString(), s1);
         v1.Reset();
 
-        VarcharT v2(s2.c_str(), s2.length());
+        VarcharT v2;
+        v2.InitAsValue(s2.c_str(), s2.length());
         EXPECT_EQ(v2.length_, s2.length());
         EXPECT_EQ(v2.ToString(), s2);
         v2.Reset();

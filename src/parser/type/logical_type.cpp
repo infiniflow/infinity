@@ -49,14 +49,14 @@ static const char *type2name[] = {
     "Line",
     "LineSegment",
     "Box",
-    "Path",
-    "Polygon",
+//    "Path",
+//    "Polygon",
     "Circle",
 
     // Other
-    "Bitmap",
+//    "Bitmap",
     "UUID",
-    "Blob",
+//    "Blob",
     "Embedding",
     "RowID",
 
@@ -107,14 +107,14 @@ static int64_t type_size[] = {
     24, // Line
     32, // LineSegment
     32, // Box
-    16, // Path
-    48, // Polygon
+//    16, // Path
+//    48, // Polygon
     24, // Circle
 
     // Other
-    16, // Bitmap
+//    16, // Bitmap
     16, // UUID
-    16, // Blob
+//    16, // Blob
     8,  // Embedding
     8,  // RowID
 

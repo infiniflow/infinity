@@ -365,8 +365,9 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetData();
 
-    for (SizeT idx = 0; idx < count; ++idx) {
-        VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
+    SizeT source_end_idx = source_start_idx + count;
+    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
+        VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
 
         u32 varchar_len = src_ptr->length_;
@@ -384,6 +385,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         }
 
         dst_ptr->length_ = varchar_len;
+        ++dest_start_idx;
     }
 }
 
@@ -532,7 +534,7 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
         Memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
     } else {
         Memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
-        auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
+        auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_buf->fix_heap_mgr_.get(),
                                                                                    src_ptr->vector_.chunk_id_,
                                                                                    src_ptr->vector_.chunk_offset_,
                                                                                    varchar_len);

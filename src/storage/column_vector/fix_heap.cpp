@@ -116,7 +116,14 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, 
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         SizeT src_chunk_remain_size = src_heap_mgr->current_chunk_size() - src_chunk_offset;
 
-        SizeT copy_size = Min(current_chunk_remain_size, src_chunk_remain_size);
+        SizeT copy_size{0};
+        if(nbytes > src_chunk_remain_size) {
+            // not all data will be copied in this chunk
+            copy_size = Min(current_chunk_remain_size, src_chunk_remain_size);
+        } else {
+            copy_size = Min(current_chunk_remain_size, nbytes);
+        }
+
         char* src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;
 
         Memcpy(start_ptr, src_ptr, copy_size);
@@ -133,16 +140,21 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, 
             chunk_offset = 0;
         }
 
-        if(current_chunk_remain_size > 0) {
+        if(current_chunk_remain_size > 0 && src_chunk_remain_size == 0) {
             ++ src_chunk_id;
             src_chunk_offset = 0;
             chunk_offset += copy_size;
         }
 
-        if(src_chunk_remain_size > 0) {
+        if(src_chunk_remain_size > 0 && current_chunk_remain_size == 0) {
             ++ chunk_id;
             chunk_offset = 0;
             src_chunk_offset += copy_size;
+        }
+
+        if(src_chunk_remain_size > 0 && current_chunk_remain_size > 0) {
+            src_chunk_offset += copy_size;
+            chunk_offset += copy_size;
         }
     }
 

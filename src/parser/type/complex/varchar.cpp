@@ -20,38 +20,34 @@
 
 namespace infinity {
 
-//Varchar::Varchar(const std::string &str) { Initialize(str); }
+// Varchar::Varchar(const std::string &str) { Initialize(str); }
 //
-//Varchar::Varchar(const char *ptr) { Initialize(ptr); }
+// Varchar::Varchar(const char *ptr) { Initialize(ptr); }
 //
-//Varchar::Varchar(const char *ptr, size_t len) { Initialize(ptr, len); }
+// Varchar::Varchar(const char *ptr, size_t len) { Initialize(ptr, len); }
 
-Varchar::~Varchar() {
-    Reset();
-}
+Varchar::~Varchar() { Reset(); }
 
-Varchar::Varchar(const Varchar &other) {
-    DeepCopy(other);
-}
+Varchar::Varchar(const Varchar &other) { DeepCopy(other); }
 
-//Varchar::Varchar(Varchar &&other) noexcept {
-//    //    LOG_TRACE("Move constructor");
-//    this->length_ = other.length_;
-//    if (other.IsInlined()) {
-//        memcpy(this->short_.data_, other.short_.data_, length_);
-//    } else {
-//        if(other.IsValue()) {
-//            memcpy(this->value_.prefix_, other.value_.prefix_, VARCHAR_PREFIX_LENGTH);
-//            // Don't need to release this->ptr, since it's constructor.
-//            this->value_.ptr_ = other.value_.ptr_;
-//            other.value_.ptr_ = nullptr;
-//            other.length_ = 0;
-//        } else {
-//            // Is ColumnVector
-//            ParserError("Only support move constructor operator from varchar value to varchar value");
-//        }
-//    }
-//}
+// Varchar::Varchar(Varchar &&other) noexcept {
+//     //    LOG_TRACE("Move constructor");
+//     this->length_ = other.length_;
+//     if (other.IsInlined()) {
+//         memcpy(this->short_.data_, other.short_.data_, length_);
+//     } else {
+//         if(other.IsValue()) {
+//             memcpy(this->value_.prefix_, other.value_.prefix_, VARCHAR_PREFIX_LENGTH);
+//             // Don't need to release this->ptr, since it's constructor.
+//             this->value_.ptr_ = other.value_.ptr_;
+//             other.value_.ptr_ = nullptr;
+//             other.length_ = 0;
+//         } else {
+//             // Is ColumnVector
+//             ParserError("Only support move constructor operator from varchar value to varchar value");
+//         }
+//     }
+// }
 
 Varchar &Varchar::operator=(const Varchar &other) {
     //    LOG_TRACE("Copy assignment");
@@ -65,30 +61,34 @@ Varchar &Varchar::operator=(const Varchar &other) {
 Varchar &Varchar::operator=(Varchar &&other) noexcept {
     //    LOG_TRACE("Move assignment");
     this->length_ = other.length_;
+    this->is_value_ = other.is_value_;
     if (other.IsInlined()) {
         memcpy(this->short_.data_, other.short_.data_, length_);
     } else {
-        if(other.IsValue()) {
+        if (other.IsValue()) {
             memcpy(this->value_.prefix_, other.value_.prefix_, VARCHAR_PREFIX_LENGTH);
             // Don't need to release this->ptr, since it's constructor.
             this->value_.ptr_ = other.value_.ptr_;
             other.value_.ptr_ = nullptr;
-            other.length_ = 0;
         } else {
             // Is ColumnVector
             ParserError("Only support move constructor operator from varchar value to varchar value");
         }
     }
+    other.length_ = 0;
     return *this;
 }
 
 bool Varchar::operator==(const Varchar &other) const {
     if (this->length_ != other.length_)
         return false;
+    if (this->IsValue() != other.IsValue()) {
+        return false;
+    }
     if (this->IsInlined()) {
         return strncmp(this->short_.data_, other.short_.data_, this->length_) == 0;
     } else {
-        if(IsValue()) {
+        if (IsValue()) {
             if (strncmp(this->value_.prefix_, other.value_.prefix_, VARCHAR_PREFIX_LENGTH) != 0) {
                 return false;
             }
@@ -101,7 +101,7 @@ bool Varchar::operator==(const Varchar &other) const {
     return true;
 }
 //
-//bool Varchar::operator>(const Varchar &other) const {
+// bool Varchar::operator>(const Varchar &other) const {
 //    if (this->length > other.length) {
 //        size_t len = other.length;
 //        if (this->IsInlined()) {
@@ -157,9 +157,9 @@ bool Varchar::operator==(const Varchar &other) const {
 //    return false;
 //}
 //
-//bool Varchar::operator<=(const Varchar &other) const { return !operator>(other); }
+// bool Varchar::operator<=(const Varchar &other) const { return !operator>(other); }
 //
-//bool Varchar::operator<(const Varchar &other) const {
+// bool Varchar::operator<(const Varchar &other) const {
 //    if (this->length > other.length) {
 //        size_t len = other.length;
 //        if (this->IsInlined()) {
@@ -219,18 +219,18 @@ bool Varchar::operator==(const Varchar &other) const {
 //    return true;
 //}
 //
-//bool Varchar::operator>=(const Varchar &other) const { return !operator<(other); }
+// bool Varchar::operator>=(const Varchar &other) const { return !operator<(other); }
 //
 void Varchar::DeepCopy(const Varchar &other) {
     // Used in copy constructor and copy assignment
-    if(!other.IsValue() && !this->IsValue()) {
-        ParserError("Only suport copy from varchar value to varchar value");
+    if (!other.IsValue() && !other.IsInlined()) {
+        ParserError("Only support copy from varchar value to varchar value");
     }
 
     if (this->length_ > 0) {
         Reset();
     }
-
+    this->is_value_ = other.is_value_;
     if (other.IsInlined()) {
         memcpy((char *)this, (char *)&other, sizeof(other));
     } else {
@@ -255,11 +255,11 @@ void Varchar::InitAsValue(const char *input_ptr, bool is_move) {
 }
 
 void Varchar::InitAsValue(const char *input_ptr, size_t input_len, bool is_move) {
-    if(input_len > VARCHAR_LENGTH_LIMIT) {
+    if (input_len > VARCHAR_LENGTH_LIMIT) {
         ParserError("Attempt to write string with length exceed 8M into value");
     }
 
-    if(length_ != 0) {
+    if (length_ != 0) {
         ParserError("Varchar type was already initialized.");
     }
 
@@ -268,12 +268,12 @@ void Varchar::InitAsValue(const char *input_ptr, size_t input_len, bool is_move)
 
     if (IsInlined()) {
         memcpy(short_.data_, input_ptr, length_);
-        if(is_move) {
+        if (is_move) {
             delete input_ptr;
         }
     } else {
-        if(is_move) {
-            value_.ptr_ = const_cast<char*>(input_ptr);
+        if (is_move) {
+            value_.ptr_ = const_cast<char *>(input_ptr);
         } else {
             value_.ptr_ = new char[input_len]{0};
         }
@@ -284,20 +284,20 @@ void Varchar::InitAsValue(const char *input_ptr, size_t input_len, bool is_move)
 }
 
 //
-//void Varchar::InitializeAsEmptyStr() {
+// void Varchar::InitializeAsEmptyStr() {
 //    length = 0;
 //    ptr = nullptr;
 //}
 //
 void Varchar::Reset(bool clean_memory) {
-    if(IsInlined()) {
+    if (IsInlined()) {
         length_ = 0;
-        return ;
+        return;
     }
 
     if (!clean_memory) {
         length_ = 0;
-        if(IsValue()) {
+        if (IsValue()) {
             value_.ptr_ = nullptr;
         } else {
             // column_vector
@@ -307,7 +307,7 @@ void Varchar::Reset(bool clean_memory) {
         return;
     }
 
-    if(IsValue()) {
+    if (IsValue()) {
         delete[] value_.ptr_;
         length_ = 0;
         value_.ptr_ = nullptr;
@@ -318,7 +318,7 @@ std::string Varchar::ToString() const {
     if (IsInlined()) {
         return std::string{short_.data_, static_cast<size_t>(length_)};
     } else {
-        if(is_value_) {
+        if (is_value_) {
             return std::string{value_.ptr_, static_cast<size_t>(length_)};
         } else {
             return std::string{vector_.prefix_, static_cast<size_t>(VARCHAR_PREFIX_LENGTH)};

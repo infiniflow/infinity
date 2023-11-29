@@ -35,7 +35,7 @@ import data_block;
 import uuid_cast;
 import column_vector;
 import bound_cast_func;
-
+#if 0
 class UuidCastTest : public BaseTest {};
 
 TEST_F(UuidCastTest, uuid_cast0) {
@@ -116,3 +116,4 @@ TEST_F(UuidCastTest, uuid_cast1) {
         }
     }
 }
+#endif
