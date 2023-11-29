@@ -81,15 +81,12 @@ class ThriftInfinityClient:
                                                     db_name=db_name,
                                                     table_name=table_name))
 
-    def create_index(self, db_name: str, table_name: str, index_name: str, column_names: list[str], method_type: str,
-                     index_para_list: InitParameter, option):
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list, option):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           index_name=index_name,
-                                                          column_names=column_names,
-                                                          method_type=method_type,
-                                                          index_para_list=index_para_list,
+                                                          index_info_list=index_info_list,
                                                           option=option))
 
     def drop_index(self, db_name: str, table_name: str, index_name: str):

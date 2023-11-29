@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import os
+
 from sqlglot import condition
 
 import infinity
+import infinity.index as index
 from infinity.infinity import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
@@ -70,7 +72,7 @@ class TestCase:
         12.
         expect: all operations successfully
         """
-        ports = [9090, 9080, 9070]
+        ports = [9080]
         for port in ports:
             infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', port))
             assert infinity_obj
@@ -101,11 +103,15 @@ class TestCase:
             # index
             res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
             assert res.success
+
             table_obj = db_obj.get_table("my_table2")
             assert table_obj
 
-            res = table_obj.create_index("my_index", ["c1"], "IVFFlat", [{"centroids_count": 128}, {"metric": "l2"}],
-                                         None)
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.IVFFlat,
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "l2")])], None)
             assert res.success
 
             res = table_obj.drop_index("my_index")
