@@ -140,27 +140,27 @@ CastTable::CastTable() {
     matrix_[kBox][kVarchar] = 1;
 
     // From path to other type
-    matrix_[kPath][kPath] = 0;
-    matrix_[kPath][kVarchar] = 1;
+//    matrix_[kPath][kPath] = 0;
+//    matrix_[kPath][kVarchar] = 1;
 
     // From polygon to other type
-    matrix_[kPolygon][kPolygon] = 0;
-    matrix_[kPolygon][kVarchar] = 1;
+//    matrix_[kPolygon][kPolygon] = 0;
+//    matrix_[kPolygon][kVarchar] = 1;
 
     // From circle to other type
     matrix_[kCircle][kCircle] = 0;
     matrix_[kCircle][kVarchar] = 1;
 
     // From bitmap to other type
-    matrix_[kBitmap][kBitmap] = 0;
-    matrix_[kBitmap][kVarchar] = 1;
+//    matrix_[kBitmap][kBitmap] = 0;
+//    matrix_[kBitmap][kVarchar] = 1;
 
     // From uuid to other type
     matrix_[kUuid][kUuid] = 0;
     matrix_[kUuid][kVarchar] = 1;
 
     // From cast blob to other type
-    matrix_[kBlob][kBlob] = 0;
+//    matrix_[kBlob][kBlob] = 0;
 
     // From embedding to other type
     matrix_[kEmbedding][kEmbedding] = 0;
@@ -199,12 +199,12 @@ CastTable::CastTable() {
     matrix_[kNull][kLine] = 0;
     matrix_[kNull][kLineSeg] = 0;
     matrix_[kNull][kBox] = 0;
-    matrix_[kNull][kPath] = 0;
-    matrix_[kNull][kPolygon] = 0;
+//    matrix_[kNull][kPath] = 0;
+//    matrix_[kNull][kPolygon] = 0;
     matrix_[kNull][kCircle] = 0;
-    matrix_[kNull][kBitmap] = 0;
+//    matrix_[kNull][kBitmap] = 0;
     matrix_[kNull][kUuid] = 0;
-    matrix_[kNull][kBlob] = 0;
+//    matrix_[kNull][kBlob] = 0;
     matrix_[kNull][kEmbedding] = 0;
     matrix_[kNull][kRowID] = 0;
 
@@ -231,12 +231,12 @@ CastTable::CastTable() {
     matrix_[kVarchar][kLine] = 2;
     matrix_[kVarchar][kLineSeg] = 2;
     matrix_[kVarchar][kBox] = 2;
-    matrix_[kVarchar][kPath] = 2;
-    matrix_[kVarchar][kPolygon] = 2;
+//    matrix_[kVarchar][kPath] = 2;
+//    matrix_[kVarchar][kPolygon] = 2;
     matrix_[kVarchar][kCircle] = 2;
-    matrix_[kVarchar][kBitmap] = 2;
+//    matrix_[kVarchar][kBitmap] = 2;
     matrix_[kVarchar][kUuid] = 2;
-    matrix_[kVarchar][kBlob] = 2;
+//    matrix_[kVarchar][kBlob] = 2;
     matrix_[kVarchar][kEmbedding] = 2;
     matrix_[kVarchar][kRowID] = 2;
 }

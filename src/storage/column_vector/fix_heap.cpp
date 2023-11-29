@@ -106,6 +106,49 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
     return {start_chunk_id, start_chunk_offset};
 }
 
+// return value: start chunk id & chunk offset
+Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
+    auto [chunk_id, chunk_offset] = Allocate(nbytes);
+    u64 start_chunk_id = chunk_id;
+    u64 start_chunk_offset = chunk_offset;
+    while (nbytes > 0) {
+        char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
+        SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
+        SizeT src_chunk_remain_size = src_heap_mgr->current_chunk_size() - src_chunk_offset;
+
+        SizeT copy_size = Min(current_chunk_remain_size, src_chunk_remain_size);
+        char* src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;
+
+        Memcpy(start_ptr, src_ptr, copy_size);
+
+        current_chunk_remain_size -= copy_size;
+        src_chunk_remain_size -= copy_size;
+        nbytes -= copy_size;
+
+        if(current_chunk_remain_size == 0 && src_chunk_remain_size == 0) {
+            ++ src_chunk_id;
+            src_chunk_offset = 0;
+
+            ++ chunk_id;
+            chunk_offset = 0;
+        }
+
+        if(current_chunk_remain_size > 0) {
+            ++ src_chunk_id;
+            src_chunk_offset = 0;
+            chunk_offset += copy_size;
+        }
+
+        if(src_chunk_remain_size > 0) {
+            ++ chunk_id;
+            chunk_offset = 0;
+            src_chunk_offset += copy_size;
+        }
+    }
+
+    return {start_chunk_id, start_chunk_offset};
+}
+
 // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
 // the size of data.
 void FixHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {

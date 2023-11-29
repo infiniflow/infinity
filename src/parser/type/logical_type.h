@@ -76,14 +76,14 @@ enum LogicalType : int8_t {
     kLine,
     kLineSeg,
     kBox,
-    kPath,
-    kPolygon,
+//    kPath,
+//    kPolygon,
     kCircle,
 
     // Other * 4
-    kBitmap,
+//    kBitmap,
     kUuid,
-    kBlob,
+//    kBlob,
     kEmbedding,
     kRowID,
 

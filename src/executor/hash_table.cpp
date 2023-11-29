@@ -23,6 +23,7 @@ import infinity_exception;
 
 module hash_table;
 
+#if 0
 namespace infinity {
 
 void HashTable::Init(const Vector<DataType> &types) {
@@ -55,12 +56,12 @@ void HashTable::Init(const Vector<DataType> &types) {
             case kLine:
             case kLineSeg:
             case kBox:
-            case kPath:
-            case kPolygon:
+//            case kPath:
+//            case kPolygon:
             case kCircle:
-            case kBitmap:
+//            case kBitmap:
             case kUuid:
-            case kBlob:
+//            case kBlob:
             case kEmbedding:
             case kRowID:
             case kNull:
@@ -120,3 +121,4 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
 }
 
 } // namespace infinity
+#endif

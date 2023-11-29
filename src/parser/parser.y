@@ -651,10 +651,10 @@ IDENTIFIER column_type {
             }
             break;
         }
-        case infinity::LogicalType::kBitmap: {
-            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-            break;
-        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
@@ -681,10 +681,10 @@ IDENTIFIER column_type {
             type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
             break;
         }
-        case infinity::LogicalType::kBitmap: {
-            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-            break;
-        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
+//            break;
+//        }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
             break;
@@ -727,8 +727,8 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean}; }
 | LINE { $$ = infinity::ColumnType{infinity::LogicalType::kLine}; }
 | LSEG { $$ = infinity::ColumnType{infinity::LogicalType::kLineSeg}; }
 | BOX { $$ = infinity::ColumnType{infinity::LogicalType::kBox}; }
-| PATH { $$ = infinity::ColumnType{infinity::LogicalType::kPath}; }
-| POLYGON { $$ = infinity::ColumnType{infinity::LogicalType::kPolygon}; }
+// | PATH { $$ = infinity::ColumnType{infinity::LogicalType::kPath}; }
+// | POLYGON { $$ = infinity::ColumnType{infinity::LogicalType::kPolygon}; }
 | CIRCLE { $$ = infinity::ColumnType{infinity::LogicalType::kCircle}; }
 // Variable types
 | CHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar}; }
@@ -737,8 +737,8 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean}; }
 | DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, $5}; }
 | DECIMAL '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, 0}; }
 | DECIMAL { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, 0, 0}; }
-| BLOB '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBlob, $3}; }
-| BITMAP '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBitmap, $3}; }
+// | BLOB '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBlob, $3}; }
+// | BITMAP '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBitmap, $3}; }
 | EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
 | EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
 | EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
@@ -2171,10 +2171,10 @@ cast_expr: CAST '(' expr AS column_type ')' {
             type_info_ptr = infinity::DecimalInfo::Make($5.precision, $5.scale);
             break;
         }
-        case infinity::LogicalType::kBitmap: {
-            type_info_ptr = infinity::BitmapInfo::Make($5.width);
-            break;
-        }
+//        case infinity::LogicalType::kBitmap: {
+//            type_info_ptr = infinity::BitmapInfo::Make($5.width);
+//            break;
+//        }
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($5.embedding_type_, $5.width);
             break;

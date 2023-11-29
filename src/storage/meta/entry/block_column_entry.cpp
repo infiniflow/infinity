@@ -121,13 +121,13 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                 VarcharLayout *varchar_layout = inline_p + row_idx;
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
-                    varchar_layout->length_ = varchar_type->length;
-                    Memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
+                    varchar_layout->length_ = varchar_type->length_;
+                    Memcpy(short_info.data.data(), varchar_type->short_.data_, varchar_type->length_);
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = block_column_entry->outline_info_.get();
                     if (outline_info->written_buffers_.empty() ||
-                        outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
+                        outline_info->written_buffers_.back().second + varchar_type->length_ > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
                         auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
                         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
                         BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
@@ -137,15 +137,16 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
                     BufferHandle out_buffer_handle = current_buffer_obj->Load();
                     ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
-                    u16 outline_data_size = varchar_type->length;
-                    ptr_t outline_src_ptr = varchar_type->ptr;
-                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
-
-                    varchar_layout->length_ = varchar_type->length;
-                    Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
-                    long_info.file_idx_ = outline_info->next_file_idx - 1;
-                    long_info.file_offset_ = current_buffer_offset;
-                    current_buffer_offset += varchar_type->length;
+                    u16 outline_data_size = varchar_type->length_;
+                    Error<StorageException>("Not implement");
+//                    ptr_t outline_src_ptr = varchar_type->ptr;
+//                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+//
+//                    varchar_layout->length_ = varchar_type->length;
+//                    Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
+//                    long_info.file_idx_ = outline_info->next_file_idx - 1;
+//                    long_info.file_offset_ = current_buffer_offset;
+//                    current_buffer_offset += varchar_type->length;
                 }
             }
             break;
@@ -183,7 +184,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kLineSeg:
         case kBox:
         case kCircle:
-        case kBitmap:
+//        case kBitmap:
         case kUuid:
         case kEmbedding:
         case kRowID: {
@@ -212,9 +213,9 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         }
         case kArray:
         case kTuple:
-        case kPath:
-        case kPolygon:
-        case kBlob:
+//        case kPath:
+//        case kPolygon:
+//        case kBlob:
         case kMixed:
         case kNull: {
             LOG_ERROR(Format("{} isn't supported", column_type->ToString()));

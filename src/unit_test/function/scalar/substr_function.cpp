@@ -88,17 +88,19 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         for (SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hello" + ToStr(idx);
-            VarcharT varchar_value(s);
+            VarcharT varchar_value;
+            varchar_value.InitAsValue(s);
             Value v = Value::MakeVarchar(varchar_value);
             col0->AppendValue(v);
             Value vx = col0->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
             if (vx.value_.varchar.IsInlined()) {
-                String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+                String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
                 EXPECT_STREQ(prefix.c_str(), s.c_str());
             } else {
-                String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+                EXPECT_TRUE(vx.value_.varchar.IsValue());
+                String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
                 EXPECT_STREQ(whole_str.c_str(), s.c_str());
             }
         }
@@ -114,7 +116,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "ell");
         }
     }
@@ -162,17 +164,19 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
 
         for (SizeT idx = 0; idx < row_count; ++idx) {
             String s = "hellohellohellohello" + ToStr(idx);
-            VarcharT varchar_value(s);
+            VarcharT varchar_value;
+            varchar_value.InitAsValue(s);
             Value v = Value::MakeVarchar(varchar_value);
             col0->AppendValue(v);
             Value vx = col0->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_FALSE(vx.value_.varchar.IsInlined());
             if (vx.value_.varchar.IsInlined()) {
-                String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+                String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
                 EXPECT_STREQ(prefix.c_str(), s.c_str());
             } else {
-                String whole_str = String(vx.value_.varchar.ptr, vx.value_.varchar.length);
+                EXPECT_TRUE(vx.value_.varchar.IsValue());
+                String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
                 EXPECT_STREQ(whole_str.c_str(), s.c_str());
             }
         }
@@ -188,7 +192,7 @@ TEST_F(SubstrFunctionTest, varchar_substr) {
             Value vx = result->GetValue(idx);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            String prefix = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "hell");
         }
     }

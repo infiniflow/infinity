@@ -33,8 +33,7 @@ export struct TryCastVarcharToChar;
 export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() == LogicalType::kVarchar,
-                          Format("Expect Varchar type, but it is {}", source.ToString()));
+    Assert<TypeException>(source.type() == LogicalType::kVarchar, Format("Expect Varchar type, but it is {}", source.ToString()));
     switch (target.type()) {
         case kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);
@@ -99,24 +98,24 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         case kBox: {
             Error<TypeException>("Cast from varchar to box");
         }
-        case kPath: {
-            Error<TypeException>("Cast from varchar to path");
-        }
-        case kPolygon: {
-            Error<TypeException>("Cast from varchar to polygon");
-        }
+            //        case kPath: {
+            //            Error<TypeException>("Cast from varchar to path");
+            //        }
+            //        case kPolygon: {
+            //            Error<TypeException>("Cast from varchar to polygon");
+            //        }
         case kCircle: {
             Error<TypeException>("Cast from varchar to circle");
         }
-        case kBitmap: {
-            Error<TypeException>("Cast from varchar to bitmap");
-        }
+            //        case kBitmap: {
+            //            Error<TypeException>("Cast from varchar to bitmap");
+            //        }
         case kUuid: {
             Error<TypeException>("Cast from varchar to uuid");
         }
-        case kBlob: {
-            Error<TypeException>("Cast from varchar to blob");
-        }
+            //        case kBlob: {
+            //            Error<TypeException>("Cast from varchar to blob");
+            //        }
         case kEmbedding: {
             Error<TypeException>("Cast from varchar to embedding");
         }
@@ -136,9 +135,8 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
 struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &input, TargetType &target) {
-        Error<FunctionException>(Format("No implementation to cast from {} to {}",
-                                 DataType::TypeToString<SourceType>(),
-                                 DataType::TypeToString<TargetType>()));
+        Error<FunctionException>(
+            Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -147,9 +145,9 @@ struct TryCastVarchar {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
 
-    if (source.length == 4) {
-        bool res = ToLower(source.prefix[0]) == 't' && ToLower(source.prefix[1]) == 'r' && ToLower(source.prefix[2]) == 'u' &&
-                   ToLower(source.prefix[3]) == 'e';
+    if (source.length_ == 4) {
+        bool res = ToLower(source.short_.data_[0]) == 't' && ToLower(source.short_.data_[1]) == 'r' && ToLower(source.short_.data_[2]) == 'u' &&
+                   ToLower(source.short_.data_[3]) == 'e';
         if (res) {
             target = true;
             return true;
@@ -157,9 +155,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
             return false;
         }
     }
-    if (source.length == 5) {
-        bool res = ToLower(source.prefix[0]) == 'f' && ToLower(source.prefix[1]) == 'a' && ToLower(source.prefix[2]) == 'l' &&
-                   ToLower(source.prefix[3]) == 's' && ToLower(source.prefix[4]) == 'e';
+    if (source.length_ == 5) {
+        bool res = ToLower(source.short_.data_[0]) == 'f' && ToLower(source.short_.data_[1]) == 'a' && ToLower(source.short_.data_[2]) == 'l' &&
+                   ToLower(source.short_.data_[3]) == 's' && ToLower(source.short_.data_[4]) == 'e';
         if (res) {
             target = false;
             return true;
@@ -177,13 +175,10 @@ inline bool TryCastVarchar::Run(const VarcharT &source, TinyIntT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.prefix, &endptr, 10);
-        len = (endptr - source.prefix);
+        value = StrToL(source.short_.data_, &endptr, 10);
+        len = (endptr - source.short_.data_);
     } else {
-        value = StrToL(source.ptr, &endptr, 10);
-        len = (endptr - source.ptr);
-    }
-    if (len != source.length) {
+        // No tiny int isn't inline
         return false;
     }
     target = static_cast<TinyIntT>(value);
@@ -197,13 +192,12 @@ inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.prefix, &endptr, 10);
+        value = StrToL(source.short_.data_, &endptr, 10);
     } else {
-        value = StrToL(source.ptr, &endptr, 10);
-    }
-    if (len != source.length) {
+        // No tiny int isn't inline
         return false;
     }
+
     target = static_cast<SmallIntT>(value);
     return true;
 }
@@ -215,13 +209,11 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.prefix, &endptr, 10);
+        value = StrToL(source.short_.data_, &endptr, 10);
     } else {
-        value = StrToL(source.ptr, &endptr, 10);
-    }
-    if (len != source.length) {
         return false;
     }
+
     target = static_cast<IntegerT>(value);
     return true;
 }
@@ -229,14 +221,17 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
 // Cast VarcharT to BigIntT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
+    if (!source.IsValue()) {
+        Error<FunctionException>("No implementation to cast from column vector Varchar to big int");
+    }
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToL(source.prefix, &endptr, 10);
+        target = StrToL(source.short_.data_, &endptr, 10);
     } else {
-        target = StrToL(source.ptr, &endptr, 10);
+        target = StrToL(source.value_.ptr_, &endptr, 10);
     }
-    if (len != source.length) {
+    if (len != source.length_) {
         return false;
     }
     return true;
@@ -252,14 +247,17 @@ inline bool TryCastVarchar::Run(const VarcharT &source, HugeIntT &target) {
 // Cast VarcharT to FloatT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, FloatT &target) {
+    if (!source.IsValue()) {
+        Error<FunctionException>("No implementation to cast from column vector Varchar to big int");
+    }
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToF(source.prefix, &endptr);
+        target = StrToF(source.short_.data_, &endptr);
     } else {
-        target = StrToF(source.ptr, &endptr);
+        target = StrToF(source.value_.ptr_, &endptr);
     }
-    if (len != source.length) {
+    if (len != source.length_) {
         return false;
     }
     return true;
@@ -271,11 +269,11 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToD(source.prefix, &endptr);
+        target = StrToD(source.short_.data_, &endptr);
     } else {
-        target = StrToD(source.ptr, &endptr);
+        target = StrToD(source.value_.ptr_, &endptr);
     }
-    if (len != source.length) {
+    if (len != source.length_) {
         return false;
     }
     return true;
@@ -284,11 +282,12 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
 // Cast VarcharT to DateT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, DateT &target) {
-    if (source.IsInlined()) {
-        target.FromString(source.prefix, source.length);
-    } else {
-        target.FromString(source.ptr, source.length);
-    }
+    Error<TypeException>("Cast from varchar to date");
+//    if (source.IsInlined()) {
+//        target.FromString(source.prefix, source.length);
+//    } else {
+//        target.FromString(source.ptr, source.length);
+//    }
     return true;
 }
 

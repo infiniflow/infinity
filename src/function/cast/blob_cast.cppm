@@ -25,7 +25,7 @@ import infinity_exception;
 import third_party;
 
 export module blob_cast;
-
+#if 0
 namespace infinity {
 
 export struct BlobTryCastToVarlen;
@@ -68,7 +68,7 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
         // Set varchar prefix
         Memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
 
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
+        ptr_t ptr = vector_ptr->buffer_->fix_heap_mgr_->Allocate(target.length);
         Memcpy(ptr, source.ptr, target.length);
         target.ptr = ptr;
     }
@@ -77,3 +77,4 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
 }
 
 } // namespace infinity
+#endif

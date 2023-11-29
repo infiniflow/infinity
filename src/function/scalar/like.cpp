@@ -80,12 +80,14 @@ struct LikeFunction {
 
 template <>
 inline void LikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
-    ptr_t left_ptr = left.GetDataPtr();
-    SizeT left_len = left.GetDataLen();
-    ptr_t right_ptr = right.GetDataPtr();
-    SizeT right_len = right.GetDataLen();
+    Error<NotImplementException>("Not implement: varchar like varchar");
 
-    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
+//    ptr_t left_ptr = left.GetDataPtr();
+//    SizeT left_len = left.GetDataLen();
+//    ptr_t right_ptr = right.GetDataPtr();
+//    SizeT right_len = right.GetDataLen();
+
+//    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
 struct NotLikeFunction {
@@ -97,12 +99,14 @@ struct NotLikeFunction {
 
 template <>
 inline void NotLikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
-    ptr_t left_ptr = left.GetDataPtr();
-    SizeT left_len = left.GetDataLen();
-    ptr_t right_ptr = right.GetDataPtr();
-    SizeT right_len = right.GetDataLen();
+    Error<NotImplementException>("Not implement: varchar not like varchar");
 
-    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
+//    ptr_t left_ptr = left.GetDataPtr();
+//    SizeT left_len = left.GetDataLen();
+//    ptr_t right_ptr = right.GetDataPtr();
+//    SizeT right_len = right.GetDataLen();
+
+//    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
 void RegisterLikeFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

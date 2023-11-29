@@ -72,21 +72,21 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     }
 
     String res = EmbeddingT::Embedding2String(source, embedding_info->Type(), embedding_info->Dimension());
-    target.length = static_cast<u16>(res.size());
-    if (target.length <= VarcharT::INLINE_LENGTH) {
+    target.length_ = static_cast<u64>(res.size());
+    target.is_value_ = false;
+    if (target.length_ <= VARCHAR_PREFIX_LEN) {
         // inline varchar
-        Memcpy(target.prefix, source.ptr, target.length);
-        Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+        Memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
         Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                               "Varchar column vector should use MemoryVectorBuffer.");
 
         // Set varchar prefix
-        Memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
+        Memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
 
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
-        Memcpy(ptr, source.ptr, target.length);
-        target.ptr = ptr;
+        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(res.c_str(), target.length_);
+        target.vector_.chunk_id_ = chunk_id;
+        target.vector_.chunk_offset_ = chunk_offset;
     }
 
     return true;

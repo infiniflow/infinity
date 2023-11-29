@@ -53,12 +53,12 @@ TEST_F(BoolCastTest, bool_cast0) {
         BooleanT source = true;
         VarcharT target;
         EXPECT_TRUE(TryCastBoolean::Run(source, target));
-        String result = String(target.prefix, 4);
+        String result = String(target.short_.data_, 4);
         EXPECT_STREQ("true", result.c_str());
 
         source = false;
         EXPECT_TRUE(TryCastBoolean::Run(source, target));
-        result = String(target.prefix, 5);
+        result = String(target.short_.data_, 5);
         EXPECT_STREQ("false", result.c_str());
     }
 }
@@ -97,7 +97,7 @@ TEST_F(BoolCastTest, bool_cast1) {
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_varchar_ptr->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-            String res = String(vx.value_.varchar.prefix, vx.value_.varchar.length);
+            String res = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
             if (i % 2 == 0) {
                 EXPECT_STREQ(res.c_str(), "true");
             } else {

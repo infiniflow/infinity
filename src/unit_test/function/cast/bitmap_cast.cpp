@@ -36,7 +36,7 @@ import cast_table;
 import column_vector;
 import bitmap_cast;
 import bound_cast_func;
-
+#if 0
 class BitmapCastTest : public BaseTest {};
 
 TEST_F(BitmapCastTest, bitmap_cast0) {
@@ -130,3 +130,4 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), FunctionException);
     }
 }
+#endif

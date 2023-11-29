@@ -136,17 +136,17 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DecimalT &target) {
 // Cast TinyIntT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    target.is_value_ = false;
     if (source == 0) {
-        target.prefix[0] = '0';
-        target.length = 1;
+        target.short_.data_[0] = '0';
+        target.length_ = 1;
         return true;
     }
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
-    target.length = static_cast<u16>(tmp_str.size());
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
-    Memcpy(target.prefix, tmp_str.c_str(), target.length);
-    Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+    target.length_ = static_cast<u32>(tmp_str.size());
+    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -201,17 +201,17 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DecimalT &target) {
 // Cast SmallIntT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    target.is_value_ = false;
     if (source == 0) {
-        target.prefix[0] = '0';
-        target.length = 1;
+        target.short_.data_[0] = '0';
+        target.length_ = 1;
         return true;
     }
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
-    target.length = static_cast<u16>(tmp_str.size());
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
-    Memcpy(target.prefix, tmp_str.c_str(), target.length);
-    Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+    target.length_ = static_cast<u32>(tmp_str.size());
+    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -269,18 +269,17 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DecimalT &target) {
 // Cast IntegerT to VarcharT type
 template <>
 inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    target.is_value_ = false;
     if (source == 0) {
-        target.prefix[0] = '0';
-        target.length = 1;
+        target.short_.data_[0] = '0';
+        target.length_ = 1;
         return true;
     }
-
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
-    target.length = tmp_str.size();
-    Assert<TypeException>(tmp_str.size() <= VarcharT::INLINE_LENGTH, "Integer digits number should less than 14.");
-    Memcpy(target.prefix, tmp_str.c_str(), target.length);
-    Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+    target.length_ = static_cast<u32>(tmp_str.size());
+    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -341,26 +340,24 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DecimalT &target) {
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    target.is_value_ = false;
     if (source == 0) {
-        target.prefix[0] = '0';
-        target.length = 1;
+        target.short_.data_[0] = '0';
+        target.length_ = 1;
         return true;
     }
-
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
-    target.length = static_cast<u16>(tmp_str.size());
-    if (target.length <= VarcharT::INLINE_LENGTH) {
-        Memcpy(target.prefix, tmp_str.c_str(), target.length);
-        Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
+    target.length_ = static_cast<u32>(tmp_str.size());
+    if (target.length_ <= VARCHAR_INLINE_LEN) {
+        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
+        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
                               "Varchar column vector should use MemoryVectorBuffer. ");
-
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
-        Memcpy(ptr, tmp_str.c_str(), target.length);
-        target.ptr = ptr;
+        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
+        target.vector_.chunk_id_ = chunk_id;
+        target.vector_.chunk_offset_ = chunk_offset;
     }
 
     return true;

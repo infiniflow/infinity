@@ -17,6 +17,7 @@ module;
 import stl;
 import global_resource_usage;
 import heap_chunk;
+import fix_heap;
 
 export module vector_buffer;
 
@@ -48,7 +49,7 @@ public:
     SizeT capacity_{0};
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
-    UniquePtr<StringHeapMgr> heap_mgr_{nullptr};
+    UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
 };
 
 } // namespace infinity

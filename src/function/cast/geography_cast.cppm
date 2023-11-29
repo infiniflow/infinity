@@ -77,7 +77,7 @@ inline bool GeographyTryCastToVarlen::Run(const BoxT &source, VarcharT &target, 
     Error<NotImplementException>("Not implemented");
     return false;
 }
-
+#if 0
 template <>
 inline bool GeographyTryCastToVarlen::Run(const PathT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");
@@ -89,7 +89,7 @@ inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &targ
     Error<NotImplementException>("Not implemented");
     return false;
 }
-
+#endif
 template <>
 inline bool GeographyTryCastToVarlen::Run(const CircleT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     Error<NotImplementException>("Not implemented");

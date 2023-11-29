@@ -51,7 +51,7 @@ public:
 
     static Value MakeVarchar(const String &str);
 
-    static Value MakeVarchar(const char *ptr);
+    static Value MakeVarchar(const char *ptr, bool is_move);
 
     static Value MakeDate(DateT input);
 
@@ -75,17 +75,17 @@ public:
 
     static Value MakeBox(BoxT input);
 
-    static Value MakePath(PathT input);
-
-    static Value MakePolygon(PolygonT input);
+//    static Value MakePath(PathT input);
+//
+//    static Value MakePolygon(PolygonT input);
 
     static Value MakeCircle(CircleT input);
 
-    static Value MakeBitmap(BitmapT input);
+//    static Value MakeBitmap(BitmapT input);
 
     static Value MakeUuid(UuidT input);
 
-    static Value MakeBlob(BlobT input);
+//    static Value MakeBlob(BlobT input);
 
     static Value MakeEmbedding(EmbeddingDataType type, SizeT dimension);
 
@@ -166,13 +166,13 @@ public:
         LineT line;
         LineSegT line_segment;
         BoxT box;
-        PathT path;
-        PolygonT polygon;
+//        PathT path;
+//        PolygonT polygon;
         CircleT circle;
 
-        BitmapT bitmap;
+//        BitmapT bitmap;
         UuidT uuid;
-        BlobT blob;
+//        BlobT blob;
         EmbeddingT embedding;
         RowID row;
 
@@ -260,23 +260,23 @@ LineSegT Value::GetValue() const;
 template <>
 BoxT Value::GetValue() const;
 
-template <>
-PathT Value::GetValue() const;
-
-template <>
-PolygonT Value::GetValue() const;
+//template <>
+//PathT Value::GetValue() const;
+//
+//template <>
+//PolygonT Value::GetValue() const;
 
 template <>
 CircleT Value::GetValue() const;
 
-template <>
-BitmapT Value::GetValue() const;
+//template <>
+//BitmapT Value::GetValue() const;
 
 template <>
 UuidT Value::GetValue() const;
 
-template <>
-BlobT Value::GetValue() const;
+//template <>
+//BlobT Value::GetValue() const;
 
 template <>
 EmbeddingT Value::GetValue() const;

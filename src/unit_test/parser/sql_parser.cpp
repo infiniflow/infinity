@@ -328,21 +328,21 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
-            {
-                auto &column_def = create_table_info->column_defs_[18];
-                EXPECT_EQ(column_def->name_, "s");
-                DataType column_type(LogicalType::kPath, nullptr);
-                EXPECT_EQ(*column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
-
-            {
-                auto &column_def = create_table_info->column_defs_[19];
-                EXPECT_EQ(column_def->name_, "t");
-                DataType column_type(LogicalType::kPolygon, nullptr);
-                EXPECT_EQ(*column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
+//            {
+//                auto &column_def = create_table_info->column_defs_[18];
+//                EXPECT_EQ(column_def->name_, "s");
+//                DataType column_type(LogicalType::kPath, nullptr);
+//                EXPECT_EQ(*column_def->column_type_, column_type);
+//                EXPECT_EQ(column_def->constraints_.size(), 0);
+//            }
+//
+//            {
+//                auto &column_def = create_table_info->column_defs_[19];
+//                EXPECT_EQ(column_def->name_, "t");
+//                DataType column_type(LogicalType::kPolygon, nullptr);
+//                EXPECT_EQ(*column_def->column_type_, column_type);
+//                EXPECT_EQ(column_def->constraints_.size(), 0);
+//            }
 
             {
                 auto &column_def = create_table_info->column_defs_[20];
@@ -387,22 +387,22 @@ TEST_F(SQLParserTest, good_test2) {
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }
 
-            {
-                auto &column_def = create_table_info->column_defs_[26];
-                EXPECT_EQ(column_def->name_, "aa");
-                DataType column_type(LogicalType::kBlob);
-                EXPECT_EQ(*column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
-
-            {
-                auto &column_def = create_table_info->column_defs_[27];
-                EXPECT_EQ(column_def->name_, "ab");
-                SharedPtr<TypeInfo> type_info = BitmapInfo::Make(16);
-                DataType column_type(LogicalType::kBitmap, type_info);
-                EXPECT_EQ(*column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
+//            {
+//                auto &column_def = create_table_info->column_defs_[26];
+//                EXPECT_EQ(column_def->name_, "aa");
+//                DataType column_type(LogicalType::kBlob);
+//                EXPECT_EQ(*column_def->column_type_, column_type);
+//                EXPECT_EQ(column_def->constraints_.size(), 0);
+//            }
+//
+//            {
+//                auto &column_def = create_table_info->column_defs_[27];
+//                EXPECT_EQ(column_def->name_, "ab");
+//                SharedPtr<TypeInfo> type_info = BitmapInfo::Make(16);
+//                DataType column_type(LogicalType::kBitmap, type_info);
+//                EXPECT_EQ(*column_def->column_type_, column_type);
+//                EXPECT_EQ(column_def->constraints_.size(), 0);
+//            }
 
             {
                 auto &column_def = create_table_info->column_defs_[28];

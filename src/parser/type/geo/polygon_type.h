@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #pragma once
 
 #include "type/geo/box_type.h"
@@ -122,3 +124,4 @@ public:
 };
 
 } // namespace infinity
+#endif

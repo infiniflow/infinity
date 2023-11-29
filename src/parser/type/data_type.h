@@ -18,6 +18,7 @@
 #include "type/complex/row_id.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include "type/complex/varchar.h"
 
 #include <memory>
 #include <vector>
@@ -42,7 +43,8 @@ using DoubleT = double;
 using DecimalT = DecimalType;
 
 // std::string
-using VarcharT = VarcharType;
+//using VarcharT = VarcharType;
+using VarcharT = Varchar;
 
 // Date and Time
 using DateT = DateType;
@@ -62,14 +64,14 @@ using PointT = PointType;
 using LineT = LineType;
 using LineSegT = LineSegmentType;
 using BoxT = BoxType;
-using PathT = PathType;
-using PolygonT = PolygonType;
+//using PathT = PathType;
+//using PolygonT = PolygonType;
 using CircleT = CircleType;
 
 // Other
-using BitmapT = BitmapType;
+//using BitmapT = BitmapType;
 using UuidT = UuidType;
-using BlobT = BlobType;
+//using BlobT = BlobType;
 using EmbeddingT = EmbeddingType;
 
 // Heterogeneous
@@ -242,23 +244,23 @@ std::string DataType::TypeToString<LineSegT>();
 template <>
 std::string DataType::TypeToString<BoxT>();
 
-template <>
-std::string DataType::TypeToString<PathT>();
-
-template <>
-std::string DataType::TypeToString<PolygonT>();
+//template <>
+//std::string DataType::TypeToString<PathT>();
+//
+//template <>
+//std::string DataType::TypeToString<PolygonT>();
 
 template <>
 std::string DataType::TypeToString<CircleT>();
 
-template <>
-std::string DataType::TypeToString<BitmapT>();
+//template <>
+//std::string DataType::TypeToString<BitmapT>();
 
 template <>
 std::string DataType::TypeToString<UuidT>();
 
-template <>
-std::string DataType::TypeToString<BlobT>();
+//template <>
+//std::string DataType::TypeToString<BlobT>();
 
 template <>
 std::string DataType::TypeToString<EmbeddingT>();

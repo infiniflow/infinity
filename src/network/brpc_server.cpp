@@ -112,10 +112,13 @@ void BrpcServiceImpl::ListDatabase(google::protobuf::RpcController *cntl_base,
         for (int i = 0; i < row_count; ++i) {
             Value value = data_block->GetValue(0, i);
             if (value.value_.varchar.IsInlined()) {
-                String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
                 response->add_db_name(prefix);
             } else {
-                String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                if(!value.value_.varchar.IsValue()) {
+                    Error<NotImplementException>("Unexpected error: varchar type isn't value");
+                }
+                String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
                 response->add_db_name(whole_str);
             }
         }
@@ -213,10 +216,13 @@ void BrpcServiceImpl::ListTable(google::protobuf::RpcController *cntl_base,
         for (int i = 0; i < row_count; ++i) {
             Value value = data_block->GetValue(1, i);
             if (value.value_.varchar.IsInlined()) {
-                String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
                 response->add_table_name(prefix);
             } else {
-                String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                if(!value.value_.varchar.IsValue()) {
+                    Error<NotImplementException>("Unexpected error: varchar type isn't value");
+                }
+                String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
                 response->add_table_name(whole_str);
             }
         }

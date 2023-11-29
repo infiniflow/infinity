@@ -73,7 +73,7 @@ public:
 
 public:
     // Construct a column vector without initialization;
-    explicit ColumnVector(SharedPtr<DataType> data_type) : data_type_(Move(data_type)), vector_type_(ColumnVectorType::kInvalid) {
+    explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(Move(data_type)) {
         GlobalResourceUsage::IncrObjectCount();
     }
 
@@ -169,13 +169,14 @@ public:
 
 private:
     template <typename DataT>
-    inline void CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select);
+    inline void CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select);
 
     template <typename DataT>
-    inline void CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count);
+    inline void
+    CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT source_start_idx, SizeT dest_start_idx, SizeT count);
 
     template <typename DataT>
-    inline void CopyRowFrom(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx);
+    inline void CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx);
 
 public:
     [[nodiscard]] const inline ColumnVectorType &vector_type() const { return vector_type_; }
@@ -190,7 +191,10 @@ public:
 };
 
 template <typename DataT>
-inline void ColumnVector::CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void
+ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         ((DataT *)(dst))[idx] = ((const DataT *)(src))[row_id];
@@ -198,29 +202,43 @@ inline void ColumnVector::CopyFrom(const_ptr_t __restrict src, ptr_t __restrict 
 }
 
 template <>
-inline void ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT count,
+                                             const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
+
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
 
-        u16 varchar_len = src_ptr->length;
-        if (varchar_len <= VarcharT::INLINE_LENGTH) {
+        u32 varchar_len = src_ptr->length_;
+        if (src_ptr->IsInlined()) {
             // Only prefix is enough to contain all string data.
-            Memcpy(dst_ptr->prefix, src_ptr->prefix, varchar_len);
+            Memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            Memcpy(dst_ptr->prefix, src_ptr->prefix, VarcharT::PREFIX_LENGTH);
-            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
-            Memcpy(ptr, src_ptr->ptr, varchar_len);
-            dst_ptr->ptr = ptr;
+            Memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
+                                                                                       src_ptr->vector_.chunk_id_,
+                                                                                       src_ptr->vector_.chunk_offset_,
+                                                                                       varchar_len);
+            dst_ptr->vector_.chunk_id_ = chunk_id;
+            dst_ptr->vector_.chunk_offset_ = chunk_offset;
         }
-        dst_ptr->length = varchar_len;
+
+        dst_ptr->length_ = varchar_len;
     }
 }
 
+#if 0
+
 template <>
-inline void ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void
+ColumnVector::CopyFrom<PathT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
+
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
@@ -230,7 +248,7 @@ inline void ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __re
         u32 point_count = src_ptr->point_count;
 
         SizeT point_area_size = point_count * sizeof(PointT);
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
         Memcpy(ptr, src_ptr->ptr, point_area_size);
 
         dst_ptr->ptr = ptr;
@@ -240,7 +258,10 @@ inline void ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __re
 }
 
 template <>
-inline void ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void ColumnVector::CopyFrom<PolygonT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT count,
+                                             const Selection &input_select) {
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
@@ -250,7 +271,7 @@ inline void ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t _
         u64 point_count = src_ptr->point_count;
 
         SizeT point_area_size = point_count * sizeof(PointT);
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
         Memcpy(ptr, src_ptr->ptr, point_area_size);
 
         dst_ptr->ptr = ptr;
@@ -260,7 +281,10 @@ inline void ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t _
 }
 
 template <>
-inline void ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void ColumnVector::CopyFrom<BitmapT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT count,
+                                            const Selection &input_select) {
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
@@ -271,7 +295,7 @@ inline void ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __
         u64 unit_count = BitmapT::UnitCount(bit_count);
 
         SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
         Memcpy(ptr, (void *)(src_ptr->ptr), bit_area_size);
 
         dst_ptr->ptr = (u64 *)ptr;
@@ -280,7 +304,8 @@ inline void ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __
 }
 
 template <>
-inline void ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void
+ColumnVector::CopyFrom<BlobT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
@@ -288,7 +313,7 @@ inline void ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __re
         const BlobT *src_ptr = &(((const BlobT *)src)[row_id]);
 
         u64 blob_size = src_ptr->size;
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(blob_size);
         Memcpy(ptr, (void *)(src_ptr->ptr), blob_size);
 
         dst_ptr->ptr = ptr;
@@ -296,8 +321,16 @@ inline void ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __re
     }
 }
 
+#endif
+
 template <>
-inline void ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT count, const Selection &input_select) {
+inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf,
+                                               VectorBuffer *__restrict dst_buf,
+                                               SizeT count,
+                                               const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
+
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
 
@@ -308,7 +341,14 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src, ptr_t
 }
 
 template <typename DataT>
-inline void ColumnVector::CopyFrom(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
+                                   VectorBuffer *__restrict dst_buf,
+                                   SizeT source_start_idx,
+                                   SizeT dest_start_idx,
+                                   SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
+
     SizeT source_end_idx = source_start_idx + count;
 
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
@@ -317,32 +357,43 @@ inline void ColumnVector::CopyFrom(const_ptr_t __restrict src, ptr_t __restrict 
 }
 
 template <>
-inline void
-ColumnVector::CopyFrom<VarcharT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT source_start_idx,
+                                             SizeT dest_start_idx,
+                                             SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
 
-    SizeT source_end_idx = source_start_idx + count;
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
-        VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
+    for (SizeT idx = 0; idx < count; ++idx) {
+        VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
 
-        u16 varchar_len = src_ptr->length;
-        if (varchar_len <= VarcharT::INLINE_LENGTH) {
+        u32 varchar_len = src_ptr->length_;
+        if (src_ptr->IsInlined()) {
             // Only prefix is enough to contain all string data.
-            Memcpy(dst_ptr->prefix, src_ptr->prefix, varchar_len);
+            Memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
         } else {
-            Memcpy(dst_ptr->prefix, src_ptr->prefix, VarcharT::PREFIX_LENGTH);
-            ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
-            Memcpy(ptr, src_ptr->ptr, varchar_len);
-            dst_ptr->ptr = ptr;
+            Memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+            auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
+                                                                                       src_ptr->vector_.chunk_id_,
+                                                                                       src_ptr->vector_.chunk_offset_,
+                                                                                       varchar_len);
+            dst_ptr->vector_.chunk_id_ = chunk_id;
+            dst_ptr->vector_.chunk_offset_ = chunk_offset;
         }
-        dst_ptr->length = varchar_len;
-        ++dest_start_idx;
+
+        dst_ptr->length_ = varchar_len;
     }
 }
 
+#if 0
 template <>
-inline void
-ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<PathT>(const VectorBuffer *__restrict src_buf,
+                                          VectorBuffer *__restrict dst_buf,
+                                          SizeT source_start_idx,
+                                          SizeT dest_start_idx,
+                                          SizeT count) {
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         PathT *dst_ptr = &(((PathT *)dst)[dest_start_idx]);
@@ -351,7 +402,7 @@ ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __restrict dst, 
         u32 point_count = src_ptr->point_count;
 
         SizeT point_area_size = point_count * sizeof(PointT);
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
         Memcpy(ptr, src_ptr->ptr, point_area_size);
 
         dst_ptr->ptr = ptr;
@@ -363,8 +414,11 @@ ColumnVector::CopyFrom<PathT>(const_ptr_t __restrict src, ptr_t __restrict dst, 
 }
 
 template <>
-inline void
-ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<PolygonT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT source_start_idx,
+                                             SizeT dest_start_idx,
+                                             SizeT count) {
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         PolygonT *dst_ptr = &(((PolygonT *)dst)[dest_start_idx]);
@@ -373,7 +427,7 @@ ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t __restrict ds
         u64 point_count = src_ptr->point_count;
 
         SizeT point_area_size = point_count * sizeof(PointT);
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
         Memcpy(ptr, src_ptr->ptr, point_area_size);
 
         dst_ptr->ptr = ptr;
@@ -384,8 +438,11 @@ ColumnVector::CopyFrom<PolygonT>(const_ptr_t __restrict src, ptr_t __restrict ds
 }
 
 template <>
-inline void
-ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<BitmapT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT source_start_idx,
+                                            SizeT dest_start_idx,
+                                            SizeT count) {
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
 
@@ -396,7 +453,7 @@ ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __restrict dst
         u64 unit_count = BitmapT::UnitCount(bit_count);
 
         SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
         Memcpy(ptr, (void *)(src_ptr->ptr), bit_area_size);
 
         dst_ptr->ptr = (u64 *)ptr;
@@ -407,8 +464,11 @@ ColumnVector::CopyFrom<BitmapT>(const_ptr_t __restrict src, ptr_t __restrict dst
 }
 
 template <>
-inline void
-ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<BlobT>(const VectorBuffer *__restrict src_buf,
+                                          VectorBuffer *__restrict dst_buf,
+                                          SizeT source_start_idx,
+                                          SizeT dest_start_idx,
+                                          SizeT count) {
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
 
@@ -416,7 +476,7 @@ ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __restrict dst, 
         const BlobT *src_ptr = &(((const BlobT *)src)[idx]);
 
         u64 blob_size = src_ptr->size;
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+        ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(blob_size);
         Memcpy(ptr, (void *)(src_ptr->ptr), blob_size);
 
         dst_ptr->ptr = ptr;
@@ -426,9 +486,17 @@ ColumnVector::CopyFrom<BlobT>(const_ptr_t __restrict src, ptr_t __restrict dst, 
     }
 }
 
+#endif
+
 template <>
-inline void
-ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src, ptr_t __restrict dst, SizeT source_start_idx, SizeT dest_start_idx, SizeT count) {
+inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf,
+                                               VectorBuffer *__restrict dst_buf,
+                                               SizeT source_start_idx,
+                                               SizeT dest_start_idx,
+                                               SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
+
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
 
@@ -441,38 +509,51 @@ ColumnVector::CopyFrom<EmbeddingT>(const_ptr_t __restrict src, ptr_t __restrict 
 }
 
 template <typename DataT>
-inline void ColumnVector::CopyRowFrom(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
+
     ((DataT *)(dst))[dst_idx] = ((const DataT *)(src))[src_idx];
 }
 
 template <>
-inline void ColumnVector::CopyRowFrom<VarcharT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void
+ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
 
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
 
-    u16 varchar_len = src_ptr->length;
-    if (varchar_len <= VarcharT::INLINE_LENGTH) {
+    u32 varchar_len = src_ptr->length_;
+    if (src_ptr->IsInlined()) {
         // Only prefix is enough to contain all string data.
-        Memcpy(dst_ptr->prefix, src_ptr->prefix, varchar_len);
+        Memcpy(dst_ptr->short_.data_, src_ptr->short_.data_, varchar_len);
     } else {
-        Memcpy(dst_ptr->prefix, src_ptr->prefix, VarcharT::PREFIX_LENGTH);
-        ptr_t ptr = this->buffer_->heap_mgr_->Allocate(varchar_len);
-        Memcpy(ptr, src_ptr->ptr, varchar_len);
-        dst_ptr->ptr = ptr;
+        Memcpy(dst_ptr->vector_.prefix_, src_ptr->value_.prefix_, VARCHAR_PREFIX_LEN);
+        auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(dst_buf->fix_heap_mgr_.get(),
+                                                                                   src_ptr->vector_.chunk_id_,
+                                                                                   src_ptr->vector_.chunk_offset_,
+                                                                                   varchar_len);
+        dst_ptr->vector_.chunk_id_ = chunk_id;
+        dst_ptr->vector_.chunk_offset_ = chunk_offset;
     }
-    dst_ptr->length = varchar_len;
+
+    dst_ptr->length_ = varchar_len;
 }
 
+#if 0
+
 template <>
-inline void ColumnVector::CopyRowFrom<PathT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void ColumnVector::CopyRowFrom<PathT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     PathT *dst_ptr = &(((PathT *)dst)[dst_idx]);
     const PathT *src_ptr = &(((const PathT *)src)[src_idx]);
 
     u32 point_count = src_ptr->point_count;
 
     SizeT point_area_size = point_count * sizeof(PointT);
-    ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+    ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
     Memcpy(ptr, src_ptr->ptr, point_area_size);
 
     dst_ptr->ptr = ptr;
@@ -481,14 +562,15 @@ inline void ColumnVector::CopyRowFrom<PathT>(const_ptr_t __restrict src, SizeT s
 }
 
 template <>
-inline void ColumnVector::CopyRowFrom<PolygonT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void
+ColumnVector::CopyRowFrom<PolygonT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     PolygonT *dst_ptr = &(((PolygonT *)dst)[dst_idx]);
     const PolygonT *src_ptr = &(((const PolygonT *)src)[src_idx]);
 
     u64 point_count = src_ptr->point_count;
 
     SizeT point_area_size = point_count * sizeof(PointT);
-    ptr_t ptr = this->buffer_->heap_mgr_->Allocate(point_area_size);
+    ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
     Memcpy(ptr, src_ptr->ptr, point_area_size);
 
     dst_ptr->ptr = ptr;
@@ -497,7 +579,8 @@ inline void ColumnVector::CopyRowFrom<PolygonT>(const_ptr_t __restrict src, Size
 }
 
 template <>
-inline void ColumnVector::CopyRowFrom<BitmapT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void
+ColumnVector::CopyRowFrom<BitmapT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     BitmapT *dst_ptr = &(((BitmapT *)dst)[dst_idx]);
     const BitmapT *src_ptr = &(((const BitmapT *)src)[src_idx]);
 
@@ -505,7 +588,7 @@ inline void ColumnVector::CopyRowFrom<BitmapT>(const_ptr_t __restrict src, SizeT
     u64 unit_count = BitmapT::UnitCount(bit_count);
 
     SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-    ptr_t ptr = this->buffer_->heap_mgr_->Allocate(bit_area_size);
+    ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
     Memcpy(ptr, (void *)(src_ptr->ptr), bit_area_size);
 
     dst_ptr->ptr = (u64 *)ptr;
@@ -513,20 +596,25 @@ inline void ColumnVector::CopyRowFrom<BitmapT>(const_ptr_t __restrict src, SizeT
 }
 
 template <>
-inline void ColumnVector::CopyRowFrom<BlobT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void ColumnVector::CopyRowFrom<BlobT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     BlobT *dst_ptr = &(((BlobT *)dst)[dst_idx]);
     const BlobT *src_ptr = &(((const BlobT *)src)[src_idx]);
 
     u64 blob_size = src_ptr->size;
-    ptr_t ptr = this->buffer_->heap_mgr_->Allocate(blob_size);
+    ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(blob_size);
     Memcpy(ptr, (void *)(src_ptr->ptr), blob_size);
 
     dst_ptr->ptr = ptr;
     dst_ptr->size = blob_size;
 }
 
+#endif
+
 template <>
-inline void ColumnVector::CopyRowFrom<EmbeddingT>(const_ptr_t __restrict src, SizeT src_idx, ptr_t __restrict dst, SizeT dst_idx) {
+inline void
+ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = src_buf->GetData();
     const_ptr_t src_ptr = src + src_idx * data_type_size_;
     ptr_t dst_ptr = dst + dst_idx * data_type_size_;
     Memcpy(dst_ptr, src_ptr, data_type_size_);

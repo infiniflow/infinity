@@ -37,6 +37,9 @@ public:
     // return value: start chunk id & chunk offset
     Pair<u64, u64> AppendToHeap(const char* data_ptr, SizeT nbytes);
 
+    // return value: start chunk id & chunk offset
+    Pair<u64, u64> AppendToHeap(const FixHeapManager* src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes);
+
     // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
     // the size of data.
     void ReadFromHeap(char* buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes);
