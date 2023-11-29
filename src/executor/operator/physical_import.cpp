@@ -303,10 +303,9 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
 }
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    const char_t *tmp_buffer = str_view.data();
     auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), 0);
 }
 
 } // namespace
@@ -333,6 +332,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
         last_block_entry = segment_entry->block_entries_.back().get();
     }
 
+    // if column count is larger than columns defined from schema, extra columns are abandoned
+    if(column_count != last_block_entry->columns_.size()) {
+        UniquePtr<String> err_msg = MakeUnique<String>("CSV file row count isn't match with table schema, row id: {}.");
+        LOG_ERROR(*err_msg);
+        Error<StorageException>(*err_msg);
+    }
     // append data to segment entry
     SizeT write_row = last_block_entry->row_count_;
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
@@ -343,6 +348,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
         BlockColumnEntry *block_column_entry = last_block_entry->columns_[column_idx].get();
         auto column_type = block_column_entry->column_type_.get();
+        // FIXME: Variable length types cannot use type inference addresses
         SizeT dst_offset = write_row * column_type->Size();
         if (column_type->type() == kVarchar) {
             AppendVarcharData(block_column_entry, str_view, dst_offset);

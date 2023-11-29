@@ -52,6 +52,7 @@ target_include_directories(hnsw_benchmark2 PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
     hnsw_benchmark2
     infinity_core
+    sql_parser
     benchmark_profiler
 )
 
@@ -66,6 +67,7 @@ target_include_directories(ann_ivfflat_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src
 target_link_libraries(
         ann_ivfflat_benchmark
         infinity_core
+        sql_parser
         benchmark_profiler
         faiss
         onnxruntime_mlas

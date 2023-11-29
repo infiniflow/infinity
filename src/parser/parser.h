@@ -349,14 +349,16 @@ union SQLSTYPE
     infinity::CopyOption* copy_option_t;
     std::vector<infinity::CopyOption*>* copy_option_array;
 
-    infinity::InitParameter*        index_para_t;
-    std::vector<infinity::InitParameter*>* index_para_list_t;
-    std::vector<infinity::InitParameter*>* with_index_para_list_t;
+    infinity::InitParameter*        index_param_t;
+    std::vector<infinity::InitParameter*>* index_param_list_t;
+    std::vector<infinity::InitParameter*>* with_index_param_list_t;
+
+    std::vector<infinity::IndexInfo*>* index_info_list_t;
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-#line 360 "parser.h"
+#line 362 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

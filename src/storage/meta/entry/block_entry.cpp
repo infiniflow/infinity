@@ -249,9 +249,13 @@ void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
 }
 
 void BlockEntry::FlushData(BlockEntry *block_entry, int64_t checkpoint_row_count) {
-    for (auto &column_data : block_entry->columns_) {
-        column_data->Flush(column_data.get(), checkpoint_row_count);
-        LOG_TRACE(Format("ColumnData {} is flushed", column_data->column_id_));
+    SizeT column_count = block_entry->columns_.size();
+    SizeT column_idx = 0;
+    while(column_idx < column_count) {
+        BlockColumnEntry* block_column_entry = block_entry->columns_[column_idx].get();
+        BlockColumnEntry::Flush(block_column_entry, checkpoint_row_count);
+        LOG_TRACE(Format("ColumnData {} is flushed", block_column_entry->column_id_));
+        ++ column_idx;
     }
 }
 

@@ -153,23 +153,35 @@ struct SQL_LTYPE {
     infinity::CopyOption* copy_option_t;
     std::vector<infinity::CopyOption*>* copy_option_array;
 
-    infinity::InitParameter*        index_para_t;
-    std::vector<infinity::InitParameter*>* index_para_list_t;
-    std::vector<infinity::InitParameter*>* with_index_para_list_t;
+    infinity::InitParameter*        index_param_t;
+    std::vector<infinity::InitParameter*>* index_param_list_t;
+    std::vector<infinity::InitParameter*>* with_index_param_list_t;
+
+    std::vector<infinity::IndexInfo*>* index_info_list_t;
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 }
 
 %destructor {
-    fprintf(stderr, "destroy create index para list\n");
+    fprintf(stderr, "destroy index info list\n");
     if (($$) != nullptr) {
         for (auto ptr : *($$)) {
             delete ptr;
         }
         delete ($$);
     }
-} <with_index_para_list_t>
+} <index_info_list_t>
+
+%destructor {
+    fprintf(stderr, "destroy create index param list\n");
+    if (($$) != nullptr) {
+        for (auto ptr : *($$)) {
+            delete ptr;
+        }
+        delete ($$);
+    }
+} <with_index_param_list_t>
 
 /* %destructor {
     fprintf(stderr, "destroy if exists info\n");
@@ -416,9 +428,11 @@ struct SQL_LTYPE {
 
 %type <bool_value>        if_not_exists if_exists distinct
 
-%type <index_para_t> index_para
-%type <index_para_list_t> index_para_list
-%type <with_index_para_list_t> with_index_para_list
+%type <index_param_t> index_param
+%type <index_param_list_t> index_param_list
+%type <with_index_param_list_t> with_index_param_list
+
+%type <index_info_list_t> index_info_list
 
 /* %type <if_exists_info_t> if_exists_info */
 %type <if_not_exists_info_t> if_not_exists_info 
@@ -580,9 +594,8 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     $$->create_info_ = create_view_info;
 }
 // TODO shenyushi 4: should support default index name if the name does not exist
-/* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (para[, ...para])]; */
-| CREATE INDEX if_not_exists_info ON table_name '(' identifier_array ')' USING IDENTIFIER with_index_para_list {
-    $$ = new infinity::CreateStatement();
+/* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
+| CREATE INDEX if_not_exists_info ON table_name index_info_list {
     std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
     if($5->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $5->schema_name_ptr_;
@@ -593,18 +606,21 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     delete $5;
 
     create_index_info->index_name_ = $3->info_;
-
-    create_index_info->column_names_ = $7;
     if ($3->exists_) {
         create_index_info->conflict_type_ = $3->if_not_exists_ ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
     } else {
         create_index_info->conflict_type_ = infinity::ConflictType::kIgnore;
     }
-    create_index_info->method_type_ = $10;
-    free($10);
     delete $3;
 
-    create_index_info->index_para_list_ = $11;
+    create_index_info->index_info_list_ = $6;
+
+    if(create_index_info->index_name_.empty()) {
+        yyerror(&yyloc, scanner, result, "No index name");
+        YYERROR;
+    }
+
+    $$ = new infinity::CreateStatement();
     $$->create_info_ = create_index_info;
 };
 
@@ -1830,7 +1846,7 @@ query_expr : QUERY '(' STRING ')' {
 
 fusion_expr : FUSION '(' STRING ',' STRING ')' {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
-    fusion_expr->method_ = std::move(std::string($3));
+    fusion_expr->method_ = std::string($3);
     free($3);
     fusion_expr->SetOptions($5);
     free($5);
@@ -2420,7 +2436,11 @@ copy_option : FORMAT IDENTIFIER {
 | DELIMITER STRING {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kDelimiter;
-    $$->delimiter_ = $2[0];
+    if(strlen($2) > 1 && $2[0] == '\\') {
+        if($2[1] == 't') $$->delimiter_ = '\t';
+    }else {
+        $$->delimiter_ = $2[0];
+    }
     free($2);
 }
 | HEADER {
@@ -2465,49 +2485,154 @@ if_not_exists_info : if_not_exists IDENTIFIER {
 }
 
 // TODO shenyushi -1: Can no parameter be represented as this?
-with_index_para_list : WITH '(' index_para_list ')' {
+with_index_param_list : WITH '(' index_param_list ')' {
     $$ = std::move($3);
 }
 | {
     $$ = new std::vector<infinity::InitParameter*>();
 }
 
-index_para_list : index_para {
+index_param_list : index_param {
     $$ = new std::vector<infinity::InitParameter*>();
     $$->push_back($1);
 }
-| index_para_list ',' index_para {
+| index_param_list ',' index_param {
     $1->push_back($3);
     $$ = $1;
 };
 
-index_para : IDENTIFIER {
+index_param : IDENTIFIER {
     $$ = new infinity::InitParameter();
-    $$->para_name_ = $1;
+    $$->param_name_ = $1;
     free($1);
 }
 | IDENTIFIER '=' IDENTIFIER {
     $$ = new infinity::InitParameter();
-    $$->para_name_ = $1;
+    $$->param_name_ = $1;
     free($1);
 
-    $$->para_value_ = $3;
+    $$->param_value_ = $3;
     free($3);
 }
 | IDENTIFIER '=' LONG_VALUE {
     $$ = new infinity::InitParameter();
-    $$->para_name_ = $1;
+    $$->param_name_ = $1;
     free($1);
 
-    $$->para_value_ = std::to_string($3);
+    $$->param_value_ = std::to_string($3);
 }
 | IDENTIFIER '=' DOUBLE_VALUE {
     $$ = new infinity::InitParameter();
-    $$->para_name_ = $1;
+    $$->param_name_ = $1;
     free($1);
 
-    $$->para_value_ = std::to_string($3);
+    $$->param_value_ = std::to_string($3);
 };
+
+/* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name
+(column1[, ...column2]) USING method [WITH (param[, ...param])] (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
+
+index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
+    ParserHelper::ToLower($5);
+    infinity::IndexType index_type = infinity::IndexType::kInvalid;
+    if(strcmp($5, "fulltext") == 0) {
+        index_type = infinity::IndexType::kIRSFullText;
+    } else if (strcmp($5, "hlvq") == 0) {
+        index_type = infinity::IndexType::kHnswLVQ;
+    } else if (strcmp($5, "hnsw") == 0) {
+        index_type = infinity::IndexType::kHnsw;
+    } else if (strcmp($5, "ivfflat") == 0) {
+        index_type = infinity::IndexType::kIVFFlat;
+    } else {
+        free($5);
+        delete $2;
+        delete $6;
+        yyerror(&yyloc, scanner, result, "Unknown index type");
+        YYERROR;
+    }
+    free($5);
+
+    size_t index_count = $2->size();
+    if(index_count == 0) {
+        delete $2;
+        delete $6;
+    }
+    $$ = new std::vector<infinity::IndexInfo*>();
+    $$->reserve(index_count);
+
+    infinity::IndexInfo* index_info = new infinity::IndexInfo();
+    index_info->index_type_ = index_type;
+    index_info->column_name_ = (*$2)[0];
+    index_info->index_param_list_ = $6;
+    $$->emplace_back(index_info);
+
+    for(size_t idx = 1; idx < index_count; ++ idx) {
+        infinity::IndexInfo* index_info = new infinity::IndexInfo();
+        index_info->index_type_ = index_type;
+        index_info->column_name_ = (*$2)[idx];
+
+        size_t param_count = $6->size();
+        index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
+        index_info->index_param_list_->resize(param_count);
+        for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
+            (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
+            *(*(index_info->index_param_list_))[param_idx] = *(*$6)[param_idx];
+        }
+        $$->emplace_back(index_info);
+    }
+    delete $2;
+}
+| index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
+    ParserHelper::ToLower($6);
+    infinity::IndexType index_type = infinity::IndexType::kInvalid;
+    if(strcmp($6, "fulltext") == 0) {
+        index_type = infinity::IndexType::kIRSFullText;
+    } else if (strcmp($6, "hlvq") == 0) {
+        index_type = infinity::IndexType::kHnswLVQ;
+    } else if (strcmp($6, "hnsw") == 0) {
+        index_type = infinity::IndexType::kHnsw;
+    } else if (strcmp($6, "ivfflat") == 0) {
+        index_type = infinity::IndexType::kIVFFlat;
+    } else {
+        free($6);
+        delete $3;
+        delete $7;
+        yyerror(&yyloc, scanner, result, "Unknown index type");
+        YYERROR;
+    }
+    free($6);
+
+    size_t index_count = $3->size();
+    if(index_count == 0) {
+        delete $1;
+        delete $3;
+        delete $7;
+    }
+    $$ = $1;
+    $$->reserve($$->size() + index_count);
+
+    infinity::IndexInfo* index_info = new infinity::IndexInfo();
+    index_info->index_type_ = index_type;
+    index_info->column_name_ = (*$3)[0];
+    index_info->index_param_list_ = $7;
+    $$->emplace_back(index_info);
+
+    for(size_t idx = 1; idx < index_count; ++ idx) {
+        infinity::IndexInfo* index_info = new infinity::IndexInfo();
+        index_info->index_type_ = index_type;
+        index_info->column_name_ = (*$3)[idx];
+
+        size_t param_count = $7->size();
+        index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
+        index_info->index_param_list_->resize(param_count);
+        for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
+            (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
+            *(*(index_info->index_param_list_))[param_idx] = *(*$7)[param_idx];
+        }
+        $$->emplace_back(index_info);
+    }
+    delete $3;
+}
 
 %%
 

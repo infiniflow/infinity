@@ -84,11 +84,11 @@ public:
 
     [[nodiscard]] inline int64_t id() const { return id_; }
 
-    inline std::shared_ptr<DataType> &type() { return column_type_; }
+    inline const std::shared_ptr<DataType> &type() const { return column_type_; }
 
 public:
     int64_t id_{-1};
-    std::shared_ptr<DataType> column_type_{};
+    const std::shared_ptr<DataType> column_type_{};
     std::string name_{};
     std::unordered_set<ConstraintType> constraints_{};
 };

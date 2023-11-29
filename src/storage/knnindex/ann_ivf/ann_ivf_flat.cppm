@@ -19,7 +19,7 @@ import stl;
 import knn_distance;
 import parser;
 import infinity_exception;
-import index_def;
+import index_base;
 import annivfflat_index_data;
 import kmeans_partition;
 import vector_distance;

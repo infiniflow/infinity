@@ -19,9 +19,9 @@ import stl;
 import index_file_worker;
 import dist_func;
 import knn_hnsw;
-import hnsw_index_def;
+import index_hnsw;
 import parser;
-import index_def;
+import index_base;
 import dist_func_l2;
 import dist_func_ip;
 
@@ -39,7 +39,7 @@ void HnswFileWorker::AllocateInMemory() {
     if (data_) {
         Error<StorageException>("Data is already allocated.");
     }
-    if (index_def_->method_type_ != IndexMethod::kHnsw) {
+    if (index_base_->index_type_ != IndexType::kHnsw) {
         Error<StorageException>("Bug.");
     }
 
@@ -49,16 +49,16 @@ void HnswFileWorker::AllocateInMemory() {
     }
 
     SizeT dimension = GetDimension();
-    auto hnsw_index_def = static_cast<HnswIndexDef *>(index_def_.get());
+    const IndexHnsw* index_hnsw = static_cast<const IndexHnsw*>(index_base_);
     switch (GetType()) {
         case kElemFloat: {
             auto dist_func = GetDistFunc<f32>(dimension);
             data_ = static_cast<void *>(new KnnHnsw<f32, u64>(max_element_,
                                                               dimension,
                                                               *dist_func,
-                                                              hnsw_index_def->M_,
-                                                              hnsw_index_def->ef_construction_,
-                                                              hnsw_index_def->ef_));
+                                                              index_hnsw->M_,
+                                                              index_hnsw->ef_construction_,
+                                                              index_hnsw->ef_));
             break;
         }
         default: {
@@ -131,7 +131,7 @@ SizeT HnswFileWorker::GetDimension() const {
 template <typename DataType>
 UniquePtr<SpaceBase<DataType>> HnswFileWorker::GetDistFunc(SizeT dimension) const {
     UniquePtr<SpaceBase<f32>> space = nullptr;
-    auto hnsw_index_def = static_cast<HnswIndexDef *>(index_def_.get());
+    const auto* hnsw_index_def = static_cast<const IndexHnsw *>(index_base_);
     switch (hnsw_index_def->metric_type_) {
         case MetricType::kMerticInnerProduct: {
             space = MakeUnique<DistFuncIP<f32>>(dimension);

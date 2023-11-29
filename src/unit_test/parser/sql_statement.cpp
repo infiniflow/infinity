@@ -158,13 +158,22 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->index_name_, "idx1");
         EXPECT_EQ(create_index_info->schema_name_, "default");
         EXPECT_EQ(create_index_info->table_name_, "t1");
-        EXPECT_EQ(create_index_info->method_type_, "IVFFlat");
-        EXPECT_EQ(create_index_info->column_names_->size(), 2);
-        EXPECT_EQ((*create_index_info->column_names_)[0], "c1");
-        EXPECT_EQ((*create_index_info->column_names_)[1], "c2");
-        EXPECT_EQ(create_index_info->index_para_list_->size(), 1);
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_name_, "metric");
-        EXPECT_EQ((*create_index_info->index_para_list_)[0]->para_value_, "l2");
+
+        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
+        EXPECT_EQ(index_info_list.size(), 2);
+        IndexInfo * index_info1 = index_info_list[0];
+        EXPECT_EQ(index_info1->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info1->column_name_, "c1");
+        EXPECT_EQ(index_info1->index_param_list_->size(), 1);
+        EXPECT_EQ((*index_info1->index_param_list_)[0]->param_name_, "metric");
+        EXPECT_EQ((*index_info1->index_param_list_)[0]->param_value_, "l2");
+
+        IndexInfo * index_info2 = index_info_list[1];
+        EXPECT_EQ(index_info2->index_type_, IndexType::kIVFFlat);
+        EXPECT_EQ(index_info2->column_name_, "c2");
+        EXPECT_EQ(index_info2->index_param_list_->size(), 1);
+        EXPECT_EQ((*index_info2->index_param_list_)[0]->param_name_, "metric");
+        EXPECT_EQ((*index_info2->index_param_list_)[0]->param_value_, "l2");
 
         result->Reset();
     }

@@ -20,7 +20,7 @@ import stl;
 import faiss;
 import index_file_worker;
 import parser;
-import index_def;
+import index_base;
 
 export module faiss_index_file_worker;
 
@@ -40,9 +40,9 @@ export class FaissIndexFileWorker : public IndexFileWorker {
 public:
     explicit FaissIndexFileWorker(SharedPtr<String> file_dir,
                                   SharedPtr<String> file_name,
-                                  SharedPtr<IndexDef> index_def,
-                                  SharedPtr<ColumnDef> column_def)
-        : IndexFileWorker(file_dir, file_name, index_def, column_def) {}
+                                  IndexBase* index_base,
+                                  ColumnDef* column_def)
+        : IndexFileWorker(file_dir, file_name, index_base, column_def) {}
 
     virtual ~FaissIndexFileWorker() override;
 

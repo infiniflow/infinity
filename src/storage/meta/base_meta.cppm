@@ -18,6 +18,7 @@ import stl;
 import base_entry;
 import parser;
 import status;
+import infinity_exception;
 
 export module base_meta;
 
@@ -27,28 +28,24 @@ class TxnManager;
 
 export class BaseMeta {
 public:
-    BaseMeta() {
-        // Insert a dummy entry
-        entry_list_.emplace_front(MakeUnique<BaseEntry>(EntryType::kDummy));
+    static Status CheckDDLResult(Status result, ConflictType conflict_type) {
+        switch (conflict_type) {
+            case ConflictType::kError: {
+                return result;
+            }
+            case ConflictType::kIgnore: {
+                if (result.code() == ErrorCode::kDuplicate or result.code() == ErrorCode::kNotFound) {
+                    return Status::OK();
+                } else {
+                    return result;
+                }
+            }
+            default: {
+                Error<StorageException>("Invalid conflict type.");
+                return result;
+            }
+        }
     }
-
-    static void DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr);
-
-    static Status GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry);
-
-protected:
-    enum EntryStatus : u8 {
-        kExisted = 0,
-        kNotExisted = 1,
-        kConflict = 2,
-    };
-
-    // The write lock must be held before calling this function.
-    // It return the status useful when to add new/delete entry
-    EntryStatus AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const;
-
-    RWMutex rw_locker_{};
-    List<UniquePtr<BaseEntry>> entry_list_{};
 };
 
 } // namespace infinity

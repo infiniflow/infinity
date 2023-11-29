@@ -383,6 +383,10 @@ export {
     inline bool IsAlNum(const char &c) {
         return std::isalnum(c);
     }
+
+    SizeT Pow(SizeT x, SizeT y) {
+        return std::pow(x, y);
+    }
 }
 
 } // namespace infinity

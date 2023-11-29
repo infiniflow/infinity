@@ -33,7 +33,7 @@ class BlockEntry;
 export struct BlockColumnEntry : public BaseEntry {
 public:
     inline explicit BlockColumnEntry(const BlockEntry *block_entry, u64 column_id, const SharedPtr<String> &base_dir_ref)
-        : BaseEntry(EntryType::kSegmentColumn), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
+        : BaseEntry(EntryType::kBlockColumn), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
     const BlockEntry *block_entry_{nullptr};
     u64 column_id_{};
@@ -62,7 +62,9 @@ public:
 
     static UniquePtr<BlockColumnEntry> Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 
-    static SharedPtr<String> OutlineFilename(SizeT file_idx) { return MakeShared<String>(Format("out_{}", file_idx)); }
+    static SharedPtr<String> OutlineFilename(u64 column_id, SizeT file_idx) {
+        return MakeShared<String>(Format("col_{}_out_{}", column_id, file_idx));
+    }
 };
 
 } // namespace infinity

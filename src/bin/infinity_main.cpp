@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "network/thrift_server.h"
 #include <csignal>
 #include <cstdlib>
+
+#include "network/brpc_server.h"
 
 import compilation_config;
 import stl;

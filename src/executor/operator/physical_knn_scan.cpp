@@ -35,9 +35,6 @@ import table_collection_entry;
 import default_values;
 
 import segment_entry;
-import index_def_meta;
-import index_def_entry;
-import index_entry;
 import block_column_entry;
 import base_entry;
 import knn_expression;
@@ -51,6 +48,10 @@ import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
 import knn_hnsw;
+import table_index_meta;
+import segment_column_index_entry;
+import column_index_entry;
+import table_index_entry;
 
 module physical_knn_scan;
 
@@ -95,7 +96,8 @@ BlockIndex *PhysicalKnnScan::GetBlockIndex() const { return base_table_ref_->blo
 
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
-Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
+Pair<Vector<BlockColumnEntry *>, Vector<SegmentColumnIndexEntry *>>
+PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
@@ -107,21 +109,34 @@ Pair<Vector<BlockColumnEntry *>, Vector<IndexEntry *>> PhysicalKnnScan::PlanWith
     SizeT knn_column_id = column_expr->binding().column_idx;
 
     Vector<BlockColumnEntry *> block_column_entries;
-    Vector<IndexEntry *> index_entries;
+    Vector<SegmentColumnIndexEntry *> index_entries;
 
     TableCollectionEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    HashMap<u32, Vector<IndexEntry *>> index_entry_map;
-    for (auto &[index_name, index_meta] : table_entry->indexes_) {
+    HashMap<u32, Vector<SegmentColumnIndexEntry *>> index_entry_map;
+    for (auto &[index_name, table_index_meta] : table_entry->index_meta_map_) {
         BaseEntry *base_entry{nullptr};
-        auto status = IndexDefMeta::GetEntry(index_meta.get(), txn_id, begin_ts, base_entry);
+        auto status = TableIndexMeta::GetEntry(table_index_meta.get(), txn_id, begin_ts, base_entry);
         if (!status.ok()) {
+            // FIXME: not found index means exception??
             Error<StorageException>("Cannot find index entry.");
         }
-        auto index_def_entry = static_cast<IndexDefEntry *>(base_entry);
-        for (auto &[segment_id, index_entry] : index_def_entry->indexes_) {
-            index_entry_map[segment_id].emplace_back(index_entry.get());
+
+        TableIndexEntry *table_index_entry = (TableIndexEntry *)base_entry;
+        auto column_index_iter = table_index_entry->column_index_map_.find(knn_column_id);
+        if (column_index_iter == table_index_entry->column_index_map_.end()) {
+            // knn_column_id isn't in this table index
+            continue;
+        }
+
+        // Fill the segment with index
+        ColumnIndexEntry *column_index_entry = table_index_entry->column_index_map_[knn_column_id].get();
+        index_entry_map.reserve(column_index_entry->index_by_segment.size());
+        for(auto& [segment_id, segment_column_index] : column_index_entry->index_by_segment) {
+            index_entry_map[segment_id].emplace_back(segment_column_index.get());
         }
     }
+
+    // Generate task set: index segment and no index block
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (SegmentEntry *segment_entry : block_index->segments_) {
         if (auto iter = index_entry_map.find(segment_entry->segment_id_); iter != index_entry_map.end()) {
@@ -172,15 +187,15 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
-        IndexEntry *index_entry = knn_scan_shared_data->index_entries_[index_idx];
+        SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-        switch (index_entry->index_def_entry_->index_def_->method_type_) {
-            case IndexMethod::kIVFFlat: {
-                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+        switch (segment_column_index_entry->column_index_entry_->index_base_->index_type_) {
+            case IndexType::kIVFFlat: {
+                BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
-                auto segment_id = index_entry->segment_entry_->segment_id_;
+                auto segment_id = segment_column_index_entry->segment_id_;
                 switch (knn_scan_shared_data->knn_distance_type_) {
                     case KnnDistanceType::kL2: {
                         AnnIVFFlatL2 ann_ivfflat_query{query,
@@ -216,8 +231,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 }
                 break;
             }
-            case IndexMethod::kHnsw: {
-                BufferHandle index_handle = IndexEntry::GetIndex(index_entry, buffer_mgr);
+            case IndexType::kHnsw: {
+                BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
                 auto index = static_cast<const KnnHnsw<DataType, u64> *>(index_handle.GetData());
 
                 Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);

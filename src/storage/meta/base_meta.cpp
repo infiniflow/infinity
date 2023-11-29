@@ -29,6 +29,8 @@ import status;
 
 module base_meta;
 
+#if 0
+
 namespace infinity {
 BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const {
     Assert<StorageException>(!entry_list_.empty(), "entry list should at least has a dummy head.");
@@ -131,3 +133,5 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
     return Status(ErrorCode::kNotFound, Move(err_msg));
 }
 } // namespace infinity
+
+#endif
