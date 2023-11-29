@@ -772,6 +772,9 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
         case ShowStmtType::kProfiles: {
             return BuildShowProfiles(statement, bind_context_ptr);
         }
+        case ShowStmtType::kSegments: {
+            return BuildShowSegments(statement, bind_context_ptr);
+        }
         default: {
             Error<PlannerException>("Unexpected show statement type.");
         }
@@ -812,6 +815,17 @@ Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPt
 Status LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowColumn,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
+Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSegments,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());

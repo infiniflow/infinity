@@ -167,6 +167,17 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowSegments: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("size");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Error<NotImplementException>("Not implemented show type");
         }
@@ -200,6 +211,10 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowProfiles: {
             ExecuteShowProfiles(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowSegments: {
+            ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
         default: {
@@ -532,6 +547,55 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             }
 
             Value value = Value::MakeVarchar(column_constraint);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+        output_block_ptr->Finalize();
+    }
+
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+
+    BaseEntry *base_table_entry{nullptr};
+    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    if (!status.ok()) {
+        show_operator_state->error_message_ = Move(status.msg_);
+        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        return;
+    }
+
+    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "path", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
+    };
+
+    auto output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    for (auto &[_, segment] : table_collection_entry->segment_map_) {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar(segment->DirPath());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            u64 folder_size = GetFolderSize(segment->DirPath());
+            Value value = Value::MakeVarchar(FormatFileSize(folder_size));
+
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

@@ -96,6 +96,8 @@ public:
 
     Status BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowSegments(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

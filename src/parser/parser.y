@@ -355,7 +355,7 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
 %token EXCEPT FLUSH USE
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT CHAR VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -1471,6 +1471,17 @@ show_statement: SHOW DATABASES {
 | DESCRIBE table_name {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kColumns;
+    if($2->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
+    }
+    $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
+    delete $2;
+}
+| DESCRIBE table_name SEGMENTS {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kSegments;
     if($2->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $2->schema_name_ptr_;
         free($2->schema_name_ptr_);
