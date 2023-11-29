@@ -5,9 +5,6 @@ add_subdirectory(cxxopts)
 # Build doctest
 add_subdirectory(googletest)
 
-# Build linenoise
-add_subdirectory(linenoise)
-
 # Build magic_enum
 add_subdirectory(magic_enum)
 
