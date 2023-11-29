@@ -20,6 +20,7 @@ import base_entry;
 import third_party;
 import block_column_entry;
 import parser;
+import local_file_system;
 
 export module block_entry;
 
@@ -119,7 +120,7 @@ public:
     const String &DirPath() { return *base_dir_; }
 
     String VersionFilePath() {
-        return ConcatenateFilePath(*base_dir_, BlockVersion::PATH);
+        return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH);
     }
 
 private:

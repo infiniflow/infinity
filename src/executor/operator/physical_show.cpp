@@ -54,6 +54,7 @@ import session;
 import options;
 import status;
 import block_column_entry;
+import local_file_system;
 
 module physical_show;
 
@@ -587,7 +588,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(FormatFileSize(file_size_func(path)));
+            Value value = Value::MakeVarchar(LocalFileSystem::FormatFileSize(file_size_func(path)));
 
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -606,13 +607,13 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             auto block = iter->second->block_entries_[*block_id_];
             auto version_path = block->VersionFilePath();
 
-            chuck_filling(GetFileSize, version_path);
+            chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
             for (auto &column: block->columns_) {
                 auto col_file_path = column->FilePath();
 
-                chuck_filling(GetFileSize, col_file_path);
+                chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
                 for (auto &outline : column->OutlinePaths()) {
-                    chuck_filling(GetFileSize, outline);
+                    chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
                 }
             }
         }
@@ -623,14 +624,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             for (auto &entry : iter->second->block_entries_) {
                 auto dir_path = entry->DirPath();
 
-                chuck_filling(GetFolderSize, dir_path);
+                chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
             }
         }
     } else {
         for (auto &[_, segment] : table_collection_entry->segment_map_) {
             auto dir_path = segment->DirPath();
 
-            chuck_filling(GetFolderSize, dir_path);
+            chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
     }
     output_block_ptr->Finalize();

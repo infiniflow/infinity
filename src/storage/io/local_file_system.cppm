@@ -69,6 +69,14 @@ public:
     Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) final;
 
     String GetAbsolutePath(const String &path);
+
+    static u64 GetFileSizeByPath(const String& path);
+
+    static u64 GetFolderSizeByPath(const String& path);
+
+    static String FormatFileSize(u64 fileSize);
+
+    static String ConcatenateFilePath(const String& dir_path, const String& file_path);
 };
 
 } // namespace infinity
