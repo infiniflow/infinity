@@ -1,23 +1,20 @@
 # dependency
-
+## python
 pip install -r requirements.txt
-sudo apt-get install -y libssl-dev libgflags-dev libprotobuf-dev libprotoc-dev protobuf-compiler libleveldb-dev
-
+## cpp
+### thrift
+sudo apt-get install thrift-compiler
 # build
-
 python setup.py bdist_wheel
-
 # install
-
 cd dist
 pip install infinity-0.0.1-py3-none-any.whl
-
-
 # using
+
 ```python
 import infinity
 
-infinity_obj = infinity.connect("0.0.0.0:50051")
+infinity_obj = infinity.connect("0.0.0.0:9090")
 
 infinity_obj.create_database("my_db")
 
@@ -27,7 +24,7 @@ db_obj = infinity_obj.get_database("default")
 
 db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
 
-db_obj.list_tables("default")
+db_obj.list_tables()
 
 db_obj.drop_table("my_table1")
 

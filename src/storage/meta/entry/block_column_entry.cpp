@@ -115,38 +115,39 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             // FIXME
             auto inline_p = reinterpret_cast<VarcharLayout *>(dst_p);
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
-            SizeT row_n = data_size / sizeof(VarcharT);
-            for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
-                auto varchar_type = src_ptr + row_idx;
-                VarcharLayout *varchar_layout = inline_p + row_idx;
-                if (varchar_type->IsInlined()) {
-                    auto &short_info = varchar_layout->u.short_info_;
-                    varchar_layout->length_ = varchar_type->length;
-                    Memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
-                } else {
-                    auto &long_info = varchar_layout->u.long_info_;
-                    auto outline_info = block_column_entry->outline_info_.get();
-                    if (outline_info->written_buffers_.empty() ||
-                        outline_info->written_buffers_.back().second + varchar_type->length > DEFAULT_OUTLINE_FILE_MAX_SIZE) {
-                        auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
-                        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, file_name, DEFAULT_OUTLINE_FILE_MAX_SIZE);
-                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
-                        outline_info->written_buffers_.emplace_back(buffer_obj, 0);
-                    }
+            auto varchar_type = src_ptr;
+            VarcharLayout *varchar_layout = inline_p;
+            if (varchar_type->IsInlined()) {
+                auto &short_info = varchar_layout->u.short_info_;
+                varchar_layout->length_ = varchar_type->length;
+                Memcpy(short_info.data.data(), varchar_type->prefix, varchar_type->length);
+            } else {
+                auto &long_info = varchar_layout->u.long_info_;
+                auto outline_info = block_column_entry->outline_info_.get();
+                auto base_file_size = Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
-                    auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
-                    BufferHandle out_buffer_handle = current_buffer_obj->Load();
-                    ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
-                    u16 outline_data_size = varchar_type->length;
-                    ptr_t outline_src_ptr = varchar_type->ptr;
-                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+                if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length > base_file_size) {
 
-                    varchar_layout->length_ = varchar_type->length;
-                    Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
-                    long_info.file_idx_ = outline_info->next_file_idx - 1;
-                    long_info.file_offset_ = current_buffer_offset;
-                    current_buffer_offset += varchar_type->length;
+                    auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
+                    auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_,
+                                                                  file_name,
+                                                                  DEFAULT_BASE_NUM * Max(base_file_size, static_cast<SizeT>(varchar_type->length)));
+
+                    BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
+                    outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                 }
+                auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
+                BufferHandle out_buffer_handle = current_buffer_obj->Load();
+                ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
+                u16 outline_data_size = varchar_type->length;
+                ptr_t outline_src_ptr = varchar_type->ptr;
+                Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+
+                varchar_layout->length_ = varchar_type->length;
+                Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
+                long_info.file_idx_ = outline_info->next_file_idx - 1;
+                long_info.file_offset_ = current_buffer_offset;
+                current_buffer_offset += varchar_type->length;
             }
             break;
         }

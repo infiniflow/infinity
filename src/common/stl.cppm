@@ -375,6 +375,18 @@ export {
 
     template <typename T, typename Allocator = std::allocator<T>>
     using ForwardList = std::forward_list<T, Allocator>;
+
+    inline bool IsAlpha(const char &c) {
+        return std::isalpha(c);
+    }
+
+    inline bool IsAlNum(const char &c) {
+        return std::isalnum(c);
+    }
+
+    SizeT Pow(SizeT x, SizeT y) {
+        return std::pow(x, y);
+    }
 }
 
 } // namespace infinity

@@ -13,12 +13,17 @@
 # limitations under the License.
 
 import importlib.metadata
+
 __version__ = importlib.metadata.version("infinity")
-from .infinity import URI, InfinityConnection
-from .remote.infinity import RemoteInfinityConnection
+
+from infinity.infinity import URI, InfinityConnection, NetworkAddress
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 
 def connect(
         uri: URI,
 ) -> InfinityConnection:
-    return RemoteInfinityConnection(uri)
+    if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 9080 or uri.port == 9070):
+        return RemoteThriftInfinityConnection(uri)
+    else:
+        raise Exception(f"unknown uri: {uri}")

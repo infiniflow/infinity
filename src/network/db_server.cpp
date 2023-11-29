@@ -16,8 +16,7 @@ module;
 
 #include <boost/bind.hpp>
 #include <thread>
-//#include "grpc_server.h"
-#include "brpc_server.h"
+#include "thrift_server.h"
 
 module db_server;
 import infinity_context;
