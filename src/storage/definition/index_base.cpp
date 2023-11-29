@@ -177,6 +177,10 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
+        case IndexType::kIRSFullText: {
+
+            break;
+        }
         case IndexType::kInvalid: {
             Error<StorageException>("Error index method while deserializing");
         }

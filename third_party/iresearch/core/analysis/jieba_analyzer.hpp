@@ -24,7 +24,8 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   attribute* get_mutable(irs::type_info::type_id type) noexcept final {
     return irs::get_mutable(attrs_, type);
   }
-  explicit jieba_analyzer(options_t&& opts);
+  explicit jieba_analyzer(options_t &&opts);
+  jieba_analyzer(const jieba_analyzer &other);
   ~jieba_analyzer();
   bool next() final;
   bool reset(std::string_view data) final;
@@ -38,6 +39,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   }
   using attributes = std::tuple<increment, offset, term_attribute>;
   cppjieba::Jieba* jieba_ = nullptr;
+  bool own_jieba_;
   size_t cursor_;
   std::vector<cppjieba::Word> cut_words_;
   std::string term_buf_;

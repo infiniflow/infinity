@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -28,16 +29,19 @@ module index_full_text;
 
 namespace infinity {
 
+void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
+
 SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     String analyzer{};
     SizeT param_count = index_param_list.size();
     for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
-        if (parameter->param_name_ == "analyzer") {
+        String para_name = parameter->param_name_;
+        ToLowerString(para_name);
+        if (para_name == "analyzer") {
             analyzer = parameter->param_value_;
         }
     }
-
     return MakeShared<IndexFullText>(file_name, Move(column_names), analyzer);
 }
 
