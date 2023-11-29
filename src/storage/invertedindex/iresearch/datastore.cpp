@@ -21,12 +21,14 @@ module;
 
 #include "formats/formats.hpp"
 #include "index/index_reader.hpp"
+#include "index/norm.hpp"
 #include "parser/type/datetime/date_type.h"
 #include "parser/type/datetime/datetime_type.h"
 #include "parser/type/datetime/time_type.h"
 #include "parser/type/datetime/timestamp_type.h"
 #include "store/fs_directory.hpp"
 #include "utils/index_utils.hpp"
+#include "utils/text_format.hpp"
 
 import stl;
 import parser;
@@ -61,22 +63,31 @@ module iresearch_datastore;
 
 namespace infinity {
 
-#define DOCMASK 0xFF
+constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
+constexpr SizeT DEFAULT_CONSOLIDATION_INTERVAL_MSEC = 1000;
+
+#define DOCMASK 0xFFFF
 
 u32 RowID2DocID(RowID row_id) { return (row_id.segment_id_ << 16) + row_id.segment_offset_; }
 u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
-    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
+    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset + 1;
     return (segment_id << 16) + segment_offset;
 }
 
-RowID DocID2RowID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK); }
+RowID DocID2RowID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK - 1); }
 
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
+    T t = Move(fn);
     if (0 == id)
-        pool_0_.push(Move(fn));
+        pool_0_.push(Move(t));
     else if (1 == id)
-        pool_1_.push(Move(fn));
+        pool_1_.push(Move(t));
+}
+
+void IRSAsync::ClearQueue() {
+    pool_0_.clear_queue();
+    pool_1_.clear_queue();
 }
 
 struct MaintenanceState {
@@ -85,9 +96,17 @@ struct MaintenanceState {
 };
 
 struct Task {
+    Task() {}
+
+    Task(const Task &other) {
+        state_ = other.state_;
+        store_ = other.store_;
+        async_ = other.async_;
+    }
+
     IRSAsync *async_{nullptr};
+    IRSDataStore *store_{nullptr};
     SharedPtr<MaintenanceState> state_;
-    SharedPtr<IRSDataStore> store_;
 };
 
 struct ConsolidationTask : Task {
@@ -111,22 +130,23 @@ void ConsolidationTask::operator()(int id) {
     LOG_INFO(Format("ConsolidationTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
-    if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
-        // reschedule
-        for (auto count = state_->pending_consolidations_.load(MemoryOrderAcquire); count < 1;) {
-            if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
-                ConsolidationTask task(*this);
-                async_->Queue(0, Move(task));
-                break;
-            }
-        }
-    }
 
     if (optimize_) {
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
         store_->GetWriter()->Commit();
     } else {
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateByOrder()));
+    }
+
+    if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
+        // reschedule
+        auto count = state_->pending_consolidations_.load(MemoryOrderAcquire);
+        if (count > 0) {
+            if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
+                ConsolidationTask task(*this);
+                async_->Queue(1, Move(task));
+            }
+        }
     }
 }
 
@@ -182,10 +202,25 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     irs_directory_ = MakeUnique<irs::FSDirectory>(directory_.c_str());
 
     IRSIndexWriterOptions options;
+    options.segment_pool_size = 1; // number of index threads
     options.reader_options = reader_options;
     options.segment_memory_max = 256 * (1 << 20); // 256MB
     options.lock_repository = false;              //?
     options.comparator = nullptr;
+    options.features = [](irs::type_info::type_id id) {
+        const irs::ColumnInfo info{irs::type<irs::compression::none>::get(), {}, false};
+
+        if (irs::type<irs::Norm>::id() == id) {
+            return std::make_pair(info, &irs::Norm::MakeWriter);
+        }
+
+        if (irs::type<irs::Norm2>::id() == id) {
+            return std::make_pair(info, &irs::Norm2::MakeWriter);
+        }
+
+        return std::make_pair(info, irs::FeatureWriterFactory{});
+    };
+
     index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
     if (!path_exists) {
         index_writer_->Commit();
@@ -214,6 +249,8 @@ void IRSDataStore::ScheduleCommit() {
     CommitTask task;
     task.state_ = maintenance_state_;
     task.async_ = async_.get();
+    task.store_ = this;
+    task.commit_interval_ = std::chrono::milliseconds(DEFAULT_COMMIT_INTERVAL);
     maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
     async_->Queue<CommitTask>(0, Move(task));
 }
@@ -222,9 +259,11 @@ void IRSDataStore::ScheduleConsolidation() {
     ConsolidationTask task;
     task.state_ = maintenance_state_;
     task.async_ = async_.get();
+    task.store_ = this;
     task.optimize_ = false;
+    task.consolidation_interval_ = std::chrono::milliseconds{DEFAULT_CONSOLIDATION_INTERVAL_MSEC};
     maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(0, Move(task));
+    async_->Queue<ConsolidationTask>(1, Move(task));
 }
 
 void IRSDataStore::ScheduleOptimize() {
@@ -232,8 +271,10 @@ void IRSDataStore::ScheduleOptimize() {
     task.state_ = maintenance_state_;
     task.optimize_ = true;
     maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(0, Move(task));
+    async_->Queue<ConsolidationTask>(1, Move(task));
 }
+
+void IRSDataStore::StopSchedule() { async_->ClearQueue(); }
 
 void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
 
@@ -242,11 +283,10 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
 
     static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
     static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
-
+    bool schedule = false;
     auto segment_id = segment_entry->segment_id_;
     for (const auto &block_entry : segment_entry->block_entries_) {
         auto ctx = index_writer_->GetBatch();
-
         for (SizeT i = 0; i < block_entry->row_count_; ++i) {
             auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id_, i));
 
@@ -347,6 +387,10 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                         break;
                 }
             }
+        }
+        if (!schedule) {
+            ScheduleCommit();
+            schedule = true;
         }
     }
 }
