@@ -423,28 +423,36 @@ void NaivePolicy::GetCandidates(Consolidation& candidates) {
   }
   int forward_iter = index;
   int backward_iter = index;
-  while (candidates.size() < MAX_MERGE_ONE_TIME) {
-    if (forward_iter == entries_.size()) {
-      if (backward_iter >= 0) {
-        candidates.push_back(entries_[backward_iter].reader);
-        backward_iter--;
-      } else
-        break;
-    } else {
-      if (backward_iter >= 0) {
-        if (entries_[forward_iter].meta->docs_count <
-            entries_[backward_iter].meta->docs_count) {
-          candidates.push_back(entries_[forward_iter].reader);
-          forward_iter++;
-        } else {
-          candidates.push_back(entries_[backward_iter].reader);
-          backward_iter--;
-        }
+  size_t merge_count = std::min(MAX_MERGE_ONE_TIME, entries_.size());
+  while (candidates.size() < merge_count) {
+      if (forward_iter == entries_.size()) {
+          if (backward_iter >= 0) {
+              candidates.push_back(entries_[backward_iter].reader);
+              if (forward_iter == backward_iter)
+                  forward_iter++;
+              backward_iter--;
+          } else
+              break;
       } else {
-        candidates.push_back(entries_[forward_iter].reader);
-        forward_iter++;
+          if (backward_iter >= 0) {
+              if (entries_[forward_iter].meta->docs_count < entries_[backward_iter].meta->docs_count) {
+                  candidates.push_back(entries_[forward_iter].reader);
+                  if (forward_iter == backward_iter)
+                      backward_iter--;
+                  forward_iter++;
+              } else {
+                  candidates.push_back(entries_[backward_iter].reader);
+                  if (forward_iter == backward_iter)
+                      forward_iter++;
+                  backward_iter--;
+              }
+          } else {
+              candidates.push_back(entries_[forward_iter].reader);
+              if (forward_iter == backward_iter)
+                  backward_iter--;
+              forward_iter++;
+          }
       }
-    }
   }
 }
 

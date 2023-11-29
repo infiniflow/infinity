@@ -14,8 +14,8 @@
 
 module;
 
+#include <iostream>
 #include <string>
-
 import stl;
 import parser;
 import base_entry;
@@ -204,6 +204,8 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
         for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
             irs_index_entry->irs_index_->BatchInsert(table_entry, table_index_entry->index_def_.get(), segment_entry.get(), buffer_mgr);
         }
+        irs_index_entry->irs_index_->Commit();
+        irs_index_entry->irs_index_->StopSchedule();
     }
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
     for(const auto& base_index_pair: table_index_entry->column_index_map_) {
