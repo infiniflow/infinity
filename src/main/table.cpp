@@ -62,6 +62,8 @@ QueryResult Table::DropIndex(const String &index_name) {
     drop_index_info->index_name_ = index_name;
     drop_statement->drop_info_ = drop_index_info;
 
+    drop_statement->drop_info_->conflict_type_ = ConflictType::kIgnore;
+
     QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;
 }

@@ -234,19 +234,30 @@ struct GetTableRequest {
 }
 
 struct InitParameter {
-1: string para_name,
-2: string para_value,
+1: string param_name,
+2: string param_value,
+}
+
+enum IndexType {
+IVFFlat,
+HnswLVQ,
+Hnsw,
+IRSFullText,
+}
+
+struct IndexInfo {
+1: string column_name,
+2: IndexType index_type,
+3: list<InitParameter> index_param_list = [],
 }
 
 struct CreateIndexRequest {
 1: string db_name,
 2: string table_name,
 3: string index_name,
-4: list<string> column_names = [],
-5: string method_type,
-6: list<InitParameter> index_para_list = [],
-7: i64 session_id,
-8: optional Option option,
+5: list<IndexInfo> index_info_list = [],
+6: i64 session_id,
+7: optional Option option,
 }
 
 struct DropIndexRequest {

@@ -96,7 +96,7 @@ Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index
                     LOG_TRACE("New table index entry is added.");
                     return Status::OK();
                 } else {
-                    // Duplicated database
+                    // Duplicated index name
                     UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *table_index_meta->index_name_));
                     LOG_ERROR(*err_msg);
                     return Status(ErrorCode::kDuplicate, Move(err_msg));

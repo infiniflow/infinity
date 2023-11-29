@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 import typing as tp
-from typing import Literal, Optional, Type, Union
+from abc import ABC, abstractmethod
+from typing import Optional, Union
+
+from infinity.index import IndexInfo
+
+
 class Table(ABC):
 
     @abstractmethod
-    def create_index(self, index_name: str, column_names: list[str], method_type: str, index_para_list: list[dict],
-                     options=None):
+    def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
         pass
 
     @abstractmethod
