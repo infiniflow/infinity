@@ -143,16 +143,20 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 
-    for (const auto &column_index_entry_json : index_def_entry_json["column_indexes"]) {
-        UniquePtr<ColumnIndexEntry> column_index_entry =
-            ColumnIndexEntry::Deserialize(column_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
-        u64 column_id = column_index_entry->column_id_;
-        table_index_entry->column_index_map_.emplace(column_id, Move(column_index_entry));
+    if (index_def_entry_json.contains("column_indexes")) {
+        for (const auto &column_index_entry_json : index_def_entry_json["column_indexes"]) {
+            UniquePtr<ColumnIndexEntry> column_index_entry =
+                ColumnIndexEntry::Deserialize(column_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
+            u64 column_id = column_index_entry->column_id_;
+            table_index_entry->column_index_map_.emplace(column_id, Move(column_index_entry));
+        }
     }
 
     if (index_def_entry_json.contains("irs_index_entry")) {
-        table_index_entry->irs_index_entry_ =
-            IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
+        if (index_def_entry_json.contains("irs_index_entry")) {
+            table_index_entry->irs_index_entry_ =
+                IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
+        }
     }
     return table_index_entry;
 }

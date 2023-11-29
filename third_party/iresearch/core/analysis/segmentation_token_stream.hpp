@@ -56,6 +56,7 @@ class segmentation_token_stream final
     return irs::get_mutable(attrs_, type);
   }
   explicit segmentation_token_stream(options_t&& opts);
+  segmentation_token_stream(const segmentation_token_stream &other);
   bool next() final;
   bool reset(std::string_view data) final;
 

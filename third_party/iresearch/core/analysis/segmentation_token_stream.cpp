@@ -85,6 +85,8 @@ segmentation_token_stream::segmentation_token_stream(
   segmentation_token_stream::options_t&& options)
   : state_{new state_t()}, options_{options} {}
 
+segmentation_token_stream::segmentation_token_stream(const segmentation_token_stream &other) : state_{new state_t()}, options_(other.options_) {}
+
 bool segmentation_token_stream::next() {
   while (true) {
     const auto gr_begin = state_->begin;
