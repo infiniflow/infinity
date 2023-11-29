@@ -64,25 +64,12 @@ include(BoostMacros)
 find_package(Threads)
 include(CTest)
 
-if(BUILD_COMPILER)
-    if(NOT EXISTS ${THRIFT_COMPILER})
-        set(THRIFT_COMPILER $<TARGET_FILE:thrift-compiler>)
-    endif()
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/compiler/cpp)
-elseif(EXISTS ${THRIFT_COMPILER})
-    add_executable(thrift-compiler IMPORTED)
-    set_property(TARGET thrift-compiler PROPERTY IMPORTED_LOCATION ${THRIFT_COMPILER})
-endif()
-
 if(BUILD_CPP)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/cpp)
 endif()
 
 if(BUILD_PYTHON)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/py)
-    if(BUILD_TESTING)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test/py)
-    endif()
 endif()
 
 # Create the uninstall target
