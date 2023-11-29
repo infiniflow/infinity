@@ -343,12 +343,12 @@ public:
 
         for (auto &index_para : request.index_para_list) {
             auto init_parameter = new InitParameter();
-            init_parameter->para_name_ = index_para.para_name;
-            init_parameter->para_value_ = index_para.para_value;
+            init_parameter->param_name_ = index_para.para_name;
+            init_parameter->param_value_ = index_para.para_value;
             index_para_list->emplace_back(init_parameter);
         }
 
-        auto result = table->CreateIndex(request.index_name, column_names, method_type, index_para_list, (CreateIndexOptions &)request.option);
+        auto result = table->CreateIndex(request.index_name, nullptr, (CreateIndexOptions &)request.option);
 
         ProcessCommonResult(response, result);
     }

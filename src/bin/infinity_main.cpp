@@ -14,8 +14,7 @@
 
 #include <csignal>
 #include <cstdlib>
-
-#include "network/brpc_server.h"
+#include "network/thrift_server.h"
 
 import compilation_config;
 import stl;
