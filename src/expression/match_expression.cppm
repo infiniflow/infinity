@@ -24,17 +24,16 @@ namespace infinity {
 
 export class MatchExpression : public BaseExpression {
 public:
-    MatchExpression(UniquePtr<IrsFilter> &flt, const String &fields, const String &matching_text, SharedPtr<SearchOptions> options);
+    MatchExpression(const String &fields, const String &matching_text, const String &options_text);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
     String ToString() const override;
 
 public:
-    UniquePtr<IrsFilter> flt_{};
     String fields_;
     String matching_text_;
-    SharedPtr<SearchOptions> options_{};
+    String options_text_;
 };
 
 } // namespace infinity

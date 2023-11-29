@@ -1684,7 +1684,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
-    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+//    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,

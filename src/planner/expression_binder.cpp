@@ -430,10 +430,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     SharedPtr<FusionExpression> fusion_expr = nullptr;
     for (MatchExpr *match_expr : expr.match_exprs_) {
-        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->flt_, match_expr->fields_, match_expr->matching_text_, match_expr->options_));
-    }
-    for (QueryExpr *query_expr : expr.query_exprs_) {
-        match_exprs.push_back(MakeShared<MatchExpression>(query_expr->flt_, "", query_expr->query_text_, query_expr->options_));
+        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
     }
     // TODO: build KNN expressions
     if (expr.fusion_expr_ != nullptr)

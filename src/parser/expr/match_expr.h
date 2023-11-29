@@ -32,14 +32,10 @@ public:
 
     [[nodiscard]] std::string ToString() const override;
 
-    int SetFilter(const std::string &fields, const std::string &matching_text);
-    void SetOptions(const std::string &options);
-
 public:
-    std::unique_ptr<irs::filter> flt_{};
     std::string fields_;
     std::string matching_text_;
-    std::shared_ptr<SearchOptions> options_{};
+    std::string options_text_;
 };
 
 } // namespace infinity

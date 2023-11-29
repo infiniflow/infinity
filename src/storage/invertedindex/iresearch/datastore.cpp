@@ -75,15 +75,6 @@ namespace infinity {
 constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
 constexpr SizeT DEFAULT_CONSOLIDATION_INTERVAL_MSEC = 1000;
 
-#define DOCMASK 0xFFFF
-
-u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
-    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
-    return (segment_id << 16) + segment_offset + 1;
-}
-
-RowID DocID2RowID(u32 doc_id) { return RowID((doc_id - 1) >> 16, (doc_id - 1) & DOCMASK); }
-
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
     T t = Move(fn);
@@ -443,29 +434,9 @@ const ViewSegment &ViewSnapshot::GetSegment(SizeT i) noexcept { return segments_
 
 enum class ExecutionMode { kAll, kStrictTop, kTop };
 
-static constexpr frozen::map<StringView, ExecutionMode, 3> kSearchModes = {{"all", ExecutionMode::kAll},
-                                                                           {"strictWand", ExecutionMode::kStrictTop},
-                                                                           {"wand", ExecutionMode::kTop}};
-
-int IRSDataStore::Search(UniquePtr<IrsFilter> flt, const Map<String, String> &options, ScoredIds &sorted) {
-    String search_mode(DEFAULT_SEARCH_MODE);
-    if (auto it = options.find("search_mode"); it != options.end()) {
-        search_mode = it->second;
-    }
-    ExecutionMode mode{ExecutionMode::kAll};
-    if (auto it = kSearchModes.find(search_mode); it == kSearchModes.end()) {
-        LOG_ERROR(Format("Unknown search mode '{}'", search_mode));
-        return -1;
-    } else {
-        mode = it->second;
-    }
-
-    irs::WandContext wand = [&]() -> irs::WandContext {
-        if (mode == ExecutionMode::kAll) {
-            return {};
-        }
-        return {.index = 0, .strict = mode == ExecutionMode::kStrictTop};
-    }();
+int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, ScoredIds &sorted) {
+    ExecutionMode mode{ExecutionMode::kTop};
+    irs::WandContext wand{.index = 0, .strict = false};
 
     String scorer(DEFAULT_SCORER);
     String scorer_arg(DEFAULT_SCORER_ARG);

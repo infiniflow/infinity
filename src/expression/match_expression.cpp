@@ -26,15 +26,15 @@ module match_expression;
 
 namespace infinity {
 
-MatchExpression::MatchExpression(UniquePtr<IrsFilter> &flt, const String &fields, const String &matching_text, SharedPtr<SearchOptions> options)
-    : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), flt_(Move(flt)), fields_(fields), matching_text_(matching_text),
-      options_(options) {}
+MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text)
+    : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
+      options_text_(options_text) {}
 
 String MatchExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    String expr_str = Format("MATCH('{}', '{}', '{}')", fields_, matching_text_, options_ ? options_->ToString() : "");
+    String expr_str = Format("MATCH('{}', '{}', '{}')", fields_, matching_text_, options_text_);
     return expr_str;
 }
 

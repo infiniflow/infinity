@@ -23,6 +23,7 @@ import table_index_meta;
 import buffer_manager;
 import iresearch_datastore;
 import index_base;
+import index_full_text;
 import logger;
 
 module irs_index_entry;
@@ -61,7 +62,7 @@ SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &parent_dir, con
     return nullptr;
 }
 
-SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexBase>> index_info_map,
+SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexFullText>> index_info_map,
                                                          TableIndexEntry *table_index_entry,
                                                          u64 txn_id,
                                                          SharedPtr<String> index_dir,

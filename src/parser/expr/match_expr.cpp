@@ -24,22 +24,9 @@ std::string MatchExpr::ToString() const {
     oss << "MATCH('";
     oss << fields_;
     oss << "', '" << matching_text_ << "'";
-    if (options_) {
-        oss << ", '" << options_->ToString() << "'";
-    }
+    oss << ", '" << options_text_ << "'";
     oss << ")";
     return oss.str();
-}
-
-void MatchExpr::SetOptions(const std::string &options) { options_ = std::make_shared<SearchOptions>(options); }
-
-int MatchExpr::SetFilter(const std::string &fields, const std::string &matching_text) {
-    matching_text_ = matching_text;
-    fields_ = fields;
-    QueryDriver driver;
-    int rc = driver.ParseSingleWithFields(fields, matching_text);
-    flt_ = std::move(driver.result);
-    return rc;
 }
 
 } // namespace infinity

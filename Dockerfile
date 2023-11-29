@@ -45,6 +45,6 @@ RUN tar xzf lz4.tgz && cd lz4 && make && make install && rm -fr lz4
 ENV LZ4_ROOT=/usr/local
 
 # build dependencies
-RUN apt install -y libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev libgrpc++-dev libgrpc-dev protobuf-compiler-grpc libprotobuf-dev python3-grpcio python3-grpc-tools libprotoc-dev libprotoc-dev
+RUN apt install -y libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev libevent-dev libthrift-dev
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
