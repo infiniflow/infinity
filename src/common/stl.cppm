@@ -375,6 +375,10 @@ export {
 
     template <typename T, typename Allocator = std::allocator<T>>
     using ForwardList = std::forward_list<T, Allocator>;
+
+    SizeT Pow(SizeT x, SizeT y) {
+        return std::pow(x, y);
+    }
 }
 
 } // namespace infinity
