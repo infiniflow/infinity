@@ -15,7 +15,7 @@
 from abc import ABC
 from infinity.db import Database
 from infinity.remote_thrift.table import RemoteTable
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
 
 class RemoteThriftDatabase(Database, ABC):
@@ -36,37 +36,37 @@ class RemoteThriftDatabase(Database, ABC):
                 # "vector,1024,float32"
                 length = column_big_info[1]
                 element_type = column_big_info[2]
-                proto_column_def = ColumnDef()
+                proto_column_def = ttypes.ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
 
-                column_type = DataType()
-                column_type.logic_type = LogicType.Embedding
+                column_type = ttypes.DataType()
+                column_type.logic_type = ttypes.LogicType.Embedding
 
-                embedding_type = EmbeddingType()
+                embedding_type = ttypes.EmbeddingType()
                 if element_type == "bit":
-                    embedding_type.element_type = ElementType.ElementBit
+                    embedding_type.element_type = ttypes.ElementType.ElementBit
                 elif element_type == "float32" or element_type == "float":
-                    embedding_type.element_type = ElementType.ElementFloat32
+                    embedding_type.element_type = ttypes.ElementType.ElementFloat32
                 elif element_type == "float64" or element_type == "double":
-                    embedding_type.element_type = ElementType.ElementFloat64
+                    embedding_type.element_type = ttypes.ElementType.ElementFloat64
                 elif element_type == "int8":
-                    embedding_type.element_type = ElementType.ElementInt8
+                    embedding_type.element_type = ttypes.ElementType.ElementInt8
                 elif element_type == "int16":
-                    embedding_type.element_type = ElementType.ElementInt16
+                    embedding_type.element_type = ttypes.ElementType.ElementInt16
                 elif element_type == "int32" or element_type == "int":
-                    embedding_type.element_type = ElementType.ElementInt32
+                    embedding_type.element_type = ttypes.ElementType.ElementInt32
                 elif element_type == "int64":
-                    embedding_type.element_type = ElementType.ElementInt64
+                    embedding_type.element_type = ttypes.ElementType.ElementInt64
                 else:
                     raise Exception(f"unknown element type: {element_type}")
 
                 embedding_type.dimension = int(length)
-                assert isinstance(embedding_type, EmbeddingType)
+                assert isinstance(embedding_type, ttypes.EmbeddingType)
                 assert embedding_type.element_type is not None
                 assert embedding_type.dimension is not None
 
-                physical_type = PhysicalType()
+                physical_type = ttypes.PhysicalType()
                 physical_type.embedding_type = embedding_type
 
                 column_type.physical_type = physical_type
@@ -79,32 +79,32 @@ class RemoteThriftDatabase(Database, ABC):
                 constraints = column_big_info[1:]
 
                 # process column definition
-                proto_column_def = ColumnDef()
+                proto_column_def = ttypes.ColumnDef()
                 proto_column_def.id = index
                 proto_column_def.name = column_name
-                proto_column_type = DataType()
+                proto_column_type = ttypes.DataType()
 
                 if datatype == "int8":
-                    proto_column_type.logic_type = LogicType.TinyInt
+                    proto_column_type.logic_type = ttypes.LogicType.TinyInt
                 elif datatype == "int16":
-                    proto_column_type.logic_type = LogicType.SmallInt
+                    proto_column_type.logic_type = ttypes.LogicType.SmallInt
                 elif datatype == "int32" or datatype == "int":
-                    proto_column_type.logic_type = LogicType.Integer
+                    proto_column_type.logic_type = ttypes.LogicType.Integer
                 elif datatype == "int64":
-                    proto_column_type.logic_type = LogicType.BigInt
+                    proto_column_type.logic_type = ttypes.LogicType.BigInt
                 elif datatype == "int128":
-                    proto_column_type.logic_type = LogicType.HugeInt
+                    proto_column_type.logic_type = ttypes.LogicType.HugeInt
                 elif datatype == "float":
-                    proto_column_type.logic_type = LogicType.Float
+                    proto_column_type.logic_type = ttypes.LogicType.Float
                 elif datatype == "double":
-                    proto_column_type.logic_type = LogicType.Double
+                    proto_column_type.logic_type = ttypes.LogicType.Double
                 elif datatype == "varchar":
-                    varchar_type = VarcharType()
+                    varchar_type = ttypes.VarcharType()
                     varchar_type.dimension = 1024
-                    proto_column_type.logic_type = LogicType.Varchar
+                    proto_column_type.logic_type = ttypes.LogicType.Varchar
                     proto_column_type.physical_type = varchar_type
                 elif datatype == "bool":
-                    proto_column_type.logic_type = LogicType.Boolean
+                    proto_column_type.logic_type = ttypes.LogicType.Boolean
                 else:
                     raise Exception(f"unknown datatype: {datatype}")
 
@@ -113,13 +113,13 @@ class RemoteThriftDatabase(Database, ABC):
                 # process constraints
                 for constraint in constraints:
                     if constraint == "null":
-                        proto_column_def.constraints.append(Constraint.Null)
+                        proto_column_def.constraints.append(ttypes.Constraint.Null)
                     elif constraint == "not null":
-                        proto_column_def.constraints.append(Constraint.NotNull)
+                        proto_column_def.constraints.append(ttypes.Constraint.NotNull)
                     elif constraint == "primary key":
-                        proto_column_def.constraints.append(Constraint.PrimaryKey)
+                        proto_column_def.constraints.append(ttypes.Constraint.PrimaryKey)
                     elif constraint == "unique":
-                        proto_column_def.constraints.append(Constraint.Unique)
+                        proto_column_def.constraints.append(ttypes.Constraint.Unique)
                     else:
                         raise Exception(f"unknown constraint: {constraint}")
                 column_defs.append(proto_column_def)

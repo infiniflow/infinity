@@ -23,6 +23,11 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri):
         self.db_name = "default"
         self._client = ThriftInfinityClient(uri)
+        self._is_connected = True
+
+    def __del__(self):
+        if self._is_connected:
+            self.disconnect()
 
     def create_database(self, db_name: str, options=None):
         return self._client.create_database(db_name=db_name)
@@ -43,9 +48,13 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise Exception("Get db error")
 
-
     def disconnect(self):
-        return self._client.disconnect()
+        res = self._client.disconnect()
+        if res.success is True:
+            self._is_connected = False
+        else:
+            raise Exception("Disconnect error")
+        return res
 
     @property
     def client(self):

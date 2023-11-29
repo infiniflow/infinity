@@ -14,19 +14,19 @@
 
 #include "thrift_server.h"
 
+#include <memory>
+#include <stdexcept>
 #include <thrift/TToString.h>
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TNonblockingServer.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TNonblockingServerSocket.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
-#include <thrift/transport/TNonblockingServerSocket.h>
-#include <thrift/server/TNonblockingServer.h>
-#include <memory>
-#include <stdexcept>
 
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
@@ -41,8 +41,7 @@ import data_block;
 import value;
 import third_party;
 import parser;
-
-using namespace ::infinity_thrift_rpc;
+#include "parser/statement/extra/create_index_info.h"
 
 namespace infinity {
 
@@ -60,7 +59,7 @@ public:
             infinity_session_map_mutex_.lock();
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
             infinity_session_map_mutex_.unlock();
-            response.session_id=infinity->GetSessionId();
+            response.session_id = infinity->GetSessionId();
             response.success = true;
         }
     }
@@ -77,6 +76,7 @@ public:
             infinity_session_map_mutex_.lock();
             infinity_session_map_.erase(session_id);
             infinity_session_map_mutex_.unlock();
+            LOG_TRACE(Format("THRIFT : Disconnect success"));
             _return.success = true;
         }
     }
@@ -232,7 +232,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
+            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -259,7 +259,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
+            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -286,7 +286,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}",result.ErrorStr()));
+            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -331,24 +331,29 @@ public:
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
-        auto column_names = new Vector<String>();
 
-        column_names->reserve(request.column_names.size());
-        for (auto &column_name : request.column_names) {
-            column_names->emplace_back(column_name);
+        String index_name = request.index_name;
+
+        auto *index_info_list_to_use = new Vector<IndexInfo *>();
+
+        for (auto &index_info : request.index_info_list) {
+            auto index_info_to_use = new IndexInfo();
+            index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
+            index_info_to_use->column_name_ = index_info.column_name;
+
+            auto *index_param_list = new Vector<InitParameter *>();
+            for (auto &index_param : index_info.index_param_list) {
+                auto init_parameter = new InitParameter();
+                init_parameter->param_name_ = index_param.param_name;
+                init_parameter->param_value_ = index_param.param_value;
+                index_param_list->emplace_back(init_parameter);
+            }
+            index_info_to_use->index_param_list_ = index_param_list;
+
+            index_info_list_to_use->emplace_back(index_info_to_use);
         }
 
-        String method_type = request.method_type;
-        auto *index_para_list = new Vector<InitParameter *>();
-
-        for (auto &index_para : request.index_para_list) {
-            auto init_parameter = new InitParameter();
-            init_parameter->param_name_ = index_para.para_name;
-            init_parameter->param_value_ = index_para.para_value;
-            index_para_list->emplace_back(init_parameter);
-        }
-
-        auto result = table->CreateIndex(request.index_name, nullptr, (CreateIndexOptions &)request.option);
+        QueryResult result = table->CreateIndex(request.index_name, index_info_list_to_use, (CreateIndexOptions &)request.option);
 
         ProcessCommonResult(response, result);
     }
@@ -463,6 +468,21 @@ private:
                 return EmbeddingDataType::kElemDouble;
             default:
                 Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    static IndexType GetIndexTypeFromProto(const infinity_thrift_rpc::IndexType::type &type) {
+        switch (type) {
+            case infinity_thrift_rpc::IndexType::IVFFlat:
+                return IndexType::kIVFFlat;
+            case infinity_thrift_rpc::IndexType::HnswLVQ:
+                return IndexType::kHnswLVQ;
+            case infinity_thrift_rpc::IndexType::Hnsw:
+                return IndexType::kHnsw;
+            case infinity_thrift_rpc::IndexType::IRSFullText:
+                return IndexType::kIRSFullText;
+            default:
+                Error<TypeException>("Invalid index type", __FILE_NAME__, __LINE__);
         }
     }
 
@@ -642,7 +662,7 @@ private:
 class InfinityServiceCloneFactory : virtual public infinity_thrift_rpc::InfinityServiceIfFactory {
 public:
     ~InfinityServiceCloneFactory() override = default;
-    InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
+    infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
         LOG_TRACE(Format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
                          sock->getSocketInfo(),
@@ -659,7 +679,7 @@ public:
 void ThreadedThriftServer::Init(i32 port_no) {
 
     std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << std::endl;
-    server = MakeUnique<TThreadedServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+    server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
                                          MakeShared<TServerSocket>(port_no), // port
                                          MakeShared<TBufferedTransportFactory>(),
                                          MakeShared<TBinaryProtocolFactory>());
@@ -679,11 +699,12 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
     std::cout << "Thread pool Thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
 
-    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
-                                           MakeShared<TServerSocket>(port_no),
-                                           MakeShared<TBufferedTransportFactory>(),
-                                           MakeShared<TBinaryProtocolFactory>(),
-                                           threadManager);
+    server =
+        MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+                                      MakeShared<TServerSocket>(port_no),
+                                      MakeShared<TBufferedTransportFactory>(),
+                                      MakeShared<TBinaryProtocolFactory>(),
+                                      threadManager);
 }
 
 void PoolThriftServer::Start() { server->serve(); }
@@ -694,9 +715,9 @@ void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
     SharedPtr<ThreadFactory> thread_factory = MakeShared<ThreadFactory>();
     service_handler_ = MakeShared<InfinityServiceHandler>();
-    SharedPtr<InfinityServiceProcessor> service_processor = MakeShared<InfinityServiceProcessor>(service_handler_);
+    SharedPtr<infinity_thrift_rpc::InfinityServiceProcessor> service_processor =
+        MakeShared<infinity_thrift_rpc::InfinityServiceProcessor>(service_handler_);
     SharedPtr<TProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
-
 
     SharedPtr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(pool_size);
     threadManager->threadFactory(thread_factory);
@@ -704,18 +725,18 @@ void NonBlockPoolThriftServer::Init(i32 port_no, i32 pool_size) {
 
     std::cout << "Non-block pooled thrift server listen on: 0.0.0.0:" << port_no << ", pool size: " << pool_size << std::endl;
 
-    SharedPtr<TNonblockingServerSocket> non_block_socket =  MakeShared<TNonblockingServerSocket>(port_no);
+    SharedPtr<TNonblockingServerSocket> non_block_socket = MakeShared<TNonblockingServerSocket>(port_no);
 
-//    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
-//        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));
+    //    server_thread_ = thread_factory->newThread(std::shared_ptr<TServer>(
+    //        new TNonblockingServer(serviceProcessor, protocolFactory, nbSocket1, threadManager)));
 
     server_thread_ = thread_factory->newThread(MakeShared<TNonblockingServer>(service_processor, protocol_factory, non_block_socket, threadManager));
 
-//    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
-//                                           MakeShared<TServerSocket>(port_no),
-//                                           MakeShared<TBufferedTransportFactory>(),
-//                                           MakeShared<TBinaryProtocolFactory>(),
-//                                           threadManager);
+    //    server = MakeUnique<TThreadPoolServer>(MakeShared<InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
+    //                                           MakeShared<TServerSocket>(port_no),
+    //                                           MakeShared<TBufferedTransportFactory>(),
+    //                                           MakeShared<TBinaryProtocolFactory>(),
+    //                                           threadManager);
 }
 
 void NonBlockPoolThriftServer::Start() { server_thread_->start(); }
