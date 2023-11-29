@@ -46,11 +46,17 @@ jieba_analyzer::jieba_analyzer(jieba_analyzer::options_t &&options) {
     }
 
     jieba_ = new cppjieba::Jieba(dict_path.string(), hmm_path.string(), userdict_path.string(), idf_path.string(), stopwords_path.string());
+    own_jieba_ = true;
     load_stopwords_dict(stopwords_path.string());
 }
 
+jieba_analyzer::jieba_analyzer(const jieba_analyzer &other) {
+    own_jieba_ = false;
+    jieba_ = other.jieba_;
+}
 jieba_analyzer::~jieba_analyzer() {
-  if (jieba_) delete jieba_;
+    if (own_jieba_ && jieba_)
+        delete jieba_;
 }
 
 void jieba_analyzer::load_stopwords_dict(const std::string& stopwords_path) {

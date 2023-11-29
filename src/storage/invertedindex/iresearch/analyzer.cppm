@@ -27,9 +27,9 @@ export constexpr StringView SEGMENT = "segmentation";
 
 export class AnalyzerPool : public Singleton<AnalyzerPool> {
 public:
-    using CacheType = FlatHashMap<StringView, SharedPtr<IRSAnalyzer>>;
+    using CacheType = FlatHashMap<StringView, UniquePtr<IRSAnalyzer>>;
 
-    IRSAnalyzer *Get(const StringView &name);
+    UniquePtr<IRSAnalyzer> Get(const StringView &name);
 
     void Set(const StringView &name, const String &args = "");
 

@@ -27,18 +27,19 @@ constexpr u64 prime = 0x100000001B3ull;
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
 void AnalyzerPool::Set(const StringView &name, const String &args) {
-    if (!Get(name)) {
+    IRSAnalyzer *analyzer = cache_[name].get();
+    if (!analyzer) {
         switch (Str2Int(name.data())) {
             case Str2Int(JIEBA.data()): {
                 IRSJiebaAnalyzer::options_t opt;
                 opt.path_ = args;
-                SharedPtr<IRSAnalyzer> analyzer = MakeShared<IRSJiebaAnalyzer>(Move(opt));
-                cache_[JIEBA] = analyzer;
+                UniquePtr<IRSAnalyzer> analyzer = MakeUnique<IRSJiebaAnalyzer>(Move(opt));
+                cache_[JIEBA] = Move(analyzer);
             } break;
             case Str2Int(SEGMENT.data()): {
                 IRSSegmentationAnalyzer::options_t opt;
-                SharedPtr<IRSAnalyzer> analyzer = MakeShared<IRSSegmentationAnalyzer>(Move(opt));
-                cache_[SEGMENT] = analyzer;
+                UniquePtr<IRSAnalyzer> analyzer = MakeUnique<IRSSegmentationAnalyzer>(Move(opt));
+                cache_[SEGMENT] = Move(analyzer);
             } break;
             default:
                 break;
@@ -46,6 +47,18 @@ void AnalyzerPool::Set(const StringView &name, const String &args) {
     }
 }
 
-IRSAnalyzer *AnalyzerPool::Get(const StringView &name) { return cache_[name].get(); }
+UniquePtr<IRSAnalyzer> AnalyzerPool::Get(const StringView &name) {
+    IRSAnalyzer *analyzer = cache_[name].get();
+    switch (Str2Int(name.data())) {
+        case Str2Int(JIEBA.data()): {
+            return MakeUnique<IRSJiebaAnalyzer>(*reinterpret_cast<IRSJiebaAnalyzer *>(analyzer));
+        } break;
+        case Str2Int(SEGMENT.data()): {
+            return MakeUnique<IRSSegmentationAnalyzer>(*reinterpret_cast<IRSSegmentationAnalyzer *>(analyzer));
+        } break;
+        default:
+            return nullptr;
+    }
+}
 
 } // namespace infinity
