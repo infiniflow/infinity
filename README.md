@@ -82,3 +82,9 @@ $ ninja -j 12
 ```shell
 $ ./src/infinity_main
 ```
+
+## Python SDK develop
+### how to generate thrift rpc code
+```shell
+$ cd tools && python generate_rpc_code.py
+```
