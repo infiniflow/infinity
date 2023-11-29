@@ -82,10 +82,15 @@ test/sql/**/*fvecs*.slt
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h
 
-#proto
-python/infinity/remote/infinity_pb2.py
-python/infinity/remote/infinity_pb2_grpc.py
+# py thrift rpc
+#python/infinity/remote_thrift/infinity_thrift_rpc/constants.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService.py
+#python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService-remote
+#python/infinity/remote_thrift/infinity_thrift_rpc/ttypes.py
 
+
+# cpp rpc
+#src/network/infinity_thrift/*
 
 #python sdk
 python/build
@@ -93,5 +98,3 @@ python/dist
 python/infinity.egg-info
 python/.idea
 
-#brpc
-third_party/brpc/src/butil/config.h

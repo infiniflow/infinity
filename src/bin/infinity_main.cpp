@@ -14,8 +14,7 @@
 
 #include <csignal>
 #include <cstdlib>
-
-#include "network/brpc_server.h"
+#include "network/thrift_server.h"
 
 import compilation_config;
 import stl;
@@ -26,17 +25,25 @@ namespace {
 
 infinity::DBServer db_server;
 
-brpc::Server server;
+//infinity::Thread threaded_thrift_thread;
+//infinity::ThreadedThriftServer threaded_thrift_server;
+
+infinity::Thread pool_thrift_thread;
+infinity::PoolThriftServer pool_thrift_server;
+//infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
+//            threaded_thrift_server.Shutdown();
+//            threaded_thrift_thread.join();
 
-//            brpc_thread_.join();
-            server.Stop(0/*not used now*/);
-            server.Join();
+            pool_thrift_server.Shutdown();
+            pool_thrift_thread.join();
+
+//            non_block_pool_thrift_server.Shutdown();
 
             db_server.Shutdown();
             break;
@@ -115,7 +122,14 @@ auto main(int argc, char **argv) -> int {
     db_server.Init(parameters);
     RegisterSignal();
 
-    BrpcServiceImpl::Run(server);
+//    threaded_thrift_server.Init(9090);
+//    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+
+    pool_thrift_server.Init(9080, 128);
+    pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
+
+//    non_block_pool_thrift_server.Init(9070, 64);
+//    non_block_pool_thrift_server.Start();
 
     db_server.Run();
 

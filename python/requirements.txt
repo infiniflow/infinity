@@ -1,2 +1,7 @@
 sqlglot==11.7.1
-grpcio-tools==1.42.0
+pydantic
+thrift
+setuptools
+pytest
+pandas
+openpyxl

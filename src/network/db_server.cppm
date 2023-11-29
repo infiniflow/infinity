@@ -27,6 +27,8 @@ export struct StartupParameter {
     SharedPtr<String> config_path{};
 };
 
+class ThriftServer;
+
 export class DBServer {
 public:
     void Init(const StartupParameter& parameter);

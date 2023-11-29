@@ -24,7 +24,7 @@ class Database(ABC):
         pass  # implement drop table logic here
 
     @abstractmethod
-    def list_tables(self, db_name):
+    def list_tables(self):
         pass  # implement list tables logic here
 
     @abstractmethod
