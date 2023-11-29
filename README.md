@@ -61,9 +61,6 @@ $ make
 $ sudo make install
 $ export LZ4_ROOT=/usr/local
 
-# dependencies for thrift
-$ sudo apt install thrift-compiler
-
 ```
 
 ### Step3 Build source code
@@ -83,8 +80,9 @@ $ ninja -j 12
 $ ./src/infinity_main
 ```
 
-## Python SDK develop
+## SDK develop
 ### how to generate thrift rpc code
 ```shell
+$ apt install thrift-compiler 
 $ cd tools && python generate_rpc_code.py
 ```
