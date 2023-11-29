@@ -61,8 +61,9 @@ $ make
 $ sudo make install
 $ export LZ4_ROOT=/usr/local
 
-# dependencies for brpc
-$ sudo apt install libgrpc++-dev libgrpc-dev protobuf-compiler-grpc libprotobuf-dev python3-grpcio python3-grpc-tools libprotoc-dev libprotoc-dev
+# dependencies for thrift
+$ sudo apt install thrift-compiler
+
 ```
 
 ### Step3 Build source code

@@ -49,49 +49,5 @@ def generate_thrift():
     os.system(f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {infinity_thrift_file}")
 
 
-def generate_grpc():
-    parent_dir = os.path.dirname(os.getcwd())
-    python_dir = parent_dir + "/python/infinity/remote_grpc/grpc_pb"
-    cpp_dir = parent_dir + "/src/network/infinity_grpc"
-    create_dir([python_dir, cpp_dir])
-    os.system("protoc --version")
-    os.system("which protoc")
-    # py
-    os.system(
-        f"python3 -m grpc_tools.protoc -I={python_dir} --python_out={python_dir} --grpc_python_out={python_dir} {python_dir}/infinity_grpc.proto")
-
-    fix_python_import_path(python_dir + "/infinity_grpc_pb2_grpc.py")
-
-    # cpp
-    grpc_cpp_plugin_dir = get_path('grpc_cpp_plugin')
-    match grpc_cpp_plugin_dir:
-        case None:
-            raise Exception(f"can't find the grpc_cpp_plugin")
-        case _:
-            os.system(f"/usr/bin/protoc -I={python_dir} --cpp_out={cpp_dir}  {python_dir}/infinity_grpc.proto")
-            os.system(
-                f"/usr/bin/protoc -I={python_dir}  --grpc_out={cpp_dir}  --plugin=protoc-gen-grpc={grpc_cpp_plugin_dir} {python_dir}/infinity_grpc.proto")
-
-
-def generate_brpc():
-    parent_dir = os.path.dirname(os.getcwd())
-    python_dir = parent_dir + "/python/infinity/remote_brpc/brpc_pb"
-    cpp_dir = parent_dir + "/src/network/infinity_brpc"
-    create_dir([python_dir, cpp_dir])
-    # py
-    os.system(
-        f"python3 -m grpc_tools.protoc -I={python_dir} --python_out={python_dir} --grpc_python_out={python_dir} {python_dir}/infinity_brpc.proto")
-
-    fix_python_import_path(python_dir + "/infinity_brpc_pb2_grpc.py")
-    # cpp
-
-    if not os.path.exists(cpp_dir):
-        os.makedirs(cpp_dir)
-
-    os.system(f"/usr/bin/protoc -I={python_dir} --cpp_out={cpp_dir}  {python_dir}/infinity_brpc.proto")
-
-
 if __name__ == '__main__':
     generate_thrift()
-    generate_grpc()
-    generate_brpc()

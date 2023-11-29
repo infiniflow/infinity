@@ -1,16 +1,8 @@
 # dependency
-
 ## python
 pip install -r requirements.txt
-conda install grpcio-tools
-
 ## cpp
-
-### brpc
-sudo apt-get install -y libssl-dev libgflags-dev libprotobuf-dev libprotoc-dev protobuf-compiler libleveldb-dev
-
 ### thrift
-
 sudo apt-get install thrift-compiler
 # build
 python setup.py bdist_wheel
@@ -22,7 +14,7 @@ pip install infinity-0.0.1-py3-none-any.whl
 ```python
 import infinity
 
-infinity_obj = infinity.connect("0.0.0.0:50051")
+infinity_obj = infinity.connect("0.0.0.0:9090")
 
 infinity_obj.create_database("my_db")
 

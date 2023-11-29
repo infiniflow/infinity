@@ -88,15 +88,8 @@ benchmark/csv/csv_config.h
 #python/infinity/remote_thrift/infinity_thrift_rpc/InfinityService-remote
 #python/infinity/remote_thrift/infinity_thrift_rpc/ttypes.py
 
-# py grpc rpc
-#python/infinity/remote_grpc/grpc_pb/infinity_grpc_pb2*
-
-# py brpc rpc
-#python/infinity/remote_brpc/brpc_pb/infinity_brpc_pb2*
 
 # cpp rpc
-#src/network/infinity_brpc/*
-#src/network/infinity_grpc/*
 #src/network/infinity_thrift/*
 
 #python sdk
@@ -105,5 +98,3 @@ python/dist
 python/infinity.egg-info
 python/.idea
 
-#brpc
-third_party/brpc/src/butil/config.h

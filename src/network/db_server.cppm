@@ -21,12 +21,6 @@ import connection;
 
 export module db_server;
 
-namespace grpc {
-
-class Server;
-
-}
-
 namespace infinity {
 
 export struct StartupParameter {

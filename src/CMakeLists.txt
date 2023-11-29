@@ -50,13 +50,6 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
-        brpc_cpp
-        CONFIGURE_DEPENDS
-        network/*.cpp
-        network/*.cc
-)
-
-file(GLOB_RECURSE
         function_cpp
         CONFIGURE_DEPENDS
         function/*.cpp
@@ -200,14 +193,12 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/brpc/src")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
-        ${brpc_cpp}
 )
 
 target_sources(infinity
@@ -226,12 +217,6 @@ target_link_libraries(infinity
         fastpfor
         newpfor
         openfst
-
-        protobuf
-        grpc
-        grpc++
-        gpr
-        absl_synchronization
 #        iresearch
 
         thrift
@@ -241,18 +226,11 @@ target_link_libraries(infinity
         atomic
 #        profiler
 
-        leveldb
-        protobuf
-        ssl
-        brpc-static
-        gflags
-        crypto
 )
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
-target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 ### unit test
 
@@ -344,7 +322,6 @@ add_executable(unit_test
         ${function_cpp}
         ${common_cpp}
         ${executor_cpp}
-#        ${grpc_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -368,12 +345,6 @@ target_link_libraries(unit_test
         atomic
 #        profiler
         thrift
-#        leveldb
-#        protobuf
-#        ssl
-#        brpc-static
-#        gflags
-#        crypto
 )
 
 target_sources(unit_test
@@ -398,46 +369,5 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
-target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/brpc")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-
-# infinty client
-add_executable(infinity_client
-        bin/infinity_client.cpp
-        network/infinity_grpc/infinity_grpc.grpc.pb.cc
-        network/infinity_grpc/infinity_grpc.pb.cc
-)
-
-target_link_libraries(infinity_client
-        infinity_core
-        sql_parser
-        faiss
-        onnxruntime_mlas
-        zsv_parser
-        roaring
-        fastpfor
-        newpfor
-        openfst
-
-        protobuf
-        grpc
-        grpc++
-        gpr
-        absl_synchronization
-        #        iresearch
-
-        thrift
-        thriftnb
-        iresearch
-        lz4
-        atomic
-        #        profiler
-
-        leveldb
-        protobuf
-        ssl
-        brpc-static
-        gflags
-        crypto
-)

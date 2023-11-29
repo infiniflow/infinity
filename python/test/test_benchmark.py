@@ -13,7 +13,6 @@
 # limitations under the License.
 import os
 import shutil
-
 import pytest
 import threading
 import time
@@ -21,7 +20,6 @@ import infinity
 from infinity.infinity import NetworkAddress
 import multiprocessing
 from datetime import datetime
-import numpy as np
 import pandas as pd
 import traceback, functools
 
@@ -215,8 +213,6 @@ class TestBenchmark:
         # Using the tune
 
         ip: str = '0.0.0.0'
-        grpc = ("G RPC", ip, 50052)
-        brpc = ("B RPC", ip, 50051)
         thrift = ("Thrift", ip, 9090)
         thread_pool_thrift = ("Thread Pool Thrift", ip, 9080)
         async_thrift = ("AsyncThrift", ip, 9070)

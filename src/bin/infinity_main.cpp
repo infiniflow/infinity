@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include "network/thrift_server.h"
-#include "network/grpc_server.h"
-#include "network/brpc_server.h"
 #include <csignal>
 #include <cstdlib>
 
@@ -34,12 +32,6 @@ infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
-infinity::Thread grpc_thread;
-infinity::Thread grpc_async_thread;
-//std::unique_ptr<grpc::Server> grpc_server;
-
-infinity::Thread brpc_thread{};
-
 void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
     switch (signal_number) {
         case SIGINT:
@@ -52,11 +44,6 @@ void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
             pool_thrift_thread.join();
 
             non_block_pool_thrift_server.Shutdown();
-
-            grpc_thread.join();
-            grpc_async_thread.join();
-
-            brpc_thread.join();
 
             db_server.Shutdown();
             break;
@@ -143,11 +130,6 @@ auto main(int argc, char **argv) -> int {
 
     non_block_pool_thrift_server.Init(9070, 64);
     non_block_pool_thrift_server.Start();
-
-    grpc_thread = infinity::Thread([]() { GrpcServiceImpl::Run(); });
-    grpc_async_thread =infinity::Thread([]() { GrpcAsyncServiceImpl::Run(); });
-
-    brpc_thread = infinity::Thread([]() { BrpcServiceImpl::Run(); });
 
     db_server.Run();
 
