@@ -15,6 +15,7 @@
 #pragma once
 
 #include "base_statement.h"
+#include <optional>
 
 namespace infinity {
 
@@ -27,6 +28,7 @@ enum class ShowStmtType {
     kIndexes,
     kConfigs,
     kProfiles,
+    kSegments,
 };
 
 class ShowStatement : public BaseStatement {
@@ -38,6 +40,8 @@ public:
     ShowStmtType show_type_{ShowStmtType::kTables};
     std::string schema_name_{"default"};
     std::string table_name_{};
+    std::optional<int64_t> segment_id_{};
+    std::optional<int64_t> block_id_{};
 };
 
 } // namespace infinity

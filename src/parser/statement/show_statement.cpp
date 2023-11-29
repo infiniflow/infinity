@@ -44,6 +44,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show databases";
             break;
         }
+        case ShowStmtType::kSegments : {
+            ss << "Show Segments";
+            break;
+        }
         case ShowStmtType::kConfigs: {
             ss << "Show configs";
             break;

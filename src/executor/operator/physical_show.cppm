@@ -29,9 +29,15 @@ namespace infinity {
 
 export class PhysicalShow : public PhysicalOperator {
 public:
-    explicit PhysicalShow(u64 id, ShowType type, String db_name, String object_name, u64 table_index)
+    explicit PhysicalShow(u64 id,
+                          ShowType type,
+                          String db_name,
+                          String object_name,
+                          u64 table_index,
+                          Optional<u32> segment_id,
+                          Optional<u16> block_id)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id), scan_type_(type), db_name_(Move(db_name)),
-          object_name_(Move(object_name)), table_index_(table_index) {}
+          object_name_(Move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
 
     ~PhysicalShow() override = default;
 
@@ -62,25 +68,30 @@ private:
                                const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
                                const SharedPtr<Vector<String>> &column_names);
 
-    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
 
     /// Execute push based show table
-    void ExecuteShowTable(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
 
     /// Execute push based describe table
-    void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state);
 
-    void ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    void ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState* operator_state);
+    void ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *operator_state);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};
     String object_name_{};
     u64 table_index_{};
+
+    Optional<u32> segment_id_{};
+    Optional<u16> block_id_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

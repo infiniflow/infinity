@@ -224,4 +224,40 @@ String LocalFileSystem::GetAbsolutePath(const String &path) {
     return std::filesystem::absolute(p).string();
 }
 
+u64 LocalFileSystem::GetFileSizeByPath(const String& path) {
+    return std::filesystem::file_size(path);
+}
+
+u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
+    u64 totalSize = 0;
+
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+        if (std::filesystem::is_regular_file(entry.status())) {
+            totalSize += std::filesystem::file_size(entry);
+        }
+    }
+
+    return totalSize;
+}
+
+String LocalFileSystem::FormatFileSize(u64 file_size) {
+    static const char* sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+
+    if (file_size == 0) {
+        return "0B";
+    }
+
+    int suffixIndex = static_cast<int>(Log2(file_size) / 10);
+    double size = static_cast<double>(file_size) / (1 << (suffixIndex * 10));
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << size << sizeSuffixes[suffixIndex];
+    return oss.str();
+}
+
+String LocalFileSystem::ConcatenateFilePath(const String& dir_path, const String& file_path) {
+    std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
+    return full_path.string();
+}
+
 } // namespace infinity

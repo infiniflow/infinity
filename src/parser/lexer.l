@@ -42,6 +42,7 @@ BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
+BLOCK          { return BLOCK; }
 BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
@@ -146,6 +147,8 @@ SECONDS         { return SECONDS; }
 SELECT          { return SELECT; }
 SESSION         { return SESSION; }
 SET             { return SET; }
+SEGMENT         { return SEGMENT; }
+SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
 THEN            { return THEN; }
