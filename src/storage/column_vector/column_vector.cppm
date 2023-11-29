@@ -194,7 +194,7 @@ template <typename DataT>
 inline void
 ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         ((DataT *)(dst))[idx] = ((const DataT *)(src))[row_id];
@@ -207,7 +207,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
                                              SizeT count,
                                              const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
@@ -329,7 +329,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
                                                SizeT count,
                                                const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
@@ -347,7 +347,7 @@ inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
                                    SizeT dest_start_idx,
                                    SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     SizeT source_end_idx = source_start_idx + count;
 
@@ -363,7 +363,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
                                              SizeT dest_start_idx,
                                              SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     for (SizeT idx = 0; idx < count; ++idx) {
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
@@ -495,7 +495,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
                                                SizeT dest_start_idx,
                                                SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
@@ -511,7 +511,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
 template <typename DataT>
 inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     ((DataT *)(dst))[dst_idx] = ((const DataT *)(src))[src_idx];
 }
@@ -521,7 +521,7 @@ inline void
 ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
 
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
 
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
@@ -614,7 +614,7 @@ template <>
 inline void
 ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = src_buf->GetData();
+    ptr_t dst = dst_buf->GetData();
     const_ptr_t src_ptr = src + src_idx * data_type_size_;
     ptr_t dst_ptr = dst + dst_idx * data_type_size_;
     Memcpy(dst_ptr, src_ptr, data_type_size_);
