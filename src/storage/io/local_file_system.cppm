@@ -74,7 +74,7 @@ public:
 
     static u64 GetFolderSizeByPath(const String& path);
 
-    static String FormatFileSize(u64 fileSize);
+    static String FormatFileSize(u64 file_size);
 
     static String ConcatenateFilePath(const String& dir_path, const String& file_path);
 };

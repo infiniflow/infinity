@@ -32,7 +32,7 @@ class SegmentEntry;
 class DataBlock;
 
 export struct BlockVersion {
-    constexpr static const String PATH = "version";
+    constexpr static String PATH = "version";
 
     BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
     bool operator==(const BlockVersion &rhs) const;
