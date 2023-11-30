@@ -2,7 +2,7 @@
 #include "parser_assert.h"
 #include "query_driver.h"
 #include "search/filter.hpp"
-#include "search_parser.h"
+#include "search_options.h"
 #include "spdlog/fmt/fmt.h"
 
 #include <cmath>
@@ -21,23 +21,12 @@ std::string MatchExpr::ToString() const {
     }
 
     std::ostringstream oss;
-    oss << "MATCH(";
+    oss << "MATCH('";
     oss << fields_;
-    oss << ", '" << matching_text_ << "'";
-    oss << SearchParser::OptionsToString(options_);
+    oss << "', '" << matching_text_ << "'";
+    oss << ", '" << options_text_ << "'";
     oss << ")";
     return oss.str();
-}
-
-void MatchExpr::SetOptions(const std::string &options) { SearchParser::ParseOptions(options, options_); }
-
-int MatchExpr::SetFilter(const std::string &fields, const std::string &matching_text) {
-    matching_text_ = matching_text;
-    fields_ = fields;
-    QueryDriver driver;
-    int rc = driver.ParseSingleWithFields(fields, matching_text);
-    flt_ = std::move(driver.result);
-    return rc;
 }
 
 } // namespace infinity

@@ -106,7 +106,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport: {
+        case PhysicalOperatorType::kExport:
+        case PhysicalOperatorType::kMatch: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(Format("{} shouldn't have child.", phys_op->GetName()));
@@ -155,6 +156,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             break;
         }
+        case PhysicalOperatorType::kFusion:
         case PhysicalOperatorType::kMergeParallelAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
@@ -175,6 +177,15 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            if (phys_op->right() != nullptr) {
+                auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+                next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                                SinkType::kLocalQueue,
+                                                phys_op->right()->GetOutputNames(),
+                                                phys_op->right()->GetOutputTypes());
+                BuildFragments(phys_op->right(), next_plan_fragment.get());
+                current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            }
             return;
         }
         case PhysicalOperatorType::kUnionAll:

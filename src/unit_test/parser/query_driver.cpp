@@ -145,7 +145,9 @@ _exists_:"author" AND page_count:>200 AND (name:/star.*/ OR name:duna~)
 _exists_:"author" AND page_count:>200^1.3 AND (name:/star.*/ OR name:duna~^1.2)^1.2
     )##";
 
-    QueryDriver driver;
+    Map<String, String> column2analyzer;
+    String default_field("body");
+    QueryDriver driver(column2analyzer, default_field);
     IStringStream iss(row_quires);
     int rc = driver.ParseStream(iss);
     EXPECT_EQ(rc, 0);

@@ -31,7 +31,6 @@ public:
 
 public:
     std::vector<MatchExpr *> match_exprs_{};
-    std::vector<QueryExpr *> query_exprs_{};
     std::vector<KnnExpr *> knn_exprs_{};
     FusionExpr *fusion_expr_{};
 

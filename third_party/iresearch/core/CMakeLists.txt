@@ -175,6 +175,7 @@ set(IResearch_core_sources
   ./utils/process_utils.cpp
   ./utils/network_utils.cpp
   ./utils/numeric_utils.cpp
+  ./utils/options.cpp
   ${IResearch_core_os_specific_sources}
   ${IResearch_core_optimized_sources}
   )
@@ -275,6 +276,7 @@ set(IResearch_core_headers
   ./utils/version_utils.hpp
   ./utils/bitset.hpp
   ./utils/type_id.hpp
+  ./utils/options.hpp
   ./shared.hpp
   ./types.hpp
   )

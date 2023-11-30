@@ -23,6 +23,7 @@ import logical_node;
 import table_ref;
 import parser;
 import query_context;
+import search_expression;
 
 export module bound_select_statement;
 
@@ -76,6 +77,9 @@ public:
 
     // From clause
     SharedPtr<TableRef> table_ref_ptr_{};
+
+    // Search expression
+    SharedPtr<SearchExpression> search_expr_{};
 
     // Where conditions
     Vector<SharedPtr<BaseExpression>> where_conditions_{};

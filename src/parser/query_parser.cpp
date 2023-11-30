@@ -859,7 +859,7 @@ namespace infinity {
           switch (yyn)
             {
   case 2: // topLevelQuery: query "end of file"
-#line 104 "query_parser.y"
+#line 103 "query_parser.y"
             {
     driver.result = std::move(yystack_[1].value.as < std::unique_ptr<irs::filter> > ());
 }
@@ -867,13 +867,13 @@ namespace infinity {
     break;
 
   case 3: // query: clause
-#line 109 "query_parser.y"
+#line 108 "query_parser.y"
          { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
 #line 873 "query_parser.cpp"
     break;
 
   case 4: // query: query clause
-#line 110 "query_parser.y"
+#line 109 "query_parser.y"
                {
     auto query = std::make_unique<irs::Or>();
     irs::filter::ptr fptr = std::move(yystack_[1].value.as < std::unique_ptr<irs::filter> > ());
@@ -886,7 +886,7 @@ namespace infinity {
     break;
 
   case 5: // query: query OR clause
-#line 118 "query_parser.y"
+#line 117 "query_parser.y"
                   {
     auto query = std::make_unique<irs::Or>();
     irs::filter::ptr fptr = std::move(yystack_[2].value.as < std::unique_ptr<irs::filter> > ());
@@ -899,13 +899,13 @@ namespace infinity {
     break;
 
   case 6: // clause: term
-#line 128 "query_parser.y"
+#line 127 "query_parser.y"
        { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
 #line 905 "query_parser.cpp"
     break;
 
   case 7: // clause: clause AND term
-#line 129 "query_parser.y"
+#line 128 "query_parser.y"
                   {
     auto query = std::make_unique<irs::And>();
     irs::filter::ptr fptr = std::move(yystack_[2].value.as < std::unique_ptr<irs::filter> > ());
@@ -918,13 +918,13 @@ namespace infinity {
     break;
 
   case 8: // term: basic_filter_boost
-#line 139 "query_parser.y"
+#line 138 "query_parser.y"
                      { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
 #line 924 "query_parser.cpp"
     break;
 
   case 9: // term: NOT term
-#line 140 "query_parser.y"
+#line 139 "query_parser.y"
            {
     auto query = std::make_unique<irs::And>();
     irs::filter::ptr fptr = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ());
@@ -935,13 +935,13 @@ namespace infinity {
     break;
 
   case 10: // term: LPAREN query RPAREN
-#line 146 "query_parser.y"
+#line 145 "query_parser.y"
                       { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[1].value.as < std::unique_ptr<irs::filter> > ()); }
 #line 941 "query_parser.cpp"
     break;
 
   case 11: // term: LPAREN query RPAREN CARAT
-#line 147 "query_parser.y"
+#line 146 "query_parser.y"
                             {
     float new_boost = yystack_[2].value.as < std::unique_ptr<irs::filter> > ()->boost() * yystack_[0].value.as < float > ();
     yystack_[2].value.as < std::unique_ptr<irs::filter> > ()->boost(new_boost);
@@ -951,7 +951,7 @@ namespace infinity {
     break;
 
   case 12: // basic_filter_boost: basic_filter
-#line 154 "query_parser.y"
+#line 153 "query_parser.y"
                {
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ());
 }
@@ -959,7 +959,7 @@ namespace infinity {
     break;
 
   case 13: // basic_filter_boost: basic_filter CARAT
-#line 157 "query_parser.y"
+#line 156 "query_parser.y"
                      {
     float new_boost = yystack_[1].value.as < std::unique_ptr<irs::filter> > ()->boost() * yystack_[0].value.as < float > ();
     yystack_[1].value.as < std::unique_ptr<irs::filter> > ()->boost(new_boost);
@@ -969,104 +969,106 @@ namespace infinity {
     break;
 
   case 14: // basic_filter: STRING
-#line 164 "query_parser.y"
+#line 163 "query_parser.y"
          {
-    std::istringstream iss(yystack_[0].value.as < std::string > ());
-    std::string term;
-    std::vector<std::string> terms;
-    while (std::getline(iss, term, ' ')) {
-        terms.push_back(term);
+    std::string &field = driver.default_field;
+    if(field.empty()){
+        error(yystack_[0].location, "");
+        YYERROR;
     }
+    std::vector<std::string> terms;
+    driver.Analyze(field, yystack_[0].value.as < std::string > (), terms);
     if(terms.size()==1){
         auto query = std::make_unique<irs::by_term>();
         query->mutable_options()->term = toBstring(terms[0]);
+        *query->mutable_field() = field;
         yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
     } else {
-        auto query = std::make_unique<irs::by_phrase>();
-        auto* opts = query->mutable_options();
+        auto query = std::make_unique<irs::Or>();
         for(size_t i=0; i<terms.size(); i++){
-            opts->push_back<irs::by_term_options>().term = toBstring(terms[i]);
+            auto subquery = std::make_unique<irs::by_term>();
+            subquery->mutable_options()->term = toBstring(terms[i]);
+            *subquery->mutable_field() = field;
+            query->add(std::move(subquery));
         }
         yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
     }
 }
-#line 994 "query_parser.cpp"
+#line 998 "query_parser.cpp"
     break;
 
   case 15: // basic_filter: rangeExpr
-#line 184 "query_parser.y"
+#line 187 "query_parser.y"
             { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
-#line 1000 "query_parser.cpp"
+#line 1004 "query_parser.cpp"
     break;
 
   case 16: // basic_filter: regexExpr
-#line 185 "query_parser.y"
+#line 188 "query_parser.y"
             { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
-#line 1006 "query_parser.cpp"
+#line 1010 "query_parser.cpp"
     break;
 
   case 17: // basic_filter: fuzzyExpr
-#line 186 "query_parser.y"
+#line 189 "query_parser.y"
             { yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ()); }
-#line 1012 "query_parser.cpp"
+#line 1016 "query_parser.cpp"
     break;
 
   case 18: // basic_filter: STRING OP_COLON STRING
-#line 187 "query_parser.y"
+#line 190 "query_parser.y"
                          {
-    std::istringstream iss(yystack_[0].value.as < std::string > ());
-    std::string term;
     std::vector<std::string> terms;
-    while (std::getline(iss, term, ' ')) {
-        terms.push_back(term);
-    }
+    driver.Analyze(yystack_[2].value.as < std::string > (), yystack_[0].value.as < std::string > (), terms);
+    std::string &field = yystack_[2].value.as < std::string > ();
     if(terms.size()==1){
         auto query = std::make_unique<irs::by_term>();
         query->mutable_options()->term = toBstring(terms[0]);
-        *query->mutable_field() = yystack_[2].value.as < std::string > ();
+        *query->mutable_field() = field;
         yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
     } else {
-        auto query = std::make_unique<irs::by_phrase>();
-        auto* opts = query->mutable_options();
+        auto query = std::make_unique<irs::Or>();
         for(size_t i=0; i<terms.size(); i++){
-            opts->push_back<irs::by_term_options>().term = toBstring(terms[i]);
+            auto subquery = std::make_unique<irs::by_term>();
+            subquery->mutable_options()->term = toBstring(terms[i]);
+            *subquery->mutable_field() = field;
+            query->add(std::move(subquery));
         }
-        *query->mutable_field() = yystack_[2].value.as < std::string > ();
         yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
     }
 }
-#line 1039 "query_parser.cpp"
+#line 1041 "query_parser.cpp"
     break;
 
   case 19: // basic_filter: STRING OP_COLON rangeExpr
-#line 209 "query_parser.y"
+#line 210 "query_parser.y"
                             {
     *dynamic_cast<irs::by_range*>(yystack_[0].value.as < std::unique_ptr<irs::filter> > ().get())->mutable_field() = yystack_[2].value.as < std::string > ();
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ());
 }
-#line 1048 "query_parser.cpp"
+#line 1050 "query_parser.cpp"
     break;
 
   case 20: // basic_filter: STRING OP_COLON regexExpr
-#line 213 "query_parser.y"
+#line 214 "query_parser.y"
                             {
     *dynamic_cast<irs::by_wildcard*>(yystack_[0].value.as < std::unique_ptr<irs::filter> > ().get())->mutable_field() = yystack_[2].value.as < std::string > ();
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ());
 }
-#line 1057 "query_parser.cpp"
+#line 1059 "query_parser.cpp"
     break;
 
   case 21: // basic_filter: STRING OP_COLON fuzzyExpr
-#line 217 "query_parser.y"
+#line 218 "query_parser.y"
                             {
     *dynamic_cast<irs::by_edit_distance*>(yystack_[0].value.as < std::unique_ptr<irs::filter> > ().get())->mutable_field() = yystack_[2].value.as < std::string > ();
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(yystack_[0].value.as < std::unique_ptr<irs::filter> > ());
 }
-#line 1066 "query_parser.cpp"
+#line 1068 "query_parser.cpp"
     break;
 
   case 22: // rangeExpr: opCompare STRING
-#line 223 "query_parser.y"
+#line 224 "query_parser.y"
                    {
     auto query = std::make_unique<irs::by_range>();
     auto &range = query->mutable_options()->range;
@@ -1098,11 +1100,11 @@ namespace infinity {
     }
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
 }
-#line 1102 "query_parser.cpp"
+#line 1104 "query_parser.cpp"
     break;
 
   case 23: // rangeExpr: rangeStart boundVal RANGE_TO boundVal rangeEnd
-#line 254 "query_parser.y"
+#line 255 "query_parser.y"
                                                  {
     const std::string &beg = yystack_[3].value.as < std::string > ();
     const std::string &end = yystack_[1].value.as < std::string > ();
@@ -1126,92 +1128,92 @@ namespace infinity {
     }
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
 }
-#line 1130 "query_parser.cpp"
+#line 1132 "query_parser.cpp"
     break;
 
   case 24: // opCompare: OP_EQUAL
-#line 279 "query_parser.y"
+#line 280 "query_parser.y"
            { yylhs.value.as < int > () = int(token::OP_EQUAL); }
-#line 1136 "query_parser.cpp"
+#line 1138 "query_parser.cpp"
     break;
 
   case 25: // opCompare: OP_LESSTHAN
-#line 280 "query_parser.y"
+#line 281 "query_parser.y"
               { yylhs.value.as < int > () = int(token::OP_LESSTHAN); }
-#line 1142 "query_parser.cpp"
+#line 1144 "query_parser.cpp"
     break;
 
   case 26: // opCompare: OP_MORETHAN
-#line 281 "query_parser.y"
+#line 282 "query_parser.y"
               { yylhs.value.as < int > () = int(token::OP_MORETHAN); }
-#line 1148 "query_parser.cpp"
+#line 1150 "query_parser.cpp"
     break;
 
   case 27: // opCompare: OP_LESSTHANEQ
-#line 282 "query_parser.y"
+#line 283 "query_parser.y"
                 { yylhs.value.as < int > () = int(token::OP_LESSTHANEQ); }
-#line 1154 "query_parser.cpp"
+#line 1156 "query_parser.cpp"
     break;
 
   case 28: // opCompare: OP_MORETHANEQ
-#line 283 "query_parser.y"
+#line 284 "query_parser.y"
                 { yylhs.value.as < int > () = int(token::OP_MORETHANEQ); }
-#line 1160 "query_parser.cpp"
+#line 1162 "query_parser.cpp"
     break;
 
   case 29: // rangeStart: RANGEIN_START
-#line 287 "query_parser.y"
+#line 288 "query_parser.y"
                 { yylhs.value.as < int > () = int(token::RANGEIN_START); }
-#line 1166 "query_parser.cpp"
+#line 1168 "query_parser.cpp"
     break;
 
   case 30: // rangeStart: RANGEEX_START
-#line 288 "query_parser.y"
+#line 289 "query_parser.y"
                 { yylhs.value.as < int > () = int(token::RANGEEX_START); }
-#line 1172 "query_parser.cpp"
+#line 1174 "query_parser.cpp"
     break;
 
   case 31: // rangeEnd: RANGEIN_END
-#line 292 "query_parser.y"
+#line 293 "query_parser.y"
               { yylhs.value.as < int > () = int(token::RANGEIN_END); }
-#line 1178 "query_parser.cpp"
+#line 1180 "query_parser.cpp"
     break;
 
   case 32: // rangeEnd: RANGEEX_END
-#line 293 "query_parser.y"
+#line 294 "query_parser.y"
               { yylhs.value.as < int > () = int(token::RANGEEX_END); }
-#line 1184 "query_parser.cpp"
+#line 1186 "query_parser.cpp"
     break;
 
   case 33: // boundVal: STRING
-#line 297 "query_parser.y"
+#line 298 "query_parser.y"
          {
     yylhs.value.as < std::string > () = yystack_[0].value.as < std::string > ();
 }
-#line 1192 "query_parser.cpp"
+#line 1194 "query_parser.cpp"
     break;
 
   case 34: // boundVal: %empty
-#line 300 "query_parser.y"
+#line 301 "query_parser.y"
  {
     yylhs.value.as < std::string > () = std::string("");
 }
-#line 1200 "query_parser.cpp"
+#line 1202 "query_parser.cpp"
     break;
 
   case 35: // regexExpr: REGEXPTERM
-#line 305 "query_parser.y"
+#line 306 "query_parser.y"
              {
     auto query = std::make_unique<irs::by_wildcard>();
     size_t leng = yystack_[0].value.as < std::string > ().length();
     query->mutable_options()->term = toBstring(yystack_[0].value.as < std::string > ().substr(1, leng-2));
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
 }
-#line 1211 "query_parser.cpp"
+#line 1213 "query_parser.cpp"
     break;
 
   case 36: // fuzzyExpr: STRING TILDE
-#line 313 "query_parser.y"
+#line 314 "query_parser.y"
                {
     auto query = std::make_unique<irs::by_edit_distance>();
     auto* opts = query->mutable_options();
@@ -1220,11 +1222,11 @@ namespace infinity {
     opts->term = toBstring(yystack_[1].value.as < std::string > ());
     yylhs.value.as < std::unique_ptr<irs::filter> > () = std::move(query);
 }
-#line 1224 "query_parser.cpp"
+#line 1226 "query_parser.cpp"
     break;
 
 
-#line 1228 "query_parser.cpp"
+#line 1230 "query_parser.cpp"
 
             default:
               break;
@@ -1693,10 +1695,10 @@ namespace infinity {
   const short
   QueryParser::yyrline_[] =
   {
-       0,   104,   104,   109,   110,   118,   128,   129,   139,   140,
-     146,   147,   154,   157,   164,   184,   185,   186,   187,   209,
-     213,   217,   223,   254,   279,   280,   281,   282,   283,   287,
-     288,   292,   293,   297,   300,   305,   313
+       0,   103,   103,   108,   109,   117,   127,   128,   138,   139,
+     145,   146,   153,   156,   163,   187,   188,   189,   190,   210,
+     214,   218,   224,   255,   280,   281,   282,   283,   284,   288,
+     289,   293,   294,   298,   301,   306,   314
   };
 
   void
@@ -1734,9 +1736,9 @@ namespace infinity {
 
 #line 9 "query_parser.y"
 } // infinity
-#line 1738 "query_parser.cpp"
+#line 1740 "query_parser.cpp"
 
-#line 322 "query_parser.y"
+#line 323 "query_parser.y"
 
 
 namespace infinity{

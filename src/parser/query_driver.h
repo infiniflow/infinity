@@ -14,8 +14,10 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace irs {
 class filter;
@@ -26,15 +28,16 @@ namespace infinity {
 class QueryParser;
 class QueryScanner;
 
-// Conducting the whole scanning and parsing of Lucene.
+/**
+ * Conducting the whole scanning and parsing.
+ * WARNNING: Parse* are not thread-safe since they access the shared parsing options and result.
+ */
 class QueryDriver {
 public:
-    QueryDriver();
+    QueryDriver(const std::map<std::string, std::string> &field2analyzer_, const std::string &default_field_);
     virtual ~QueryDriver();
 
     int ParseSingleWithFields(const std::string &fields_str, const std::string &query);
-
-    void PopulateDefaultField(const std::string &default_field, float boost = 1.0F);
 
     /**
      * parse a stream - read and parse line by line
@@ -48,10 +51,21 @@ public:
      */
     int ParseSingle(const std::string &query);
 
+    void Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms);
+
+    using AnalyzeFunc = void (*)(const std::string &analyzer_name, const std::string &text, std::vector<std::string> &terms);
+    AnalyzeFunc analyze_func_{};
+
     /**
      * parsing result
      */
     std::unique_ptr<irs::filter> result = nullptr;
+
+    /**
+     * parsing options
+     */
+    std::string default_field;
+    std::map<std::string, std::string> field2analyzer;
 
 private:
     int parse_helper(std::istream &stream);

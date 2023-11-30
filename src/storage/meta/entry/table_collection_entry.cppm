@@ -39,6 +39,7 @@ namespace infinity {
 class DBEntry;
 class IndexDef;
 class TableIndexEntry;
+class IrsIndexEntry;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
@@ -71,6 +72,8 @@ public:
     GetIndex(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&segment_column_index_entry);
 
     static void RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr);
+
+    static void GetFullTextAnalyzer(TableCollectionEntry *table_entry, Map<String, String> column2analyzer);
 
 public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
@@ -112,6 +115,12 @@ public:
     static Json Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableCollectionEntry> Deserialize(const Json &table_entry_json, TableCollectionMeta *table_meta, BufferManager *buffer_mgr);
+
+    static void GetFullTextAnalyzers(TableCollectionEntry *table_entry,
+                                     u64 txn_id,
+                                     TxnTimeStamp begin_ts,
+                                     SharedPtr<IrsIndexEntry> &irs_index_entry,
+                                     Map<String, String> &column2analyzer);
 
     virtual void MergeFrom(BaseEntry &other);
 

@@ -53,7 +53,7 @@ SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {
     dst->reserve(base_table_ref_->column_names_->size() + 1);
     for (auto &name : *base_table_ref_->column_names_)
         dst->emplace_back(name);
-    dst->emplace_back("__rowid");
+    dst->emplace_back(COLUMN_NAME_ROW_ID);
     return dst;
 }
 
