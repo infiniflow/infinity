@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 
+import pandas as pd
 from sqlglot import condition
 
 import infinity
@@ -45,7 +45,7 @@ class TestCase:
         method: create db with empty name
         expect: create db fail with error message
         """
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9080))
         assert infinity_obj
 
         res = infinity_obj.create_database("")
@@ -130,11 +130,11 @@ class TestCase:
             res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
             assert res.success
             # search
-            res = table_obj.search().output(["c1 + 0.1"]).filter("c1 > 1").to_list()
-            print(res)
+            res = table_obj.search().output(["c1 + 0.1"]).to_df()
+            pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}))
 
-            res = table_obj.search().output(["*"]).filter("c1 > 1").to_list()
-            print(res)
+            res = table_obj.search().output(["*"]).filter("c1 > 1").to_df()
+            pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2,), 'c2': (2.2,)}))
 
             res = db_obj.drop_table("my_table3")
             assert res.success
@@ -153,7 +153,7 @@ class TestCase:
             assert res.success
 
             # search
-            res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
+            res = table_obj.search().output(["c1"]).filter("c1 > 1").to_df()
             print(res)
             res = db_obj.drop_table("my_table4")
             assert res.success

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pandas as pd
 
 import infinity
 from infinity.infinity import NetworkAddress
@@ -91,39 +92,40 @@ class TestSelect:
              {"c1": 9, "c2": 9}])
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_list()
-        assert res == {'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
-                       'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}))
 
-        res = table_obj.search().output(["c1", "c2"]).to_list()
-        assert res == {'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
-                       'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}
+        res = table_obj.search().output(["c1", "c2"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
+                                                         'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)}))
 
-        res = table_obj.search().output(["c1 + c2"]).filter("c1 = 3").to_list()
-        assert res == {'(c1 + c2)': (6,)}
+        res = table_obj.search().output(["c1 + c2"]).filter("c1 = 3").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)}))
 
-        res = table_obj.search().output(["c1"]).filter("c1 > 2 and c2 < 4").to_list()
-        assert res == {'c1': (3,)}
+        res = table_obj.search().output(["c1"]).filter("c1 > 2 and c2 < 4").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)}))
 
-        res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c1 = 3)").to_list()
-        assert res == {'c1': (3,)}
+        res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
+        #todo: fix this negative test case
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)}))
 
-        res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_list()
-        assert res == {'c1': (-7, 1)}
-
-        res = table_obj.search().output(["c2"]).filter(
-            "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_list()
-        assert res == {'c1': (-7, 1)}
-
-        res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c2 = 3)").to_list()
-        assert res == {'c1': (3,)}
-
-        res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_list()
-        assert res == {'c1': (-7, 1)}
+        res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)}))
 
         res = table_obj.search().output(["c2"]).filter(
-            "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_list()
-        assert res == {'c1': (-7, 1)}
+            "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)}))
+
+        res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)}))
+
+        res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)}))
+
+        res = table_obj.search().output(["c2"]).filter(
+            "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)}))
 
         res = db_obj.drop_table("table_1")
         assert res.success

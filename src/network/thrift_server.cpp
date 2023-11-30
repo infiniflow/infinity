@@ -174,7 +174,10 @@ public:
 
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
 
-        ParsedExpr *filter = GetParsedExprFromProto(request.where_expr);
+        ParsedExpr *filter = nullptr;
+        if (request.__isset.where_expr == true) {
+            filter = GetParsedExprFromProto(request.where_expr);
+        }
 
         // TODO:
         //    ParsedExpr *offset;

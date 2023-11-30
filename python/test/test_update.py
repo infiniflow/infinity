@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pandas as pd
 
 import infinity
 from infinity.infinity import NetworkAddress
@@ -52,7 +53,7 @@ class TestDelete:
             - 'table_4'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9080))
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -69,14 +70,14 @@ class TestDelete:
         res = table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_list()
-        assert res == {'c1': (1, 2, 3, 4), 'c2': (90, 20, 30, 40), 'c3': (900, 200, 300, 400)}
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3, 4), 'c2': (90, 20, 30, 40), 'c3': (900, 200, 300, 400)}))
 
         res = table_obj.update([{"c2": 80, "c3": 800}])
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_list()
-        assert res == {'c1': (1, 2, 3, 4), 'c2': (80, 80, 80, 80), 'c3': (800, 800, 800, 800)}
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3, 4), 'c2': (80, 80, 80, 80), 'c3': (800, 800, 800, 800)}))
 
         res = db_obj.drop_table("table_4")
         assert res.success

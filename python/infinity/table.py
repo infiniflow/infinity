@@ -54,7 +54,7 @@ class Table(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _execute_query(self, query: Query) -> list[dict]:
+    def _execute_query(self, query: Query):
         pass
 
 

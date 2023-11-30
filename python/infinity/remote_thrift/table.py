@@ -14,8 +14,9 @@
 
 import struct
 from abc import ABC
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, List
 
+import pandas as pd
 from sqlglot import condition, expressions as exp
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -111,7 +112,7 @@ class RemoteTable(Table, ABC):
             vector_column_name="",
         )
 
-    def _execute_query(self, query: Query) -> Dict[str, Any]:
+    def _execute_query(self, query: Query) -> pd.DataFrame:
         # process select_list
         select_list: List[ttypes.ParsedExpr] = []
 
@@ -129,29 +130,39 @@ class RemoteTable(Table, ABC):
                     select_list.append(traverse_conditions(condition(column)))
 
         # process where_expr
-        where_expr = ttypes.ParsedExpr()
-        if query.filter is not None:
-            where_expr = traverse_conditions(condition(query.filter))
+        match query.filter:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(query.filter))
 
-        # process limit_expr and offset_expr
-        limit_expr = ttypes.ParsedExpr()
-        offset_expr = ttypes.ParsedExpr()
-        if query.limit is not None:
-            constant_exp = ttypes.ConstantExpr()
-            constant_exp.literal_type = ttypes.LiteralType.Int64
+        # process limit_expr
+        match query.limit:
+            case None:
+                limit_expr = None
+            case _:
+                constant_exp = ttypes.ConstantExpr()
+                constant_exp.literal_type = ttypes.LiteralType.Int64
+                paser_expr_type = ttypes.ParsedExprType()
+                paser_expr_type.constant_expr = constant_exp
+                limit_expr = ttypes.ParsedExpr()
+                limit_expr.type = paser_expr_type
+                limit_expr.i64_value = query.limit
 
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            limit_expr.type = paser_expr_type
-            limit_expr.i64_value = query.limit
-        if query.offset is not None:
-            constant_exp = ttypes.ConstantExpr()
-            constant_exp.literal_type = ttypes.LiteralType.Int64
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            offset_expr.type = paser_expr_type
-            offset_expr.i64_value = query.offset
+        # process offset_expr
+        match query.offset:
+            case None:
+                offset_expr = None
+            case _:
+                constant_exp = ttypes.ConstantExpr()
+                constant_exp.literal_type = ttypes.LiteralType.Int64
+                paser_expr_type = ttypes.ParsedExprType()
+                paser_expr_type.constant_expr = constant_exp
+                offset_expr = ttypes.ParsedExpr()
+                offset_expr.type = paser_expr_type
+                offset_expr.i64_value = query.offset
 
+        # execute the query
         res = self._conn.client.select(db_name=self._db_name,
                                        table_name=self._table_name,
                                        select_list=select_list,
@@ -186,7 +197,7 @@ class RemoteTable(Table, ABC):
             else:
                 raise Exception(f"unknown column type: {column_type}")
 
-        return results
+        return pd.DataFrame(results)
         # todo: how to convert bytes to string?
 
 

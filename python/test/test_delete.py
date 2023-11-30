@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pandas as pd
 
 import infinity
 from infinity.infinity import NetworkAddress
@@ -64,13 +65,13 @@ class TestDelete:
         res = table_obj.delete("c1 = 1")
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_list()
-        assert res == {'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)}
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)}))
 
         res = table_obj.delete()
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_list()
+        res = table_obj.search().output(["*"]).to_df()
         assert res == {}
 
         res = db_obj.drop_table("table_3")

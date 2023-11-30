@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import shutil
-import pytest
+import functools
+import multiprocessing
 import threading
 import time
+import traceback
+from datetime import datetime
+
+import pandas as pd
+
 import infinity
 from infinity.infinity import NetworkAddress
-import multiprocessing
-from datetime import datetime
-import pandas as pd
-import traceback, functools
 
 
 def trace_unhandled_exceptions(func):
@@ -179,7 +179,7 @@ class TestBenchmark:
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .search()
                    .output(["*"])
-                   .filter("c1 > 1").to_list())
+                   .filter("c1 > 1").to_df())
             if res is None:
                 raise Exception(f"select_table failed: {res}")
 
