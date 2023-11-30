@@ -93,8 +93,12 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             if (explain_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty explain output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
-            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
+
+            DataBlock* data_block_ptr = task_op_state->data_block_.get();
+            if(data_block_ptr->Finalized() && data_block_ptr->row_count() > 0) {
+                materialize_sink_state->data_block_array_.emplace_back(task_op_state->data_block_);
+                task_op_state->data_block_.reset();
+            }
             break;
         }
         case PhysicalOperatorType::kProjection: {
@@ -102,9 +106,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             if (projection_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty projection output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
-            if(new_data_block->Finalized() && new_data_block->row_count() > 0) {
-                materialize_sink_state->data_block_array_.emplace_back(new_data_block);
+            DataBlock* data_block_ptr = task_op_state->data_block_.get();
+            if(data_block_ptr->Finalized() && data_block_ptr->row_count() > 0) {
+                materialize_sink_state->data_block_array_.emplace_back(task_op_state->data_block_);
+                task_op_state->data_block_.reset();
             }
 
             break;
@@ -115,8 +120,12 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             if (knn_output_state->data_block_.get() == nullptr) {
                 Error<ExecutorException>("Empty knn scan output");
             }
-            auto new_data_block = DataBlock::MoveFrom(task_op_state->data_block_);
-            materialize_sink_state->data_block_array_.emplace_back(new_data_block);
+
+            DataBlock* data_block_ptr = task_op_state->data_block_.get();
+            if(data_block_ptr->Finalized() && data_block_ptr->row_count() > 0) {
+                materialize_sink_state->data_block_array_.emplace_back(task_op_state->data_block_);
+                task_op_state->data_block_.reset();
+            }
             break;
         }
         default: {

@@ -111,8 +111,14 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
                                         TableScanOperatorState *table_scan_operator_state) {
+    if(table_scan_operator_state->data_block_.get() == nullptr) {
+        table_scan_operator_state->data_block_ = DataBlock::Make();
+
+        // Performance issue here.
+        table_scan_operator_state->data_block_->Init(*GetOutputTypes());
+    }
+
     DataBlock *output_ptr = table_scan_operator_state->data_block_.get();
-    output_ptr->Reset();
 
     TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;

@@ -47,6 +47,13 @@ void PhysicalProject::Init() {
 }
 
 void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    if(operator_state->data_block_.get() == nullptr) {
+        operator_state->data_block_ = DataBlock::Make();
+
+        // Performance issue here.
+        operator_state->data_block_->Init(*GetOutputTypes());
+    }
+
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
     if (prev_op_state->Complete() && !prev_op_state->data_block_->Finalized()) {
@@ -82,7 +89,7 @@ void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operat
     }
 
     project_operator_state->data_block_->Finalize();
-    prev_op_state->data_block_->Reset();
+    prev_op_state->data_block_.reset();
     if (prev_op_state->Complete()) {
         project_operator_state->SetComplete();
     }
