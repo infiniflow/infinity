@@ -56,18 +56,6 @@ target_link_libraries(
     benchmark_profiler
 )
 
-add_executable(test_hnsw
-    test_hnsw.cpp
-    helper.cpp
-    helper.h
-)
-target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-    test_hnsw
-    infinity_core
-    benchmark_profiler
-)
-
 add_executable(ann_ivfflat_benchmark
         ann_ivfflat_benchmark.cpp
         helper.cpp

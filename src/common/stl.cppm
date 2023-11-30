@@ -61,8 +61,8 @@ export {
     template <typename T1, typename T2>
     using Pair = std::pair<T1, T2>;
 
-    template <typename T1, typename... T2>
-    using Tuple = std::tuple<T1, T2...>;
+    template <typename... T>
+    using Tuple = std::tuple<T...>;
 
     template <typename T, std::size_t N>
     using Array = std::array<T, N>;
@@ -246,6 +246,16 @@ export {
     constexpr u64 *u64_ptr_inf = std::numeric_limits<u64 *>::infinity();
 
     template <typename T>
+    constexpr T LimitMax() {
+        return std::numeric_limits<T>::max();
+    }
+
+    template <typename T>
+    constexpr T LimitMin() {
+        return std::numeric_limits<T>::min();
+    }
+
+    template <typename T>
     using Atomic = std::atomic<T>;
 
     // Smart ptr
@@ -377,20 +387,26 @@ export {
     template <typename T, typename Allocator = std::allocator<T>>
     using ForwardList = std::forward_list<T, Allocator>;
 
-    inline bool IsAlpha(const char &c) {
-        return std::isalpha(c);
+    inline bool IsAlpha(const char &c) { return std::isalpha(c); }
+
+    inline bool IsAlNum(const char &c) { return std::isalnum(c); }
+
+    SizeT Pow(SizeT x, SizeT y) { return std::pow(x, y); }
+
+    u64 Log2(u64 num) { return std::log2(num); }
+
+    u64 Log(u64 num) { return std::log(num); }
+
+    u64 Floor(u64 num) { return std::floor(num); }
+
+    template <typename II, typename OI>
+    OI Copy(II first, II last, OI d_first) {
+        return std::copy(first, last, d_first);
     }
 
-    inline bool IsAlNum(const char &c) {
-        return std::isalnum(c);
-    }
-
-    SizeT Pow(SizeT x, SizeT y) {
-        return std::pow(x, y);
-    }
-
-    u64 Log2(u64 num) {
-        return std::log2(num);
+    template <typename FI, typename T>
+    void Fill(FI first, FI last, const T &value) {
+        std::fill(first, last, value);
     }
 }
 

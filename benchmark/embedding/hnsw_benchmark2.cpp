@@ -7,7 +7,6 @@
 
 import stl;
 import hnsw_alg;
-import hnsw_profiler;
 import local_file_system;
 import file_system_type;
 import file_system;
@@ -18,7 +17,7 @@ import dist_func_ip;
 
 static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
 static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/ip_groundtruth.ivecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/l2_groundtruth.ivecs";
 
 using namespace infinity;
 
@@ -39,17 +38,17 @@ int main() {
     // std::tuple<> init_args = {};
     // std::string save_place = save_dir + "/my_sift_plain_l2.hnsw";
 
-    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
-    // Pair<SizeT, bool> init_args = {0, true};
-    // std::string save_place = save_dir + "/my_sift_lvq8_l2.hnsw";
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    Pair<SizeT, bool> init_args = {0, true};
+    std::string save_place = save_dir + "/my_sift_lvq8_l2.hnsw";
 
     // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
     // std::tuple<> init_args = {};
     // std::string save_place = save_dir + "/my_sift_plain_ip.hnsw";
 
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
-    Pair<SizeT, bool> init_args = {0, true};
-    std::string save_place = save_dir + "/my_sift_lvq8_ip.hnsw";
+    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
+    // Pair<SizeT, bool> init_args = {0, true};
+    // std::string save_place = save_dir + "/my_sift_lvq8_ip.hnsw";
 
     std::unique_ptr<Hnsw> knn_hnsw = nullptr;
 

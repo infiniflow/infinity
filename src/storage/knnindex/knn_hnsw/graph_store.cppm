@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-
+#include <new>
 #include <cassert>
 #include <iostream>
 

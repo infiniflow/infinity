@@ -18,8 +18,6 @@ module;
 #include <cassert>
 #include <iostream>
 
-// #define USE_AVX512
-
 import stl;
 
 export module hnsw_simd_func;

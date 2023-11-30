@@ -14,10 +14,7 @@
 
 module;
 
-#include <algorithm>
 #include <cassert>
-#include <cmath>
-#include <limits>
 #include <new>
 #include <type_traits>
 #include <xmmintrin.h>
@@ -48,7 +45,7 @@ public:
     static constexpr SizeT PADDING_SIZE = 32;
 
 private:
-    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
+    constexpr static SizeT max_bucket_idx_ = LimitMax<CompressType>() - LimitMin<CompressType>(); // 255 for i8
 
     // Decompress: Q = scale * C + bias + Mean
     using ScalarType = DataType; // type for scale and bias
@@ -125,7 +122,7 @@ private:
           plain_data_(PlainStore<DataType>::Make(0, dim()))                                                                                   //
     {
         MeanType *mean = GetMeanMut();
-        std::fill(mean, mean + dim(), 0);
+        Fill(mean, mean + dim(), 0);
     }
 
 public:
@@ -185,22 +182,22 @@ private:
         auto [scale_p, bias_p] = lvq.GetScalarMut();
         CompressType *compress = lvq.GetCompressVecMut();
 
-        ScalarType lower = std::numeric_limits<ScalarType>::max();
-        ScalarType upper = -std::numeric_limits<ScalarType>::max();
+        ScalarType lower = LimitMax<ScalarType>();
+        ScalarType upper = -LimitMax<ScalarType>();
         for (SizeT j = 0; j < dim(); ++j) {
             auto x = static_cast<ScalarType>(vec[j] - mean[j]);
-            lower = std::min(lower, x);
-            upper = std::max(upper, x);
+            lower = Min(lower, x);
+            upper = Max(upper, x);
         }
         ScalarType scale = (upper - lower) / max_bucket_idx_;
-        ScalarType bias = lower - std::numeric_limits<CompressType>::min() * scale;
+        ScalarType bias = lower - LimitMin<CompressType>() * scale;
         if (scale == 0) {
-            std::fill(compress, compress + dim(), 0);
+            Fill(compress, compress + dim(), 0);
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
-                auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                assert(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min());
+                auto c = Floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
+                assert(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>());
                 compress[j] = c;
             }
         }
@@ -244,13 +241,12 @@ private:
         for (SizeT vec_i = compress_n; vec_i < compress_n + plain_data_.cur_vec_num(); ++vec_i) {
             CompressVec(plain_data_.GetVec(vec_i - compress_n), GetLVQData(vec_i));
         }
-        SizeT start_idx = compress_n + plain_data_.cur_vec_num();
-        for (SizeT vec_i = start_idx; vec_i < start_idx + vec_num; ++vec_i) {
-            CompressVec(vecs + (vec_i - start_idx) * dim(), GetLVQData(vec_i));
+        for (SizeT vec_i = compress_n + plain_data_.cur_vec_num(); vec_i < compress_n + plain_data_.cur_vec_num() + vec_num; ++vec_i) {
+            CompressVec(vecs + (vec_i - (compress_n + plain_data_.cur_vec_num())) * dim(), GetLVQData(vec_i));
         }
         *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
         plain_data_ = PlainStore<DataType>::Make(Min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
-        return start_idx;
+        return compress_n + plain_data_.cur_vec_num() + vec_num;
     }
 
 public:

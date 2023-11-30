@@ -15,7 +15,6 @@
 module;
 
 #include "header.h"
-#include <tuple>
 #include <type_traits>
 
 import stl;
@@ -68,7 +67,7 @@ class LVQL2Cache {
 public:
     // for l2 distance, const1 = scale * norm1(compress), const2 = scale * scale * norm2(compress)
     using LocalCacheType = Pair<DataType, DataType>;
-    using GlobalCacheType = std::tuple<>;
+    using GlobalCacheType = Tuple<>;
 
     static LocalCacheType MakeLocalCache(const CompressType *c, DataType scale, SizeT dim, const MeanType *) {
         i64 norm1 = 0;

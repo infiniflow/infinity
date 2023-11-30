@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include <algorithm>
+
 #include <cassert>
 #include <xmmintrin.h>
 
@@ -29,7 +29,7 @@ export template <typename DataType>
 class PlainStore {
 public:
     using This = PlainStore<DataType>;
-    using InitArgs = std::tuple<>;
+    using InitArgs = Tuple<>;
     using StoreType = const DataType *;
     using QueryType = StoreType;
 
@@ -77,7 +77,7 @@ public:
         SizeT new_idx = meta_.AllocateVec(vec_num);
         if (new_idx != ERR_IDX) {
             DataType *ptr = ptr_.get() + new_idx * dim();
-            std::copy(vecs, vecs + vec_num * dim(), ptr);
+            Copy(vecs, vecs + vec_num * dim(), ptr);
         }
         return new_idx;
     }

@@ -14,7 +14,6 @@
 
 module;
 
-#include "header.h"
 #include <iostream>
 #include <random>
 
@@ -24,7 +23,6 @@ import file_system_type;
 import infinity_exception;
 
 import hnsw_common;
-import hnsw_profiler;
 import plain_store;
 import graph_store;
 import lvq_store;
@@ -113,12 +111,13 @@ private:
     // >= 0
     i32 GenerateRandomLayer() {
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
-        double r = -std::log(distribution(level_rng_)) * mult_;
+        auto r1 = distribution(level_rng_);
+        double r = -std::log(r1) * mult_;
         return static_cast<i32>(r);
     }
 
     VertexType StoreData(const DataType *data, const LabelType *labels, SizeT insert_n) {
-        VertexType ret = data_store_.AddVec(data, insert_n);
+        auto ret = data_store_.AddVec(data, insert_n);
         if (ret == DataStore::ERR_IDX) {
             Error<StorageException>("Data index is not enough.");
         }
@@ -135,7 +134,6 @@ public:
 
         data_store_.Prefetch(enter_point);
         DataType dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
-        SizeT cal_num = 1;
 
         candidate.emplace(-dist, enter_point);
         result.emplace(dist, enter_point);
@@ -165,7 +163,6 @@ public:
                     prefetch_start -= prefetch_step_;
                 }
                 dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
-                ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
                     result.emplace(dist, n_idx);
@@ -181,7 +178,6 @@ public:
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
         DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_);
-        SizeT cal_num = 1;
         bool check = true;
         while (check) {
             check = false;
@@ -189,7 +185,6 @@ public:
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
                 DataType n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
-                ++cal_num;
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
