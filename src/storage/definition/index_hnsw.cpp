@@ -117,6 +117,7 @@ String IndexHnsw::ToString() const {
 Json IndexHnsw::Serialize() const {
     Json res = IndexBase::Serialize();
     res["metric_type"] = MetricTypeToString(metric_type_);
+    res["encode_type"] = HnswEncodeTypeToString(encode_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;
     res["ef"] = ef_;
