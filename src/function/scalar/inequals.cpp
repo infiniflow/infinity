@@ -38,24 +38,25 @@ struct InEqualsFunction {
 
 template <>
 inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
-    if (left.IsInlined()) {
-        if (right.IsInlined()) {
-            result = (Memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) != 0);
-            return;
-        }
-    } else if (right.IsInlined()) {
-        ;
-    } else {
-        // Both left and right are not inline
-        u16 min_len = Min(right.length, left.length);
-        if (Memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) != 0) {
-            result = true;
-        } else {
-            result = (Memcmp(left.ptr, right.ptr, min_len) != 0);
-        }
+    if (left.length_ != right.length_) {
+        result = true;
         return;
     }
-    result = false;
+    if (left.IsInlined()) {
+        result = (Memcmp(left.short_.data_, right.short_.data_, left.length_) != 0);
+        return;
+    } else {
+        // Both left and right are not inline
+        if(left.IsValue() && right.IsValue()) {
+            if (Memcmp(left.value_.prefix_, right.value_.prefix_, VARCHAR_PREFIX_LEN) != 0) {
+                result = (Memcmp(left.value_.ptr_, right.value_.ptr_, left.length_) != 0);
+                return;
+            }
+        } else {
+            Error<NotImplementException>("Column vector varchar can't be compared");
+        }
+    }
+    result = true;
 }
 
 template <>

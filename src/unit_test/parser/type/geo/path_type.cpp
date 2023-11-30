@@ -22,7 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-
+#if 0
 class PathTypeTest : public BaseTest {};
 
 TEST_F(PathTypeTest, path1) {
@@ -106,3 +106,4 @@ TEST_F(PathTypeTest, path1) {
 
     EXPECT_EQ(path6, path5);
 }
+#endif

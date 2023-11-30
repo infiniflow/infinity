@@ -86,37 +86,37 @@ public:
 
     inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<VarcharT, VarcharT>); }
 };
-
-template <>
-struct FirstState<PathT, PathT> {
-public:
-    PathT value_{};
-    bool is_set_{false};
-
-    inline void Initialize() { is_set_ = false; }
-
-    inline void Update(const PathT *__restrict input, SizeT idx) {
-        if (is_set_)
-            return;
-
-        is_set_ = true;
-        // This assignment will call varchar deep copy
-        value_ = input[idx];
-    }
-
-    inline void ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT count) {
-        if (is_set_)
-            return;
-
-        is_set_ = true;
-        // This assignment will call varchar deep copy
-        value_ = input[idx];
-    }
-
-    inline ptr_t Finalize() { return (ptr_t)&value_; }
-
-    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
-};
+//
+//template <>
+//struct FirstState<PathT, PathT> {
+//public:
+//    PathT value_{};
+//    bool is_set_{false};
+//
+//    inline void Initialize() { is_set_ = false; }
+//
+//    inline void Update(const PathT *__restrict input, SizeT idx) {
+//        if (is_set_)
+//            return;
+//
+//        is_set_ = true;
+//        // This assignment will call varchar deep copy
+//        value_ = input[idx];
+//    }
+//
+//    inline void ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT count) {
+//        if (is_set_)
+//            return;
+//
+//        is_set_ = true;
+//        // This assignment will call varchar deep copy
+//        value_ = input[idx];
+//    }
+//
+//    inline ptr_t Finalize() { return (ptr_t)&value_; }
+//
+//    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<PathT, PathT>); }
+//};
 
 void RegisterFirstFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "FIRST";

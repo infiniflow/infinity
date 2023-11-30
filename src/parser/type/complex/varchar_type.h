@@ -23,7 +23,7 @@ struct VarcharType {
 public:
     static constexpr size_t PREFIX_LENGTH = 6;
     static constexpr size_t INLINE_LENGTH = 14;
-    static constexpr size_t LEN_LIMIT = 65536;
+    static constexpr size_t LEN_LIMIT = 65536; // 16 bit
 
 public:
     VarcharType() {

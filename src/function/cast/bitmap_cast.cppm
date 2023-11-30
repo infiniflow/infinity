@@ -24,7 +24,7 @@ import column_vector;
 import third_party;
 
 export module bitmap_cast;
-
+#if 0
 namespace infinity {
 
 export struct BitmapTryCastToVarlen;
@@ -56,3 +56,4 @@ inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, 
 }
 
 } // namespace infinity
+#endif

@@ -436,12 +436,6 @@ void FragmentContext::BuildTask(QueryContext *query_context,
                 }
             }
 
-            auto output_types = fragment_operators[operator_id]->GetOutputTypes();
-            if (output_types != nullptr) {
-                operator_state->data_block_ = DataBlock::Make();
-                operator_state->data_block_->Init(*output_types);
-            }
-
             task->operator_states_[operator_id] = Move(operator_state);
         }
     }

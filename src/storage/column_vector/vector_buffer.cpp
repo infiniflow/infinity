@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import heap_chunk;
+import fix_heap;
 
 import infinity_exception;
 
@@ -37,7 +37,7 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
         data_ = MakeUnique<char[]>(data_size);
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
-        heap_mgr_ = MakeUnique<StringHeapMgr>();
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>();
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -46,7 +46,7 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
 
 void VectorBuffer::ResetToInit() {
     if (buffer_type_ == VectorBufferType::kHeap) {
-        heap_mgr_ = MakeUnique<StringHeapMgr>();
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>();
     }
 }
 

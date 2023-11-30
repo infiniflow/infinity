@@ -45,7 +45,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case kLineSeg:
         case kBox:
         case kCircle:
-        case kBitmap:
+//        case kBitmap:
         case kUuid:
         case kEmbedding:
         case kRowID: {
@@ -55,10 +55,10 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case kMixed:
         case kVarchar:
         case kArray:
-        case kTuple:
-        case kPath:
-        case kPolygon:
-        case kBlob: {
+        case kTuple: {
+//        case kPath:
+//        case kPolygon:
+//        case kBlob:
             plain_type_ = false;
             break;
         }
@@ -166,9 +166,9 @@ int32_t DataType::GetSizeInBytes() const {
             case LogicalType::kArray:
                 ParserError("Array isn't implemented here.");
                 break;
-            case LogicalType::kBitmap:
-                size += sizeof(int64_t);
-                break;
+//            case LogicalType::kBitmap:
+//                size += sizeof(int64_t);
+//                break;
             case LogicalType::kDecimal:
                 size += sizeof(int64_t) * 2;
                 break;
@@ -189,16 +189,16 @@ void DataType::WriteAdv(char *&ptr) const {
         case LogicalType::kArray:
             ParserError("Array isn't implemented here.");
             break;
-        case LogicalType::kBitmap: {
-            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
-            if (this->type_info_ != nullptr) {
-                const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
-                if (bitmap_info != nullptr)
-                    limit = bitmap_info->length_limit();
-            }
-            WriteBufAdv<int64_t>(ptr, limit);
-            break;
-        }
+//        case LogicalType::kBitmap: {
+//            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
+//            if (this->type_info_ != nullptr) {
+//                const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
+//                if (bitmap_info != nullptr)
+//                    limit = bitmap_info->length_limit();
+//            }
+//            WriteBufAdv<int64_t>(ptr, limit);
+//            break;
+//        }
         case LogicalType::kDecimal: {
             int64_t precision = 0;
             int64_t scale = 0;
@@ -235,11 +235,11 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
         case LogicalType::kArray:
             ParserError("Array isn't implemented here.");
             break;
-        case LogicalType::kBitmap: {
-            int64_t limit = ReadBufAdv<int64_t>(ptr);
-            type_info = BitmapInfo::Make(limit);
-            break;
-        }
+//        case LogicalType::kBitmap: {
+//            int64_t limit = ReadBufAdv<int64_t>(ptr);
+//            type_info = BitmapInfo::Make(limit);
+//            break;
+//        }
         case LogicalType::kDecimal: {
             int64_t precision = ReadBufAdv<int64_t>(ptr);
             int64_t scale = ReadBufAdv<int64_t>(ptr);
@@ -284,10 +284,10 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 type_info = nullptr;
                 break;
             }
-            case LogicalType::kBitmap: {
-                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
-                break;
-            }
+//            case LogicalType::kBitmap: {
+//                type_info = BitmapInfo::Make(type_info_json["length_limit"]);
+//                break;
+//            }
             case LogicalType::kDecimal: {
                 type_info = DecimalInfo::Make(type_info_json["precision"], type_info_json["scale"]);
                 break;
@@ -406,35 +406,35 @@ std::string DataType::TypeToString<BoxT>() {
     return "Box";
 }
 
-template <>
-std::string DataType::TypeToString<PathT>() {
-    return "Path";
-}
-
-template <>
-std::string DataType::TypeToString<PolygonT>() {
-    return "Polygon";
-}
+//template <>
+//std::string DataType::TypeToString<PathT>() {
+//    return "Path";
+//}
+//
+//template <>
+//std::string DataType::TypeToString<PolygonT>() {
+//    return "Polygon";
+//}
 
 template <>
 std::string DataType::TypeToString<CircleT>() {
     return "Circle";
 }
 
-template <>
-std::string DataType::TypeToString<BitmapT>() {
-    return "Bitmap";
-}
+//template <>
+//std::string DataType::TypeToString<BitmapT>() {
+//    return "Bitmap";
+//}
 
 template <>
 std::string DataType::TypeToString<UuidT>() {
     return "UUID";
 }
 
-template <>
-std::string DataType::TypeToString<BlobT>() {
-    return "Blob";
-}
+//template <>
+//std::string DataType::TypeToString<BlobT>() {
+//    return "Blob";
+//}
 
 template <>
 std::string DataType::TypeToString<EmbeddingT>() {

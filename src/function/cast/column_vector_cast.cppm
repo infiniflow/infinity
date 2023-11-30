@@ -28,7 +28,7 @@ namespace infinity {
 
 struct ColumnVectorCastData {
     explicit ColumnVectorCastData(bool strict, SharedPtr<ColumnVector> &column_vector_ptr, DataType source_type, DataType target_type)
-        : strict_(strict), column_vector_ptr_(column_vector_ptr), source_type_(Move(source_type)), target_type_(Move(target_type)) {}
+        : source_type_(Move(source_type)), target_type_(Move(target_type)), strict_(strict), column_vector_ptr_(column_vector_ptr) {}
 
     DataType source_type_{LogicalType::kInvalid};
     DataType target_type_{LogicalType::kInvalid};

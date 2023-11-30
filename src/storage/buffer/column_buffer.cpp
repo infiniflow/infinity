@@ -41,7 +41,7 @@ const_ptr_t ColumnBuffer::GetAll() {
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
     auto varchar_layout = reinterpret_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
-    if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
+    if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
         return {ptr, varchar_layout->length_};
     }
@@ -61,12 +61,12 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
     auto varchar_layout = static_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
-    if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
+    if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
         return {ptr, varchar_layout->length_};
     }
     const_ptr_t ptr = varchar_layout->u.long_info_.prefix_.data();
-    return {ptr, VarcharT::PREFIX_LENGTH};
+    return {ptr, VARCHAR_PREFIX_LEN};
 }
 
 const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
@@ -77,9 +77,9 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
             case kVarchar:
             case kArray:
             case kTuple:
-            case kPath:
-            case kPolygon:
-            case kBlob:
+//            case kPath:
+//            case kPolygon:
+//            case kBlob:
             case kMixed: {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
@@ -104,9 +104,9 @@ ptr_t ColumnBuffer::GetAllMut() {
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
     auto varchar_layout = reinterpret_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
-    if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
+    if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();
-        return {ptr, varchar_layout->length_};
+        return {ptr, u64(varchar_layout->length_)};
     }
     auto &long_info = varchar_layout->u.long_info_;
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
@@ -118,18 +118,18 @@ Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
         outline_buffer_->current_file_idx_ = long_info.file_idx_;
     }
     auto ptr = static_cast<ptr_t>(outline_buffer_->outline_ele_.GetDataMut()) + long_info.file_offset_;
-    return {ptr, varchar_layout->length_};
+    return {ptr, u64(varchar_layout->length_)};
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtMut(SizeT row_idx) {
     Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
     auto varchar_layout = static_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
-    if (varchar_layout->length_ <= VarcharT::INLINE_LENGTH) {
+    if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();
-        return {ptr, varchar_layout->length_};
+        return {ptr, u64(varchar_layout->length_)};
     }
     ptr_t ptr = varchar_layout->u.long_info_.prefix_.data();
-    return {ptr, VarcharT::PREFIX_LENGTH};
+    return {ptr, VARCHAR_PREFIX_LEN};
 }
 
 ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
@@ -140,9 +140,9 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
             case kVarchar:
             case kArray:
             case kTuple:
-            case kPath:
-            case kPolygon:
-            case kBlob:
+//            case kPath:
+//            case kPolygon:
+//            case kBlob:
             case kMixed: {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }

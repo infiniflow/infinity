@@ -53,14 +53,15 @@ struct UuidTryCastToVarlen {
 
 template <>
 inline bool UuidTryCastToVarlen::Run(const UuidT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    target.length = UuidT::LENGTH;
-    Memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
-    Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                          "Varchar column vector should use MemoryVectorBuffer.");
-
-    ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
-    Memcpy(ptr, source.body, target.length);
-    target.ptr = ptr;
+    Error<FunctionException>("Not implemented");
+//    target.length_ = UuidT::LENGTH;
+//    Memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
+//    Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+//                          "Varchar column vector should use MemoryVectorBuffer.");
+//
+//    ptr_t ptr = vector_ptr->buffer_->fix_heap_mgr_->Allocate(target.length);
+//    Memcpy(ptr, source.body, target.length);
+//    target.ptr = ptr;
 
     return true;
 }

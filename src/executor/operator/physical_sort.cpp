@@ -354,7 +354,7 @@ SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &in
                             dst_ref.length = src_ref.length;
                             memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
 
-                            dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->heap_mgr_->Allocate(
+                            dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(
                                     src_ref.length);
                             memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
                         }

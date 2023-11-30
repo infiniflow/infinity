@@ -22,8 +22,24 @@ import third_party;
 import stl;
 import global_resource_usage;
 import infinity_context;
+import default_values;
 
 class StringChunkTest : public BaseTest {};
+//
+//
+//TEST_F(StringChunkTest, heap_chunk_test) {
+//    using namespace infinity;
+//
+//    {
+//        HeapChunk heap_chunk(0);
+//        EXPECT_EQ(heap_chunk.ptr_, nullptr);
+//    }
+//
+//    {
+//        HeapChunk heap_chunk(MIN_VECTOR_CHUNK_SIZE);
+//        EXPECT_NE(heap_chunk.ptr_, nullptr);
+//    }
+//}
 
 TEST_F(StringChunkTest, string_chunk_a) {
     using namespace infinity;

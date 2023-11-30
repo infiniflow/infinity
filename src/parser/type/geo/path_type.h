@@ -14,6 +14,8 @@
 
 #pragma once
 
+#if 0
+
 #include "point_type.h"
 #include <cstdint>
 
@@ -111,3 +113,4 @@ public:
 };
 
 } // namespace infinity
+#endif

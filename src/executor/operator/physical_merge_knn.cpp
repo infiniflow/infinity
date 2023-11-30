@@ -32,6 +32,7 @@ import block_column_entry;
 import third_party;
 import block_entry;
 import default_values;
+import data_block;
 
 module physical_merge_knn;
 
@@ -43,6 +44,13 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);
     if (merge_knn_op_state->input_complete_) {
         LOG_TRACE("PhysicalMergeKnn::Input is complete");
+    }
+
+    if(merge_knn_op_state->data_block_.get() == nullptr) {
+        merge_knn_op_state->data_block_ = DataBlock::Make();
+
+        // Performance issue here.
+        merge_knn_op_state->data_block_->Init(*GetOutputTypes());
     }
 
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;

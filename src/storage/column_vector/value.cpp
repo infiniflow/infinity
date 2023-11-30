@@ -102,21 +102,30 @@ Value Value::MakeDecimal(DecimalT input, const SharedPtr<TypeInfo> &type_info_pt
 
 Value Value::MakeVarchar(VarcharT &input) {
     Value value(LogicalType::kVarchar);
-    value.value_.varchar = input;
+    if(input.IsInlined()) {
+        value.value_.varchar = input;
+    } else {
+        if(input.IsValue()) {
+            value.value_.varchar = input;
+        } else {
+            Error<StorageException>("Can't make varchar from column vector");
+        }
+    }
+    value.value_.varchar.is_value_ = true;
     value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeVarchar(const String &str) {
     Value value(LogicalType::kVarchar);
-    value.value_.varchar.Initialize(str);
+    value.value_.varchar.InitAsValue(str);
     value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeVarchar(const char *ptr) {
+Value Value::MakeVarchar(const char *ptr, bool is_move) {
     Value value(LogicalType::kVarchar);
-    value.value_.varchar.Initialize(ptr);
+    value.value_.varchar.InitAsValue(ptr, is_move);
     value.is_null_ = false;
     return value;
 }
@@ -198,19 +207,19 @@ Value Value::MakeBox(BoxT input) {
     return value;
 }
 
-Value Value::MakePath(PathT input) {
-    Value value(LogicalType::kPath);
-    value.value_.path = Move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakePolygon(PolygonT input) {
-    Value value(LogicalType::kPolygon);
-    value.value_.polygon = Move(input);
-    value.is_null_ = false;
-    return value;
-}
+//Value Value::MakePath(PathT input) {
+//    Value value(LogicalType::kPath);
+//    value.value_.path = Move(input);
+//    value.is_null_ = false;
+//    return value;
+//}
+//
+//Value Value::MakePolygon(PolygonT input) {
+//    Value value(LogicalType::kPolygon);
+//    value.value_.polygon = Move(input);
+//    value.is_null_ = false;
+//    return value;
+//}
 
 Value Value::MakeCircle(CircleT input) {
     Value value(LogicalType::kCircle);
@@ -219,12 +228,12 @@ Value Value::MakeCircle(CircleT input) {
     return value;
 }
 
-Value Value::MakeBitmap(BitmapT input) {
-    Value value(LogicalType::kBitmap);
-    value.value_.bitmap = Move(input);
-    value.is_null_ = false;
-    return value;
-}
+//Value Value::MakeBitmap(BitmapT input) {
+//    Value value(LogicalType::kBitmap);
+//    value.value_.bitmap = Move(input);
+//    value.is_null_ = false;
+//    return value;
+//}
 
 Value Value::MakeUuid(UuidT input) {
     Value value(LogicalType::kUuid);
@@ -233,12 +242,12 @@ Value Value::MakeUuid(UuidT input) {
     return value;
 }
 
-Value Value::MakeBlob(BlobT input) {
-    Value value(LogicalType::kBlob);
-    value.value_.blob = Move(input);
-    value.is_null_ = false;
-    return value;
-}
+//Value Value::MakeBlob(BlobT input) {
+//    Value value(LogicalType::kBlob);
+//    value.value_.blob = Move(input);
+//    value.is_null_ = false;
+//    return value;
+//}
 
 Value Value::MakeEmbedding(EmbeddingDataType type, SizeT dimension) {
     auto embedding_info_ptr = EmbeddingInfo::Make(type, dimension);
@@ -401,17 +410,17 @@ BoxT Value::GetValue() const {
     return value_.box;
 }
 
-template <>
-PathT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPath, Format("Not matched type: {}", type_.ToString()));
-    return value_.path;
-}
-
-template <>
-PolygonT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPolygon, Format("Not matched type: {}", type_.ToString()));
-    return value_.polygon;
-}
+//template <>
+//PathT Value::GetValue() const {
+//    Assert<TypeException>(type_.type() == LogicalType::kPath, Format("Not matched type: {}", type_.ToString()));
+//    return value_.path;
+//}
+//
+//template <>
+//PolygonT Value::GetValue() const {
+//    Assert<TypeException>(type_.type() == LogicalType::kPolygon, Format("Not matched type: {}", type_.ToString()));
+//    return value_.polygon;
+//}
 
 template <>
 CircleT Value::GetValue() const {
@@ -419,11 +428,11 @@ CircleT Value::GetValue() const {
     return value_.circle;
 }
 
-template <>
-BitmapT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBitmap, Format("Not matched type: {}", type_.ToString()));
-    return value_.bitmap;
-}
+//template <>
+//BitmapT Value::GetValue() const {
+//    Assert<TypeException>(type_.type() == LogicalType::kBitmap, Format("Not matched type: {}", type_.ToString()));
+//    return value_.bitmap;
+//}
 
 template <>
 UuidT Value::GetValue() const {
@@ -431,11 +440,11 @@ UuidT Value::GetValue() const {
     return value_.uuid;
 }
 
-template <>
-BlobT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBlob, Format("Not matched type: {}", type_.ToString()));
-    return value_.blob;
-}
+//template <>
+//BlobT Value::GetValue() const {
+//    Assert<TypeException>(type_.type() == LogicalType::kBlob, Format("Not matched type: {}", type_.ToString()));
+//    return value_.blob;
+//}
 
 template <>
 EmbeddingT Value::GetValue() const {
@@ -462,26 +471,26 @@ Value::~Value() {
             value_.varchar.Reset();
             break;
         }
-        case kPolygon: {
-            //            value_.polygon.~PolygonType();
-            value_.polygon.Reset();
-            break;
-        }
-        case kPath: {
-            //            value_.path.~PathType();
-            value_.path.Reset();
-            break;
-        }
-        case kBitmap: {
-            //            value_.bitmap.~BitmapType();
-            value_.bitmap.Reset();
-            break;
-        }
-        case kBlob: {
-            //            value_.blob.~BlobType();
-            value_.blob.Reset();
-            break;
-        }
+//        case kPolygon: {
+//            //            value_.polygon.~PolygonType();
+//            value_.polygon.Reset();
+//            break;
+//        }
+//        case kPath: {
+//            //            value_.path.~PathType();
+//            value_.path.Reset();
+//            break;
+//        }
+//        case kBitmap: {
+//            //            value_.bitmap.~BitmapType();
+//            value_.bitmap.Reset();
+//            break;
+//        }
+//        case kBlob: {
+//            //            value_.blob.~BlobType();
+//            value_.blob.Reset();
+//            break;
+//        }
         case kMixed: {
             //            value_.mixed_value.~MixedType();
             value_.mixed_value.Reset();
@@ -576,8 +585,8 @@ void Value::Init(bool in_constructor) {
             break;
         }
         case kVarchar: {
-            value_.varchar.ptr = nullptr;
-            value_.varchar.length = 0;
+            value_.varchar.value_.ptr_ = nullptr;
+            value_.varchar.length_ = 0;
             break;
         }
         case kDate: {
@@ -622,36 +631,36 @@ void Value::Init(bool in_constructor) {
             value_.box.Reset();
             break;
         }
-        case kPath: {
-            value_.path.closed = false;
-            value_.path.ptr = nullptr;
-            value_.path.point_count = 0;
-            break;
-        }
-        case kPolygon: {
-            value_.polygon.point_count = 0;
-            value_.polygon.ptr = nullptr;
-            value_.polygon.bounding_box.Reset();
-            break;
-        }
+//        case kPath: {
+//            value_.path.closed = false;
+//            value_.path.ptr = nullptr;
+//            value_.path.point_count = 0;
+//            break;
+//        }
+//        case kPolygon: {
+//            value_.polygon.point_count = 0;
+//            value_.polygon.ptr = nullptr;
+//            value_.polygon.bounding_box.Reset();
+//            break;
+//        }
         case kCircle: {
             value_.circle.Reset();
             break;
         }
-        case kBitmap: {
-            value_.bitmap.ptr = nullptr;
-            value_.bitmap.count = 0;
-            break;
-        }
+//        case kBitmap: {
+//            value_.bitmap.ptr = nullptr;
+//            value_.bitmap.count = 0;
+//            break;
+//        }
         case kUuid: {
             value_.uuid.Reset();
             break;
         }
-        case kBlob: {
-            value_.blob.ptr = nullptr;
-            value_.blob.size = 0;
-            break;
-        }
+//        case kBlob: {
+//            value_.blob.ptr = nullptr;
+//            value_.blob.size = 0;
+//            break;
+//        }
         case kEmbedding: {
             value_.embedding.SetNull();
             break;
@@ -766,36 +775,36 @@ void Value::CopyUnionValue(const Value &other) {
             value_.box = other.value_.box;
             break;
         }
-        case kPath: {
-            // PathT copy assignment
-            value_.path = other.value_.path;
-            break;
-        }
-        case kPolygon: {
-            // Polygon copy assignment
-            value_.polygon = other.value_.polygon;
-            break;
-        }
+//        case kPath: {
+//            // PathT copy assignment
+//            value_.path = other.value_.path;
+//            break;
+//        }
+//        case kPolygon: {
+//            // Polygon copy assignment
+//            value_.polygon = other.value_.polygon;
+//            break;
+//        }
         case kCircle: {
             // trivial copy-assignment
             value_.circle = other.value_.circle;
             break;
         }
-        case kBitmap: {
-            // bitmap copy assignment
-            value_.bitmap = other.value_.bitmap;
-            break;
-        }
+//        case kBitmap: {
+//            // bitmap copy assignment
+//            value_.bitmap = other.value_.bitmap;
+//            break;
+//        }
         case kUuid: {
             // UUID copy assignment
             value_.uuid = other.value_.uuid;
             break;
         }
-        case kBlob: {
-            // Blob copy assignment
-            value_.blob = other.value_.blob;
-            break;
-        }
+//        case kBlob: {
+//            // Blob copy assignment
+//            value_.blob = other.value_.blob;
+//            break;
+//        }
         case kEmbedding: {
             SizeT embedding_size = type_.type_info()->Size();
 
@@ -909,30 +918,30 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_.box = other.value_.box;
             break;
         }
-        case kPath: {
-            this->value_.path = Move(other.value_.path);
-            break;
-        }
-        case kPolygon: {
-            this->value_.polygon = Move(other.value_.polygon);
-            break;
-        }
+//        case kPath: {
+//            this->value_.path = Move(other.value_.path);
+//            break;
+//        }
+//        case kPolygon: {
+//            this->value_.polygon = Move(other.value_.polygon);
+//            break;
+//        }
         case kCircle: {
             this->value_.circle = other.value_.circle;
             break;
         }
-        case kBitmap: {
-            this->value_.bitmap = Move(other.value_.bitmap);
-            break;
-        }
+//        case kBitmap: {
+//            this->value_.bitmap = Move(other.value_.bitmap);
+//            break;
+//        }
         case kUuid: {
             this->value_.uuid = Move(other.value_.uuid);
             break;
         }
-        case kBlob: {
-            this->value_.blob = Move(other.value_.blob);
-            break;
-        }
+//        case kBlob: {
+//            this->value_.blob = Move(other.value_.blob);
+//            break;
+//        }
         case kEmbedding: {
             this->value_.embedding = other.value_.embedding;
             other.value_.embedding.SetNull();
@@ -1042,30 +1051,30 @@ void Value::Reset() {
             value_.box.Reset();
             break;
         }
-        case kPath: {
-            value_.path.Reset();
-            break;
-        }
-        case kPolygon: {
-            value_.polygon.Reset();
-            break;
-        }
+//        case kPath: {
+//            value_.path.Reset();
+//            break;
+//        }
+//        case kPolygon: {
+//            value_.polygon.Reset();
+//            break;
+//        }
         case kCircle: {
             value_.circle.Reset();
             break;
         }
-        case kBitmap: {
-            value_.bitmap.Reset();
-            break;
-        }
+//        case kBitmap: {
+//            value_.bitmap.Reset();
+//            break;
+//        }
         case kUuid: {
             value_.uuid.Reset();
             break;
         }
-        case kBlob: {
-            value_.blob.Reset();
-            break;
-        }
+//        case kBlob: {
+//            value_.blob.Reset();
+//            break;
+//        }
         case kEmbedding: {
             if (value_.embedding.ptr != nullptr) {
                 LOG_TRACE("Need to manually reset the embedding type.");
@@ -1178,29 +1187,29 @@ String Value::ToString() const {
             Error<NotImplementException>("Box");
             break;
         }
-        case kPath: {
-            Error<NotImplementException>("Path");
-            break;
-        }
-        case kPolygon: {
-            Error<NotImplementException>("Polygon");
-            break;
-        }
+//        case kPath: {
+//            Error<NotImplementException>("Path");
+//            break;
+//        }
+//        case kPolygon: {
+//            Error<NotImplementException>("Polygon");
+//            break;
+//        }
         case kCircle: {
             Error<NotImplementException>("Circle");
             break;
         }
-        case kBitmap: {
-            Error<NotImplementException>("Bitmap");
-            break;
-        }
+//        case kBitmap: {
+//            Error<NotImplementException>("Bitmap");
+//            break;
+//        }
         case kUuid: {
             Error<NotImplementException>("Uuid");
             break;
         }
-        case kBlob: {
-            return value_.blob.ToString();
-        }
+//        case kBlob: {
+//            return value_.blob.ToString();
+//        }
         case kEmbedding: {
             Error<NotImplementException>("Embedding");
             break;

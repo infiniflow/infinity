@@ -152,19 +152,19 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DecimalT &target) {
 // Cast FloatT to varlen type
 template <>
 inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    // TODO: High-performance to_string implementation is needed.
+    target.is_value_ = false;
     String tmp_str = ToStr(source);
-    target.length = static_cast<u16>(tmp_str.size());
-    if (target.length <= VarcharT::INLINE_LENGTH) {
-        Memcpy(target.prefix, tmp_str.c_str(), target.length);
-        Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
-    } else {
-        Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
+    target.length_ = static_cast<u32>(tmp_str.size());
 
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
-        Memcpy(ptr, tmp_str.c_str(), target.length);
-        target.ptr = ptr;
+    if (target.length_ <= VARCHAR_INLINE_LEN) {
+        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    } else {
+        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+                              "Varchar column vector should use MemoryVectorBuffer. ");
+        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
+        target.vector_.chunk_id_ = chunk_id;
+        target.vector_.chunk_offset_ = chunk_offset;
     }
 
     return true;
@@ -234,19 +234,21 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, DecimalT &target) {
 template <>
 inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
+    target.is_value_ = false;
     String tmp_str = ToStr(source);
-    target.length = static_cast<u16>(tmp_str.size());
-    if (target.length <= VarcharT::INLINE_LENGTH) {
-        Memcpy(target.prefix, tmp_str.c_str(), target.length);
-        Memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
-    } else {
-        Memcpy(target.prefix, tmp_str.c_str(), VarcharT::PREFIX_LENGTH);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
+    target.length_ = static_cast<u32>(tmp_str.size());
 
-        ptr_t ptr = vector_ptr->buffer_->heap_mgr_->Allocate(target.length);
-        Memcpy(ptr, tmp_str.c_str(), target.length);
-        target.ptr = ptr;
+    if (target.length_ <= VARCHAR_INLINE_LEN) {
+        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    } else {
+        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+                              "Varchar column vector should use MemoryVectorBuffer. ");
+        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
+        target.vector_.chunk_id_ = chunk_id;
+        target.vector_.chunk_offset_ = chunk_offset;
     }
+
 
     return true;
 }

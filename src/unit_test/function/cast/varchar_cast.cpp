@@ -47,8 +47,8 @@ TEST_F(VarcharTest, varchar_cast0) {
             DataType target_type(LogicalType::kBoolean);
 
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             BooleanT target{false};
@@ -60,8 +60,8 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "false";
         {
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             BooleanT target{true};
@@ -73,8 +73,8 @@ TEST_F(VarcharTest, varchar_cast0) {
         s1 = "falsk";
         {
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             BooleanT target{true};
@@ -90,8 +90,8 @@ TEST_F(VarcharTest, varchar_cast0) {
 
         {
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             TinyIntT target{0};
@@ -105,8 +105,8 @@ TEST_F(VarcharTest, varchar_cast0) {
             DataType target_type(LogicalType::kBoolean);
 
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             TinyIntT target{0};
@@ -120,8 +120,8 @@ TEST_F(VarcharTest, varchar_cast0) {
             DataType target_type(LogicalType::kBoolean);
 
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             TinyIntT target{0};
@@ -134,8 +134,8 @@ TEST_F(VarcharTest, varchar_cast0) {
             DataType target_type(LogicalType::kBoolean);
 
             VarcharT v1;
-            v1.Initialize(s1);
-            EXPECT_EQ(v1.length, s1.length());
+            v1.InitAsValue(s1);
+            EXPECT_EQ(v1.length_, s1.length());
             EXPECT_EQ(v1.ToString(), s1);
 
             TinyIntT target{0};

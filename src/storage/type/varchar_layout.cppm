@@ -25,14 +25,15 @@ namespace infinity {
 #pragma pack(1)
 
 export struct VarcharLayout {
-    u16 length_{};
+    u64 is_value_:1{};
+    u64 length_:23{};
 
     struct ShortInfo {
-        Array<char_t, VarcharT::INLINE_LENGTH> data{};
+        Array<char_t, VARCHAR_INLINE_LEN> data{};
     };
 
     struct LongInfo {
-        Array<char_t, VarcharT::PREFIX_LENGTH> prefix_{};
+        Array<char_t, VARCHAR_PREFIX_LEN> prefix_{};
 
         u16 file_idx_{};
 

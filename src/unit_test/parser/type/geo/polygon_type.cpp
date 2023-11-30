@@ -22,7 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-
+#if 0
 class PolygonTypeTest : public BaseTest {};
 
 TEST_F(PolygonTypeTest, polygon1) {
@@ -140,3 +140,4 @@ TEST_F(PolygonTypeTest, polygon1) {
 
     EXPECT_EQ(polygon6 == polygon7, true);
 }
+#endif

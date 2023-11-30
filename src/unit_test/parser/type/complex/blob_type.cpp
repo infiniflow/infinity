@@ -22,7 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-
+#if 0
 class BlobTypeTest : public BaseTest {};
 
 TEST_F(BlobTypeTest, blob1) {
@@ -98,3 +98,4 @@ TEST_F(BlobTypeTest, blob1) {
     EXPECT_STREQ(b7.ptr, "abcdefghijklmnopqrstuvwxyz");
     EXPECT_EQ(b7.size, SIZE);
 }
+#endif

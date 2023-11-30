@@ -49,7 +49,7 @@ export using DoubleT = DoubleT;
 export using DecimalT = DecimalT;
 
 // std::string
-export using VarcharT = VarcharType;
+export using VarcharT = Varchar;
 
 // Date and Time
 export using DateT = DateType;
@@ -69,14 +69,14 @@ export using PointT = PointType;
 export using LineT = LineType;
 export using LineSegT = LineSegmentType;
 export using BoxT = BoxType;
-export using PathT = PathType;
-export using PolygonT = PolygonType;
+//export using PathT = PathType;
+//export using PolygonT = PolygonType;
 export using CircleT = CircleType;
 
 // Other
-export using BitmapT = BitmapType;
+//export using BitmapT = BitmapType;
 export using UuidT = UuidType;
-export using BlobT = BlobType;
+//export using BlobT = BlobType;
 export using EmbeddingT = EmbeddingType;
 export using RowID = RowID;
 
@@ -116,6 +116,9 @@ int32_t GetSizeInBytes(const std::string &value);
 
 export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
 export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
+export constexpr uint64_t VARCHAR_PREFIX_LEN = VARCHAR_PREFIX_LENGTH;
+export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;
+export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
 
 // Parser Exception
 export using ParserException = ParserException;

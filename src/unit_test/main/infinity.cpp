@@ -54,10 +54,11 @@ TEST_F(InfinityTest, test1) {
         Value value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "default");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
     }
@@ -71,20 +72,22 @@ TEST_F(InfinityTest, test1) {
         Value value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "db1");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "db1");
         }
 
         value = data_block->GetValue(0, 1);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "default");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
 
@@ -110,10 +113,11 @@ TEST_F(InfinityTest, test1) {
         value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "default");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
 
@@ -150,10 +154,11 @@ TEST_F(InfinityTest, test1) {
         Value value = data_block->GetValue(1, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "table1");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "table1");
         }
 
@@ -258,20 +263,22 @@ TEST_F(InfinityTest, test1) {
         Value value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "db1");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "db1");
         }
 
         value = data_block->GetValue(0, 1);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "default");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
 
@@ -284,10 +291,11 @@ TEST_F(InfinityTest, test1) {
         value = data_block->GetValue(0, 0);
         EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
         if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
             EXPECT_STREQ(prefix.c_str(), "default");
         } else {
-            String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+            EXPECT_TRUE(value.value_.varchar.IsValue());
+            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
             EXPECT_STREQ(whole_str.c_str(), "default");
         }
 

@@ -55,6 +55,13 @@ void PhysicalFilter::Init() {
 }
 
 void PhysicalFilter::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    if(operator_state->data_block_.get() == nullptr) {
+        operator_state->data_block_ = DataBlock::Make();
+
+        // Performance issue here.
+        operator_state->data_block_->Init(*GetOutputTypes());
+    }
+
     SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
 
     auto* prev_op_state = operator_state->prev_op_state_;
@@ -68,6 +75,7 @@ void PhysicalFilter::Execute(QueryContext *query_context, OperatorState *operato
 
     LOG_TRACE(Format("{} rows after filter", selected_count));
     if (prev_op_state->Complete()) {
+        prev_op_state->data_block_.reset();
         filter_operator_state->SetComplete();
     }
     return;

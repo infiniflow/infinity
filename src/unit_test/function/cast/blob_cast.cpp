@@ -36,7 +36,7 @@ import cast_table;
 import column_vector;
 import blob_cast;
 import bound_cast_func;
-
+#if 0
 class BlobCastTest : public BaseTest {};
 
 TEST_F(BlobCastTest, blob_cast0) {
@@ -147,3 +147,4 @@ TEST_F(BlobCastTest, blob_cast1) {
         }
     }
 }
+#endif

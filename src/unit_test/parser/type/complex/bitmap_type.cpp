@@ -22,7 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-
+#if 0
 class BitmapTypeTest : public BaseTest {};
 
 TEST_F(BitmapTypeTest, bitmap1) {
@@ -342,3 +342,4 @@ TEST_F(BitmapTypeTest, bitmap34) {
     // move assignment
     BitmapT bt55(50);
 }
+#endif

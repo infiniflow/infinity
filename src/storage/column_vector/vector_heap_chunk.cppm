@@ -12,6 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "char_type.h"
+module;
 
-namespace infinity {}
+import stl;
+import global_resource_usage;
+import allocator;
+
+export module vector_heap_chunk;
+
+namespace infinity {
+
+export struct VectorHeapChunk {
+public:
+    inline explicit VectorHeapChunk(u64 capacity) : capacity_(capacity) {
+        GlobalResourceUsage::IncrObjectCount();
+        ptr_ = Allocator::allocate(capacity);
+    }
+
+    inline ~VectorHeapChunk() {
+        Allocator::deallocate(ptr_);
+        ptr_ = nullptr;
+        capacity_ = 0;
+        GlobalResourceUsage::DecrObjectCount();
+    }
+
+    ptr_t ptr_{nullptr};
+    u64 capacity_{0};
+};
+
+}
+

@@ -137,7 +137,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.capacity(), 0);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
@@ -275,7 +275,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.tail_index_, 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_EQ(column_vector.buffer_->heap_mgr_, nullptr);
+    EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
