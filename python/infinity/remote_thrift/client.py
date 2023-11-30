@@ -127,6 +127,14 @@ class ThriftInfinityClient:
                                                 table_name=table_name,
                                                 where_expr=where_expr))
 
+    def update(self, db_name: str, table_name: str, where_expr, update_expr_array):
+        return self.client.Update(UpdateRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                where_expr=where_expr,
+                                                update_expr_array=update_expr_array))
+
+
     def disconnect(self):
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
         self.transport.close()

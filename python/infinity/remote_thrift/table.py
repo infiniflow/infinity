@@ -104,7 +104,49 @@ class RemoteTable(Table, ABC):
                 where_expr = traverse_conditions(condition(cond))
         return self._conn.client.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
 
-    def update(self, cond, data):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
+        # {"c1": 1, "c2": 1.1}
+        match cond:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(cond))
+        match data:
+            case None:
+                update_expr_array = None
+            case _:
+                update_expr_array: list[ttypes.UpdateExpr] = []
+                for row in data:
+                    parse_exprs = []
+                    for column_name, value in row.items():
+
+                        if isinstance(value, str):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.String
+                            constant_expression.str_value = value
+                        elif isinstance(value, int):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.Int64
+                            constant_expression.i64_value = value
+                        elif isinstance(value, float):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.Double
+                            constant_expression.f64_value = value
+                        else:
+                            raise Exception("Invalid constant expression")
+
+                        paser_expr_type = ttypes.ParsedExprType()
+                        paser_expr_type.constant_expr = constant_expression
+                        paser_expr = ttypes.ParsedExpr()
+                        paser_expr.type = paser_expr_type
+
+                        update_expr = ttypes.UpdateExpr()
+                        update_expr.column_name = column_name
+                        update_expr.value = paser_expr
+                        update_expr_array.append(update_expr)
+
+        return self._conn.client.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
+                                        update_expr_array=update_expr_array)
 
         pass
 

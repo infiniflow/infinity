@@ -42,7 +42,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def update(self, condition, data):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, tp.Union[str, int, float]]]]):
         pass
 
     from infinity.query import Query, InfinityQueryBuilder
