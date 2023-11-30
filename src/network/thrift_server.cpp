@@ -246,11 +246,15 @@ public:
 
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(0, i);
-                if (value.value_.varchar.IsInlined()) {
-                    String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                VarcharT& varchar_ref = value.value_.varchar;
+                if(!varchar_ref.IsValue()) {
+                    Error<NetworkException>("Varchar should be value type");
+                }
+                if (varchar_ref.IsInlined()) {
+                    String prefix = String(varchar_ref.short_.data_, varchar_ref.length_);
                     response.db_names.emplace_back(prefix);
                 } else {
-                    String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                    String whole_str = String(varchar_ref.value_.ptr_, varchar_ref.length_);
                     response.db_names.emplace_back(whole_str);
                 }
             }
@@ -273,11 +277,15 @@ public:
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(1, i);
-                if (value.value_.varchar.IsInlined()) {
-                    String prefix = String(value.value_.varchar.prefix, value.value_.varchar.length);
+                VarcharT& varchar_ref = value.value_.varchar;
+                if(!varchar_ref.IsValue()) {
+                    Error<NetworkException>("Varchar should be value type");
+                }
+                if (varchar_ref.IsInlined()) {
+                    String prefix = String(varchar_ref.short_.data_, varchar_ref.length_);
                     response.table_names.emplace_back(prefix);
                 } else {
-                    String whole_str = String(value.value_.varchar.ptr, value.value_.varchar.length);
+                    String whole_str = String(varchar_ref.value_.ptr_, varchar_ref.length_);
                     response.table_names.emplace_back(whole_str);
                 }
             }

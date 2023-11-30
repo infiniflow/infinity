@@ -131,13 +131,13 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                     auto outline_info = block_column_entry->outline_info_.get();
                     auto base_file_size = Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
-                    if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length > base_file_size) {
+                    if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
 
                         auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
                         auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_,
                                                                       file_name,
                                                                       DEFAULT_BASE_NUM *
-                                                                      Max(base_file_size, static_cast<SizeT>(varchar_type->length)));
+                                                                      Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
 
                         BufferObj* buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
