@@ -40,4 +40,12 @@ std::string BaseProfiler::ElapsedToString() const {
     return ss.str();
 }
 
+int BaseProfiler::ElapsedToMs() const {
+    std::stringstream ss;
+    auto duration = this->ElapsedInternal();
+    ss << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    int ret;
+    ss >> ret;
+    return ret;
+}
 } // namespace infinity

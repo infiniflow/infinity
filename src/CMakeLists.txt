@@ -371,3 +371,9 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+
+add_executable(unit_test_hnswalg "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
+
+target_link_libraries(unit_test_hnswalg
+    infinity_core
+)

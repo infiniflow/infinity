@@ -31,6 +31,8 @@ class InfinityServiceIf {
   virtual void Insert(CommonResponse& _return, const InsertRequest& request) = 0;
   virtual void Import(CommonResponse& _return, const ImportRequest& request) = 0;
   virtual void Select(SelectResponse& _return, const SelectRequest& request) = 0;
+  virtual void Delete(CommonResponse& _return, const DeleteRequest& request) = 0;
+  virtual void Update(CommonResponse& _return, const UpdateRequest& request) = 0;
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
   virtual void DescribeDatabase(DescribeDatabaseResponse& _return, const DescribeDatabaseRequest& request) = 0;
@@ -93,6 +95,12 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Select(SelectResponse& /* _return */, const SelectRequest& /* request */) override {
+    return;
+  }
+  void Delete(CommonResponse& /* _return */, const DeleteRequest& /* request */) override {
+    return;
+  }
+  void Update(CommonResponse& /* _return */, const UpdateRequest& /* request */) override {
     return;
   }
   void ListDatabase(ListDatabaseResponse& /* _return */, const ListDatabaseRequest& /* request */) override {
@@ -1045,6 +1053,214 @@ class InfinityService_Select_presult {
 
 };
 
+typedef struct _InfinityService_Delete_args__isset {
+  _InfinityService_Delete_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Delete_args__isset;
+
+class InfinityService_Delete_args {
+ public:
+
+  InfinityService_Delete_args(const InfinityService_Delete_args&);
+  InfinityService_Delete_args& operator=(const InfinityService_Delete_args&);
+  InfinityService_Delete_args() noexcept {
+  }
+
+  virtual ~InfinityService_Delete_args() noexcept;
+  DeleteRequest request;
+
+  _InfinityService_Delete_args__isset __isset;
+
+  void __set_request(const DeleteRequest& val);
+
+  bool operator == (const InfinityService_Delete_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Delete_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Delete_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Delete_pargs {
+ public:
+
+
+  virtual ~InfinityService_Delete_pargs() noexcept;
+  const DeleteRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Delete_result__isset {
+  _InfinityService_Delete_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Delete_result__isset;
+
+class InfinityService_Delete_result {
+ public:
+
+  InfinityService_Delete_result(const InfinityService_Delete_result&);
+  InfinityService_Delete_result& operator=(const InfinityService_Delete_result&);
+  InfinityService_Delete_result() noexcept {
+  }
+
+  virtual ~InfinityService_Delete_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Delete_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Delete_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Delete_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Delete_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Delete_presult__isset {
+  _InfinityService_Delete_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Delete_presult__isset;
+
+class InfinityService_Delete_presult {
+ public:
+
+
+  virtual ~InfinityService_Delete_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Delete_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_Update_args__isset {
+  _InfinityService_Update_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Update_args__isset;
+
+class InfinityService_Update_args {
+ public:
+
+  InfinityService_Update_args(const InfinityService_Update_args&);
+  InfinityService_Update_args& operator=(const InfinityService_Update_args&);
+  InfinityService_Update_args() noexcept {
+  }
+
+  virtual ~InfinityService_Update_args() noexcept;
+  UpdateRequest request;
+
+  _InfinityService_Update_args__isset __isset;
+
+  void __set_request(const UpdateRequest& val);
+
+  bool operator == (const InfinityService_Update_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Update_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Update_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Update_pargs {
+ public:
+
+
+  virtual ~InfinityService_Update_pargs() noexcept;
+  const UpdateRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Update_result__isset {
+  _InfinityService_Update_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Update_result__isset;
+
+class InfinityService_Update_result {
+ public:
+
+  InfinityService_Update_result(const InfinityService_Update_result&);
+  InfinityService_Update_result& operator=(const InfinityService_Update_result&);
+  InfinityService_Update_result() noexcept {
+  }
+
+  virtual ~InfinityService_Update_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Update_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Update_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Update_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Update_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Update_presult__isset {
+  _InfinityService_Update_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Update_presult__isset;
+
+class InfinityService_Update_presult {
+ public:
+
+
+  virtual ~InfinityService_Update_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Update_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _InfinityService_ListDatabase_args__isset {
   _InfinityService_ListDatabase_args__isset() : request(false) {}
   bool request :1;
@@ -1929,6 +2145,12 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   void send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return);
+  void Delete(CommonResponse& _return, const DeleteRequest& request) override;
+  void send_Delete(const DeleteRequest& request);
+  void recv_Delete(CommonResponse& _return);
+  void Update(CommonResponse& _return, const UpdateRequest& request) override;
+  void send_Update(const UpdateRequest& request);
+  void recv_Update(CommonResponse& _return);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   void send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return);
@@ -1977,6 +2199,8 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DescribeDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -1997,6 +2221,8 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Insert"] = &InfinityServiceProcessor::process_Insert;
     processMap_["Import"] = &InfinityServiceProcessor::process_Import;
     processMap_["Select"] = &InfinityServiceProcessor::process_Select;
+    processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
+    processMap_["Update"] = &InfinityServiceProcessor::process_Update;
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
     processMap_["DescribeDatabase"] = &InfinityServiceProcessor::process_DescribeDatabase;
@@ -2120,6 +2346,26 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->Select(_return, request);
     }
     ifaces_[i]->Select(_return, request);
+    return;
+  }
+
+  void Delete(CommonResponse& _return, const DeleteRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Delete(_return, request);
+    }
+    ifaces_[i]->Delete(_return, request);
+    return;
+  }
+
+  void Update(CommonResponse& _return, const UpdateRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Update(_return, request);
+    }
+    ifaces_[i]->Update(_return, request);
     return;
   }
 
@@ -2262,6 +2508,12 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   int32_t send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return, const int32_t seqid);
+  void Delete(CommonResponse& _return, const DeleteRequest& request) override;
+  int32_t send_Delete(const DeleteRequest& request);
+  void recv_Delete(CommonResponse& _return, const int32_t seqid);
+  void Update(CommonResponse& _return, const UpdateRequest& request) override;
+  int32_t send_Update(const UpdateRequest& request);
+  void recv_Update(CommonResponse& _return, const int32_t seqid);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   int32_t send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return, const int32_t seqid);

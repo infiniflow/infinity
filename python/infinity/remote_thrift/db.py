@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from abc import ABC
+
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.db import Database
 from infinity.remote_thrift.table import RemoteTable
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
 
 class RemoteThriftDatabase(Database, ABC):
@@ -94,9 +95,9 @@ class RemoteThriftDatabase(Database, ABC):
                     proto_column_type.logic_type = ttypes.LogicType.BigInt
                 elif datatype == "int128":
                     proto_column_type.logic_type = ttypes.LogicType.HugeInt
-                elif datatype == "float":
+                elif datatype == "float" or datatype == "float32":
                     proto_column_type.logic_type = ttypes.LogicType.Float
-                elif datatype == "double":
+                elif datatype == "double" or datatype == "float64":
                     proto_column_type.logic_type = ttypes.LogicType.Double
                 elif datatype == "varchar":
                     varchar_type = ttypes.VarcharType()

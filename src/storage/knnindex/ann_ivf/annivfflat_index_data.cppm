@@ -100,7 +100,7 @@ struct AnnIVFFlatIndexData {
     void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
-        SaveIndexInner(*file_handler);
+        SaveIndex(*file_handler);
         file_handler->Close();
     }
 

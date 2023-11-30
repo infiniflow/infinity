@@ -31,11 +31,33 @@ module index_hnsw;
 
 namespace infinity {
 
+HnswEncodeType StringToHnswEncodeType(const String &str) {
+    if (str == "plain") {
+        return HnswEncodeType::kPlain;
+    } else if (str == "lvq") {
+        return HnswEncodeType::kLVQ;
+    } else {
+        return HnswEncodeType::kInvalid;
+    }
+}
+
+String HnswEncodeTypeToString(HnswEncodeType encode_type) {
+    switch (encode_type) {
+        case HnswEncodeType::kPlain:
+            return "plain";
+        case HnswEncodeType::kLVQ:
+            return "lvq";
+        default:
+            return "invalid";
+    }
+}
+
 SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
     SizeT ef = HNSW_EF;
     MetricType metric_type = MetricType::kInvalid;
+    HnswEncodeType encode_type = HnswEncodeType::kPlain;
     for (auto para : index_param_list) {
         if (para->param_name_ == "M") {
             M = std::stoi(para->param_value_);
@@ -45,21 +67,24 @@ SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_nam
             ef = std::stoi(para->param_value_);
         } else if (para->param_name_ == "metric") {
             metric_type = StringToMetricType(para->param_value_);
+        } else if (para->param_name_ == "encode") {
+            encode_type = StringToHnswEncodeType(para->param_value_);
         } else {
             Error<StorageException>("Invalid index parameter");
         }
     }
-    if (metric_type == MetricType::kInvalid) {
+    if (metric_type == MetricType::kInvalid || encode_type == HnswEncodeType::kInvalid) {
         Error<StorageException>("Lack index parameters");
     }
-    return MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
+    return MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, encode_type, M, ef_construction, ef);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {
     if (this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
-    return metric_type_ == other.metric_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ && ef_ == other.ef_;
+    return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ &&
+           ef_ == other.ef_;
 }
 
 bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == other); }
@@ -67,6 +92,7 @@ bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == oth
 i32 IndexHnsw::GetSizeInBytes() const {
     SizeT size = IndexBase::GetSizeInBytes();
     size += sizeof(metric_type_);
+    size += sizeof(encode_type_);
     size += sizeof(M_);
     size += sizeof(ef_construction_);
     size += sizeof(ef_);
@@ -76,12 +102,11 @@ i32 IndexHnsw::GetSizeInBytes() const {
 void IndexHnsw::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
     WriteBufAdv(ptr, metric_type_);
+    WriteBufAdv(ptr, encode_type_);
     WriteBufAdv(ptr, M_);
     WriteBufAdv(ptr, ef_construction_);
     WriteBufAdv(ptr, ef_);
 }
-
-SharedPtr<IndexBase> IndexHnsw::ReadAdv(char *&ptr, int32_t maxbytes) { Error<StorageException>("Not implemented"); }
 
 String IndexHnsw::ToString() const {
     std::stringstream ss;
@@ -92,12 +117,11 @@ String IndexHnsw::ToString() const {
 Json IndexHnsw::Serialize() const {
     Json res = IndexBase::Serialize();
     res["metric_type"] = MetricTypeToString(metric_type_);
+    res["encode_type"] = HnswEncodeTypeToString(encode_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;
     res["ef"] = ef_;
     return res;
 }
-
-SharedPtr<IndexHnsw> IndexHnsw::Deserialize(const Json &index_def_json) { Error<StorageException>("Not implemented"); }
 
 } // namespace infinity

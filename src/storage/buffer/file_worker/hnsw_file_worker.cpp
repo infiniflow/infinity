@@ -17,13 +17,14 @@ module;
 import infinity_exception;
 import stl;
 import index_file_worker;
-import dist_func;
-import knn_hnsw;
+import hnsw_alg;
 import index_hnsw;
 import parser;
 import index_base;
 import dist_func_l2;
 import dist_func_ip;
+import lvq_store;
+import plain_store;
 
 module hnsw_file_worker;
 
@@ -49,16 +50,54 @@ void HnswFileWorker::AllocateInMemory() {
     }
 
     SizeT dimension = GetDimension();
-    const IndexHnsw* index_hnsw = static_cast<const IndexHnsw*>(index_base_);
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    SizeT M = index_hnsw->M_;
+    SizeT ef_c = index_hnsw->ef_construction_;
+    auto AllocateData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
+
     switch (GetType()) {
         case kElemFloat: {
-            auto dist_func = GetDistFunc<f32>(dimension);
-            data_ = static_cast<void *>(new KnnHnsw<f32, u64>(max_element_,
-                                                              dimension,
-                                                              *dist_func,
-                                                              index_hnsw->M_,
-                                                              index_hnsw->ef_construction_,
-                                                              index_hnsw->ef_));
+            switch (index_hnsw->encode_type_) {
+                case HnswEncodeType::kPlain: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                case HnswEncodeType::kLVQ: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Bug.");
+                }
+            }
             break;
         }
         default: {
@@ -69,12 +108,53 @@ void HnswFileWorker::AllocateInMemory() {
 
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("Data is not allocated.");
+        Error<StorageException>("Bug. Data is not allocated.");
     }
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
     switch (GetType()) {
         case kElemFloat: {
-            auto hnsw_index_ptr = static_cast<KnnHnsw<f32, u64> *>(data_);
-            delete hnsw_index_ptr;
+            switch (index_hnsw->encode_type_) {
+                case HnswEncodeType::kPlain: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                            FreeData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                            FreeData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                case HnswEncodeType::kLVQ: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            FreeData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            FreeData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Bug.");
+                }
+            }
             break;
         }
         default: {
@@ -85,10 +165,54 @@ void HnswFileWorker::FreeInMemory() {
 }
 
 void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
+    if (!data_) {
+        Error<StorageException>("Bug.");
+    }
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    auto SaveData = [&](auto *hnsw_index) { hnsw_index->Save(*file_handler_); };
     switch (GetType()) {
         case kElemFloat: {
-            auto *hnsw_index_ptr = static_cast<KnnHnsw<f32, u64> *>(data_);
-            hnsw_index_ptr->SaveIndexInner(*file_handler_);
+            switch (index_hnsw->encode_type_) {
+                case HnswEncodeType::kPlain: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                            SaveData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                            SaveData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                case HnswEncodeType::kLVQ: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            SaveData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            SaveData(static_cast<Hnsw *>(data_));
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Bug.");
+                }
+            }
             break;
         }
         default: {
@@ -99,13 +223,52 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
 }
 
 void HnswFileWorker::ReadFromFileImpl() {
-    SizeT dimension = GetDimension();
+    // TODO!! not save index parameter in index file.
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
+    auto LoadData = [&](auto *hnsw_index) { data_ = static_cast<void *>(hnsw_index); };
     switch (GetType()) {
         case kElemFloat: {
-            auto dist_func = GetDistFunc<f32>(dimension);
-            UniquePtr<KnnHnsw<f32, u64>> hnsw_index = KnnHnsw<f32, u64>::LoadIndexInner(*file_handler_, *dist_func);
-            // TODO!! not save index parameter in index file.
-            data_ = static_cast<void *>(hnsw_index.release());
+            switch (index_hnsw->encode_type_) {
+                case HnswEncodeType::kPlain: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                            LoadData(Hnsw::Load(*file_handler_, {}).release());
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                            LoadData(Hnsw::Load(*file_handler_, {}).release());
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                case HnswEncodeType::kLVQ: {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMerticInnerProduct: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            LoadData(Hnsw::Load(*file_handler_, {}).release());
+                            break;
+                        }
+                        case MetricType::kMerticL2: {
+                            using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            LoadData(Hnsw::Load(*file_handler_, {}).release());
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Bug.");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Bug.");
+                }
+            }
             break;
         }
         default: {
@@ -126,25 +289,5 @@ SizeT HnswFileWorker::GetDimension() const {
     auto type_info = data_type->type_info().get();
     auto embedding_info = (EmbeddingInfo *)type_info;
     return embedding_info->Dimension();
-}
-
-template <typename DataType>
-UniquePtr<SpaceBase<DataType>> HnswFileWorker::GetDistFunc(SizeT dimension) const {
-    UniquePtr<SpaceBase<f32>> space = nullptr;
-    const auto* hnsw_index_def = static_cast<const IndexHnsw *>(index_base_);
-    switch (hnsw_index_def->metric_type_) {
-        case MetricType::kMerticInnerProduct: {
-            space = MakeUnique<DistFuncIP<f32>>(dimension);
-            break;
-        }
-        case MetricType::kMerticL2: {
-            space = MakeUnique<DistFuncL2<f32>>(dimension);
-            break;
-        }
-        case MetricType::kInvalid: {
-            StorageException("Bug.");
-        }
-    }
-    return space;
 }
 } // namespace infinity

@@ -60,9 +60,7 @@ MetricType StringToMetricType(const String &str) {
 
 namespace infinity {
 
-bool IndexBase::operator==(const IndexBase &other) const {
-    return index_type_ == other.index_type_ && column_names_ == other.column_names_;
-}
+bool IndexBase::operator==(const IndexBase &other) const { return index_type_ == other.index_type_ && column_names_ == other.column_names_; }
 
 bool IndexBase::operator!=(const IndexBase &other) const { return !(*this == other); }
 
@@ -107,14 +105,11 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
         }
         case IndexType::kHnsw: {
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
+            HnswEncodeType encode_type = ReadBufAdv<HnswEncodeType>(ptr);
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT ef = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexHnsw>(file_name, column_names, metric_type, M, ef_construction, ef);
-            break;
-        }
-        case IndexType::kHnswLVQ: {
-            Error<StorageException>("Index HnswLVQ isn't implemented");
+            res = MakeShared<IndexHnsw>(file_name, column_names, metric_type, encode_type, M, ef_construction, ef);
             break;
         }
         case IndexType::kIRSFullText: {
@@ -173,7 +168,8 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
             SizeT ef_construction = index_def_json["ef_construction"];
             SizeT ef = index_def_json["ef"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, M, ef_construction, ef);
+            HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
+            auto ptr = MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, encode_type, M, ef_construction, ef);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

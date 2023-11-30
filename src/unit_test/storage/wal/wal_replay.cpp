@@ -51,7 +51,7 @@ namespace {
 template <typename T>
 void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
     T ele = DataType::StringToValue<T>(str_view);
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
 }
 } // namespace
 
@@ -569,7 +569,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(data_type_size, 1);
                 ptr_t src_ptr = columns_vector[0].get()->data();
                 SizeT data_size = 1 * data_type_size;
-                BlockColumnEntry::AppendRaw(block_column_entry1, 0, src_ptr, data_size);
+                BlockColumnEntry::AppendRaw(block_column_entry1, 0, src_ptr, data_size, nullptr);
             }
             {
                 auto block_column_entry2 = last_block_entry->columns_[1].get();
@@ -579,7 +579,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(data_type_size, 8);
                 ptr_t src_ptr = columns_vector[1].get()->data();
                 SizeT data_size = 1 * data_type_size;
-                BlockColumnEntry::AppendRaw(block_column_entry2, 0, src_ptr, data_size);
+                BlockColumnEntry::AppendRaw(block_column_entry2, 0, src_ptr, data_size, nullptr);
             }
             {
                 auto block_column_entry3 = last_block_entry->columns_[2].get();
@@ -589,7 +589,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(data_type_size, 8);
                 ptr_t src_ptr = columns_vector[2].get()->data();
                 SizeT data_size = 1 * data_type_size;
-                BlockColumnEntry::AppendRaw(block_column_entry3, 0, src_ptr, data_size);
+                BlockColumnEntry::AppendRaw(block_column_entry3, 0, src_ptr, data_size, nullptr);
             }
 
             last_block_entry->row_count_ = 1;

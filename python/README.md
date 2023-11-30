@@ -42,7 +42,7 @@ table_obj = db_obj.get_table("my_table3")
 
 table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
 
-res = table_obj.search().output(["c1", "c2"]).filter("c1>1").to_list()
+res = table_obj.search().output(["c1", "c2"]).filter("c1>1").to_df()
 print(res)
 
 res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
@@ -53,7 +53,7 @@ test_csv_dir = "/test/data/csv/embedding_int_dim3.csv"
 
 table_obj.import_data(test_csv_dir, None)
 
-res = table_obj.search().output(["c1"]).filter("c1 > 1").to_list()
+res = table_obj.search().output(["c1"]).filter("c1 > 1").to_df()
 print(res)
 
 res = infinity_obj.disconnect()

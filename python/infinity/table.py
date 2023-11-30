@@ -38,11 +38,11 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def delete(self, condition):
+    def delete(self, cond: Optional[str] = None):
         pass
 
     @abstractmethod
-    def update(self, condition, data):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, tp.Union[str, int, float]]]]):
         pass
 
     from infinity.query import Query, InfinityQueryBuilder
@@ -54,7 +54,7 @@ class Table(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _execute_query(self, query: Query) -> list[dict]:
+    def _execute_query(self, query: Query):
         pass
 
 

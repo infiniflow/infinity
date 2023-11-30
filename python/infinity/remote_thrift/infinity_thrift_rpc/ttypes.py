@@ -707,15 +707,17 @@ class ParsedExprType(object):
      - column_expr
      - function_expr
      - knn_expr
+     - between_expr
 
     """
 
 
-    def __init__(self, constant_expr=None, column_expr=None, function_expr=None, knn_expr=None,):
+    def __init__(self, constant_expr=None, column_expr=None, function_expr=None, knn_expr=None, between_expr=None,):
         self.constant_expr = constant_expr
         self.column_expr = column_expr
         self.function_expr = function_expr
         self.knn_expr = knn_expr
+        self.between_expr = between_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -750,6 +752,12 @@ class ParsedExprType(object):
                     self.knn_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRUCT:
+                    self.between_expr = BetweenExpr()
+                    self.between_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -775,6 +783,10 @@ class ParsedExprType(object):
         if self.knn_expr is not None:
             oprot.writeFieldBegin('knn_expr', TType.STRUCT, 4)
             self.knn_expr.write(oprot)
+            oprot.writeFieldEnd()
+        if self.between_expr is not None:
+            oprot.writeFieldBegin('between_expr', TType.STRUCT, 5)
+            self.between_expr.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1333,6 +1345,75 @@ class BetweenExpr(object):
         if self.lower_bound is not None:
             oprot.writeFieldBegin('lower_bound', TType.STRUCT, 3)
             self.lower_bound.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class UpdateExpr(object):
+    """
+    Attributes:
+     - column_name
+     - value
+
+    """
+
+
+    def __init__(self, column_name=None, value=None,):
+        self.column_name = column_name
+        self.value = value
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.column_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRUCT:
+                    self.value = ParsedExpr()
+                    self.value.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('UpdateExpr')
+        if self.column_name is not None:
+            oprot.writeFieldBegin('column_name', TType.STRING, 1)
+            oprot.writeString(self.column_name.encode('utf-8') if sys.version_info[0] == 2 else self.column_name)
+            oprot.writeFieldEnd()
+        if self.value is not None:
+            oprot.writeFieldBegin('value', TType.STRUCT, 2)
+            self.value.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -3811,6 +3892,212 @@ class SelectResponse(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class DeleteRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - where_expr
+     - session_id
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, where_expr=None, session_id=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.where_expr = where_expr
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRUCT:
+                    self.where_expr = ParsedExpr()
+                    self.where_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('DeleteRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.where_expr is not None:
+            oprot.writeFieldBegin('where_expr', TType.STRUCT, 3)
+            self.where_expr.write(oprot)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 4)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class UpdateRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - where_expr
+     - update_expr_array
+     - session_id
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, where_expr=None, update_expr_array=[
+    ], session_id=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.where_expr = where_expr
+        if update_expr_array is self.thrift_spec[4][4]:
+            update_expr_array = [
+            ]
+        self.update_expr_array = update_expr_array
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRUCT:
+                    self.where_expr = ParsedExpr()
+                    self.where_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.LIST:
+                    self.update_expr_array = []
+                    (_etype129, _size126) = iprot.readListBegin()
+                    for _i130 in range(_size126):
+                        _elem131 = UpdateExpr()
+                        _elem131.read(iprot)
+                        self.update_expr_array.append(_elem131)
+                    iprot.readListEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('UpdateRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.where_expr is not None:
+            oprot.writeFieldBegin('where_expr', TType.STRUCT, 3)
+            self.where_expr.write(oprot)
+            oprot.writeFieldEnd()
+        if self.update_expr_array is not None:
+            oprot.writeFieldBegin('update_expr_array', TType.LIST, 4)
+            oprot.writeListBegin(TType.STRUCT, len(self.update_expr_array))
+            for iter132 in self.update_expr_array:
+                iter132.write(oprot)
+            oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 5)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(Option)
 Option.thrift_spec = (
 )
@@ -3857,6 +4144,7 @@ ParsedExprType.thrift_spec = (
     (2, TType.STRUCT, 'column_expr', [ColumnExpr, None], None, ),  # 2
     (3, TType.STRUCT, 'function_expr', [FunctionExpr, None], None, ),  # 3
     (4, TType.STRUCT, 'knn_expr', [KnnExpr, None], None, ),  # 4
+    (5, TType.STRUCT, 'between_expr', [BetweenExpr, None], None, ),  # 5
 )
 all_structs.append(ParsedExpr)
 ParsedExpr.thrift_spec = (
@@ -3903,6 +4191,12 @@ BetweenExpr.thrift_spec = (
     (1, TType.STRUCT, 'value', [ParsedExpr, None], None, ),  # 1
     (2, TType.STRUCT, 'upper_bound', [ParsedExpr, None], None, ),  # 2
     (3, TType.STRUCT, 'lower_bound', [ParsedExpr, None], None, ),  # 3
+)
+all_structs.append(UpdateExpr)
+UpdateExpr.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'column_name', 'UTF8', None, ),  # 1
+    (2, TType.STRUCT, 'value', [ParsedExpr, None], None, ),  # 2
 )
 all_structs.append(Field)
 Field.thrift_spec = (
@@ -4122,6 +4416,24 @@ SelectResponse.thrift_spec = (
     ], ),  # 3
     (4, TType.LIST, 'column_fields', (TType.STRUCT, [ColumnField, None], False), [
     ], ),  # 4
+)
+all_structs.append(DeleteRequest)
+DeleteRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 3
+    (4, TType.I64, 'session_id', None, None, ),  # 4
+)
+all_structs.append(UpdateRequest)
+UpdateRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRUCT, 'where_expr', [ParsedExpr, None], None, ),  # 3
+    (4, TType.LIST, 'update_expr_array', (TType.STRUCT, [UpdateExpr, None], False), [
+    ], ),  # 4
+    (5, TType.I64, 'session_id', None, None, ),  # 5
 )
 fix_spec(all_structs)
 del all_structs

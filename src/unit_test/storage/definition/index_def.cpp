@@ -36,7 +36,7 @@ TEST_F(IndexDefTest, ivfflat_readwrite) {
 
     auto index_base = IndexIVFFlat::Make("idx1", columns, parameters);
     std::cout << "index_base: " << index_base->ToString() << std::endl;
-    for(auto parameter: parameters) {
+    for (auto parameter : parameters) {
         delete parameter;
     }
 
@@ -65,11 +65,12 @@ TEST_F(IndexDefTest, hnsw_readwrite) {
     parameters.emplace_back(new InitParameter("M", "16"));
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("ef", "200"));
+    parameters.emplace_back(new InitParameter("encode", "plain"));
 
     auto index_base = IndexHnsw::Make("idx1", columns, parameters);
     std::cout << "index_base: " << index_base->ToString() << std::endl;
 
-    for(auto parameter: parameters) {
+    for (auto parameter : parameters) {
         delete parameter;
     }
 
@@ -99,7 +100,7 @@ TEST_F(IndexDefTest, full_text_readwrite) {
     auto index_base = IndexFullText::Make("idx1", columns, parameters);
     std::cout << "index_base: " << index_base->ToString() << std::endl;
 
-    for(auto parameter: parameters) {
+    for (auto parameter : parameters) {
         delete parameter;
     }
 
@@ -132,6 +133,7 @@ TEST_F(IndexDefTest, index_def) {
     Vector<String> columns2{"col3"};
     Vector<InitParameter *> parameters2;
     parameters2.emplace_back(new InitParameter("metric", "l2"));
+    parameters2.emplace_back(new InitParameter("encode", "plain"));
     parameters2.emplace_back(new InitParameter("M", "16"));
     parameters2.emplace_back(new InitParameter("ef_construction", "200"));
     parameters2.emplace_back(new InitParameter("ef", "200"));

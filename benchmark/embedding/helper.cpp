@@ -51,7 +51,7 @@ get_current_rss() {
     FILE* fp = NULL;
     if((fp = fopen("/proc/self/statm", "r")) == NULL)
         return (size_t)0L;      /* Can't open? */
-    if(fscanf(fp, "%*s%ld", &rss) != 1) {
+    if(fscanf(fp, "%*s%ld", &rss) != 1) { // asterisk means ignore
         fclose(fp);
         return (size_t)0L;      /* Can't read? */
     }

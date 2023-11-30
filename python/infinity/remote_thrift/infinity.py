@@ -26,7 +26,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         self._is_connected = True
 
     def __del__(self):
-        if self._is_connected:
+        if self._is_connected is True:
             self.disconnect()
 
     def create_database(self, db_name: str, options=None):
