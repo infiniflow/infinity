@@ -92,6 +92,11 @@ export enum class ExpressionType {
     kWindowRank,
     kWindowRowNumber,
 
+    // Search
+    kSearch,
+    kMatch,
+    kFusion,
+
     // Misc.
     kKnn,
     kDistinctFrom,    // ??
@@ -100,5 +105,4 @@ export enum class ExpressionType {
     kPredicate, // ?
     kRaw,
 };
-
 }

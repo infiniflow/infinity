@@ -22,6 +22,7 @@ import column_binding;
 import logical_node_type;
 import knn_expression;
 import parser;
+import default_values;
 
 module logical_knn_scan;
 
@@ -62,7 +63,7 @@ SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
         result_names->emplace_back(knn_expr->Name());
     }
 
-    result_names->emplace_back("_row_id");
+    result_names->emplace_back(COLUMN_NAME_ROW_ID);
     return result_names;
 }
 

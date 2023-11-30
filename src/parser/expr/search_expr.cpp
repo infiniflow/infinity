@@ -2,8 +2,6 @@
 #include "fusion_expr.h"
 #include "knn_expr.h"
 #include "match_expr.h"
-#include "query_expr.h"
-#include "search_parser.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>
@@ -20,22 +18,6 @@ SearchExpr::~SearchExpr() {
         delete exprs_;
         exprs_ = nullptr;
     }
-
-    // following expr ptrs are already freed in exprs_.
-//    for(auto match_expr: match_exprs_) {
-//        delete match_expr;
-//    }
-//
-//    for(auto query_expr: query_exprs_) {
-//        delete query_expr;
-//    }
-//
-//    for(auto knn_expr: knn_exprs_) {
-//        delete knn_expr;
-//    }
-//
-//    delete fusion_expr_;
-//    fusion_expr_ = nullptr;
 }
 
 std::string SearchExpr::ToString() const {
@@ -46,12 +28,6 @@ std::string SearchExpr::ToString() const {
     oss << "SEARCH ";
     bool is_first = true;
     for (auto &expr : match_exprs_) {
-        if (!is_first)
-            oss << ", ";
-        oss << expr->ToString();
-        is_first = false;
-    }
-    for (auto &expr : query_exprs_) {
         if (!is_first)
             oss << ", ";
         oss << expr->ToString();
@@ -79,9 +55,6 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
             case ParsedExprType::kMatch:
                 match_exprs_.push_back(dynamic_cast<MatchExpr *>(expr));
                 break;
-            case ParsedExprType::kQuery:
-                query_exprs_.push_back(dynamic_cast<QueryExpr *>(expr));
-                break;
             case ParsedExprType::kFusion:
                 if (fusion_expr_ != nullptr) {
                     ParserError("More than one FUSION expr");
@@ -92,7 +65,7 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
                 ParserError("Invalid expr type for SEARCH");
         }
     }
-    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + query_exprs_.size();
+    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size();
     if (num_sub_expr <= 0) {
         ParserError("Need at least one KNN/MATCH/QUERY expression");
     } else if (num_sub_expr == 1) {

@@ -111,6 +111,9 @@ class PhysicalMergeSort;
 
 class PhysicalMergeKnn;
 
+class PhysicalMatch;
+class PhysicalFusion;
+
 export class ExplainPhysicalPlan {
 public:
     static void Explain(const PhysicalOperator *op, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive = false, i64 intent_size = 0);
@@ -226,6 +229,9 @@ public:
     Explain(const PhysicalMergeSort *merge_sort_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
 
     static void Explain(const PhysicalMergeKnn *merge_knn_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
+
+    static void Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
+    static void Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size = 0);
 };
 
 } // namespace infinity

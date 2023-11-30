@@ -30,6 +30,14 @@ module;
 #include "utils/index_utils.hpp"
 #include "utils/text_format.hpp"
 
+#include "analysis/analyzers.hpp"
+#include "analysis/token_attributes.hpp"
+#include "frozen/map.h"
+#include "search/bm25.hpp"
+#include "search/filter.hpp"
+#include "search/score.hpp"
+#include "utils/type_info.hpp"
+
 import stl;
 import parser;
 import logger;
@@ -66,16 +74,6 @@ namespace infinity {
 
 constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
 constexpr SizeT DEFAULT_CONSOLIDATION_INTERVAL_MSEC = 1000;
-
-#define DOCMASK 0xFFFF
-
-u32 RowID2DocID(RowID row_id) { return (row_id.segment_id_ << 16) + row_id.segment_offset_; }
-u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
-    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset + 1;
-    return (segment_id << 16) + segment_offset;
-}
-
-RowID DocID2RowID(u32 doc_id) { return RowID(doc_id >> 16, doc_id & DOCMASK - 1); }
 
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
@@ -433,5 +431,98 @@ ViewSnapshot::ViewSnapshot(IRSDirectoryReader *reader) : reader_(reader) {
 const IRSSubReader *ViewSnapshot::operator[](SizeT i) noexcept { return segments_[i].segment_; }
 
 const ViewSegment &ViewSnapshot::GetSegment(SizeT i) noexcept { return segments_[i]; }
+
+enum class ExecutionMode { kAll, kStrictTop, kTop };
+
+int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, ScoredIds &sorted) {
+    ExecutionMode mode{ExecutionMode::kTop};
+    irs::WandContext wand{.index = 0, .strict = false};
+
+    String scorer(DEFAULT_SCORER);
+    String scorer_arg(DEFAULT_SCORER_ARG);
+    if (auto it = options.find("scorer"); it != options.end()) {
+        scorer = it->second;
+    }
+    if (auto it = options.find("scorer_arg"); it != options.end()) {
+        scorer_arg = it->second;
+    }
+    auto arg_format = irs::type<irs::text_format::csv>::get();
+    auto scr = irs::scorers::get(scorer, arg_format, scorer_arg);
+    if (!scr) {
+        LOG_ERROR(Format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
+        return -1;
+    }
+    auto *score = scr.get();
+
+    const IRSDirectoryReader &reader = GetDirectoryReader();
+    LOG_INFO(Format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
+    irs::Scorers order = irs::Scorers::Prepare(scr.get());
+
+    irs::filter::prepared::ptr filter = flt->prepare({
+        .index = reader,
+        .scorers = order,
+    });
+
+    SizeT topn(DEFAULT_TOPN);
+    if (auto it = options.find("topn"); it != options.end()) {
+        topn = StrToInt(it->second);
+    }
+
+    SizeT doc_count(0);
+    sorted.reserve(topn);
+    for (auto left = topn; auto &segment : reader) {
+        auto docs = filter->execute(irs::ExecutionContext{.segment = segment, .scorers = order, .wand = wand});
+        IRS_ASSERT(docs);
+
+        const irs::document *doc = irs::get<irs::document>(*docs);
+        const irs::score *score = irs::get<irs::score>(*docs);
+        auto *threshold = irs::get_mutable<irs::score>(docs.get());
+        if (!left && threshold) {
+            IRS_ASSERT(!sorted.empty());
+            IRS_ASSERT(std::is_heap(std::begin(sorted),
+                                    std::end(sorted),
+                                    [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                        return lhs.first > rhs.first;
+                                    }));
+            threshold->Min(sorted.front().first);
+        }
+
+        for (float_t score_value; docs->next();) {
+            ++doc_count;
+            (*score)(&score_value);
+            if (left) {
+                sorted.emplace_back(score_value, doc->value);
+                if (0 == --left) {
+                    std::make_heap(std::begin(sorted),
+                                   std::end(sorted),
+                                   [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                       return lhs.first > rhs.first;
+                                   });
+                    threshold->Min(sorted.front().first);
+                }
+            } else if (sorted.front().first < score_value) {
+                std::pop_heap(std::begin(sorted),
+                              std::end(sorted),
+                              [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                  return lhs.first > rhs.first;
+                              });
+                auto &[score, doc_id] = sorted.back();
+                score = score_value;
+                doc_id = doc->value;
+                std::push_heap(std::begin(sorted),
+                               std::end(sorted),
+                               [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                   return lhs.first > rhs.first;
+                               });
+                threshold->Min(sorted.front().first);
+            }
+        }
+    }
+    std::sort(
+        std::begin(sorted),
+        std::end(sorted),
+        [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept { return lhs.first > rhs.first; });
+    return 0;
+}
 
 } // namespace infinity

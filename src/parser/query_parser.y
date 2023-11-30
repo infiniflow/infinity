@@ -89,7 +89,6 @@
 %type <int>                           opCompare rangeStart rangeEnd 
 %type <std::string>                   boundVal
 
-
 %locations
 
 %%
@@ -162,21 +161,25 @@ basic_filter_boost
 
 basic_filter
 : STRING {
-    std::istringstream iss($1);
-    std::string term;
-    std::vector<std::string> terms;
-    while (std::getline(iss, term, ' ')) {
-        terms.push_back(term);
+    std::string &field = driver.default_field;
+    if(field.empty()){
+        error(@1, "");
+        YYERROR;
     }
+    std::vector<std::string> terms;
+    driver.Analyze(field, $1, terms);
     if(terms.size()==1){
         auto query = std::make_unique<irs::by_term>();
         query->mutable_options()->term = toBstring(terms[0]);
+        *query->mutable_field() = field;
         $$ = std::move(query);
     } else {
-        auto query = std::make_unique<irs::by_phrase>();
-        auto* opts = query->mutable_options();
+        auto query = std::make_unique<irs::Or>();
         for(size_t i=0; i<terms.size(); i++){
-            opts->push_back<irs::by_term_options>().term = toBstring(terms[i]);
+            auto subquery = std::make_unique<irs::by_term>();
+            subquery->mutable_options()->term = toBstring(terms[i]);
+            *subquery->mutable_field() = field;
+            query->add(std::move(subquery));
         }
         $$ = std::move(query);
     }
@@ -185,24 +188,22 @@ basic_filter
 | regexExpr { $$ = std::move($1); }
 | fuzzyExpr { $$ = std::move($1); }
 | STRING OP_COLON STRING {
-    std::istringstream iss($3);
-    std::string term;
     std::vector<std::string> terms;
-    while (std::getline(iss, term, ' ')) {
-        terms.push_back(term);
-    }
+    driver.Analyze($1, $3, terms);
+    std::string &field = $1;
     if(terms.size()==1){
         auto query = std::make_unique<irs::by_term>();
         query->mutable_options()->term = toBstring(terms[0]);
-        *query->mutable_field() = $1;
+        *query->mutable_field() = field;
         $$ = std::move(query);
     } else {
-        auto query = std::make_unique<irs::by_phrase>();
-        auto* opts = query->mutable_options();
+        auto query = std::make_unique<irs::Or>();
         for(size_t i=0; i<terms.size(); i++){
-            opts->push_back<irs::by_term_options>().term = toBstring(terms[i]);
+            auto subquery = std::make_unique<irs::by_term>();
+            subquery->mutable_options()->term = toBstring(terms[i]);
+            *subquery->mutable_field() = field;
+            query->add(std::move(subquery));
         }
-        *query->mutable_field() = $1;
         $$ = std::move(query);
     }
 }

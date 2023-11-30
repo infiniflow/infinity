@@ -33,6 +33,7 @@
 #include "search/scorer_impl.hpp"
 #include "utils/math_utils.hpp"
 #include "utils/misc.hpp"
+#include "utils/options.hpp"
 #include "utils/rst/strings/str_cat.h"
 
 namespace irs {
@@ -78,6 +79,32 @@ struct BM25FieldCollector final : FieldCollector {
 // TODO(MBkkt) deduplicate with tfidf.cpp
 const auto kSQRT = irs::cache_func<uint32_t, 2048>(
   0, [](uint32_t i) noexcept { return std::sqrt(static_cast<float_t>(i)); });
+
+Scorer::ptr make_csv(std::string_view args) {
+    if (irs::IsNull(args)) {
+        // default args
+        return std::make_unique<irs::BM25>();
+    } else {
+        // default args
+        auto k = BM25::K();
+        auto b = BM25::B();
+
+        std::vector<std::pair<std::string, std::string>> options;
+        parse_options(args, ',', options);
+        for (auto &option : options) {
+            if (option.first == "k") {
+                k = std::stof(option.second);
+            } else if (option.first == "b") {
+                b = std::stof(option.second);
+            } else {
+                IRS_LOG_ERROR(rst::StrCat({"Unknown option '", option.first, "'"}));
+            }
+        }
+        return std::make_unique<BM25>(k, b);
+    }
+}
+
+REGISTER_SCORER_CSV(irs::BM25, make_csv);
 
 struct BM1Context : public irs::score_ctx {
   BM1Context(float_t k, irs::score_t boost, const BM25Stats& stats,

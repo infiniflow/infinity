@@ -21,7 +21,17 @@ import stl;
 namespace infinity {
 
 export {
+    // hidden columns' id
     constexpr SizeT COLUMN_IDENTIFIER_ROW_ID = (SizeT)(-1);
+    constexpr SizeT COLUMN_IDENTIFIER_CREATE = (SizeT)(-2);
+    constexpr SizeT COLUMN_IDENTIFIER_DELETE = (SizeT)(-3);
+    constexpr SizeT COLUMN_IDENTIFIER_SCORE = (SizeT)(-4);
+    constexpr SizeT COLUMN_IDENTIFIER_DISTANCE = (SizeT)(-5);
+    constexpr String COLUMN_NAME_ROW_ID = "__rowid";
+    constexpr String COLUMN_NAME_CREATE = "__create";
+    constexpr String COLUMN_NAME_DELETE = "__delete";
+    constexpr String COLUMN_NAME_SCORE = "__scroe";
+    constexpr String COLUMN_NAME_DISTANCE = "__distance";
 
     // type related constants
     constexpr i64 MAX_VARCHAR_SIZE = 65536;

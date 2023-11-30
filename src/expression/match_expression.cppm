@@ -12,17 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
-#include "expr/between_expr.h"
-#include "expr/case_expr.h"
-#include "expr/cast_expr.h"
-#include "expr/column_expr.h"
-#include "expr/constant_expr.h"
-#include "expr/function_expr.h"
-#include "expr/fusion_expr.h"
-#include "expr/in_expr.h"
-#include "expr/knn_expr.h"
-#include "expr/match_expr.h"
-#include "expr/search_expr.h"
-#include "expr/subquery_expr.h"
+import stl;
+import parser;
+import base_expression;
+
+export module match_expression;
+
+namespace infinity {
+
+export class MatchExpression : public BaseExpression {
+public:
+    MatchExpression(const String &fields, const String &matching_text, const String &options_text);
+
+    inline DataType Type() const override { return DataType(LogicalType::kFloat); }
+
+    String ToString() const override;
+
+public:
+    String fields_;
+    String matching_text_;
+    String options_text_;
+};
+
+} // namespace infinity

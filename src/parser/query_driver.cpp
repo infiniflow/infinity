@@ -23,7 +23,9 @@
 #include "search/boolean_filter.hpp"
 
 namespace infinity {
-QueryDriver::QueryDriver() {}
+QueryDriver::QueryDriver(const std::map<std::string, std::string> &field2analyzer_, const std::string &default_field_)
+    : field2analyzer(field2analyzer_), default_field(default_field_) {}
+
 QueryDriver::~QueryDriver() {}
 
 static std::pair<std::string, float> ParseField(const std::string_view &field) {
@@ -70,26 +72,17 @@ int QueryDriver::ParseSingleWithFields(const std::string &fields_str, const std:
         rc = ParseSingle(query);
         if (rc != 0)
             return rc;
-        PopulateDefaultField(fields[0].first, fields[0].second);
     } else {
         auto flt = std::make_unique<irs::Or>();
         for (auto &field_boost : fields) {
             rc = ParseSingle(query);
             if (rc != 0)
                 return rc;
-            PopulateDefaultField(field_boost.first, field_boost.second);
             flt->add(std::move(result));
         }
         result = std::move(flt);
     }
     return 0;
-}
-
-void QueryDriver::PopulateDefaultField(const std::string &default_field, float boost) {
-    assert(result != nullptr);
-    float new_boost = result->boost() * boost;
-    result->boost(new_boost);
-    result->PopulateDefaultFieldRecursive(default_field);
 }
 
 int QueryDriver::ParseStream(std::istream &ist) {
@@ -136,6 +129,20 @@ int QueryDriver::parse_helper(std::istream &stream) {
         return -1;
     }
     return 0;
+}
+
+void QueryDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) {
+    if (field.empty()) {
+        terms.push_back(text);
+        return;
+    }
+    auto it = field2analyzer.find(field);
+    if (it == field2analyzer.end()) {
+        terms.push_back(text);
+        return;
+    }
+    std::string &analyzer_name = it->second;
+    analyze_func_(analyzer_name, text, terms);
 }
 
 } // namespace infinity

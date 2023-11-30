@@ -35,6 +35,9 @@ import cast_expression;
 import case_expression;
 import function_expression;
 import value_expression;
+import fusion_expression;
+import search_expression;
+import match_expression;
 
 import function;
 import aggregate_function;
@@ -106,6 +109,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
         }
         case ParsedExprType::kKnn: {
             return BuildKnnExpr((const KnnExpr &)expr, bind_context_ptr, depth, root);
+        }
+        case ParsedExprType::kSearch: {
+            return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
         }
         default: {
             Error<PlannerException>("Unexpected expression type.");
@@ -417,6 +423,20 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
                                                                         arguments);
 
     return bound_knn_expr;
+}
+
+SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    Vector<SharedPtr<MatchExpression>> match_exprs;
+    Vector<SharedPtr<KnnExpression>> knn_exprs;
+    SharedPtr<FusionExpression> fusion_expr = nullptr;
+    for (MatchExpr *match_expr : expr.match_exprs_) {
+        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
+    }
+    // TODO: build KNN expressions
+    if (expr.fusion_expr_ != nullptr)
+        fusion_expr = MakeShared<FusionExpression>(expr.fusion_expr_->method_, expr.fusion_expr_->options_);
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, fusion_expr);
+    return bound_search_expr;
 }
 
 // Bind subquery expression.

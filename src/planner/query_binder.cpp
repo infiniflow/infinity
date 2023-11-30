@@ -54,6 +54,7 @@ import view_entry;
 import table_collection_type;
 import block_index;
 import cast_expression;
+import search_expression;
 import status;
 
 module query_binder;
@@ -146,7 +147,14 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
 
-    // 6. WHERE
+    // 6.1 SEARCH
+    if (statement.search_expr_ != nullptr) {
+        auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
+        SharedPtr<BaseExpression> search_expr = where_binder->Bind(*statement.search_expr_, this->bind_context_ptr_.get(), 0, true);
+        bound_select_statement->search_expr_ = dynamic_pointer_cast<SearchExpression>(search_expr);
+    }
+
+    // 6.2 WHERE
     if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);

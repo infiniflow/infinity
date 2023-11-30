@@ -25,9 +25,7 @@
 namespace irs {
 namespace {
 
-Scorer::ptr make_json(std::string_view /*args*/) {
-  return std::make_unique<BoostScore>();
-}
+Scorer::ptr make_csv(std::string_view /*args*/) { return std::make_unique<BoostScore>(); }
 
 struct volatile_boost_score_ctx final : score_ctx {
   volatile_boost_score_ctx(const filter_boost* volatile_boost,
@@ -60,6 +58,6 @@ ScoreFunction BoostScore::prepare_scorer(const ColumnProvider& /*segment*/,
     ScoreFunction::DefaultMin, volatile_boost, boost);
 }
 
-void BoostScore::init() { REGISTER_SCORER_JSON(BoostScore, make_json); }
+void BoostScore::init() { REGISTER_SCORER_CSV(BoostScore, make_csv); }
 
 }  // namespace irs

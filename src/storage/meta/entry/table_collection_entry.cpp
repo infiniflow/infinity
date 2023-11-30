@@ -15,6 +15,7 @@
 module;
 
 #include <iostream>
+#include <memory>
 #include <string>
 import stl;
 import parser;
@@ -41,6 +42,8 @@ import table_index_entry;
 import iresearch_datastore;
 import column_index_entry;
 import irs_index_entry;
+import index_base;
+import index_full_text;
 
 module table_collection_entry;
 
@@ -165,6 +168,34 @@ void TableCollectionEntry::RemoveIndexEntry(TableCollectionEntry *table_entry, c
 
     LOG_TRACE(Format("Remove index entry: {}", index_name));
     TableIndexMeta::DeleteNewEntry(table_index_meta, txn_id, txn_mgr);
+}
+
+void TableCollectionEntry::GetFullTextAnalyzers(TableCollectionEntry *table_entry,
+                                                u64 txn_id,
+                                                TxnTimeStamp begin_ts,
+                                                SharedPtr<IrsIndexEntry> &irs_index_entry,
+                                                Map<String, String> &column2analyzer) {
+    column2analyzer.clear();
+    BaseEntry *base_entry;
+    for (auto &[_, tableIndexMeta] : table_entry->index_meta_map_) {
+        if (TableIndexMeta::GetEntry(tableIndexMeta.get(), txn_id, begin_ts, base_entry).ok()) {
+            Assert<StorageException>(EntryType::kTableIndex == base_entry->entry_type_, "unexpected entry type under TableIndexMeta");
+            TableIndexEntry *table_index_entry = dynamic_cast<TableIndexEntry *>(base_entry);
+            irs_index_entry = table_index_entry->irs_index_entry_;
+            for (SharedPtr<IndexBase> &indexBase : table_index_entry->index_def_->index_array_) {
+                if (indexBase->index_type_ != IndexType::kIRSFullText)
+                    continue;
+                IndexFullText* index_full_text = static_cast<IndexFullText*>(indexBase.get());
+                for (auto &column_name : index_full_text->column_names_) {
+                    column2analyzer[column_name] = index_full_text->analyzer_;
+                }
+            }
+            if (!column2analyzer.empty()) {
+                // iresearch requires there is exactly one full index per table.
+                break;
+            }
+        }
+    }
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {

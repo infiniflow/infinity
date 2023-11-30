@@ -13,21 +13,24 @@
 // limitations under the License.
 
 #pragma once
+#include <map>
 #include <string>
 #include <utility>
-#include <vector>
 namespace infinity {
 
-class SearchParser {
+class SearchOptions {
 public:
-    static void ParseFields(const std::string &fields_str, std::vector<std::pair<std::string, float>> &fields);
-    static std::string FieldsToString(const std::vector<std::pair<std::string, float>> &fields);
-    static void ParseOptions(const std::string &options_str, std::vector<std::pair<std::string, std::string>> &options);
-    static std::string OptionsToString(const std::vector<std::pair<std::string, std::string>> &options);
+    explicit SearchOptions(const std::string &options_str);
+    virtual ~SearchOptions(){};
+    bool operator==(const SearchOptions &other) const;
+    bool operator!=(const SearchOptions &other) const { return !(*this == other); }
+
+    std::string ToString();
+    size_t size() const { return options_.size(); }
+    std::map<std::string, std::string> options_;
 
 private:
-    static std::pair<std::string, float> ParseField(const std::string_view &field);
-    static std::pair<std::string, std::string> ParseOption(const std::string_view &option);
+    std::pair<std::string, std::string> ParseOption(const std::string_view &option);
 };
 
 } // namespace infinity

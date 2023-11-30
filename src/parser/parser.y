@@ -1846,38 +1846,36 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    int rc = match_expr->SetFilter($3, $5);
+    match_expr->fields_ = std::string($3);
+    match_expr->matching_text_ = std::string($5);
     free($3);
     free($5);
-    if(rc!=0)
-        yyerror(&yyloc, scanner, result, "Invalid match_expr");
     $$ = match_expr;
 }
 | MATCH '(' STRING ',' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->SetOptions($7);
+    match_expr->fields_ = std::string($3);
+    match_expr->matching_text_ = std::string($5);
+    match_expr->options_text_ = std::string($7);
+    free($3);
+    free($5);
     free($7);
-    int rc = match_expr->SetFilter($3, $5);
-    if(rc!=0)
-        yyerror(&yyloc, scanner, result, "Invalid match_expr");
     $$ = match_expr;
 }
 
 query_expr : QUERY '(' STRING ')' {
-    infinity::QueryExpr* query_expr = new infinity::QueryExpr();
-    int rc = query_expr->SetFilter($3);
-    if(rc!=0)
-        yyerror(&yyloc, scanner, result, "Invalid query_expr");
-    $$ = query_expr;
+    infinity::MatchExpr* match_expr = new infinity::MatchExpr();
+    match_expr->matching_text_ = std::string($3);
+    free($3);
+    $$ = match_expr;
 }
 | QUERY '(' STRING ',' STRING ')' {
-    infinity::QueryExpr* query_expr = new infinity::QueryExpr();
-    query_expr->SetOptions($5);
+    infinity::MatchExpr* match_expr = new infinity::MatchExpr();
+    match_expr->matching_text_ = std::string($3);
+    match_expr->options_text_ = std::string($5);
+    free($3);
     free($5);
-    int rc = query_expr->SetFilter($3);
-    if(rc!=0)
-        yyerror(&yyloc, scanner, result, "Invalid query_expr");
-    $$ = query_expr;
+    $$ = match_expr;
 }
 
 fusion_expr : FUSION '(' STRING ',' STRING ')' {

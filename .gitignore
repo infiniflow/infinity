@@ -15,6 +15,7 @@
 # names with given extension
 *.a
 *.app
+*.autobak
 *.class
 *.d
 *.dll

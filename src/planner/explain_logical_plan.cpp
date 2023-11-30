@@ -44,6 +44,8 @@ import logical_show;
 import logical_export;
 import logical_import;
 import logical_create_index;
+import logical_match;
+import logical_fusion;
 
 import third_party;
 import parser;
@@ -175,6 +177,14 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kKnnScan: {
             Explain((LogicalKnnScan *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kMatch: {
+            Explain((LogicalMatch *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kFusion: {
+            Explain((LogicalFusion *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kViewScan:
@@ -1511,6 +1521,14 @@ void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vecto
     }
 
     result->emplace_back(MakeShared<String>(flush_header_str));
+}
+
+void ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+}
+
+void ExplainLogicalPlan::Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    result->emplace_back(MakeShared<String>(fusion_node->ToString(intent_size)));
 }
 
 } // namespace infinity

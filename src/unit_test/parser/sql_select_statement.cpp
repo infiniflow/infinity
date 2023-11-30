@@ -1782,41 +1782,24 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(select_statement->search_expr_->type_, ParsedExprType::kSearch);
     auto *search_expr = (SearchExpr *)(select_statement->search_expr_);
 
-    EXPECT_EQ(search_expr->match_exprs_.size(), 2);
+    EXPECT_EQ(search_expr->match_exprs_.size(), 4);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
     EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
     EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
-    EXPECT_EQ(match_expr0->options_.size(), 0);
+    EXPECT_EQ(match_expr0->options_text_.empty(), true);
     auto *match_expr1 = (MatchExpr *)(search_expr->match_exprs_[1]);
     EXPECT_EQ(match_expr1->fields_, String("name"));
     EXPECT_EQ(match_expr1->matching_text_, String("to the star"));
-    EXPECT_EQ(match_expr1->options_.size(), 3);
-    EXPECT_EQ(match_expr1->options_[0].first, String("operator"));
-    EXPECT_EQ(match_expr1->options_[0].second, String("OR"));
-    EXPECT_EQ(match_expr1->options_[1].first, String("fuzziness"));
-    EXPECT_EQ(match_expr1->options_[1].second, String("AUTO:1,5"));
-    EXPECT_EQ(match_expr1->options_[2].first, String("minimum_should_match"));
-    EXPECT_EQ(match_expr1->options_[2].second, String("1"));
 
-    auto *query_expr0 = (QueryExpr *)(search_expr->query_exprs_[0]);
-    EXPECT_EQ(query_expr0->query_text_, String("name:dune"));
-    EXPECT_EQ(query_expr0->options_.size(), 0);
-    auto *query_expr1 = (QueryExpr *)(search_expr->query_exprs_[1]);
-    EXPECT_EQ(query_expr1->query_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
-    EXPECT_EQ(query_expr1->options_.size(), 2);
-    EXPECT_EQ(query_expr1->options_[0].first, String("default_operator"));
-    EXPECT_EQ(query_expr1->options_[0].second, String("and"));
-    EXPECT_EQ(query_expr1->options_[1].first, String("default_field"));
-    EXPECT_EQ(query_expr1->options_[1].second, String("name"));
+    auto *query_expr0 = (MatchExpr *)(search_expr->match_exprs_[2]);
+    EXPECT_EQ(query_expr0->matching_text_, String("name:dune"));
+    EXPECT_EQ(query_expr0->options_text_.empty(), true);
+    auto *query_expr1 = (MatchExpr *)(search_expr->match_exprs_[3]);
+    EXPECT_EQ(query_expr1->matching_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
 
     EXPECT_NE(search_expr->fusion_expr_, nullptr);
     auto *fusion_expr = search_expr->fusion_expr_;
     EXPECT_EQ(fusion_expr->method_, String("rrf"));
-    EXPECT_EQ(fusion_expr->options_.size(), 2);
-    EXPECT_EQ(fusion_expr->options_[0].first, String("rank_constant"));
-    EXPECT_EQ(fusion_expr->options_[0].second, String("60"));
-    EXPECT_EQ(fusion_expr->options_[1].first, String("window_size"));
-    EXPECT_EQ(fusion_expr->options_[1].second, String("100"));
 
     EXPECT_NE(select_statement->where_expr_, nullptr);
     EXPECT_EQ(select_statement->where_expr_->type_, ParsedExprType::kFunction);

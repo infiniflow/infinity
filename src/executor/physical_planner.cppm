@@ -111,6 +111,9 @@ private:
     // Knn
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const;
+
     // Command
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const;
 

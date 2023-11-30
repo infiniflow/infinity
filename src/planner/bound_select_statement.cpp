@@ -50,6 +50,8 @@ import logical_show;
 import logical_export;
 import logical_import;
 import logical_dummy_scan;
+import logical_match;
+import logical_fusion;
 
 import subquery_unnest;
 
@@ -70,7 +72,7 @@ namespace infinity {
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    if (bind_context->knn_exprs_.empty()) {
+    if (search_expr_ == nullptr && bind_context->knn_exprs_.empty()) {
         // Non-knn case
         SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_, query_context, bind_context);
         if (!where_conditions_.empty()) {
@@ -121,8 +123,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         return root;
-
-    } else {
+    } else if (!bind_context->knn_exprs_.empty()) {
         SharedPtr<LogicalNode> root = nullptr;
 
         // Knn case
@@ -139,6 +140,39 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         knn_scan->filter_expression_ = filter_expr;
         root = knn_scan;
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        project->set_left_node(root);
+        root = project;
+
+        return root;
+    } else {
+        SharedPtr<LogicalNode> root = nullptr;
+        // FIXME: add KNN support here!
+        if (search_expr_->match_exprs_.empty()) {
+            Error<PlannerException>("SEARCH shall have at least one MATCH expression");
+        }
+        if (search_expr_->match_exprs_.size() >= 3) {
+            Error<PlannerException>("SEARCH shall have at max two MATCH expression");
+        }
+
+        Vector<SharedPtr<LogicalNode>> match_knn_nodes;
+        match_knn_nodes.reserve(search_expr_->match_exprs_.size());
+        for (auto &match_expr : search_expr_->match_exprs_) {
+            Assert<PlannerException>(table_ref_ptr_->type() == TableRefType::kTable, "Not base table reference");
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+            SharedPtr<LogicalNode> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
+            match_knn_nodes.push_back(matchNode);
+            root = matchNode;
+        }
+
+        if (search_expr_->fusion_expr_ != nullptr) {
+            SharedPtr<LogicalNode> fusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), search_expr_->fusion_expr_);
+            fusionNode->set_left_node(match_knn_nodes[0]);
+            if (match_knn_nodes.size() > 1)
+                fusionNode->set_right_node(match_knn_nodes[1]);
+            root = fusionNode;
+        }
 
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
         project->set_left_node(root);

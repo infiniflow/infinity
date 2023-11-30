@@ -54,6 +54,10 @@ export enum class LogicalNodeType : u8 {
     kDropSchema,
     kDropView,
 
+    // Search
+    kFusion,
+    kMatch,
+
     // Scan
     kTableScan,
     kViewScan,
@@ -67,5 +71,4 @@ export enum class LogicalNodeType : u8 {
     kPrepare,
     kFlush,
 };
-
 }

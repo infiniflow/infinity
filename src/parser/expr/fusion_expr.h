@@ -11,17 +11,20 @@
  * QUERY('dune god', 'default_operator=and;default_field=name');
  */
 #include "expr.h"
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace infinity {
 
+class SearchOptions;
+
 class FusionExpr : public ParsedExpr {
 public:
-    explicit FusionExpr() : ParsedExpr(ParsedExprType::kFusion) {}
+    explicit FusionExpr();
 
-    ~FusionExpr() override{};
+    ~FusionExpr() override;
 
     [[nodiscard]] std::string ToString() const override;
 
@@ -29,7 +32,7 @@ public:
 
 public:
     std::string method_;
-    std::vector<std::pair<std::string, std::string>> options_;
+    std::shared_ptr<SearchOptions> options_;
 };
 
 } // namespace infinity

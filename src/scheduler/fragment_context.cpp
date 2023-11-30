@@ -268,6 +268,14 @@ void MakeTaskState(UniquePtr<OperatorState> &operator_state,
             MakeTaskStateTemplate<ShowOperatorState>(operator_state, physical_ops[operator_id]);
             break;
         }
+        case PhysicalOperatorType::kMatch: {
+            MakeTaskStateTemplate<MatchOperatorState>(operator_state, physical_ops[operator_id]);
+            break;
+        }
+        case PhysicalOperatorType::kFusion: {
+            MakeTaskStateTemplate<FusionOperatorState>(operator_state, physical_ops[operator_id]);
+            break;
+        }
         case PhysicalOperatorType::kUnionAll:
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
@@ -537,6 +545,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kMergeKnn:
         case PhysicalOperatorType::kProjection: {
             // Serial Materialize
@@ -612,7 +621,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn: {
+        case PhysicalOperatorType::kMergeKnn:
+        case PhysicalOperatorType::kFusion: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should be serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -686,7 +696,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:
         case PhysicalOperatorType::kExplain:
-        case PhysicalOperatorType::kShow: {
+        case PhysicalOperatorType::kShow:
+        case PhysicalOperatorType::kMatch: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -753,6 +764,12 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             MaterializeSinkState *sink_state_ptr = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
             sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
             sink_state_ptr->column_names_ = last_operator->GetOutputNames();
+            break;
+        }
+        case PhysicalOperatorType::kMatch: {
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>();
+            }
             break;
         }
         case PhysicalOperatorType::kKnnScan: {

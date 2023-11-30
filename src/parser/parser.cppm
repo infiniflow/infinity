@@ -14,6 +14,7 @@
 module;
 
 #include "query_driver.h"
+#include "search_options.h"
 #include "sql_parser.h"
 #include "type/info/array_info.h"
 #include "type/number/float16.h"
@@ -23,6 +24,7 @@ export module parser;
 namespace infinity {
 
 export using IrsFilter = irs::filter;
+export using SearchOptions = SearchOptions;
 export using QueryDriver = QueryDriver;
 
 export using SQLParser = SQLParser;

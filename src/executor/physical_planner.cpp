@@ -70,6 +70,8 @@ import physical_union_all;
 import physical_update;
 import physical_drop_index;
 import physical_command;
+import physical_match;
+import physical_fusion;
 
 import logical_node;
 import logical_node_type;
@@ -102,6 +104,8 @@ import logical_dummy_scan;
 import logical_explain;
 import logical_drop_index;
 import logical_command;
+import logical_match;
+import logical_fusion;
 
 import parser;
 import explain_physical_plan;
@@ -187,6 +191,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             // Scan
         case LogicalNodeType::kShow: {
             result = BuildShow(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kMatch: {
+            result = BuildMatch(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kFusion: {
+            result = BuildFusion(logical_operator);
             break;
         }
         case LogicalNodeType::kTableScan: {
@@ -589,6 +601,25 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<Logi
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalFlush *logical_flush = (LogicalFlush *)(logical_operator.get());
     return MakeUnique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalMatch> logical_match = static_pointer_cast<LogicalMatch>(logical_operator);
+    return MakeUnique<PhysicalMatch>(logical_match->node_id(), logical_match->base_table_ref_->table_entry_ptr_, logical_match->match_expr_);
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalFusion> logical_fusion = static_pointer_cast<LogicalFusion>(logical_operator);
+    UniquePtr<PhysicalOperator> left_phy = nullptr, right_phy = nullptr;
+    auto left_logical_node = logical_operator->left_node();
+    if (left_logical_node != nullptr) {
+        left_phy = BuildPhysicalOperator(left_logical_node);
+    }
+    auto right_logical_node = logical_operator->right_node();
+    if (right_logical_node != nullptr) {
+        right_phy = BuildPhysicalOperator(right_logical_node);
+    }
+    return MakeUnique<PhysicalFusion>(logical_fusion->node_id(), Move(left_phy), Move(right_phy), logical_fusion->fusion_expr_);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
