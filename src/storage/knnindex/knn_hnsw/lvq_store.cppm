@@ -14,13 +14,13 @@
 
 module;
 
-#include "storage/knnindex/header.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <limits>
 #include <new>
 #include <type_traits>
+#include <xmmintrin.h>
 
 import stl;
 import hnsw_common;
@@ -31,40 +31,39 @@ export module lvq_store;
 
 namespace infinity {
 
-export template <typename DataT, typename CompressT>
+export template <typename DataType, typename CompressType, LVQCacheConcept<DataType, CompressType> LVQCache>
 class LVQStore {
 public:
     // Compress type must be i8 temporarily
-    static_assert(std::is_same<CompressT, i8>());
+    static_assert(std::is_same<CompressType, i8>());
 
-    using This = LVQStore<DataT, CompressT>;
+    using This = LVQStore<DataType, CompressType, LVQCache>;
     using InitArgs = Pair<SizeT, bool>; // first is buffer size, second is whether to make padding
-    using DataType = DataT;
     class LVQData;
-    using RtnType = LVQData;
-    class QueryCtx;
-    using QueryCtxType = QueryCtx;
+    using StoreType = LVQData;
+    struct QueryLVQ;
+    using QueryType = QueryLVQ;
 
     static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
     static constexpr SizeT PADDING_SIZE = 32;
 
 private:
-    using MeanType = double;
+    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
 
     // Decompress: Q = scale * C + bias + Mean
-    using ScalarType = DataT; // type for scale and bias
-    using Const1Type = DataT; // for l2 distance, const1 = scale * scale * Norm2Sq
-    using Const2Type = DataT; // const2 = scale * Norm1
+    using ScalarType = DataType; // type for scale and bias
 
-    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressT>::max() - std::numeric_limits<CompressT>::min(); // 255 for i8
+    using LocalCacheType = LVQCache::LocalCacheType;
+    using GlobalCacheType = LVQCache::GlobalCacheType;
+
     // mean vector is in front
-    constexpr static SizeT mean_offset_ = 0;
+    constexpr static SizeT global_cache_offset_ = 0;
+    constexpr static SizeT mean_offset_ = AlignTo(global_cache_offset_ + sizeof(GlobalCacheType), sizeof(MeanType));
     // struct for every compress data
     constexpr static SizeT scale_offset_ = 0;
     constexpr static SizeT bias_offset_ = AlignTo(scale_offset_ + sizeof(ScalarType), sizeof(ScalarType));
-    constexpr static SizeT const1_offset_ = AlignTo(bias_offset_ + sizeof(ScalarType), sizeof(Const1Type));
-    constexpr static SizeT const2_offset_ = AlignTo(const1_offset_ + sizeof(Const1Type), sizeof(Const2Type));
-    constexpr static SizeT compress_vec_offset_ = AlignTo(const2_offset_ + sizeof(Const2Type), sizeof(CompressT));
+    constexpr static SizeT local_cache_offset_ = AlignTo(bias_offset_ + sizeof(ScalarType), sizeof(LocalCacheType));
+    constexpr static SizeT compress_vec_offset_ = AlignTo(local_cache_offset_ + sizeof(LocalCacheType), sizeof(CompressType));
 
     DataStoreMeta meta_;
 
@@ -77,53 +76,50 @@ private:
     PlainStore<DataType> plain_data_;
 
 private:
+    constexpr GlobalCacheType *GetGlobalCacheMut() { return reinterpret_cast<GlobalCacheType *>(ptr_ + global_cache_offset_); }
     constexpr MeanType *GetMeanMut() { return reinterpret_cast<MeanType *>(ptr_ + mean_offset_); }
 
-    const char *GetCompressData(SizeT vec_i) const { return ptr_ + compress_data_offset_ + compress_data_size_ * vec_i; }
-    char *GetCompressDataMut(SizeT vec_i) { return ptr_ + compress_data_offset_ + compress_data_size_ * vec_i; }
-
-    class LVQDataMut {
-        char *const ptr_;
-
-    public:
-        LVQDataMut(char *c) : ptr_(c) {}
-        Pair<ScalarType *, ScalarType *> GetScalarMut() {
-            return {reinterpret_cast<ScalarType *>(ptr_ + scale_offset_), reinterpret_cast<ScalarType *>(ptr_ + bias_offset_)};
-        }
-        Pair<Const1Type *, Const2Type *> GetConstantMut() {
-            return {reinterpret_cast<Const1Type *>(ptr_ + const1_offset_), reinterpret_cast<Const2Type *>(ptr_ + const2_offset_)};
-        }
-        CompressT *GetCompressVecMut() { return reinterpret_cast<CompressT *>(ptr_ + compress_vec_offset_); }
-    };
+    LVQData GetLVQData(SizeT vec_i) const { return LVQData(ptr_ + compress_data_offset_ + compress_data_size_ * vec_i); }
 
 public:
+    constexpr const GlobalCacheType GetGlobalCache() const { return *reinterpret_cast<const GlobalCacheType *>(ptr_ + global_cache_offset_); }
     constexpr const MeanType *GetMean() const { return reinterpret_cast<const MeanType *>(ptr_ + mean_offset_); }
+
+    struct QueryLVQ {
+        const UniquePtr<char[]> ptr_;
+    };
 
     class LVQData {
         friend This;
-        const char *const ptr_;
+        char *const ptr_;
+
+        Pair<ScalarType *, ScalarType *> GetScalarMut() const {
+            return {reinterpret_cast<ScalarType *>(ptr_ + scale_offset_), reinterpret_cast<ScalarType *>(ptr_ + bias_offset_)};
+        }
+        LocalCacheType *GetLocalCacheMut() const { return reinterpret_cast<LocalCacheType *>(ptr_ + local_cache_offset_); }
+        CompressType *GetCompressVecMut() const { return reinterpret_cast<CompressType *>(ptr_ + compress_vec_offset_); }
 
     public:
-        LVQData(const char *c) : ptr_(c) {}
+        LVQData(char *c) : ptr_(c) {}
+
+        LVQData(const QueryLVQ &query) : ptr_(query.ptr_.get()) {}
+
         Pair<ScalarType, ScalarType> GetScalar() const {
             return {*reinterpret_cast<const ScalarType *>(ptr_ + scale_offset_), *reinterpret_cast<const ScalarType *>(ptr_ + bias_offset_)};
         }
-        Pair<Const1Type, Const2Type> GetConstant() const {
-            return {*reinterpret_cast<const Const1Type *>(ptr_ + const1_offset_), *reinterpret_cast<const Const2Type *>(ptr_ + const2_offset_)};
-        }
-        const CompressT *GetCompressVec() const { return reinterpret_cast<const CompressT *>(ptr_ + compress_vec_offset_); }
+        LocalCacheType GetLocalCache() const { return *reinterpret_cast<const LocalCacheType *>(ptr_ + local_cache_offset_); }
+        const CompressType *GetCompressVec() const { return reinterpret_cast<const CompressType *>(ptr_ + compress_vec_offset_); }
     };
 
     SizeT cur_vec_num() const { return meta_.cur_vec_num() + plain_data_.cur_vec_num(); }
     SizeT max_vec_num() const { return meta_.max_vec_num_; }
     SizeT dim() const { return meta_.dim_; }
-    static SizeT err_idx() { return DataStoreMeta::ERR_IDX; }
 
 private:
     LVQStore(DataStoreMeta meta, This::InitArgs init_args)
         : meta_(Move(meta)),                                                                                                                  //
-          compress_data_offset_(AlignTo(dim() * sizeof(MeanType), init_args.second ? PADDING_SIZE : 1)),                                      //
-          compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressT) * dim(), init_args.second ? PADDING_SIZE : 1)),                //
+          compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), init_args.second ? PADDING_SIZE : 1)),                       //
+          compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), init_args.second ? PADDING_SIZE : 1)),             //
           ptr_(new(std::align_val_t(init_args.second ? PADDING_SIZE : 8)) char[compress_data_offset_ + compress_data_size_ * max_vec_num()]), //
           buffer_plain_size_(init_args.first),                                                                                                //
           plain_data_(PlainStore<DataType>::Make(0, dim()))                                                                                   //
@@ -133,16 +129,16 @@ private:
     }
 
 public:
-    static LVQStore Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
-        DataStoreMeta data_store(max_vec_num, dim);
-        return LVQStore(Move(data_store), Move(init_args));
+    static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
+        DataStoreMeta meta(max_vec_num, dim);
+        return This(Move(meta), Move(init_args));
     }
 
-    LVQStore(const LVQStore &) = delete;
-    LVQStore &operator=(const LVQStore &) = delete;
-    LVQStore &operator=(LVQStore &&other) = delete;
+    LVQStore(const This &) = delete;
+    LVQStore &operator=(const This &) = delete;
+    LVQStore &operator=(This &&other) = delete;
 
-    LVQStore(LVQStore &&other)
+    LVQStore(This &&other)
         : meta_(Move(other.meta_)),                         //
           compress_data_offset_(other.compress_data_size_), //
           compress_data_size_(other.compress_data_offset_), //
@@ -159,23 +155,35 @@ public:
         }
     }
 
+    void Save(FileHandler &file_handler) {
+        Compress();
+        meta_.Save(file_handler);
+        file_handler.Write(ptr_, compress_data_offset_ + compress_data_size_ * cur_vec_num());
+    }
+
+    static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
+        DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
+        auto ret = This(Move(meta), Move(init_args));
+        file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
+        return ret;
+    }
+
 private:
     // the caller is responsible for allocate the `result`
     void Decompress(SizeT vec_i, DataType *result) const {
         const MeanType *mean = GetMean();
         LVQData lvq = GetVec(vec_i);
-        const CompressT *compress_vec = lvq.GetCompressVec();
+        const CompressType *compress_vec = lvq.GetCompressVec();
         auto [scale, bias] = lvq.GetScalar();
         for (SizeT j = 0; j < dim(); ++j) {
             result[j] = scale * compress_vec[j] + bias + mean[j];
         }
     }
 
-    void CompressVec(const DataType *vec, LVQDataMut &lvq) const {
+    void CompressVec(const DataType *vec, const LVQData &lvq) const {
         const MeanType *mean = GetMean();
         auto [scale_p, bias_p] = lvq.GetScalarMut();
-        auto [constant1_p, constant2_p] = lvq.GetConstantMut();
-        CompressT *tgt = lvq.GetCompressVecMut();
+        CompressType *compress = lvq.GetCompressVecMut();
 
         ScalarType lower = std::numeric_limits<ScalarType>::max();
         ScalarType upper = -std::numeric_limits<ScalarType>::max();
@@ -185,31 +193,26 @@ private:
             upper = std::max(upper, x);
         }
         ScalarType scale = (upper - lower) / max_bucket_idx_;
-        ScalarType bias = lower - std::numeric_limits<CompressT>::min() * scale;
-        i64 norm1 = 0;
-        i64 norm2 = 0;
+        ScalarType bias = lower - std::numeric_limits<CompressType>::min() * scale;
         if (scale == 0) {
-            std::fill(tgt, tgt + dim(), 0);
+            std::fill(compress, compress + dim(), 0);
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                assert(c <= std::numeric_limits<CompressT>::max() && c >= std::numeric_limits<CompressT>::min());
-                tgt[j] = c;
-                norm1 += c;
-                norm2 += c * c;
+                assert(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min());
+                compress[j] = c;
             }
         }
         *bias_p = bias;
         *scale_p = scale;
-        *constant1_p = norm1 * scale;
-        *constant2_p = norm2 * scale * scale;
+        *lvq.GetLocalCacheMut() = LVQCache::MakeLocalCache(compress, scale, dim(), mean);
     }
 
     SizeT MergeCompress(const DataType *vecs, SizeT vec_num) {
         SizeT compress_n = meta_.cur_vec_num();
         if (auto ret = meta_.AllocateVec(vec_num + plain_data_.cur_vec_num()); ret > max_vec_num()) {
-            return err_idx();
+            return ERR_IDX;
         }
         auto decompress_vecs = MakeUnique<DataType[]>(dim() * compress_n);
         for (SizeT vec_i = 0; vec_i < compress_n; ++vec_i) {
@@ -236,18 +239,16 @@ private:
         }
 
         for (SizeT vec_i = 0; vec_i < compress_n; ++vec_i) {
-            LVQDataMut lvq(GetCompressDataMut(vec_i));
-            CompressVec(decompress_vecs.get() + vec_i * dim(), lvq);
+            CompressVec(decompress_vecs.get() + vec_i * dim(), GetLVQData(vec_i));
         }
         for (SizeT vec_i = compress_n; vec_i < compress_n + plain_data_.cur_vec_num(); ++vec_i) {
-            LVQDataMut lvq(GetCompressDataMut(vec_i));
-            CompressVec(plain_data_.GetVec(vec_i - compress_n), lvq);
+            CompressVec(plain_data_.GetVec(vec_i - compress_n), GetLVQData(vec_i));
         }
         SizeT start_idx = compress_n + plain_data_.cur_vec_num();
         for (SizeT vec_i = start_idx; vec_i < start_idx + vec_num; ++vec_i) {
-            LVQDataMut lvq(GetCompressDataMut(vec_i));
-            CompressVec(vecs + (vec_i - start_idx) * dim(), lvq);
+            CompressVec(vecs + (vec_i - start_idx) * dim(), GetLVQData(vec_i));
         }
+        *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
         plain_data_ = PlainStore<DataType>::Make(Min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
         return start_idx;
     }
@@ -259,44 +260,13 @@ public:
         } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != DataStoreMeta::ERR_IDX) {
             return idx;
         } else {
-            return err_idx();
+            return ERR_IDX;
         }
     }
 
-    RtnType GetVec(SizeT vec_i) const {
+    StoreType GetVec(SizeT vec_i) const {
         assert(vec_i < meta_.cur_vec_num()); // must call compress before get vec
-        return LVQData(GetCompressData(vec_i));
-    }
-
-    struct QueryCtx {
-        const char *compress_query_;
-    };
-
-    QueryCtx MakeCtx(const DataType *vecs) const {
-        char *compress_query_ = new (std::align_val_t(PADDING_SIZE)) char[compress_vec_offset_ + sizeof(CompressT) * dim()];
-        LVQDataMut lvq(compress_query_);
-        CompressVec(vecs, lvq);
-        return QueryCtx{compress_query_};
-    }
-
-    RtnType GetVec(const QueryCtx &query_ctx) const { return LVQData(query_ctx.compress_query_); }
-
-    void Compress() {
-        SizeT ret = MergeCompress(nullptr, 0);
-        assert(ret != DataStoreMeta::ERR_IDX);
-    }
-
-    void Save(FileHandler &file_handler) {
-        Compress();
-        meta_.Save(file_handler);
-        file_handler.Write(ptr_, compress_data_offset_ + compress_data_size_ * cur_vec_num());
-    }
-
-    static LVQStore Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
-        DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
-        LVQStore ret(Move(meta), Move(init_args));
-        file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
-        return ret;
+        return GetLVQData(vec_i);
     }
 
     void Prefetch(SizeT vec_i) const {
@@ -305,6 +275,17 @@ public:
         } else {
             plain_data_.Prefetch(vec_i - meta_.cur_vec_num());
         }
+    }
+
+    QueryType MakeQuery(const DataType *vec) const {
+        auto ptr = MakeUnique<char[]>(compress_data_size_);
+        CompressVec(vec, LVQData(ptr.get()));
+        return QueryType{Move(ptr)};
+    }
+
+    void Compress() {
+        SizeT ret = MergeCompress(nullptr, 0);
+        assert(ret != DataStoreMeta::ERR_IDX);
     }
 };
 

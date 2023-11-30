@@ -13,10 +13,9 @@
 // limitations under the License.
 
 module;
-
 #include <algorithm>
 #include <cassert>
-#include "storage/knnindex/header.h"
+#include <xmmintrin.h>
 
 import stl;
 import file_system;
@@ -26,20 +25,17 @@ export module plain_store;
 
 namespace infinity {
 
-export template <typename T>
+export template <typename DataType>
 class PlainStore {
 public:
-    using This = PlainStore<T>;
+    using This = PlainStore<DataType>;
     using InitArgs = std::tuple<>;
-    using DataType = T;
-    using RtnType = const T *;
-    using QueryCtx = const T *;
-
-    static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
+    using StoreType = const DataType *;
+    using QueryType = StoreType;
 
 private:
-    DataStoreMeta base_;
-    const UniquePtr<T[]> ptr_;
+    DataStoreMeta meta_;
+    const UniquePtr<DataType[]> ptr_;
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs = {}) {
@@ -47,53 +43,51 @@ public:
         return This(Move(data_store));
     }
 
-    PlainStore(DataStoreMeta base) : base_(Move(base)), ptr_(MakeUnique<T[]>(base_.max_vec_num_ * base_.dim_)) {}
+    PlainStore(DataStoreMeta meta) : meta_(Move(meta)), ptr_(MakeUnique<DataType[]>(meta_.max_vec_num_ * meta_.dim_)) {}
 
-    PlainStore(PlainStore &&other) : base_(Move(other.base_)), ptr_(Move(const_cast<UniquePtr<T[]> &>(other.ptr_))) {}
-    PlainStore &operator=(PlainStore &&other) {
-        base_ = Move(other.base_);
-        const_cast<UniquePtr<T[]> &>(ptr_) = Move(const_cast<UniquePtr<T[]> &>(other.ptr_));
+    PlainStore(This &&other) : meta_(Move(other.meta_)), ptr_(Move(const_cast<UniquePtr<DataType[]> &>(other.ptr_))) {}
+    PlainStore &operator=(This &&other) {
+        meta_ = Move(other.meta_);
+        const_cast<UniquePtr<DataType[]> &>(ptr_) = Move(const_cast<UniquePtr<DataType[]> &>(other.ptr_));
         return *this;
     }
 
     ~PlainStore() = default;
 
-    SizeT cur_vec_num() const { return base_.cur_vec_num(); }
-    SizeT max_vec_num() const { return base_.max_vec_num_; }
-    SizeT dim() const { return base_.dim_; }
+    void Save(FileHandler &file_handler) const {
+        meta_.Save(file_handler);
+        file_handler.Write(ptr_.get(), sizeof(DataType) * cur_vec_num() * dim());
+    }
 
-    static SizeT err_idx() { return DataStoreMeta::ERR_IDX; }
+    static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs = {}) {
+        DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
+        This ret(Move(meta));
+        file_handler.Read(ret.ptr_.get(), sizeof(DataType) * ret.cur_vec_num() * ret.dim());
+        return ret;
+    }
+
+public:
+    static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
+    SizeT cur_vec_num() const { return meta_.cur_vec_num(); }
+    SizeT max_vec_num() const { return meta_.max_vec_num_; }
+    SizeT dim() const { return meta_.dim_; }
 
 public:
     SizeT AddVec(const DataType *vecs, SizeT vec_num) {
-        SizeT new_idx = base_.AllocateVec(vec_num);
-        if (new_idx != err_idx()) {
-            T *ptr = ptr_.get() + new_idx * dim();
+        SizeT new_idx = meta_.AllocateVec(vec_num);
+        if (new_idx != ERR_IDX) {
+            DataType *ptr = ptr_.get() + new_idx * dim();
             std::copy(vecs, vecs + vec_num * dim(), ptr);
         }
         return new_idx;
     }
 
-    RtnType GetVec(SizeT vec_i) const {
+    StoreType GetVec(SizeT vec_i) const {
         assert(vec_i < cur_vec_num());
         return ptr_.get() + vec_i * dim();
     }
 
-    QueryCtx MakeCtx(const DataType *vecs) const { return vecs; }
-
-    RtnType GetVec(const QueryCtx &ctx) const { return ctx; }
-
-    void Save(FileHandler &file_handler) const {
-        base_.Save(file_handler);
-        file_handler.Write(ptr_.get(), sizeof(T) * cur_vec_num() * dim());
-    }
-
-    static PlainStore Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs = {}) {
-        DataStoreMeta data_store = DataStoreMeta::Load(file_handler, max_vec_num);
-        PlainStore ret(Move(data_store));
-        file_handler.Read(ret.ptr_.get(), sizeof(T) * ret.cur_vec_num() * ret.dim());
-        return ret;
-    }
+    QueryType MakeQuery(const DataType *vec) const { return vec; }
 
     void Prefetch(SizeT vec_i) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i)), _MM_HINT_T0); }
 };

@@ -8,17 +8,17 @@
 import stl;
 import hnsw_alg;
 import hnsw_profiler;
-import dist_func_l2;
 import local_file_system;
 import file_system_type;
 import file_system;
 import plain_store;
 import lvq_store;
-import dist_func_l2_2;
+import dist_func_l2;
+import dist_func_ip;
 
-static const char *base_file = "/home/shenyushi/Documents/data/gist/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/gist/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/gist/groundtruth.ivecs";
+static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
+static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/ip_groundtruth.ivecs";
 
 using namespace infinity;
 
@@ -26,26 +26,32 @@ int main() {
     LocalFileSystem fs;
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
-    size_t dimension = 960;
+    size_t dimension = 128;
     size_t M = 16;
     size_t ef_construction = 200;
     size_t embedding_count = 1000000;
     size_t test_top = 100;
-    const int thread_n = 8;
+    const int thread_n = 1;
 
     using LabelT = uint64_t;
 
-    // using HNSW = KnnHnsw<float, LabelT, PlainStore<float>>;
+    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
     // std::tuple<> init_args = {};
-    // FloatL2Space space(dimension);
-    // std::string save_place = save_dir + "/my_gist_plain.hnsw";
+    // std::string save_place = save_dir + "/my_sift_plain_l2.hnsw";
 
-    using HNSW = KnnHnsw<float, LabelT, LVQStore<float, int8_t>>;
+    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    // Pair<SizeT, bool> init_args = {0, true};
+    // std::string save_place = save_dir + "/my_sift_lvq8_l2.hnsw";
+
+    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
+    // std::tuple<> init_args = {};
+    // std::string save_place = save_dir + "/my_sift_plain_ip.hnsw";
+
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
     Pair<SizeT, bool> init_args = {0, true};
-    FloatLVQ8L2Space space(dimension);
-    std::string save_place = save_dir + "/my_gist_lvq8.hnsw";
+    std::string save_place = save_dir + "/my_sift_lvq8_ip.hnsw";
 
-    std::unique_ptr<HNSW> knn_hnsw = nullptr;
+    std::unique_ptr<Hnsw> knn_hnsw = nullptr;
 
     std::ifstream f(save_place);
     if (!f.good()) {
@@ -57,7 +63,7 @@ int main() {
         assert(dimension == dim || !"embedding dimension isn't correct");
         assert(embedding_count == eb_cnt || !"embedding size isn't correct");
 
-        knn_hnsw = HNSW::Make(embedding_count, dimension, space, M, ef_construction, init_args);
+        knn_hnsw = Hnsw::Make(embedding_count, dimension, M, ef_construction, init_args);
 
         infinity::BaseProfiler profiler;
         std::cout << "Begin memory cost: " << get_current_rss() << "B" << std::endl;
@@ -85,7 +91,7 @@ int main() {
 
         uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kWriteLock);
-        knn_hnsw->SaveIndex(*file_handler);
+        knn_hnsw->Save(*file_handler);
         file_handler->Close();
     } else {
         std::cout << "Load index from " << save_place << std::endl;
@@ -93,7 +99,7 @@ int main() {
         uint8_t file_flags = FileFlags::READ_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kReadLock);
 
-        knn_hnsw = HNSW::LoadIndex(*file_handler, space, init_args);
+        knn_hnsw = Hnsw::Load(*file_handler, init_args);
     }
 
     size_t number_of_queries;
@@ -168,7 +174,7 @@ int main() {
             sum_time += profiler.ElapsedToMs();
         }
         sum_time /= round;
-        printf("ef = %d, Spend: %dms\n", ef, sum_time);
+        printf("ef = %d, Spend: %d\n", ef, sum_time);
 
         std::cout << "----------------------------" << std::endl;
     }

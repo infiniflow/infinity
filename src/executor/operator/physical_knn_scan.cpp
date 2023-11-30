@@ -242,7 +242,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             }
             case IndexType::kHnsw: {
                 BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
-                auto index = static_cast<const KnnHnsw<DataType, u64, PlainStore<DataType>> *>(index_handle.GetData());
+                // auto index = static_cast<const KnnHnsw<DataType, u64, PlainStore<DataType>> *>(index_handle.GetData());
 
                 Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
                 Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);

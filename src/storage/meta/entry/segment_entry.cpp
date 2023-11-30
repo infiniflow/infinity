@@ -49,7 +49,6 @@ import column_index_entry;
 import index_base;
 
 import hnsw_alg;
-import dist_func;
 
 import plain_store;
 
@@ -226,7 +225,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
             BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
             switch (embedding_info->Type()) {
                 case kElemFloat: {
-                    auto hnsw_index = static_cast<KnnHnsw<float, u64, PlainStore<f32>> *>(buffer_handle.GetDataMut());
+                    // auto hnsw_index = static_cast<KnnHnsw<float, u64, PlainStore<f32>> *>(buffer_handle.GetDataMut());
                     u32 segment_offset = 0;
                     for (const auto &block_entry : segment_entry->block_entries_) {
                         auto block_column_entry = block_entry->columns_[column_id].get();

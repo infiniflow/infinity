@@ -20,13 +20,14 @@ import lvq_store;
 import local_file_system;
 import file_system;
 import file_system_type;
+import dist_func_l2;
 
 using namespace infinity;
 
 class HnswLVQTest : public BaseTest {
 public:
-    using LVQ8Store = LVQStore<float, int8_t>;
-    using LVQ8Data = LVQ8Store::RtnType;
+    using LVQ8Store = LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>;
+    using LVQ8Data = LVQ8Store::StoreType;
 
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 20;
@@ -91,7 +92,7 @@ TEST_F(HnswLVQTest, test1) {
     {
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
         auto ret = lvq_store.AddVec(data.get(), vec_n_);
-        EXPECT_NE(ret, LVQ8Store::err_idx());
+        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         CheckStore(lvq_store, data.get());
     }
 
@@ -99,11 +100,11 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-        EXPECT_NE(ret, LVQ8Store::err_idx());
+        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         idx += vec_n_ / 2;
 
         ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-        EXPECT_NE(ret, LVQ8Store::err_idx());
+        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         CheckStore(lvq_store, data.get());
     }
 
@@ -111,16 +112,16 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-        EXPECT_NE(ret, LVQ8Store::err_idx());
+        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         idx += vec_n_ / 2;
 
         for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
             ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
-            EXPECT_NE(ret, LVQ8Store::err_idx());
+            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
             ++idx;
         }
         ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-        EXPECT_NE(ret, LVQ8Store::err_idx());
+        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
 
         CheckStore(lvq_store, data.get());
     }
@@ -136,7 +137,7 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_NE(ret, LVQ8Store::err_idx());
+            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
             idx += vec_n_ / 2;
 
             lvq_store.Save(*file_handler);
@@ -162,12 +163,12 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_NE(ret, LVQ8Store::err_idx());
+            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
             idx += vec_n_ / 2;
 
             for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
                 ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
-                EXPECT_NE(ret, LVQ8Store::err_idx());
+                EXPECT_NE(ret, LVQ8Store::ERR_IDX);
                 ++idx;
             }
             lvq_store.Save(*file_handler);
@@ -179,7 +180,7 @@ TEST_F(HnswLVQTest, test1) {
             LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, {buffer_size_, true});
 
             auto ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-            EXPECT_NE(ret, LVQ8Store::err_idx());
+            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
 
             CheckStore(lvq_store, data.get());
         }

@@ -26,21 +26,44 @@ export module hnsw_common;
 namespace infinity {
 export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
 
-export template <typename Store, typename DataType>
-concept DataStoreConcept = requires(Store s) {
-    { std::same_as<typename Store::DataType, DataType> };
-    { s.AddVec(std::declval<const typename Store::DataType *>(), std::declval<SizeT>()) } -> std::same_as<SizeT>;
-    { s.GetVec(std::declval<SizeT>()) } -> std::same_as<typename Store::RtnType>;
-    { s.MakeCtx(std::declval<const typename Store::DataType *>()) } -> std::same_as<typename Store::QueryCtx>;
-    { s.GetVec(std::declval<const typename Store::QueryCtx &>()) } -> std::same_as<typename Store::RtnType>;
-    { Store::ERR_IDX };
+export using MeanType = double;
+
+export template <typename Distance, typename DataType>
+concept DistanceConcept = requires(Distance d) {
+    { Distance((SizeT)0) };
+
+    {
+        d(std::declval<const typename Distance::StoreType &>(),
+          std::declval<const typename Distance::StoreType &>(),
+          std::declval<const typename Distance::DataStore &>())
+    } -> std::same_as<DataType>;
+};
+
+export template <typename LVQCache, typename DataType, typename CompressType>
+concept LVQCacheConcept = requires(LVQCache) {
+    {
+        LVQCache::MakeLocalCache(std::declval<const CompressType *>(), std::declval<DataType>(), (SizeT)0, std::declval<const MeanType *>())
+    } -> std::same_as<typename LVQCache::LocalCacheType>;
+
+    { LVQCache::MakeGlobalCache(std::declval<const MeanType *>(), (SizeT)0) } -> std::same_as<typename LVQCache::GlobalCacheType>;
+};
+
+export template <typename DataStore, typename DataType>
+concept DataStoreConcept = requires(DataStore s, SizeT idx) {
+    { DataStore::Make((SizeT)0, (SizeT)0, std::declval<typename DataStore::InitArgs>()) } -> std::same_as<DataStore>;
+    { s.Save(std::declval<FileHandler &>()) };
+    { DataStore::Load(std::declval<FileHandler &>(), (SizeT)0, std::declval<typename DataStore::InitArgs>()) } -> std::same_as<DataStore>;
+
+    { DataStore::ERR_IDX };
     { s.cur_vec_num() } -> std::same_as<SizeT>;
     { s.dim() } -> std::same_as<SizeT>;
     { s.max_vec_num() } -> std::same_as<SizeT>;
-    { s.Save(std::declval<FileHandler &>()) };
-    { Store::Load(std::declval<FileHandler &>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
-    { Store::Make(std::declval<SizeT>(), std::declval<SizeT>(), std::declval<typename Store::InitArgs>()) } -> std::same_as<Store>;
-    { s.Prefetch(std::declval<SizeT>()) };
+
+    { s.AddVec((const DataType *)nullptr, (SizeT)0) } -> std::same_as<SizeT>;
+    { s.GetVec((SizeT)0) } -> std::same_as<typename DataStore::StoreType>;
+    { s.Prefetch((SizeT)0) };
+    { s.MakeQuery((const DataType *)nullptr) } -> std::same_as<typename DataStore::QueryType>;
+    { typename DataStore::StoreType(std::declval<const typename DataStore::QueryType &>()) };
 };
 
 export class DataStoreMeta {
@@ -101,5 +124,4 @@ public:
 export using VertexType = i32;
 export using VertexListSize = i32;
 export using LayerSize = i32;
-
 } // namespace infinity

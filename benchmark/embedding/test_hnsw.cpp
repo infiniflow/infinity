@@ -4,8 +4,6 @@
 #include <queue>
 #include <random>
 
-import dist_func;
-import dist_func_l2_2;
 import hnsw_alg;
 import file_system;
 import file_system_type;
@@ -13,6 +11,7 @@ import local_file_system;
 import file_system_type;
 import plain_store;
 import lvq_store;
+import dist_func_l2;
 
 using namespace infinity;
 
@@ -20,16 +19,16 @@ int main() {
     using LabelT = uint64_t;
     using RetHeap = std::priority_queue<std::pair<float, LabelT>>;
 
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>>;
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t>>;
-
-    std::default_random_engine rng;
-    std::uniform_real_distribution<float> distrib_real;
-
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
     int dim = 128;
-    int element_size = 1000;
+    int element_size = 100000;
+
+    using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
+    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+
+    std::default_random_engine rng;
+    std::uniform_real_distribution<float> distrib_real;
 
     auto data = std::make_unique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
@@ -41,11 +40,8 @@ int main() {
     int M = 16;
     int ef_construction = 200;
 
-    // FloatL2Space space(dim);
-    FloatLVQ8L2Space space(dim);
-
     {
-        auto hnsw_index = Hnsw::Make(element_size, dim, space, M, ef_construction, {});
+        auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
 
         if (false) {
             for (int i = 0; i < element_size; ++i) {
@@ -63,9 +59,9 @@ int main() {
         }
 
         // hnsw_index->Dump(std::cout);
-        hnsw_index->Check();
+        // hnsw_index->Check();
 
-        hnsw_index->SetEf(ef_construction);
+        hnsw_index->SetEf(10);
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
@@ -78,7 +74,7 @@ int main() {
 
         uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kWriteLock);
-        hnsw_index->SaveIndex(*file_handler);
+        hnsw_index->Save(*file_handler);
         file_handler->Close();
     }
 
@@ -86,9 +82,11 @@ int main() {
         uint8_t file_flags = FileFlags::READ_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kReadLock);
 
-        auto hnsw_index = Hnsw::LoadIndex(*file_handler, space, {});
+        auto hnsw_index = Hnsw::Load(*file_handler, {});
+        hnsw_index->SetEf(10);
+
         // hnsw_index->Dump(std::cout);
-        hnsw_index->Check();
+        // hnsw_index->Check();
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;

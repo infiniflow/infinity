@@ -14,12 +14,11 @@
 
 module;
 
-#include "storage/knnindex/header.h"
+#include "header.h"
 #include <iostream>
 #include <random>
 
 import stl;
-import dist_func;
 import file_system;
 import file_system_type;
 import infinity_exception;
@@ -34,11 +33,13 @@ export module hnsw_alg;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType, DataStoreConcept<DataType> DataStore>
+export template <typename DataType, typename LabelType, typename DataStore, typename Distance>
+    requires DataStoreConcept<DataStore, DataType> && DistanceConcept<Distance, DataType> && std::same_as<typename Distance::DataStore, DataStore>
 class KnnHnsw {
 public:
-    using This = KnnHnsw<DataType, LabelType, DataStore>;
-    using DataRtnType = typename DataStore::RtnType;
+    using This = KnnHnsw<DataType, LabelType, DataStore, Distance>;
+    using StoreType = typename DataStore::StoreType;
+
     using PDV = Pair<DataType, VertexType>;
     using CMP = CompareByFirst<DataType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
@@ -46,19 +47,12 @@ public:
     constexpr static int prefetch_offset_ = 0;
     constexpr static int prefetch_step_ = 2;
 
-    struct QueryCtx {
-        typename DataStore::QueryCtx datastore_ctx_;
-    };
-
-    QueryCtx MakeQueryCtx(const DataType *query) const { return QueryCtx{.datastore_ctx_ = data_store_.MakeCtx(query)}; }
-
 private:
     const SizeT M_;
     const SizeT Mmax_;
     const SizeT Mmax0_;
     const SizeT ef_construction_;
     SizeT ef_;
-    const DistFunc<DataType, DataRtnType> dist_func2_;
 
     // 1 / log(1.0 * M_)
     const double mult_;
@@ -66,24 +60,25 @@ private:
 
     DataStore data_store_;
     GraphStore graph_store_;
+    Distance distance_;
     const UniquePtr<LabelType[]> labels_;
 
 private:
-    KnnHnsw(const SpaceBase<DataType, DataRtnType> &space,
-            SizeT M,
+    KnnHnsw(SizeT M,
             SizeT Mmax,
             SizeT Mmax0,
             SizeT ef_construction,
             DataStore data_store,
             GraphStore graph_store,
+            Distance distance,
             UniquePtr<LabelType[]> labels,
             SizeT ef,
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
-          dist_func2_(space.DistFuncPtr()),                                              //
           mult_(1 / std::log(1.0 * M_)),                                                 //
           data_store_(Move(data_store)),                                                 //
           graph_store_(Move(graph_store)),                                               //
+          distance_(Move(distance)),                                                     //
           labels_(Move(labels)) {
         if (ef == 0) {
             ef = ef_construction_;
@@ -95,13 +90,21 @@ private:
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {M, 2 * M}; }
 
 public:
-    static UniquePtr<This>
-    Make(SizeT max_vertex, SizeT dim, const SpaceBase<DataType, DataRtnType> &space, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
+    static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
         auto [Mmax, Mmax0] = This::GetMmax(M);
-        DataStore data_store = DataStore::Make(max_vertex, dim, args);
-        GraphStore graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
-        return UniquePtr<This>(
-            new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), MakeUnique<LabelType[]>(max_vertex), 0, 0));
+        auto data_store = DataStore::Make(max_vertex, dim, Move(args));
+        auto graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
+        Distance distance(data_store.dim());
+        return UniquePtr<This>(new This(M,
+                                        Mmax,
+                                        Mmax0,
+                                        ef_construction,
+                                        Move(data_store),
+                                        Move(graph_store),
+                                        Move(distance),
+                                        MakeUnique<LabelType[]>(max_vertex),
+                                        0,
+                                        0));
     }
 
     ~KnnHnsw() = default;
@@ -126,12 +129,12 @@ private:
 public:
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     // return value is a max heap of distance
-    DistHeap SearchLayer(VertexType enter_point, const DataRtnType &query, i32 layer_idx, SizeT candidate_n) const {
+    DistHeap SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT candidate_n) const {
         DistHeap result;
         DistHeap candidate;
 
         data_store_.Prefetch(enter_point);
-        DataType dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
+        DataType dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
         SizeT cal_num = 1;
 
         candidate.emplace(-dist, enter_point);
@@ -161,7 +164,7 @@ public:
                     }
                     prefetch_start -= prefetch_step_;
                 }
-                dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
+                dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
                 ++cal_num;
                 if (dist < result.top().first || result.size() < candidate_n) {
                     candidate.emplace(-dist, n_idx);
@@ -175,9 +178,9 @@ public:
         return result;
     }
 
-    VertexType SearchLayerNearest(VertexType enter_point, const DataRtnType &query, i32 layer_idx) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
-        DataType cur_dist = dist_func2_(query, data_store_.GetVec(enter_point), data_store_.dim());
+        DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_);
         SizeT cal_num = 1;
         bool check = true;
         while (check) {
@@ -185,7 +188,7 @@ public:
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                DataType n_dist = dist_func2_(query, data_store_.GetVec(n_idx), data_store_.dim());
+                DataType n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
                 ++cal_num;
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
@@ -199,8 +202,6 @@ public:
 
     // DistHeap is the min heap whose key is the minus distance to query
     // result distance is increasing
-    // TODO:: write directly into query's neighbors
-
     void SelectNeighborsHeuristic(DistHeap &candidates, SizeT M, VertexType *result_p, VertexListSize *result_size_p) const {
         VertexListSize result_size = 0;
         if (SizeT c_size = candidates.size(); c_size < M) {
@@ -211,11 +212,11 @@ public:
         } else {
             while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
                 const auto &[minus_c_dist, c_idx] = candidates.top();
-                auto c_data = data_store_.GetVec(c_idx);
+                StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;
                 for (SizeT i = 0; i < result_size; ++i) {
                     VertexType r_idx = result_p[i];
-                    DataType cr_dist = dist_func2_(c_data, data_store_.GetVec(r_idx), data_store_.dim());
+                    DataType cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_);
                     if (cr_dist < -minus_c_dist) {
                         check = false;
                         break;
@@ -241,14 +242,14 @@ public:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            auto n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = dist_func2_(n_data, data_store_.GetVec(vertex_i), data_store_.dim());
+            StoreType n_data = data_store_.GetVec(n_idx);
+            DataType n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_);
 
             Vector<PDV> tmp;
             tmp.reserve(n_neighbor_size + 1);
             tmp.emplace_back(-n_dist, vertex_i);
             for (int i = 0; i < n_neighbor_size; ++i) {
-                tmp.emplace_back(-dist_func2_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_.dim()), n_neighbors_p[i]);
+                tmp.emplace_back(-distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_), n_neighbors_p[i]);
             }
 
             DistHeap candidates(tmp.begin(), tmp.end());
@@ -261,7 +262,7 @@ public:
     void Insert(const DataType *queries, const LabelType *label, SizeT insert_n) {
         VertexType vertex_i1 = StoreData(queries, label, insert_n);
         for (SizeT i = 0; i < insert_n; ++i) {
-            DataRtnType query = data_store_.GetVec(vertex_i1 + i);
+            StoreType query = data_store_.GetVec(vertex_i1 + i);
             i32 q_layer = GenerateRandomLayer();
             i32 max_layer = graph_store_.max_layer();
             VertexType ep = graph_store_.enterpoint();
@@ -290,8 +291,8 @@ public:
         }
     }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const QueryCtx &ctx, SizeT k) const {
-        DataRtnType query = data_store_.GetVec(ctx.datastore_ctx_);
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
+        auto query = data_store_.MakeQuery(q);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest(ep, query, cur_layer);
@@ -312,7 +313,7 @@ public:
 public:
     void SetEf(SizeT ef) { ef_ = ef; }
 
-    void SaveIndex(FileHandler &file_handler) {
+    void Save(FileHandler &file_handler) {
         file_handler.Write(&M_, sizeof(M_));
         file_handler.Write(&ef_construction_, sizeof(ef_construction_));
         data_store_.Save(file_handler);
@@ -320,17 +321,20 @@ public:
         file_handler.Write(labels_.get(), sizeof(LabelType) * data_store_.cur_vec_num());
     }
 
-    static UniquePtr<This> LoadIndex(FileHandler &file_handler, const SpaceBase<DataType, DataRtnType> &space, DataStore::InitArgs args) {
+    static UniquePtr<This> Load(FileHandler &file_handler, DataStore::InitArgs args) {
         SizeT M;
         file_handler.Read(&M, sizeof(M));
         SizeT ef_construction;
         file_handler.Read(&ef_construction, sizeof(ef_construction));
         auto [Mmax, Mmax0] = This::GetMmax(M);
+
         auto data_store = DataStore::Load(file_handler, 0, args);
         auto graph_store = GraphStore::LoadGraph(file_handler, data_store.max_vec_num(), Mmax, Mmax0, data_store.cur_vec_num());
+        Distance distance(data_store.dim());
+
         auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
         file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
-        return UniquePtr<This>(new This(space, M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), Move(labels), 0, 0));
+        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), Move(distance), Move(labels), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

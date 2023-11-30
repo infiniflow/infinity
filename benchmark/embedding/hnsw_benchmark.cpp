@@ -12,15 +12,15 @@
 #include <iostream>
 #include <thread>
 
-static const char *base_file = "/home/shenyushi/Documents/data/gist/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/gist/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/gist/groundtruth.ivecs";
+static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
+static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
+static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/ip_groundtruth.ivecs";
 
 using namespace infinity;
 
 auto main() -> int {
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
-    std::string hnsw_index_l2_name = save_dir + "/the_gist.hnsw";
+    std::string hnsw_index_l2_name = save_dir + "/the_sift_ip.hnsw";
     size_t dimension;
     size_t embedding_count;
     size_t M = 16;
@@ -34,21 +34,22 @@ auto main() -> int {
         profiler.Begin();
         input_embeddings = fvecs_read(base_file, &dimension, &embedding_count);
         profiler.End();
-        std::cout << "Load gist1M base data: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load sift1M base data: " << profiler.ElapsedToString() << std::endl;
     }
 
     // assert(dimension == 128 || !"embedding dimension isn't 128");
     // assert(embedding_count == 1000000 || !"embedding size isn't 1000000");
-    hnswlib::L2Space l2space(dimension);
+    // hnswlib::L2Space space(dimension);
+    hnswlib::InnerProductSpace space(dimension);
     hnswlib::HierarchicalNSW<float> *hnsw_index = nullptr;
 
     std::ifstream f(hnsw_index_l2_name);
     if (f.good()) {
         // Found index file
         std::cout << "Found index file ... " << std::endl;
-        hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, hnsw_index_l2_name);
+        hnsw_index = new hnswlib::HierarchicalNSW<float>(&space, hnsw_index_l2_name);
     } else {
-        hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
+        hnsw_index = new hnswlib::HierarchicalNSW<float>(&space, max_elements, M, ef_construction);
 
         infinity::BaseProfiler profiler;
         profiler.Begin();
@@ -73,7 +74,7 @@ auto main() -> int {
         queries = fvecs_read(query_file, &dim, &number_of_queries);
         assert(dimension == dim || !"query does not have same dimension as train set");
         profiler.End();
-        std::cout << "Load gist1M query data: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load sift1M query data: " << profiler.ElapsedToString() << std::endl;
     }
 
     size_t top_k;                                           // nb of results per query in the GT
@@ -95,7 +96,7 @@ auto main() -> int {
         }
         delete[] gt_int;
         profiler.End();
-        std::cout << "Load gist1M ground truth and load row id: " << profiler.ElapsedToString() << std::endl;
+        std::cout << "Load sift1M ground truth and load row id: " << profiler.ElapsedToString() << std::endl;
     }
 
     infinity::BaseProfiler profiler;
@@ -142,7 +143,7 @@ auto main() -> int {
             sum_time += profiler.ElapsedToMs();
         }
         sum_time /= round;
-        printf("ef = %d, Spend: %dms\n", ef, sum_time);
+        printf("ef = %d, Spend: %d\n", ef, sum_time);
 
         std::cout << "----------------------------" << std::endl;
     }

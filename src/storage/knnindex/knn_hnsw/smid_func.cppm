@@ -18,16 +18,15 @@ module;
 #include <cassert>
 #include <iostream>
 
-import stl;
-import dist_func;
-import lvq_store;
+// #define USE_AVX512
 
-export module dist_func_l2_2;
+import stl;
+
+export module hnsw_simd_func;
 
 namespace infinity {
 
-using LVQ8 = LVQStore<float, int8_t>::RtnType;
-
+// for debug
 template <typename T>
 void log_m256(const __m256i &value) {
     const size_t n = sizeof(__m256i) / sizeof(T);
@@ -71,6 +70,7 @@ export int32_t I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 }
 #endif
 
+#if defined(USE_AVX)
 export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim32 = dim >> 5;
     const int8_t *pend1 = pv1 + (dim32 << 5);
@@ -100,69 +100,34 @@ export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     // Extract the result
     return _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
 }
-
-export float L2Sqr3(LVQ8 v1, LVQ8 v2, SizeT dim) {
-    int32_t c1c2_ip = I8IPAVX(v1.GetCompressVec(), v2.GetCompressVec(), dim);
-    auto [scale1, bias1] = v1.GetScalar();
-    auto [scale2, bias2] = v2.GetScalar();
-    auto beta = bias1 - bias2;
-    auto [norm1_scale_1, norm2sq_scalesq_1] = v1.GetConstant();
-    auto [norm1_scale_2, norm2sq_scalesq_2] = v2.GetConstant();
-    double dist = norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
-                  2 * beta * norm1_scale_2;
-
-    return dist;
-}
-
-#if defined(USE_AVX512)
-export float L2Sqr4(LVQ8 v1, LVQ8 v2, SizeT dim) {
-    int32_t c1c2_ip = I8IPAVX512(v1.GetCompressVec(), v2.GetCompressVec(), dim);
-    auto [scale1, bias1] = v1.GetScalar();
-    auto [scale2, bias2] = v2.GetScalar();
-    auto beta = bias1 - bias2;
-    auto [norm1_scale_1, norm2sq_scalesq_1] = v1.GetConstant();
-    auto [norm1_scale_2, norm2sq_scalesq_2] = v2.GetConstant();
-    double dist = norm2sq_scalesq_1 + norm2sq_scalesq_2 + beta * beta * dim - 2 * scale1 * scale2 * c1c2_ip + 2 * beta * norm1_scale_1 -
-                  2 * beta * norm1_scale_2;
-
-    return dist;
-}
 #endif
 
-export class FloatLVQ8L2Space : public SpaceBase<float, LVQ8> {
-public:
-    FloatLVQ8L2Space(SizeT dim) {
-        // assert(dim <= 256);
-
-#if defined(USE_AVX512)
-        assert(dim % 64 == 0);
-        this->fstdistfunc_ = L2Sqr4;
-#else
-        assert(dim % 32 == 0);
-        this->fstdistfunc_ = L2Sqr3;
-#endif
+export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    int32_t res = 0;
+    for (size_t i = 0; i < dim; i++) {
+        res += (int16_t)(pv1[i]) * pv2[i];
     }
-};
+    return res;
+}
 
 //------------------------------//------------------------------//------------------------------
 
 #if defined(USE_AVX512)
 
-// Favor using AVX512 if available.
-static float FloatL2AVX512(const float *pVect1, const float *pVect2, size_t qty) {
+export float F32L2AVX512(const float *pv1, const float *pv2, size_t dim) {
     float PORTABLE_ALIGN64 TmpRes[16];
-    size_t qty16 = qty >> 4;
+    size_t dim16 = dim >> 4;
 
-    const float *pEnd1 = pVect1 + (qty16 << 4);
+    const float *pEnd1 = pv1 + (dim16 << 4);
 
     __m512 diff, v1, v2;
     __m512 sum = _mm512_set1_ps(0);
 
-    while (pVect1 < pEnd1) {
-        v1 = _mm512_loadu_ps(pVect1);FloatL2AVX
-        pVect1 += 16;
-        v2 = _mm512_loadu_ps(pVect2);
-        pVect2 += 16;
+    while (pv1 < pEnd1) {
+        v1 = _mm512_loadu_ps(pv1);
+        pv1 += 16;
+        v2 = _mm512_loadu_ps(pv2);
+        pv2 += 16;
         diff = _mm512_sub_ps(v1, v2);
         // sum = _mm512_fmadd_ps(diff, diff, sum);
         sum = _mm512_add_ps(sum, _mm512_mul_ps(diff, diff));
@@ -174,14 +139,16 @@ static float FloatL2AVX512(const float *pVect1, const float *pVect2, size_t qty)
 
     return (res);
 }
+
 #endif
 
-static float FloatL2AVX(const float *pVect1, const float *pVect2, size_t qty) {
-    float PORTABLE_ALIGN32 TmpRes[8];
-    size_t qty16 = qty >> 4;
+#if defined(USE_AVX)
 
-    const float *pEnd1 = pVect1 + (qty16 << 4);
-    const float *pv1 = pVect1, *pv2 = pVect2;
+export float F32L2AVX(const float *pv1, const float *pv2, size_t dim) {
+    float PORTABLE_ALIGN32 TmpRes[8];
+    size_t dim16 = dim >> 4;
+
+    const float *pEnd1 = pv1 + (dim16 << 4);
 
     __m256 diff, v1, v2;
     __m256 sum = _mm256_set1_ps(0);
@@ -206,17 +173,89 @@ static float FloatL2AVX(const float *pVect1, const float *pVect2, size_t qty) {
     return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7];
 }
 
-export class FloatL2Space : public SpaceBase<float, const float *> {
-public:
-    FloatL2Space(SizeT dim) {
-#if defined(USE_AVX512)
-        assert(dim % 16 == 0);
-        this->fstdistfunc_ = FloatL2AVX512;
-#else
-        assert(dim % 16 == 0);
-        this->fstdistfunc_ = FloatL2AVX;
 #endif
+
+export float F32L2BF(const float *pv1, const float *pv2, size_t dim) {
+    float res = 0;
+    for (size_t i = 0; i < dim; i++) {
+        float t = pv1[i] - pv2[i];
+        res += t * t;
     }
-};
+    return res;
+}
+
+//------------------------------//------------------------------//------------------------------
+#if defined(USE_AVX512)
+
+export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
+    float PORTABLE_ALIGN64 TmpRes[16];
+
+    size_t qty16 = qty / 16;
+
+    const float *pEnd1 = pVect1 + 16 * qty16;
+
+    __m512 sum512 = _mm512_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        //_mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
+
+        __m512 v1 = _mm512_loadu_ps(pVect1);
+        pVect1 += 16;
+        __m512 v2 = _mm512_loadu_ps(pVect2);
+        pVect2 += 16;
+        sum512 = _mm512_add_ps(sum512, _mm512_mul_ps(v1, v2));
+    }
+
+    _mm512_store_ps(TmpRes, sum512);
+    float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7] + TmpRes[8] + TmpRes[9] + TmpRes[10] +
+                TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + pVect2v TmpRes[15];
+
+    return sum;
+}
+
+#endif
+
+#if defined(USE_AVX)
+
+export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
+    float PORTABLE_ALIGN32 TmpRes[8];
+
+    size_t qty16 = qty / 16;
+
+    const float *pEnd1 = pVect1 + 16 * qty16;
+
+    __m256 sum256 = _mm256_set1_ps(0);
+
+    while (pVect1 < pEnd1) {
+        //_mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
+
+        __m256 v1 = _mm256_loadu_ps(pVect1);
+        pVect1 += 8;
+        __m256 v2 = _mm256_loadu_ps(pVect2);
+        pVect2 += 8;
+        sum256 = _mm256_add_ps(sum256, _mm256_mul_ps(v1, v2));
+
+        v1 = _mm256_loadu_ps(pVect1);
+        pVect1 += 8;
+        v2 = _mm256_loadu_ps(pVect2);
+        pVect2 += 8;
+        sum256 = _mm256_add_ps(sum256, _mm256_mul_ps(v1, v2));
+    }
+
+    _mm256_store_ps(TmpRes, sum256);
+    float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7];
+
+    return sum;
+}
+
+#endif
+
+export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
+    float res = 0;
+    for (size_t i = 0; i < dim; i++) {
+        res += pv1[i] * pv2[i];
+    }
+    return res;
+}
 
 } // namespace infinity
