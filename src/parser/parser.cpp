@@ -5161,8 +5161,8 @@ yyreduce:
 #line 1847 "parser.y"
                                              {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->fields_ = *(yyvsp[-3].str_value);
-    match_expr->matching_text_ = *(yyvsp[-1].str_value);
+    match_expr->fields_ = std::string((yyvsp[-3].str_value));
+    match_expr->matching_text_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-3].str_value));
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_expr;
@@ -5174,9 +5174,9 @@ yyreduce:
 #line 1855 "parser.y"
                                              {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->fields_ = *(yyvsp[-5].str_value);
-    match_expr->matching_text_ = *(yyvsp[-3].str_value);
-    match_expr->options_text_ = *(yyvsp[-1].str_value);
+    match_expr->fields_ = std::string((yyvsp[-5].str_value));
+    match_expr->matching_text_ = std::string((yyvsp[-3].str_value));
+    match_expr->options_text_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-5].str_value));
     free((yyvsp[-3].str_value));
     free((yyvsp[-1].str_value));
@@ -5189,7 +5189,7 @@ yyreduce:
 #line 1866 "parser.y"
                                   {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->matching_text_ = *(yyvsp[-1].str_value);
+    match_expr->matching_text_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_expr;
 }
@@ -5200,8 +5200,8 @@ yyreduce:
 #line 1872 "parser.y"
                                   {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->matching_text_ = *(yyvsp[-3].str_value);
-    match_expr->options_text_ = *(yyvsp[-1].str_value);
+    match_expr->matching_text_ = std::string((yyvsp[-3].str_value));
+    match_expr->options_text_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-3].str_value));
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_expr;

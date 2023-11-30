@@ -1782,7 +1782,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(select_statement->search_expr_->type_, ParsedExprType::kSearch);
     auto *search_expr = (SearchExpr *)(select_statement->search_expr_);
 
-    EXPECT_EQ(search_expr->match_exprs_.size(), 2);
+    EXPECT_EQ(search_expr->match_exprs_.size(), 4);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
     EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
     EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));

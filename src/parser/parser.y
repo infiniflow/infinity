@@ -1846,17 +1846,17 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->fields_ = *$3;
-    match_expr->matching_text_ = *$5;
+    match_expr->fields_ = std::string($3);
+    match_expr->matching_text_ = std::string($5);
     free($3);
     free($5);
     $$ = match_expr;
 }
 | MATCH '(' STRING ',' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->fields_ = *$3;
-    match_expr->matching_text_ = *$5;
-    match_expr->options_text_ = *$7;
+    match_expr->fields_ = std::string($3);
+    match_expr->matching_text_ = std::string($5);
+    match_expr->options_text_ = std::string($7);
     free($3);
     free($5);
     free($7);
@@ -1865,14 +1865,14 @@ match_expr : MATCH '(' STRING ',' STRING ')' {
 
 query_expr : QUERY '(' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->matching_text_ = *$3;
+    match_expr->matching_text_ = std::string($3);
     free($3);
     $$ = match_expr;
 }
 | QUERY '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
-    match_expr->matching_text_ = *$3;
-    match_expr->options_text_ = *$5;
+    match_expr->matching_text_ = std::string($3);
+    match_expr->options_text_ = std::string($5);
     free($3);
     free($5);
     $$ = match_expr;
