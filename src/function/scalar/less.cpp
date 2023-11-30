@@ -37,7 +37,7 @@ struct LessFunction {
 };
 
 template <>
-inline void LessFunction::Run(VarcharT left, VarcharT right, bool &result) {
+inline void LessFunction::Run(VarcharT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: varchar < varchar");
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {
@@ -58,7 +58,7 @@ inline void LessFunction::Run(VarcharT left, VarcharT right, bool &result) {
 }
 
 template <>
-inline void LessFunction::Run(MixedT left, BigIntT right, bool &result) {
+inline void LessFunction::Run(MixedT, BigIntT, bool &) {
     Error<NotImplementException>("Not implement: mixed < bigint");
 }
 
@@ -68,7 +68,7 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void LessFunction::Run(MixedT left, DoubleT right, bool &result) {
+inline void LessFunction::Run(MixedT, DoubleT, bool &) {
     Error<NotImplementException>("Not implement: mixed < double");
 }
 
@@ -78,7 +78,7 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void LessFunction::Run(MixedT left, VarcharT right, bool &result) {
+inline void LessFunction::Run(MixedT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: mixed < varchar");
 }
 

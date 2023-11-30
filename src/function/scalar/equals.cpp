@@ -58,7 +58,7 @@ inline void EqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
 }
 
 template <>
-inline void EqualsFunction::Run(MixedT left, BigIntT right, bool &result) {
+inline void EqualsFunction::Run(MixedT, BigIntT, bool &) {
     Error<NotImplementException>("Not implement: mixed == bigint");
 }
 
@@ -68,7 +68,7 @@ inline void EqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void EqualsFunction::Run(MixedT left, DoubleT right, bool &result) {
+inline void EqualsFunction::Run(MixedT, DoubleT, bool &) {
     Error<NotImplementException>("Not implement: mixed == double");
 }
 
@@ -78,7 +78,7 @@ inline void EqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void EqualsFunction::Run(MixedT left, VarcharT right, bool &result) {
+inline void EqualsFunction::Run(MixedT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: mixed == varchar");
 }
 

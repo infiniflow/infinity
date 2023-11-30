@@ -37,7 +37,7 @@ struct GreaterEqualsFunction {
 };
 
 template <>
-inline void GreaterEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
+inline void GreaterEqualsFunction::Run(VarcharT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: varchar >= varchar");
 
 //    if (left.IsInlined()) {
@@ -59,7 +59,7 @@ inline void GreaterEqualsFunction::Run(VarcharT left, VarcharT right, bool &resu
 }
 
 template <>
-inline void GreaterEqualsFunction::Run(MixedT left, BigIntT right, bool &result) {
+inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
     Error<NotImplementException>("Not implement: mixed >= bigint");
 }
 
@@ -69,7 +69,7 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 }
 
 template <>
-inline void GreaterEqualsFunction::Run(MixedT left, DoubleT right, bool &result) {
+inline void GreaterEqualsFunction::Run(MixedT, DoubleT, bool &) {
     Error<NotImplementException>("Not implement: mixed >= double");
 }
 
@@ -79,7 +79,7 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 }
 
 template <>
-inline void GreaterEqualsFunction::Run(MixedT left, VarcharT right, bool &result) {
+inline void GreaterEqualsFunction::Run(MixedT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: mixed >= varchar");
 }
 

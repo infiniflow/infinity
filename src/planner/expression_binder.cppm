@@ -53,7 +53,7 @@ public:
 
     virtual SharedPtr<BaseExpression> BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
-    virtual void CheckFuncType(FunctionType func_type) const {}
+    virtual void CheckFuncType(FunctionType) const {}
 
     virtual SharedPtr<BaseExpression> BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 

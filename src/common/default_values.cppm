@@ -30,7 +30,7 @@ export {
     constexpr String COLUMN_NAME_ROW_ID = "__rowid";
     constexpr String COLUMN_NAME_CREATE = "__create";
     constexpr String COLUMN_NAME_DELETE = "__delete";
-    constexpr String COLUMN_NAME_SCORE = "__scroe";
+    constexpr String COLUMN_NAME_SCORE = "__score";
     constexpr String COLUMN_NAME_DISTANCE = "__distance";
 
     // type related constants

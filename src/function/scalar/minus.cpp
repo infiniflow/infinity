@@ -40,13 +40,13 @@ struct MinusFunction {
 };
 
 template <>
-inline bool MinusFunction::Run(HugeIntT value, HugeIntT &result) {
+inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 template <>
-inline bool MinusFunction::Run(DecimalT value, DecimalT &result) {
+inline bool MinusFunction::Run(DecimalT, DecimalT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }

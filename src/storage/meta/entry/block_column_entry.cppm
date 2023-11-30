@@ -74,7 +74,7 @@ public:
         Vector<String> outline_paths;
 
         if (outline_info_.get() != nullptr) {
-            for (int i = 0; i < outline_info_->next_file_idx; ++i) {
+            for (SizeT i = 0; i < outline_info_->next_file_idx; ++i) {
                 auto outline_file = BlockColumnEntry::OutlineFilename(column_id_, i);
 
                 outline_paths.push_back(Move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));

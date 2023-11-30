@@ -32,13 +32,13 @@ struct SumState {
 public:
     inline void Initialize() { Error<NotImplementException>("Not implemented"); }
 
-    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented"); }
+    inline void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { Error<NotImplementException>("Not implemented"); }
 
     inline ptr_t Finalize() { Error<NotImplementException>("Not implemented"); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented"); }
+    inline static SizeT Size(const DataType &) { Error<NotImplementException>("Not implemented"); }
 };
 
 template <>
@@ -54,7 +54,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
+    inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -70,7 +70,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
+    inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -86,7 +86,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
+    inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -102,7 +102,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
+    inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
 template <>
@@ -118,7 +118,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(DoubleT); }
+    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 template <>
@@ -134,7 +134,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(DoubleT); }
+    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 void RegisterSumFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

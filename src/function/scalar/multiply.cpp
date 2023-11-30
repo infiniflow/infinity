@@ -31,7 +31,7 @@ namespace infinity {
 
 struct MulFunction {
     template <typename TA, typename TB, typename TC>
-    static inline bool Run(TA left, TB right, TC &result) {
+    static inline bool Run(TA, TB, TC &) {
         Error<NotImplementException>("Not implement");
         return false;
     }
@@ -95,14 +95,14 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 // Decimal * Decimal = Decimal
 template <>
-inline bool MulFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
+inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // Mixed Type * i64
 template <>
-inline bool MulFunction::Run(MixedT left, BigIntT right, MixedT &result) {
+inline bool MulFunction::Run(MixedT, BigIntT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
@@ -115,7 +115,7 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 
 // Mixed Type * f64
 template <>
-inline bool MulFunction::Run(MixedT left, DoubleT right, MixedT &result) {
+inline bool MulFunction::Run(MixedT, DoubleT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
@@ -128,7 +128,7 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 
 // Mixed Type * Mixed Type
 template <>
-inline bool MulFunction::Run(MixedT left, MixedT right, MixedT &result) {
+inline bool MulFunction::Run(MixedT, MixedT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }

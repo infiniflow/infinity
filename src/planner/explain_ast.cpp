@@ -478,7 +478,7 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
     }
 }
 
-void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
     switch (flush_statement->type_) {
         case FlushType::kData:
             result->emplace_back(MakeShared<String>("FLUSH DATA"));

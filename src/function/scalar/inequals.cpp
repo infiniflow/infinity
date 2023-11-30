@@ -60,7 +60,7 @@ inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
 }
 
 template <>
-inline void InEqualsFunction::Run(MixedT left, BigIntT right, bool &result) {
+inline void InEqualsFunction::Run(MixedT, BigIntT, bool &) {
     Error<NotImplementException>("Not implement: mixed <> bigint");
 }
 
@@ -70,7 +70,7 @@ inline void InEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void InEqualsFunction::Run(MixedT left, DoubleT right, bool &result) {
+inline void InEqualsFunction::Run(MixedT, DoubleT, bool &) {
     Error<NotImplementException>("Not implement: mixed <> double");
 }
 
@@ -80,7 +80,7 @@ inline void InEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 }
 
 template <>
-inline void InEqualsFunction::Run(MixedT left, VarcharT right, bool &result) {
+inline void InEqualsFunction::Run(MixedT, VarcharT, bool &) {
     Error<NotImplementException>("Not implement: mixed <> varchar");
 }
 

@@ -185,13 +185,13 @@ public:
 
         UnionValue() {}
 
-        UnionValue(const UnionValue &other) { ; };
+        UnionValue(const UnionValue &) { ; };
 
-        UnionValue(UnionValue &&other) noexcept { ; };
+        UnionValue(UnionValue &&) noexcept { ; };
 
-        UnionValue &operator=(const UnionValue &other) { return *this; };
+        UnionValue &operator=(const UnionValue &) { return *this; };
 
-        UnionValue &operator=(UnionValue &&other) noexcept { return *this; };
+        UnionValue &operator=(UnionValue &&) noexcept { return *this; };
     } value_ = {};
 
     bool is_null_{false};

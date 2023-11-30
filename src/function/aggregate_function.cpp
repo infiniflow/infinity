@@ -23,7 +23,7 @@ module aggregate_function;
 
 namespace infinity {
 
-void AggregateFunction::CastArgumentTypes(BaseExpression &input_arguments) {
+void AggregateFunction::CastArgumentTypes(BaseExpression &) {
     // Check and add a cast function to cast the input arguments expression type to target type
 
     Error<PlannerException>("Not implemented: need to cast the argument types");

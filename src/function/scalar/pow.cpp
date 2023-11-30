@@ -38,7 +38,7 @@ struct PowFunction {
 };
 
 template <>
-inline bool PowFunction::Run(MixedT base, DoubleT exponent, DoubleT &result) {
+inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }

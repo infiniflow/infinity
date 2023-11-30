@@ -27,7 +27,7 @@ namespace infinity {
 
 QueryResult Table::CreateIndex(const String &index_name,
                                Vector<IndexInfo *> *index_info_list,
-                               CreateIndexOptions create_index_options) {
+                               CreateIndexOptions ) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -85,7 +85,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
     return result;
 }
 
-QueryResult Table::Import(const String &path, ImportOptions import_options) {
+QueryResult Table::Import(const String &path, ImportOptions ) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -135,8 +135,8 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     return result;
 }
 
-QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
-                          Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
+QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
+                          Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
                           ParsedExpr *filter,
                           Vector<ParsedExpr *> *output_columns,
                           ParsedExpr *offset,

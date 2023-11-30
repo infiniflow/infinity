@@ -119,7 +119,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
     return result;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ReferenceExpression> &column_expr) {
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<ReferenceExpression> &) {
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     return result;
 }

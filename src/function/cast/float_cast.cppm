@@ -73,7 +73,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
 
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target) {
+    static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
             Format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -82,7 +82,7 @@ struct FloatTryCastToFixlen {
 
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -131,7 +131,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 
 // TODO: Cast from float to hugeint
 template <>
-inline bool FloatTryCastToFixlen::Run(FloatT source, HugeIntT &target) {
+inline bool FloatTryCastToFixlen::Run(FloatT, HugeIntT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
@@ -144,7 +144,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 
 // TODO
 template <>
-inline bool FloatTryCastToFixlen::Run(FloatT source, DecimalT &target) {
+inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
@@ -212,7 +212,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 
 // TODO: Cast from double to hugeint
 template <>
-inline bool FloatTryCastToFixlen::Run(DoubleT source, HugeIntT &target) {
+inline bool FloatTryCastToFixlen::Run(DoubleT, HugeIntT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
@@ -225,7 +225,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 
 // TODO
 template <>
-inline bool FloatTryCastToFixlen::Run(DoubleT source, DecimalT &target) {
+inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }

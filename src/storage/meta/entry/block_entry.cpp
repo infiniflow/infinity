@@ -53,7 +53,7 @@ bool BlockVersion::operator==(const BlockVersion &rhs) const {
 i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
     if (created_.empty())
         return 0;
-    int idx = created_.size() - 1;
+    i64 idx = created_.size() - 1;
     for (; idx >= 0; idx--) {
         if (created_[idx].first <= begin_ts)
             break;
@@ -127,8 +127,8 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
                        u16 row_count_,
                        i16 min_row_ts_,
                        i16 max_row_ts_)
-    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), checkpoint_ts_(checkpoint_ts),
-      row_capacity_(DEFAULT_VECTOR_SIZE), row_count_(row_count_), min_row_ts_(min_row_ts_), max_row_ts_(max_row_ts_) {
+    : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), row_count_(row_count_),
+      row_capacity_(DEFAULT_VECTOR_SIZE), min_row_ts_(min_row_ts_), max_row_ts_(max_row_ts_), checkpoint_ts_(checkpoint_ts) {
 
     base_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir_, block_id);
 

@@ -60,7 +60,7 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 }
 
 template <>
-inline bool DivFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
+inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Error<NotImplementException>("Not implement huge int divide operator.");
     return false;
 }

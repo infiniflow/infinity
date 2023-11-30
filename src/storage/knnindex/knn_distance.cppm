@@ -38,7 +38,7 @@ export enum class KnnDistanceAlgoType {
 export class KnnDistanceBase {
 public:
     explicit KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type, u64 query_count, u64 dimension, u64 topk)
-        : algo_type_(type), elem_type_(elem_type), query_count_(query_count), dimension_(dimension), top_k_(topk) {}
+        : query_count_(query_count), dimension_(dimension), top_k_(topk), algo_type_(type), elem_type_(elem_type) {}
 
     [[nodiscard]] inline KnnDistanceAlgoType algo_type() const { return algo_type_; };
 

@@ -352,12 +352,12 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteFlatHeterogeneous(const SharedPtr<ColumnVector> &left,
-                                                const SharedPtr<ColumnVector> &right,
-                                                SharedPtr<ColumnVector> &result,
-                                                SizeT count,
-                                                void *state_ptr,
-                                                bool nullable) {
+    static void inline ExecuteFlatHeterogeneous(const SharedPtr<ColumnVector> &,
+                                                const SharedPtr<ColumnVector> &,
+                                                SharedPtr<ColumnVector> &,
+                                                SizeT ,
+                                                void *,
+                                                bool ) {
         Error<TypeException>("Not implemented.");
     }
 
@@ -479,7 +479,7 @@ private:
     static void inline ExecuteConstantConstant(const SharedPtr<ColumnVector> &left,
                                                const SharedPtr<ColumnVector> &right,
                                                SharedPtr<ColumnVector> &result,
-                                               SizeT count,
+                                               SizeT,
                                                void *state_ptr,
                                                bool nullable) {
 
@@ -510,42 +510,42 @@ private:
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteConstantHeterogeneous(const SharedPtr<ColumnVector> &left,
-                                                    const SharedPtr<ColumnVector> &right,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
-                                                    void *state_ptr,
-                                                    bool nullable) {
+    static void inline ExecuteConstantHeterogeneous(const SharedPtr<ColumnVector> &,
+                                                    const SharedPtr<ColumnVector> &,
+                                                    SharedPtr<ColumnVector> &,
+                                                    SizeT ,
+                                                    void *,
+                                                    bool ) {
         Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousFlat(const SharedPtr<ColumnVector> &left,
-                                                const SharedPtr<ColumnVector> &right,
-                                                SharedPtr<ColumnVector> &result,
-                                                SizeT count,
-                                                void *state_ptr,
-                                                bool nullable) {
+    static void inline ExecuteHeterogeneousFlat(const SharedPtr<ColumnVector> &,
+                                                const SharedPtr<ColumnVector> &,
+                                                SharedPtr<ColumnVector> &,
+                                                SizeT ,
+                                                void *,
+                                                bool ) {
         Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousConstant(const SharedPtr<ColumnVector> &left,
-                                                    const SharedPtr<ColumnVector> &right,
-                                                    SharedPtr<ColumnVector> &result,
-                                                    SizeT count,
-                                                    void *state_ptr,
-                                                    bool nullable) {
+    static void inline ExecuteHeterogeneousConstant(const SharedPtr<ColumnVector> &,
+                                                    const SharedPtr<ColumnVector> &,
+                                                    SharedPtr<ColumnVector> &,
+                                                    SizeT ,
+                                                    void *,
+                                                    bool ) {
         Error<TypeException>("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
-    static void inline ExecuteHeterogeneousHeterogeneous(const SharedPtr<ColumnVector> &left,
-                                                         const SharedPtr<ColumnVector> &right,
-                                                         SharedPtr<ColumnVector> &result,
-                                                         SizeT count,
-                                                         void *state_ptr,
-                                                         bool nullable) {
+    static void inline ExecuteHeterogeneousHeterogeneous(const SharedPtr<ColumnVector> &,
+                                                         const SharedPtr<ColumnVector> &,
+                                                         SharedPtr<ColumnVector> &,
+                                                         SizeT ,
+                                                         void *,
+                                                         bool ) {
         Error<TypeException>("Not implemented.");
     }
 };

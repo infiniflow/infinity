@@ -31,7 +31,7 @@ module txn_manager;
 namespace infinity {
 
 TxnManager::TxnManager(NewCatalog *catalog, BufferManager *buffer_mgr, PutWalEntryFn put_wal_entry_fn, u64 start_txn_id, TxnTimeStamp start_ts)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_id_(start_txn_id), txn_ts_(start_ts), is_running_(false) {}
+    : catalog_(catalog), txn_id_(start_txn_id), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true

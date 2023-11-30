@@ -72,7 +72,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(TinyIntT); }
+    inline static SizeT Size(const DataType &) { return sizeof(TinyIntT); }
 };
 
 template <>

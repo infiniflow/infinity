@@ -35,11 +35,11 @@ public:
                        SharedPtr<String> view_name,
                        SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                        SharedPtr<Vector<String>> column_names,
-                       ViewMeta *table_collection_meta,
+                       ViewMeta *view_meta,
                        u64 txn_id,
                        TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kView), base_dir_(base_dir), create_view_info_(create_view_info), view_name_(Move(view_name)),
-          column_names_(Move(column_names)), column_types_(Move(column_types)), table_collection_meta_(table_collection_meta) {
+        : BaseEntry(EntryType::kView), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(Move(view_name)),
+          column_types_(Move(column_types)), column_names_(Move(column_names)), view_meta_(view_meta) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
@@ -64,7 +64,7 @@ private:
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
 
-    ViewMeta *table_collection_meta_{};
+    ViewMeta *view_meta_{};
 };
 
 } // namespace infinity

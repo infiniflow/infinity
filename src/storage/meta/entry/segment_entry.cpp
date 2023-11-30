@@ -499,6 +499,7 @@ SegmentEntry::GetCreateIndexParam(const SegmentEntry *segment_entry, const Index
             Error<StorageException>(*err_msg);
         }
     }
+    return nullptr;
 }
 
 } // namespace infinity

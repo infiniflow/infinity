@@ -199,7 +199,7 @@ TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
 
-Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&base_entry) {
+Status Txn::CreateDatabase(const String &db_name, ConflictType, BaseEntry *&base_entry) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -225,7 +225,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, Ba
     return Status::OK();
 }
 
-Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&base_entry) {
+Status Txn::DropDatabase(const String &db_name, ConflictType, BaseEntry *&base_entry) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -293,7 +293,7 @@ Status Txn::GetTableCollections(const String &db_name, Vector<TableCollectionDet
     return DBEntry::GetTableCollectionsDetail(db_entry, txn_id_, txn_context_.GetBeginTS(), output_table_array);
 }
 
-Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type, BaseEntry *&new_table_entry) {
+Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType, BaseEntry *&new_table_entry) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -478,32 +478,32 @@ Status Txn::GetTableByName(const String &db_name, const String &table_name, Base
     return DBEntry::GetTableCollection(db_entry, table_name, txn_id_, begin_ts, new_table_entry);
 }
 
-Status Txn::CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry) {
+Status Txn::CreateCollection(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
     return Status(ErrorCode::kNotImplemented, "Not Implemented");
 }
 
-Status Txn::GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry) {
+Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
     return Status(ErrorCode::kNotImplemented, "Not Implemented");
 }
 
-Status Txn::CreateView(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry) {
+Status Txn::CreateView(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
     return Status(ErrorCode::kNotImplemented, "Not Implemented");
 }
 
-Status Txn::DropViewByName(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry) {
+Status Txn::DropViewByName(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
     return Status(ErrorCode::kNotImplemented, "Not Implemented");
 }
 
-Status Txn::GetViewByName(const String &db_name, const String &view_name, BaseEntry *&view_entry) {
+Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
     return Status(ErrorCode::kNotImplemented, "Not Implemented");
 }
 
-Vector<BaseEntry *> Txn::GetViews(const String &db_name) {
+Vector<BaseEntry *> Txn::GetViews(const String &) {
     Error<TransactionException>("Not Implemented");
     return Vector<BaseEntry *>();
 }

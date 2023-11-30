@@ -65,8 +65,9 @@ void IndexFullText::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, analyzer_);
 }
 
-SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&ptr, int32_t maxbytes) {
+SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
     Error<StorageException>("Not implemented");
+    return nullptr;
 }
 
 String IndexFullText::ToString() const {
@@ -84,8 +85,9 @@ Json IndexFullText::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexFullText> IndexFullText::Deserialize(const Json &index_def_json) {
+SharedPtr<IndexFullText> IndexFullText::Deserialize(const Json &) {
     Error<StorageException>("Not implemented");
+    return nullptr;
 }
 
 } // namespace infinity

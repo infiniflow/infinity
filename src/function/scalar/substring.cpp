@@ -30,13 +30,13 @@ namespace infinity {
 
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
-    static inline bool Run(TA first, TB second, TC third, TD &result, ColumnVector *column_vector_ptr) {
+    static inline bool Run(TA, TB, TC, TD &, ColumnVector *) {
         Error<NotImplementException>("Not implement");
     }
 };
 
 template <>
-inline bool SubstrFunction::Run(VarcharT first, BigIntT second, BigIntT third, VarcharT &result, ColumnVector *column_vector_ptr) {
+inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVector *) {
     // Validate the input before slice the string
     Error<NotImplementException>("Not implement");
 
