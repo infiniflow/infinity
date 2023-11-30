@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalMergeHash::Init() {}
 
-void PhysicalMergeHash::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalMergeHash::Execute(QueryContext *, OperatorState *) {}
 
 } // namespace infinity

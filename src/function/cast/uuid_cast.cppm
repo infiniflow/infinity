@@ -44,7 +44,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
 
 struct UuidTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -52,7 +52,7 @@ struct UuidTryCastToVarlen {
 };
 
 template <>
-inline bool UuidTryCastToVarlen::Run(const UuidT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool UuidTryCastToVarlen::Run(const UuidT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<FunctionException>("Not implemented");
 //    target.length_ = UuidT::LENGTH;
 //    Memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);

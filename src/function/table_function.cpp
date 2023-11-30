@@ -24,7 +24,7 @@ module table_function;
 namespace infinity {
 
 TableFunction::TableFunction(String name, Vector<LogicalType> argument_types, TableFunctionType function)
-    : Function(Move(name), FunctionType::kTable), parameter_types_(Move(argument_types)), main_function_(Move(function)) {}
+    : Function(Move(name), FunctionType::kTable), main_function_(Move(function)), parameter_types_(Move(argument_types)) {}
 
 String TableFunction::ToString() const {
     std::stringstream ss;

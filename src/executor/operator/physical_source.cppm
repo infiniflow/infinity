@@ -36,8 +36,8 @@ export enum class SourceType {
 export class PhysicalSource final : public PhysicalOperator {
 public:
     explicit PhysicalSource(u64 id, SourceType source_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)
-        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id), type_(source_type), output_names_(Move(names)),
-          output_types_(Move(types)) {}
+        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id), output_names_(Move(names)), output_types_(Move(types)),
+          type_(source_type) {}
 
     ~PhysicalSource() override = default;
 

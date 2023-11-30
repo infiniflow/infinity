@@ -54,7 +54,7 @@ void PhysicalFilter::Init() {
     //    output_ = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalFilter::Execute(QueryContext *query_context, OperatorState *operator_state) {
+void PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     if(operator_state->data_block_.get() == nullptr) {
         operator_state->data_block_ = DataBlock::Make();
 

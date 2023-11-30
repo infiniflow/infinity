@@ -107,7 +107,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -141,7 +141,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -175,7 +175,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -209,7 +209,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>
@@ -243,7 +243,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

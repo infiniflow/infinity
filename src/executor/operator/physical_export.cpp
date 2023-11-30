@@ -23,10 +23,10 @@ namespace infinity {
 
 void PhysicalExport::Init() {}
 
-void PhysicalExport::Execute(QueryContext *query_context, OperatorState *operator_state) { operator_state->SetComplete(); }
+void PhysicalExport::Execute(QueryContext *, OperatorState *operator_state) { operator_state->SetComplete(); }
 
-void PhysicalExport::ExportCSV(QueryContext *query_context) {}
+void PhysicalExport::ExportCSV(QueryContext *) {}
 
-void PhysicalExport::ExportJSON(QueryContext *query_context) {}
+void PhysicalExport::ExportJSON(QueryContext *) {}
 
 } // namespace infinity

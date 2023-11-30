@@ -284,7 +284,7 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
     table_entry->row_count_ += row_count;
 }
 
-void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
+void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
         for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
@@ -299,9 +299,9 @@ void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, 
 
 }
 
-void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store) {
-    auto *txn_store_ptr = (TxnTableStore *)txn_store;
-    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
+void TableCollectionEntry::RollbackAppend(TableCollectionEntry *, Txn *, void *) {
+//    auto *txn_store_ptr = (TxnTableStore *)txn_store;
+//    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Error<NotImplementException>("TableCollectionEntry::RollbackAppend");
 }
 
@@ -321,7 +321,7 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
 }
 
 UniquePtr<String>
-TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr) {
+TableCollectionEntry::RollbackDelete(TableCollectionEntry *, Txn *, DeleteState &, BufferManager *) {
     Error<NotImplementException>("TableCollectionEntry::RollbackDelete");
     return nullptr;
 }
@@ -366,7 +366,7 @@ SharedPtr<String> TableCollectionEntry::GetDBName(const TableCollectionEntry *ta
     return table_meta->db_entry_->db_name_;
 }
 
-SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64, TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     SharedLock<RWMutex> rw_locker(table_collection_entry->rw_locker_);

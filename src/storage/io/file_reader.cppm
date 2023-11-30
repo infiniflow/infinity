@@ -31,8 +31,8 @@ public:
     FileSystem &fs_;
     String path_{};
     UniquePtr<char_t[]> data_{};
-    i64 buffer_offset_{};
-    i64 already_read_size_{};
+    u64 buffer_offset_{};
+    u64 already_read_size_{};
     SizeT buffer_start_{};
     SizeT buffer_size_{};
     SizeT file_size_{};
@@ -55,9 +55,9 @@ public:
 
     bool Finished() const;
 
-    i64 GetFilePointer() const;
+    u64 GetFilePointer() const;
 
-    void Seek(const i64 pos);
+    void Seek(const u64 pos);
 
     FileReader *Clone();
 };

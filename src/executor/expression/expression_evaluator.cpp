@@ -115,7 +115,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &,
-                                  SharedPtr<ExpressionState> &state,
+                                  SharedPtr<ExpressionState> &,
                                   SharedPtr<ColumnVector> &) {
     Error<ExecutorException>("Case execution");
 }

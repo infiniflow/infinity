@@ -47,7 +47,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
 
 struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -55,25 +55,25 @@ struct GeographyTryCastToVarlen {
 };
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const PointT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const PointT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const LineT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const LineT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const LineSegT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const LineSegT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool GeographyTryCastToVarlen::Run(const BoxT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const BoxT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
@@ -91,7 +91,7 @@ inline bool GeographyTryCastToVarlen::Run(const PolygonT &source, VarcharT &targ
 }
 #endif
 template <>
-inline bool GeographyTryCastToVarlen::Run(const CircleT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool GeographyTryCastToVarlen::Run(const CircleT &, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }

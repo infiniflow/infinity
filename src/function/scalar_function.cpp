@@ -36,7 +36,7 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     Assert<PlannerException>(input_arguments.size() != arguments_count, Format("Function: {} arguments number isn't matched.", name_));
-    for (auto idx = 0; idx < arguments_count; ++idx) {
+    for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
             Error<PlannerException>("Not implemented: need to cast the argument types");
         }
@@ -60,7 +60,7 @@ String ScalarFunction::ToString() const {
 
     } else {
         ss << "(";
-        for (auto i = 0; i < parameter_count - 1; ++i) {
+        for (SizeT i = 0; i < parameter_count - 1; ++i) {
             ss << parameter_types_[i].ToString() << ", ";
         }
         ss << parameter_types_.back().ToString();

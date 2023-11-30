@@ -29,8 +29,8 @@ namespace infinity {
 export class PhysicalProject : public PhysicalOperator {
 public:
     explicit PhysicalProject(u64 id, u64 table_index, UniquePtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions)
-        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id), projection_table_index_(table_index),
-          expressions_(Move(expressions)) {}
+        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id), expressions_(Move(expressions)),
+          projection_table_index_(table_index) {}
 
     ~PhysicalProject() override = default;
 

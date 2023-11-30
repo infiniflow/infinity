@@ -146,14 +146,14 @@ public:
 
     [[nodiscard]] inline RowID *GetIDs() const final { return reservoir_result_handler_->heap_ids_tab; }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
         return reservoir_result_handler_->heap_dis_tab + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }

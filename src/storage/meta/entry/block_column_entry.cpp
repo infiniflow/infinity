@@ -179,7 +179,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry,
     }
 }
 
-void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_count) {
+void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
         case kBoolean:
@@ -205,7 +205,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
         case kUuid:
         case kEmbedding:
         case kRowID: {
-            SizeT buffer_size = row_count * column_type->Size();
+//            SizeT buffer_size = row_count * column_type->Size();
             if (block_column_entry->buffer_->Save()) {
                 block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();
@@ -214,7 +214,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT row_cou
             break;
         }
         case kVarchar: {
-            SizeT buffer_size = row_count * column_type->Size();
+//            SizeT buffer_size = row_count * column_type->Size();
             if (block_column_entry->buffer_->Save()) {
                 block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();

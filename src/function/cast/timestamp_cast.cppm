@@ -53,7 +53,7 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
 
 struct TimestampTryCastToFixlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target) {
+    static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -62,7 +62,7 @@ struct TimestampTryCastToFixlen {
 
 struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -70,25 +70,25 @@ struct TimestampTryCastToVarlen {
 };
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT source, DateT &target) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT source, TimeT &target) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT source, DateTimeT &target) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToVarlen::Run(TimestampT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }

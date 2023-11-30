@@ -153,7 +153,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
             segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
             if (segment_id == 60) {
-                int a = 1;
+//                int a = 1;
             }
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
@@ -200,7 +200,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     opts->delimiter = delimiter_;
     opts->stream = fp;
     opts->ctx = parser_context.get();
-    opts->buffsize = (1 << 20); // default buffer size 256k, we use 1M\
+    opts->buffsize = (1 << 20); // default buffer size 256k, we use 1M
 
     parser_context->parser_ = ZsvParser(opts.get());
 
@@ -231,7 +231,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state) {}
+void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
     ParserContext *parser_context = static_cast<ParserContext *>(context);
@@ -450,7 +450,7 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
     }
 
     LOG_TRACE(Format("Block rows count {}", block_row_counts.size()));
-    for (int i = 0; i < block_row_counts.size(); ++i) {
+    for (SizeT i = 0; i < block_row_counts.size(); ++i) {
         LOG_TRACE(Format("Block {} rows count {}", i, block_row_counts[i]));
     }
 

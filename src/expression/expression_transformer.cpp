@@ -58,7 +58,7 @@ SharedPtr<BaseExpression> ComposeExpressionWithDelimiter(const Vector<SharedPtr<
         return nullptr;
     }
     SharedPtr<BaseExpression> result = expressions[0];
-    for (auto i = 1; i < expr_count; ++i) {
+    for (SizeT i = 1; i < expr_count; ++i) {
         result = MakeShared<ConjunctionExpression>(conjunction_type, result, expressions[i]);
     }
     return result;

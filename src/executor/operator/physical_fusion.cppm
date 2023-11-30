@@ -28,7 +28,7 @@ export module physical_fusion;
 
 namespace infinity {
 
-export class PhysicalFusion : public PhysicalOperator {
+export class PhysicalFusion final: public PhysicalOperator {
 public:
     explicit PhysicalFusion(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<FusionExpression> fusion_expr);
     ~PhysicalFusion() override;
@@ -37,9 +37,9 @@ public:
 
     void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     String ToString(i64 &space) const;
 

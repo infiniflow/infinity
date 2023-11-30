@@ -250,7 +250,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
 }
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *, const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<BaseTableRef> base_table_ref
     auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
 
@@ -259,7 +259,7 @@ BoundSelectStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContex
 }
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+BoundSelectStatement::BuildSubqueryTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &) {
     // SharedPtr<SubqueryTableRef> subquery_table_ref
     auto subquery_table_ref = static_pointer_cast<SubqueryTableRef>(table_ref);
     SharedPtr<LogicalNode> subquery = subquery_table_ref->subquery_node_->BuildPlan(query_context);
@@ -299,7 +299,7 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContex
 }
 
 SharedPtr<LogicalNode>
-BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &, QueryContext *, const SharedPtr<BindContext> &bind_context) {
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     String alias("DummyTable" + ToStr(logical_node_id));
     SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());
@@ -350,7 +350,7 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
 SharedPtr<BaseExpression> BoundSelectStatement::UnnestSubquery(SharedPtr<LogicalNode> &root,
                                                                SharedPtr<BaseExpression> &condition,
                                                                QueryContext *query_context,
-                                                               const SharedPtr<BindContext> &bind_context) {
+                                                               const SharedPtr<BindContext> &) {
     building_subquery_ = true;
     SubqueryExpression *subquery_expr_ptr = (SubqueryExpression *)condition.get();
     SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);

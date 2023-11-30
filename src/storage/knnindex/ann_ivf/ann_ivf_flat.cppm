@@ -33,7 +33,7 @@ namespace infinity {
 export template <typename DistType>
 class AnnIVFFlatL2 final : public KnnDistance<DistType> {
 public:
-    explicit AnnIVFFlatL2(const DistType *queries, i64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
+    explicit AnnIVFFlatL2(const DistType *queries, u64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, top_k), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
@@ -63,10 +63,10 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {}
+    void Search(const DistType *, u16, u32, u16) final {}
 
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, i32 n_probes) {
-        constexpr bool b_debug_info = false;
+        //        constexpr bool b_debug_info = false;
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticL2) {
             Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
@@ -142,14 +142,14 @@ public:
 
     [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }
         return distance_array_->data() + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }
@@ -169,7 +169,7 @@ private:
 export template <typename DistType>
 class AnnIVFFlatIP final : public KnnDistance<DistType> {
 public:
-    explicit AnnIVFFlatIP(const DistType *queries, i64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
+    explicit AnnIVFFlatIP(const DistType *queries, u64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, top_k), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
@@ -204,10 +204,10 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {}
+    void Search(const DistType *, u16, u32, u16) final {}
 
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, i32 n_probes) {
-        constexpr bool b_debug_info = false;
+        //        constexpr bool b_debug_info = false;
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
             Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
@@ -283,14 +283,14 @@ public:
 
     [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }
         return distance_array_->data() + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
         }

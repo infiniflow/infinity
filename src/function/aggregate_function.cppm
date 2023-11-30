@@ -82,8 +82,8 @@ public:
                                AggregateInitializeFuncType init_func,
                                AggregateUpdateFuncType update_func,
                                AggregateFinalizeFuncType finalize_func)
-        : Function(Move(name), FunctionType::kAggregate), argument_type_(Move(argument_type)), return_type_(Move(return_type)),
-          state_size_(state_size), init_func_(Move(init_func)), update_func_(Move(update_func)), finalize_func_(Move(finalize_func)) {
+        : Function(Move(name), FunctionType::kAggregate), init_func_(Move(init_func)), update_func_(Move(update_func)),
+          finalize_func_(Move(finalize_func)), argument_type_(Move(argument_type)), return_type_(Move(return_type)), state_size_(state_size) {
         state_data_ = SharedPtr<char[]>(new char[state_size_]());
     }
 

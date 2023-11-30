@@ -36,7 +36,7 @@ public:
     explicit Comparator(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types)
         : order_by_table_(order_by_table), order_by_types_(order_by_types) {}
 
-    bool operator()(RowID left, RowID right) {
+    bool operator()(RowID, RowID ) {
 #if 0
         SizeT column_count = order_by_table_->ColumnCount();
         for(SizeT col_id = 0; col_id < column_count; ++col_id) {
@@ -194,7 +194,7 @@ private:
 
 void PhysicalSort::Init() {}
 
-void PhysicalSort::Execute(QueryContext *query_context, OperatorState *operator_state) {
+void PhysicalSort::Execute(QueryContext *, OperatorState *) {
 #if 0
     executor_.Init(this->expressions_);
 

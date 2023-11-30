@@ -56,7 +56,7 @@ void DataFileWorker::WriteToFileImpl(bool &prepare_success) {
     // - footer: checksum
 
     u64 magic_number = 0x00dd3344;
-    i64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));
+    u64 nbytes = fs.Write(*file_handler_, &magic_number, sizeof(magic_number));
     if (nbytes != sizeof(magic_number)) {
         Error<StorageException>(Format("Write magic number which length is {}.", nbytes));
     }
@@ -89,7 +89,7 @@ void DataFileWorker::ReadFromFileImpl() {
 
     // file header: magic number, buffer_size
     u64 magic_number{0};
-    i64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
+    u64 nbytes = fs.Read(*file_handler_, &magic_number, sizeof(magic_number));
     if (nbytes != sizeof(magic_number)) {
         Error<StorageException>(Format("Read magic number which length isn't {}.", nbytes));
     }

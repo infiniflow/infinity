@@ -397,7 +397,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     for (i64 operator_id = operator_count - 1; operator_id >= 0; --operator_id) {
 
         // PhysicalOperator *physical_op = fragment_operators[operator_id];
-        for (i64 task_id = 0; task_id < tasks.size(); ++task_id) {
+        for (SizeT task_id = 0; task_id < tasks.size(); ++task_id) {
             FragmentTask *task = tasks[task_id].get();
 
             UniquePtr<OperatorState> operator_state = nullptr;
@@ -675,7 +675,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             // Partition the hash range to each source state
             auto *knn_scan_operator = (PhysicalKnnScan *)first_operator;
 
-            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+            for (SizeT task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>();
             }
             break;

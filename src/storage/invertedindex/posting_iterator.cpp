@@ -37,7 +37,7 @@ PostingIterator::~PostingIterator() {
     }
 }
 
-bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32 state_pool_size) {
+bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32) {
     segment_postings_ = seg_postings;
     Reset();
     return true;

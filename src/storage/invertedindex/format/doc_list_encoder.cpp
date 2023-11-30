@@ -20,7 +20,7 @@ DocListEncoder::DocListEncoder(const DocListFormatOption &format_option,
                                MemoryPool *byte_slice_pool,
                                RecyclePool *buffer_pool,
                                DocListFormat *doc_list_format)
-    : doc_list_buffer_(byte_slice_pool, buffer_pool), format_option_(format_option), own_doc_list_format_(false), doc_list_format_(doc_list_format),
+    : doc_list_buffer_(byte_slice_pool, buffer_pool), own_doc_list_format_(false), format_option_(format_option), doc_list_format_(doc_list_format),
       last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), tf_bitmap_writer_(nullptr), doc_skiplist_writer_(nullptr),
       byte_slice_pool_(byte_slice_pool) {
     if (!doc_list_format) {

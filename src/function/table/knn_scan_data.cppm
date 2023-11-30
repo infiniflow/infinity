@@ -53,7 +53,7 @@ public:
 
     const i64 topk_;
     const i64 dimension_;
-    const i64 query_count_;
+    const u64 query_count_;
     void *const query_embedding_;
     const EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
@@ -73,7 +73,7 @@ public:
 
     Vector<DataType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim) {
         Vector<DataType> res(data_count);
-        for (int i = 0; i < data_count; ++i) {
+        for (SizeT i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
         }
         return res;

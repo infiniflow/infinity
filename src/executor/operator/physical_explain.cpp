@@ -114,7 +114,7 @@ void PhysicalExplain::Init() {
     }
 }
 
-void PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operator_state) {
+void PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));

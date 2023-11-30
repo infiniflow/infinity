@@ -75,11 +75,11 @@ public:
 
     virtual DistType *GetDistances() const = 0;
 
-    virtual DistType *GetDistanceByIdx(i64 idx) const = 0;
+    virtual DistType *GetDistanceByIdx(u64 idx) const = 0;
 
     virtual RowID *GetIDs() const = 0;
 
-    virtual RowID *GetIDByIdx(i64 idx) const = 0;
+    virtual RowID *GetIDByIdx(u64 idx) const = 0;
 };
 
 } // namespace infinity

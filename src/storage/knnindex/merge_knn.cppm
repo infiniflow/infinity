@@ -51,9 +51,9 @@ public:
 
     RowID *GetIDs() const;
 
-    DataType *GetDistancesByIdx(i64 idx) const;
+    DataType *GetDistancesByIdx(u64 idx) const;
 
-    RowID *GetIDsByIdx(i64 idx) const;
+    RowID *GetIDsByIdx(u64 idx) const;
 
     i64 total_count() const { return total_count_; }
 
@@ -116,7 +116,7 @@ RowID *MergeKnn<DataType, C>::GetIDs() const {
 }
 
 template <typename DataType, template <typename, typename> typename C>
-DataType *MergeKnn<DataType, C>::GetDistancesByIdx(i64 idx) const {
+DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         Error<ExecutorException>("Query index exceeds the limit");
     }
@@ -124,7 +124,7 @@ DataType *MergeKnn<DataType, C>::GetDistancesByIdx(i64 idx) const {
 }
 
 template <typename DataType, template <typename, typename> typename C>
-RowID *MergeKnn<DataType, C>::GetIDsByIdx(i64 idx) const {
+RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         Error<ExecutorException>("Query index exceeds the limit");
     }

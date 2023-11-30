@@ -135,7 +135,7 @@ Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts
     }
 }
 
-Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry) {
+Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, BaseEntry *&res_entry) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
@@ -196,7 +196,7 @@ void DBMeta::AddEntry(DBMeta* db_meta, UniquePtr<BaseEntry> db_entry) {
     db_meta->entry_list_.emplace_front(Move(db_entry));
 }
 
-void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
+void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.");

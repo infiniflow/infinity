@@ -45,11 +45,11 @@ export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
 
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &source,
-                           const DataType &source_type,
-                           TargetType &target,
-                           const DataType &target_type,
-                           const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(const SourceType &,
+                           const DataType &,
+                           TargetType &,
+                           const DataType &,
+                           const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -60,14 +60,14 @@ template <>
 inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &source_type,
                                           VarcharT &target,
-                                          const DataType &target_type,
+                                          const DataType &,
                                           const SharedPtr<ColumnVector> &vector_ptr) {
     Assert<TypeException>(source_type.type() == LogicalType::kEmbedding,
                           Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
 
-    for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+    for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
         LOG_TRACE(Format("{}", ((float *)(source.ptr))[j]));
     }
 

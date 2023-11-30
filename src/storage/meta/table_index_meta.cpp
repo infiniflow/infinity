@@ -38,10 +38,10 @@ module table_index_meta;
 
 namespace infinity {
 
-class SegmentEntry;
+struct SegmentEntry;
 
 TableIndexMeta::TableIndexMeta(TableCollectionEntry *table_collection_entry, SharedPtr<String> index_name)
-    : table_collection_entry_(table_collection_entry), index_name_(Move(index_name)) {}
+    : index_name_(Move(index_name)), table_collection_entry_(table_collection_entry) {}
 
 Status TableIndexMeta::CreateTableIndexEntry(TableIndexMeta *table_index_meta,
                                              const SharedPtr<IndexDef> &index_def,
@@ -177,7 +177,7 @@ Status TableIndexMeta::DropTableIndexEntry(TableIndexMeta *table_index_meta,
 Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_meta,
                                                    u64 txn_id,
                                                    TxnTimeStamp begin_ts,
-                                                   TxnManager *txn_mgr,
+                                                   TxnManager *,
                                                    BaseEntry *&dropped_index_entry) {
     UniqueLock<RWMutex> w_locker(table_index_meta->rw_locker_);
 
@@ -233,7 +233,7 @@ Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_m
     }
 }
 
-SharedPtr<String> TableIndexMeta::ToString(TableIndexMeta *table_index_meta) { throw StorageException("Not implemented"); }
+SharedPtr<String> TableIndexMeta::ToString(TableIndexMeta *) { throw StorageException("Not implemented"); }
 
 Json TableIndexMeta::Serialize(const TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts) {
     Json json;
@@ -299,7 +299,7 @@ Status TableIndexMeta::GetEntry(TableIndexMeta *meta, u64 txn_id, TxnTimeStamp b
     return Status(ErrorCode::kNotFound, Move(err_msg));
 }
 
-void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
+void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager *) {
     UniqueLock<RWMutex> w_locker(meta->rw_locker_);
     if (meta->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");

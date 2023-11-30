@@ -193,7 +193,7 @@ Status TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
 Status TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
                                          u64 txn_id,
                                          TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr,
+                                         TxnManager *,
                                          const String &table_name,
                                          ConflictType conflict_type,
                                          BaseEntry *&base_entry) {
@@ -263,7 +263,7 @@ Status TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
     }
 }
 
-void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr) {
+void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *) {
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.");

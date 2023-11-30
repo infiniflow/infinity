@@ -62,7 +62,7 @@ SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String 
     return nullptr;
 }
 
-SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexFullText>> index_info_map,
+SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexFullText>>,
                                                          TableIndexEntry *table_index_entry,
                                                          u64 txn_id,
                                                          SharedPtr<String> index_dir,

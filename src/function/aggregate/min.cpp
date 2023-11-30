@@ -34,13 +34,13 @@ public:
 
     void Initialize() { Error<NotImplementException>("Not implemented"); }
 
-    void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Not implemented"); }
+    void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) { Error<NotImplementException>("Not implemented"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { Error<NotImplementException>("Not implemented"); }
 
     [[nodiscard]] ptr_t Finalize() const { Error<NotImplementException>("Not implemented"); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>("Not implemented"); }
+    inline static SizeT Size(const DataType &) { Error<NotImplementException>("Not implemented"); }
 };
 
 template <>
@@ -52,11 +52,11 @@ public:
 
     void Update(const BooleanT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const BooleanT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const BooleanT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return 1; }
+    inline static SizeT Size(const DataType &) { return 1; }
 };
 
 template <>
@@ -68,7 +68,7 @@ public:
 
     void Update(const TinyIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const TinyIntT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
@@ -84,11 +84,11 @@ public:
 
     void Update(const SmallIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT ) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(SmallIntT); }
+    inline static SizeT Size(const DataType &) { return sizeof(SmallIntT); }
 };
 
 template <>
@@ -100,11 +100,11 @@ public:
 
     void Update(const IntegerT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const IntegerT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(IntegerT); }
+    inline static SizeT Size(const DataType &) { return sizeof(IntegerT); }
 };
 
 template <>
@@ -116,11 +116,11 @@ public:
 
     void Update(const BigIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const BigIntT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(BigIntT); }
+    inline static SizeT Size(const DataType &) { return sizeof(BigIntT); }
 };
 
 template <>
@@ -135,11 +135,11 @@ public:
 
     void Update(const HugeIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const HugeIntT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const HugeIntT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(HugeIntT); }
+    inline static SizeT Size(const DataType &) { return sizeof(HugeIntT); }
 };
 
 template <>
@@ -151,11 +151,11 @@ public:
 
     void Update(const FloatT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const FloatT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(FloatT); }
+    inline static SizeT Size(const DataType &) { return sizeof(FloatT); }
 };
 
 template <>
@@ -167,11 +167,11 @@ public:
 
     void Update(const DoubleT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT count) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const DoubleT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(DoubleT); }
+    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 void RegisterMinFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

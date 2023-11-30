@@ -28,7 +28,7 @@ namespace infinity {
 
 export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType input, TargetType &target) {
+    static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
             Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;

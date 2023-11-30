@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalSortMergeJoin::Init() {}
 
-void PhysicalSortMergeJoin::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalSortMergeJoin::Execute(QueryContext *, OperatorState *) {}
 
 } // namespace infinity

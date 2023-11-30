@@ -51,7 +51,7 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
 
 struct DateTryCastToFixlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target) {
+    static inline bool Run(SourceType , TargetType &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -60,7 +60,7 @@ struct DateTryCastToFixlen {
 
 struct DateTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(SourceType , TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -68,19 +68,19 @@ struct DateTryCastToVarlen {
 };
 
 template <>
-inline bool DateTryCastToFixlen::Run(DateT source, DateTimeT &target) {
+inline bool DateTryCastToFixlen::Run(DateT , DateTimeT &) {
     Error<FunctionException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool DateTryCastToFixlen::Run(DateT source, TimestampT &target) {
+inline bool DateTryCastToFixlen::Run(DateT , TimestampT &) {
     Error<FunctionException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool DateTryCastToVarlen::Run(DateT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool DateTryCastToVarlen::Run(DateT , VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<FunctionException>("Not implemented");
     return false;
 }

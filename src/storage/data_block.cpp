@@ -250,7 +250,7 @@ bool DataBlock::operator==(const DataBlock &other) const {
         return true;
     if (!this->initialized || !other.initialized || this->column_count_ != other.column_count_)
         return false;
-    for (int i = 0; i < this->column_count_; i++) {
+    for (SizeT i = 0; i < this->column_count_; i++) {
         const SharedPtr<ColumnVector> &column1 = this->column_vectors[i];
         const SharedPtr<ColumnVector> &column2 = other.column_vectors[i];
         if (column1.get() == nullptr || column2.get() == nullptr || *column1 != *column2)
@@ -262,7 +262,7 @@ bool DataBlock::operator==(const DataBlock &other) const {
 i32 DataBlock::GetSizeInBytes() const {
     Assert<StorageException>(finalized, "Data block is not finalized.");
     i32 size = sizeof(i32);
-    for (int i = 0; i < column_count_; i++) {
+    for (SizeT i = 0; i < column_count_; i++) {
         size += this->column_vectors[i]->GetSizeInBytes();
     }
     return size;
@@ -271,10 +271,9 @@ i32 DataBlock::GetSizeInBytes() const {
 void DataBlock::WriteAdv(char *&ptr) const {
     Assert<StorageException>(finalized, "Data block is not finalized.");
     WriteBufAdv<i32>(ptr, column_count_);
-    for (int i = 0; i < column_count_; i++) {
+    for (SizeT i = 0; i < column_count_; i++) {
         this->column_vectors[i]->WriteAdv(ptr);
     }
-    return;
 }
 
 SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {

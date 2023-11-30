@@ -49,7 +49,7 @@ void PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     operator_state->SetComplete();
 }
 
-void PhysicalFlush::FlushData(QueryContext *query_context) {
+void PhysicalFlush::FlushData(QueryContext *) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -58,7 +58,7 @@ void PhysicalFlush::FlushData(QueryContext *query_context) {
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
 }
 
-void PhysicalFlush::FlushLog(QueryContext *query_context) {
+void PhysicalFlush::FlushLog(QueryContext *) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -67,7 +67,7 @@ void PhysicalFlush::FlushLog(QueryContext *query_context) {
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
 }
 
-void PhysicalFlush::FlushBuffer(QueryContext *query_context) {
+void PhysicalFlush::FlushBuffer(QueryContext *) {
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {
         MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};

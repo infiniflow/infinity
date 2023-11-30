@@ -134,7 +134,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
 
 struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &input, TargetType &target) {
+    static inline bool Run(const SourceType &, TargetType &) {
         Error<FunctionException>(
             Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -246,7 +246,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
 
 // Cast VarcharT to HugeIntT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, HugeIntT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, HugeIntT &) {
     Error<TypeException>("Cast varchar to hugeint");
     return false;
 }
@@ -288,7 +288,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
 
 // Cast VarcharT to DateT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, DateT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
     Error<TypeException>("Cast from varchar to date");
 //    if (source.IsInlined()) {
 //        target.FromString(source.prefix, source.length);
@@ -300,28 +300,28 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DateT &target) {
 
 // Cast VarcharT to TimeT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, TimeT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, TimeT &) {
     Error<TypeException>("Cast from varchar to time");
     return true;
 }
 
 // Cast VarcharT to DateTimeT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, DateTimeT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, DateTimeT &) {
     Error<TypeException>("Cast from varchar to datetime");
     return true;
 }
 
 // Cast VarcharT to TimestampT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, TimestampT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, TimestampT &) {
     Error<TypeException>("Cast from varchar to timestamp");
     return true;
 }
 
 // Cast VarcharT to IntervalT type
 template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, IntervalT &target) {
+inline bool TryCastVarchar::Run(const VarcharT &, IntervalT &) {
     Error<TypeException>("Cast from varchar to interval");
     return true;
 }

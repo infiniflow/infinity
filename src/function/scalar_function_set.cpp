@@ -36,7 +36,7 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
-    for (auto i = 0; i < function_count; ++i) {
+    for (SizeT i = 0; i < function_count; ++i) {
         ScalarFunction &function = functions_[i];
         i64 cost = MatchFunctionCost(function, input_arguments);
         if (cost >= 0 && cost <= lowest_cost) {
@@ -86,7 +86,7 @@ i64 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction &func, const Vecto
 
     auto argument_count = arguments.size();
     i64 total_cost = 0;
-    for (auto i = 0; i < argument_count; ++i) {
+    for (SizeT i = 0; i < argument_count; ++i) {
         // Get the cost from argument to parameter
         i64 type_cast_cost = CastTable::instance().GetCastCost(arguments[i]->Type().type(), func.parameter_types_[i].type());
         if (type_cast_cost < 0) {

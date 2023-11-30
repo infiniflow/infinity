@@ -44,7 +44,7 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
 
 struct TimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
                 Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -52,7 +52,7 @@ struct TimeTryCastToVarlen {
 };
 
 template <>
-inline bool TimeTryCastToVarlen::Run(TimeT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool TimeTryCastToVarlen::Run(TimeT, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<NotImplementException>("Not implemented");
     return false;
 }

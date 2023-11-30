@@ -46,7 +46,7 @@ PhysicalFusion::~PhysicalFusion() {}
 
 void PhysicalFusion::Init() {}
 
-void PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalFusion::Execute(QueryContext *, OperatorState *) {}
 
 SharedPtr<Vector<String>> PhysicalFusion::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();

@@ -27,7 +27,7 @@ module buffer_manager;
 
 namespace infinity {
 BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
-    : memory_limit_(memory_limit), base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)), current_memory_size_(0) {
+    : base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
     LocalFileSystem fs;
     if (!fs.Exists(*base_dir_)) {
         fs.CreateDirectory(*base_dir_);

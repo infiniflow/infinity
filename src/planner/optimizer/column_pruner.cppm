@@ -51,7 +51,7 @@ private:
 
 export class ColumnPruner : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *query_context_ptr, const SharedPtr<LogicalNode> &logical_plan) final {
+    inline void ApplyToPlan(QueryContext *, const SharedPtr<LogicalNode> &logical_plan) final {
         return remove_visitor.VisitNode(*logical_plan);
     }
 

@@ -33,7 +33,7 @@ public:
     const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_{};
     const Vector<SizeT> &column_ids_{};
 
-    i64 current_block_ids_idx_{0};
+    u64 current_block_ids_idx_{0};
     SizeT current_read_offset_{0};
 };
 

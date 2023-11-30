@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalParallelAggregate::Init() {}
 
-void PhysicalParallelAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalParallelAggregate::Execute(QueryContext *, OperatorState *) {}
 
 } // namespace infinity
