@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+from numpy import dtype
 
 import infinity
 from infinity.infinity import NetworkAddress
@@ -61,7 +62,8 @@ class TestInsert:
         assert res.success
 
         res = table_obj.search().output(["*"]).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2), 'c2': (0, 2, 1)}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2), 'c2': (0, 2, 1)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = db_obj.drop_table("table_2")
         assert res.success

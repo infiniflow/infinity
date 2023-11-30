@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+from numpy import dtype
 
 import infinity
 from infinity.infinity import NetworkAddress
@@ -66,7 +67,8 @@ class TestDelete:
         assert res.success
 
         res = table_obj.search().output(["*"]).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = table_obj.delete()
         assert res.success

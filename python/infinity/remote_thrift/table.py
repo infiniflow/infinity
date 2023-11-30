@@ -22,6 +22,7 @@ from sqlglot import condition, expressions as exp
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
 from infinity.query import Query, InfinityVectorQueryBuilder
+from infinity.remote_thrift.types import build_result
 from infinity.table import Table, binary_exp_to_paser_exp
 
 
@@ -173,31 +174,8 @@ class RemoteTable(Table, ABC):
                                        search_expr=None)
 
         # process the results
-        results = dict()
-        for column_def in res.column_defs:
-            column_name = column_def.name
-            column_id = column_def.id
-            column_field = res.column_fields[column_id]
-            column_type = column_field.column_type
-            column_vector = column_field.column_vector
-            # print(column_name, column_type, column_vector)
-
-            if column_type == ttypes.ColumnType.ColumnInt32:
-                value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnInt64:
-                value_list = struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnFloat32:
-                value_list = struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnFloat64:
-                value_list = struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
-                results[column_name] = value_list
-            else:
-                raise Exception(f"unknown column type: {column_type}")
-
-        return pd.DataFrame(results)
+        if res.success:
+            return build_result(res)
         # todo: how to convert bytes to string?
 
 

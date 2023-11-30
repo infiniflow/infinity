@@ -14,6 +14,7 @@
 import os
 
 import pandas as pd
+from numpy import dtype
 from sqlglot import condition
 
 import infinity
@@ -74,7 +75,7 @@ class TestCase:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', port))
+            infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
             assert infinity_obj
 
             # infinity
@@ -131,10 +132,14 @@ class TestCase:
             assert res.success
             # search
             res = table_obj.search().output(["c1 + 0.1"]).to_df()
-            pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}))
+            pd.testing.assert_frame_equal(res,
+                                          pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
+                                              {'(c1 + 0.100000)': dtype('float64')}))
 
             res = table_obj.search().output(["*"]).filter("c1 > 1").to_df()
-            pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2,), 'c2': (2.2,)}))
+            pd.testing.assert_frame_equal(res,
+                                          pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
+                                              {'c1': dtype('int32'), 'c2': dtype('float32')}))
 
             res = db_obj.drop_table("my_table3")
             assert res.success
