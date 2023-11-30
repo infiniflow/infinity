@@ -29,6 +29,7 @@ import column_vector;
 import default_values;
 import third_party;
 import table_collection_entry;
+import vector_buffer;
 
 import infinity_exception;
 import varchar_layout;
@@ -91,10 +92,14 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
     ptr_t src_ptr = input_column_vector->data() + input_column_vector_offset * data_type_size;
     SizeT data_size = append_rows * data_type_size;
     SizeT dst_offset = column_entry_offset * data_type_size;
-    BlockColumnEntry::AppendRaw(column_entry, dst_offset, src_ptr, data_size);
+    BlockColumnEntry::AppendRaw(column_entry, dst_offset, src_ptr, data_size, input_column_vector->buffer_);
 }
 
-void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_p, SizeT data_size) {
+void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry,
+                                 SizeT dst_offset,
+                                 ptr_t src_p,
+                                 SizeT data_size,
+                                 SharedPtr<VectorBuffer> vector_buffer) {
     BufferHandle buffer_handle = block_column_entry->buffer_->Load();
     ptr_t dst_p = static_cast<ptr_t>(buffer_handle.GetDataMut()) + dst_offset;
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
@@ -112,16 +117,12 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             break;
         }
         case kVarchar: {
-            // FIXME
             auto inline_p = reinterpret_cast<VarcharLayout *>(dst_p);
             auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);
             for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr + row_idx;
                 VarcharLayout *varchar_layout = inline_p + row_idx;
-                if(!varchar_type->IsValue()) {
-                    Error<StorageException>("Varchar type here must be value.");
-                }
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length_;
@@ -129,25 +130,34 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = block_column_entry->outline_info_.get();
-                    auto base_file_size = Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    auto base_file_size =
+                        Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
-                    if (outline_info->written_buffers_.empty() || outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
+                    if (outline_info->written_buffers_.empty() ||
+                        outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
 
                         auto file_name = BlockColumnEntry::OutlineFilename(block_column_entry->column_id_, outline_info->next_file_idx++);
-                        auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_,
-                                                                      file_name,
-                                                                      DEFAULT_BASE_NUM *
-                                                                      Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
+                        auto file_worker =
+                            MakeUnique<DataFileWorker>(block_column_entry->base_dir_,
+                                                       file_name,
+                                                       DEFAULT_BASE_NUM * Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
 
-                        BufferObj* buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
+                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
                     BufferHandle out_buffer_handle = current_buffer_obj->Load();
                     ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
-                    u32 outline_data_size = varchar_type->length_;
-                    ptr_t outline_src_ptr = varchar_type->value_.ptr_;
-                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+                    if (varchar_type->IsValue()) {
+                        u32 outline_data_size = varchar_type->length_;
+                        ptr_t outline_src_ptr = varchar_type->value_.ptr_;
+                        Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+                    } else {
+                        vector_buffer->fix_heap_mgr_->ReadFromHeap(outline_dst_ptr,
+                                                              varchar_type->vector_.chunk_id_,
+                                                              varchar_type->vector_.chunk_offset_,
+                                                              varchar_type->length_);
+                    }
 
                     varchar_layout->length_ = varchar_type->length_;
                     Memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);

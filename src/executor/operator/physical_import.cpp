@@ -288,7 +288,7 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
 template <typename T>
 void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
     T ele = DataType::StringToValue<T>(str_view);
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
 }
 
 template <typename T>
@@ -299,7 +299,7 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
         T ele = DataType::StringToValue<T>(ele_str_view);
         tmp_buffer[ele_idx++] = ele;
     }
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len);
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len, nullptr);
 }
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
@@ -307,7 +307,7 @@ void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &st
     auto varchar_ptr = MakeUnique<VarcharT>();
     varchar_ptr->InitAsValue(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_ptr.get()), sizeof(VarcharT));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_ptr.get()), sizeof(VarcharT), nullptr);
 }
 
 } // namespace

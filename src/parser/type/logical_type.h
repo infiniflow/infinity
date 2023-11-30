@@ -18,7 +18,6 @@
 #include "type/complex/blob_type.h"
 #include "type/complex/embedding_type.h"
 #include "type/complex/uuid_type.h"
-#include "type/complex/varchar_type.h"
 #include "type/datetime/date_type.h"
 #include "type/datetime/datetime_type.h"
 #include "type/datetime/interval_type.h"
