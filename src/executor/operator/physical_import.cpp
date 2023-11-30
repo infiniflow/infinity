@@ -304,9 +304,10 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
     const char_t *tmp_buffer = str_view.data();
-    auto varchar_type = MakeUnique<VarcharT>(str_view.data(), str_view.size());
+    auto varchar_ptr = MakeUnique<VarcharT>();
+    varchar_ptr->InitAsValue(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_type.get()), sizeof(VarcharT));
+    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_ptr.get()), sizeof(VarcharT));
 }
 
 } // namespace

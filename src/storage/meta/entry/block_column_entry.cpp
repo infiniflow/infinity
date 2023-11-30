@@ -119,6 +119,9 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
             for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr + row_idx;
                 VarcharLayout *varchar_layout = inline_p + row_idx;
+                if(!varchar_type->IsValue()) {
+                    Error<StorageException>("Varchar type here must be value.");
+                }
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length_;
@@ -137,16 +140,15 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
                     BufferHandle out_buffer_handle = current_buffer_obj->Load();
                     ptr_t outline_dst_ptr = static_cast<ptr_t>(out_buffer_handle.GetDataMut()) + current_buffer_offset;
-                    u16 outline_data_size = varchar_type->length_;
-                    Error<StorageException>("Not implement");
-//                    ptr_t outline_src_ptr = varchar_type->ptr;
-//                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
-//
-//                    varchar_layout->length_ = varchar_type->length;
-//                    Memcpy(long_info.prefix_.data(), varchar_type->prefix, VarcharT::PREFIX_LENGTH);
-//                    long_info.file_idx_ = outline_info->next_file_idx - 1;
-//                    long_info.file_offset_ = current_buffer_offset;
-//                    current_buffer_offset += varchar_type->length;
+                    u32 outline_data_size = varchar_type->length_;
+                    ptr_t outline_src_ptr = varchar_type->value_.ptr_;
+                    Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+
+                    varchar_layout->length_ = varchar_type->length_;
+                    Memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);
+                    long_info.file_idx_ = outline_info->next_file_idx - 1;
+                    long_info.file_offset_ = current_buffer_offset;
+                    current_buffer_offset += varchar_type->length_;
                 }
             }
             break;

@@ -882,7 +882,13 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                return std::string{varchar_ref.vector_.prefix_, static_cast<size_t>(VARCHAR_PREFIX_LEN)};
+                if(varchar_ref.IsValue()) {
+                    Error<TypeException>("Must be vector type of varchar, here");
+                }
+                String result_str;
+                result_str.resize(varchar_ref.length_);
+                buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(), varchar_ref.vector_.chunk_id_, varchar_ref.vector_.chunk_offset_, varchar_ref.length_);
+                return result_str;
             }
         }
         case kDate: {
@@ -1897,9 +1903,20 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 //
          case kVarchar: {
              for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
-                 auto [src_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
-//                 auto varchar_type = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
-//                 varchar_type->Initialize(src_ptr, data_size);
+                 auto [data_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
+                 const char* src_ptr = data_ptr;
+                 SizeT src_size = data_size;
+                 auto varchar_dst = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
+                 varchar_dst->is_value_ = false;
+                 if(src_size <= VARCHAR_INLINE_LEN) {
+                     Memcpy(varchar_dst->short_.data_, src_ptr, src_size);
+                 } else {
+                     Memcpy(varchar_dst->vector_.prefix_, src_ptr, VARCHAR_PREFIX_LEN);
+                     auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
+                     varchar_dst->vector_.chunk_id_ = chunk_id;
+                     varchar_dst->vector_.chunk_offset_ = chunk_offset;
+                 }
+                 varchar_dst->length_ = src_size;
                  this->tail_index_++;
              }
              break;
