@@ -640,8 +640,6 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
 // Execute describe system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-
-    auto txn = query_context->GetTxn();
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {

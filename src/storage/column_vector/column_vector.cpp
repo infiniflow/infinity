@@ -1636,7 +1636,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
                 VarcharT &dst_ref = base_dst_ptr[idx];
                 dst_ref.length_ = src_ref.length_;
                 if (src_ref.IsInlined()) {
-                    Memcpy(dst_ref.value_.ptr_, src_ref.value_.ptr_, src_ref.length_);
+                    Memcpy(&dst_ref.short_, &src_ref.short_, src_ref.length_);
                 } else {
                     // Assume the source must be column vector type.
                     Memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
@@ -2110,19 +2110,9 @@ i32 ColumnVector::GetSizeInBytes() const {
 //        case kBitmap:
         case kUuid:
         case kRowID:
+        case kVarchar:
         case kEmbedding: {
             size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
-            break;
-        }
-        case kVarchar: {
-            size += sizeof(i32);
-
-            // FIME: on `Finalize` phase, the column vector size can be settled.
-            VarcharT *base_dst_ptr = (VarcharT *)(this->data_ptr_);
-            for (SizeT idx = 0; idx < this->tail_index_; idx++) {
-                VarcharT &val_ref = base_dst_ptr[idx];
-                size += val_ref.length_;
-            }
             break;
         }
         default:
@@ -2161,14 +2151,11 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         case kCircle:
 //        case kBitmap:
         case kUuid:
+        case kVarchar:
         case kEmbedding: {
             WriteBufAdv<i32>(ptr, tail_index_);
             Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
             ptr += this->tail_index_ * this->data_type_size_;
-            break;
-        }
-        case kVarchar: {
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
             break;
         }
         default: {
@@ -2208,16 +2195,13 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         case kCircle:
 //        case kBitmap:
         case kUuid:
+        case kVarchar:
         case kEmbedding: {
             i32 tail_index = ReadBufAdv<i32>(ptr);
             column_vector->tail_index_ = tail_index;
             i32 data_type_size = data_type->Size();
             Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
             ptr += tail_index * data_type_size;
-            break;
-        }
-        case kVarchar: {
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
             break;
         }
         default: {
