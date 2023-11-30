@@ -13,19 +13,22 @@
 # limitations under the License.
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import List, Literal, Optional, Type, Union
+
+from abc import ABC
+from typing import List, Optional, Union
+
+import pandas as pd
 import pydantic
 
+
 class Query(pydantic.BaseModel):
-    filter: Optional[str] = None
     columns: Optional[List[str]] = None
+    filter: Optional[str] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
 
 
 class InfinityQueryBuilder(ABC):
-
 
     @classmethod
     def create(
@@ -43,11 +46,11 @@ class InfinityQueryBuilder(ABC):
         self._filter = None
         self._offset = None
 
-    def limit(self, limit: int) -> InfinityQueryBuilder:
+    def limit(self, limit: Optional[int]) -> InfinityQueryBuilder:
         self._limit = limit
         return self
 
-    def offset(self, offset: int) -> InfinityQueryBuilder:
+    def offset(self, offset: Optional[int]) -> InfinityQueryBuilder:
         self._offset = offset
         return self
 
@@ -55,7 +58,7 @@ class InfinityQueryBuilder(ABC):
         self._columns = columns
         return self
 
-    def filter(self, where: str) -> InfinityQueryBuilder:
+    def filter(self, where: Optional[str]) -> InfinityQueryBuilder:
         self._filter = where
         return self
 
@@ -75,19 +78,19 @@ class InfinityVectorQueryBuilder(InfinityQueryBuilder):
         self._query = query
         self._vector_column = vector_column
 
-    def filter(self, where: str) -> InfinityVectorQueryBuilder:
+    def filter(self, where: Optional[str]) -> InfinityVectorQueryBuilder:
         self._filter = where
         return self
 
-    def limit(self, limit: int) -> InfinityVectorQueryBuilder:
+    def limit(self, limit: Optional[int]) -> InfinityVectorQueryBuilder:
         self._limit = limit
         return self
 
-    def offset(self, offset: int) -> InfinityVectorQueryBuilder:
+    def offset(self, offset: Optional[int]) -> InfinityVectorQueryBuilder:
         self._offset = offset
         return self
 
-    def to_list(self) -> List[List]:
+    def to_df(self) -> pd.DataFrame:
         query = Query(
             filter=self._filter,
             columns=self._columns,

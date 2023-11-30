@@ -1,7 +1,8 @@
 sqlglot==11.7.1
-pydantic
-thrift
-setuptools
-pytest
-pandas
+pydantic~=1.10.12
+thrift~=0.16.0
+setuptools~=68.0.0
+pytest~=7.4.0
+pandas~=2.1.1
 openpyxl
+numpy~=1.26.0

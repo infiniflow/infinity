@@ -52,7 +52,7 @@ $ wget https://github.com/Kitware/CMake/releases/download/v3.28.0-rc5/cmake-3.28
 $ tar xzvf cmake-3.28.0-rc5-linux-x86_64.tar.gz
 $ sudo cp -r cmake-3.28.0-rc5-linux-x86_64/bin/* /usr/local/bin/
 
-$ sudo apt install make ninja-build bison flex libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev
+$ sudo apt install make libevent-dev ninja-build bison flex libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev
 
 # iresearch requires lz4
 $ git clone https://github.com/lz4/lz4.git

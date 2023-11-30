@@ -188,6 +188,8 @@ class FunctionExpr;
 
 class BetweenExpr;
 
+class UpdateExpr;
+
 class Field;
 
 class ColumnField;
@@ -241,6 +243,10 @@ class ImportRequest;
 class SelectRequest;
 
 class SelectResponse;
+
+class DeleteRequest;
+
+class UpdateRequest;
 
 
 class Option : public virtual ::apache::thrift::TBase {
@@ -578,11 +584,12 @@ void swap(ColumnDef &a, ColumnDef &b);
 std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
 
 typedef struct _ParsedExprType__isset {
-  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), knn_expr(false) {}
+  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), knn_expr(false), between_expr(false) {}
   bool constant_expr :1;
   bool column_expr :1;
   bool function_expr :1;
   bool knn_expr :1;
+  bool between_expr :1;
 } _ParsedExprType__isset;
 
 class ParsedExprType : public virtual ::apache::thrift::TBase {
@@ -594,7 +601,8 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
                  : constant_expr(),
                    column_expr(),
                    function_expr(),
-                   knn_expr() {
+                   knn_expr(),
+                   between_expr() {
   }
 
   virtual ~ParsedExprType() noexcept;
@@ -602,6 +610,7 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
   ::std::shared_ptr<ColumnExpr> column_expr;
   ::std::shared_ptr<FunctionExpr> function_expr;
   ::std::shared_ptr<KnnExpr> knn_expr;
+  ::std::shared_ptr<BetweenExpr> between_expr;
 
   _ParsedExprType__isset __isset;
 
@@ -612,6 +621,8 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
   void __set_function_expr(::std::shared_ptr<FunctionExpr> val);
 
   void __set_knn_expr(::std::shared_ptr<KnnExpr> val);
+
+  void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
 
   bool operator == (const ParsedExprType & rhs) const
   {
@@ -630,6 +641,10 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
     if (__isset.knn_expr != rhs.__isset.knn_expr)
       return false;
     else if (__isset.knn_expr && !(knn_expr == rhs.knn_expr))
+      return false;
+    if (__isset.between_expr != rhs.__isset.between_expr)
+      return false;
+    else if (__isset.between_expr && !(between_expr == rhs.between_expr))
       return false;
     return true;
   }
@@ -1009,6 +1024,55 @@ class BetweenExpr : public virtual ::apache::thrift::TBase {
 void swap(BetweenExpr &a, BetweenExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const BetweenExpr& obj);
+
+typedef struct _UpdateExpr__isset {
+  _UpdateExpr__isset() : column_name(false), value(false) {}
+  bool column_name :1;
+  bool value :1;
+} _UpdateExpr__isset;
+
+class UpdateExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  UpdateExpr(const UpdateExpr&);
+  UpdateExpr& operator=(const UpdateExpr&);
+  UpdateExpr() noexcept
+             : column_name() {
+  }
+
+  virtual ~UpdateExpr() noexcept;
+  std::string column_name;
+  ParsedExpr value;
+
+  _UpdateExpr__isset __isset;
+
+  void __set_column_name(const std::string& val);
+
+  void __set_value(const ParsedExpr& val);
+
+  bool operator == (const UpdateExpr & rhs) const
+  {
+    if (!(column_name == rhs.column_name))
+      return false;
+    if (!(value == rhs.value))
+      return false;
+    return true;
+  }
+  bool operator != (const UpdateExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const UpdateExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(UpdateExpr &a, UpdateExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const UpdateExpr& obj);
 
 typedef struct _Field__isset {
   _Field__isset() : parse_exprs(true) {}
@@ -2657,6 +2721,139 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
 void swap(SelectResponse &a, SelectResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const SelectResponse& obj);
+
+typedef struct _DeleteRequest__isset {
+  _DeleteRequest__isset() : db_name(false), table_name(false), where_expr(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool where_expr :1;
+  bool session_id :1;
+} _DeleteRequest__isset;
+
+class DeleteRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DeleteRequest(const DeleteRequest&);
+  DeleteRequest& operator=(const DeleteRequest&);
+  DeleteRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  session_id(0) {
+  }
+
+  virtual ~DeleteRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  ParsedExpr where_expr;
+  int64_t session_id;
+
+  _DeleteRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_where_expr(const ParsedExpr& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const DeleteRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(where_expr == rhs.where_expr))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const DeleteRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DeleteRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DeleteRequest &a, DeleteRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DeleteRequest& obj);
+
+typedef struct _UpdateRequest__isset {
+  _UpdateRequest__isset() : db_name(false), table_name(false), where_expr(false), update_expr_array(true), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool where_expr :1;
+  bool update_expr_array :1;
+  bool session_id :1;
+} _UpdateRequest__isset;
+
+class UpdateRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  UpdateRequest(const UpdateRequest&);
+  UpdateRequest& operator=(const UpdateRequest&);
+  UpdateRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  session_id(0) {
+
+  }
+
+  virtual ~UpdateRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  ParsedExpr where_expr;
+  std::vector<UpdateExpr>  update_expr_array;
+  int64_t session_id;
+
+  _UpdateRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_where_expr(const ParsedExpr& val);
+
+  void __set_update_expr_array(const std::vector<UpdateExpr> & val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const UpdateRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(where_expr == rhs.where_expr))
+      return false;
+    if (!(update_expr_array == rhs.update_expr_array))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const UpdateRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const UpdateRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(UpdateRequest &a, UpdateRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj);
 
 } // namespace
 

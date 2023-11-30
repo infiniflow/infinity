@@ -174,7 +174,10 @@ public:
 
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
 
-        ParsedExpr *filter = GetParsedExprFromProto(request.where_expr);
+        ParsedExpr *filter = nullptr;
+        if (request.__isset.where_expr == true) {
+            filter = GetParsedExprFromProto(request.where_expr);
+        }
 
         // TODO:
         //    ParsedExpr *offset;
@@ -234,6 +237,46 @@ public:
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
+    }
+
+    void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        auto table = database->GetTable(request.table_name);
+
+        ParsedExpr *filter = nullptr;
+        if (request.__isset.where_expr == true) {
+            filter = GetParsedExprFromProto(request.where_expr);
+        }
+
+        const auto result = table->Delete(filter);
+
+        ProcessCommonResult(response, result);
+    };
+
+    void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) override {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        auto table = database->GetTable(request.table_name);
+
+        ParsedExpr *filter = nullptr;
+        if (request.__isset.where_expr == true) {
+            filter = GetParsedExprFromProto(request.where_expr);
+        }
+
+        std::vector<UpdateExpr *> *update_expr_array_{nullptr};
+        if (request.__isset.update_expr_array == true) {
+            update_expr_array_ = new std::vector<UpdateExpr *>();
+            update_expr_array_->reserve(request.update_expr_array.size());
+            for (auto &update_expr : request.update_expr_array) {
+                auto parsed_expr = GetUpdateExprFromProto(update_expr);
+                update_expr_array_->emplace_back(parsed_expr);
+            }
+        }
+
+        const QueryResult result = table->Update(filter, update_expr_array_);
+
+        ProcessCommonResult(response, result);
     }
 
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) override {
@@ -566,16 +609,25 @@ private:
     }
 
     static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
-        if (expr.type.column_expr != nullptr) {
+        if (expr.type.__isset.column_expr == true) {
             auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
             return parsed_expr;
-        } else if (expr.type.constant_expr != nullptr) {
+        } else if (expr.type.__isset.constant_expr == true) {
             auto parsed_expr = GetConstantFromProto(*expr.type.constant_expr);
             return parsed_expr;
-        } else if (expr.type.function_expr != nullptr) {
+        } else if (expr.type.__isset.function_expr == true) {
             auto parsed_expr = GetFunctionExprFromProto(*expr.type.function_expr);
             return parsed_expr;
+        } else {
+            Error<TypeException>("Invalid parsed expression type", __FILE_NAME__, __LINE__);
         }
+    }
+
+    static UpdateExpr *GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
+        auto up_expr = new UpdateExpr();
+        up_expr->column_name = update_expr.column_name;
+        up_expr->value = GetParsedExprFromProto(update_expr.value);
+        return up_expr;
     }
 
     static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const SharedPtr<DataType> &data_type) {

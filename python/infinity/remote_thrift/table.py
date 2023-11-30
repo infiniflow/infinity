@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct
 from abc import ABC
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, List
 
+import pandas as pd
 from sqlglot import condition, expressions as exp
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
 from infinity.query import Query, InfinityVectorQueryBuilder
+from infinity.remote_thrift.types import build_result
 from infinity.table import Table, binary_exp_to_paser_exp
 
 
@@ -95,10 +96,58 @@ class RemoteTable(Table, ABC):
         return self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
                                              import_options=options)
 
-    def delete(self, condition):
-        pass
+    def delete(self, cond: Optional[str] = None):
+        match cond:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(cond))
+        return self._conn.client.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
 
-    def update(self, condition, data):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
+        # {"c1": 1, "c2": 1.1}
+        match cond:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(cond))
+        match data:
+            case None:
+                update_expr_array = None
+            case _:
+                update_expr_array: list[ttypes.UpdateExpr] = []
+                for row in data:
+                    parse_exprs = []
+                    for column_name, value in row.items():
+
+                        if isinstance(value, str):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.String
+                            constant_expression.str_value = value
+                        elif isinstance(value, int):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.Int64
+                            constant_expression.i64_value = value
+                        elif isinstance(value, float):
+                            constant_expression = ttypes.ConstantExpr()
+                            constant_expression.literal_type = ttypes.LiteralType.Double
+                            constant_expression.f64_value = value
+                        else:
+                            raise Exception("Invalid constant expression")
+
+                        paser_expr_type = ttypes.ParsedExprType()
+                        paser_expr_type.constant_expr = constant_expression
+                        paser_expr = ttypes.ParsedExpr()
+                        paser_expr.type = paser_expr_type
+
+                        update_expr = ttypes.UpdateExpr()
+                        update_expr.column_name = column_name
+                        update_expr.value = paser_expr
+                        update_expr_array.append(update_expr)
+
+        return self._conn.client.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
+                                        update_expr_array=update_expr_array)
+
         pass
 
     def search(
@@ -111,7 +160,7 @@ class RemoteTable(Table, ABC):
             vector_column_name="",
         )
 
-    def _execute_query(self, query: Query) -> Dict[str, Any]:
+    def _execute_query(self, query: Query) -> pd.DataFrame:
         # process select_list
         select_list: List[ttypes.ParsedExpr] = []
 
@@ -129,29 +178,39 @@ class RemoteTable(Table, ABC):
                     select_list.append(traverse_conditions(condition(column)))
 
         # process where_expr
-        where_expr = ttypes.ParsedExpr()
-        if query.filter is not None:
-            where_expr = traverse_conditions(condition(query.filter))
+        match query.filter:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(query.filter))
 
-        # process limit_expr and offset_expr
-        limit_expr = ttypes.ParsedExpr()
-        offset_expr = ttypes.ParsedExpr()
-        if query.limit is not None:
-            constant_exp = ttypes.ConstantExpr()
-            constant_exp.literal_type = ttypes.LiteralType.Int64
+        # process limit_expr
+        match query.limit:
+            case None:
+                limit_expr = None
+            case _:
+                constant_exp = ttypes.ConstantExpr()
+                constant_exp.literal_type = ttypes.LiteralType.Int64
+                paser_expr_type = ttypes.ParsedExprType()
+                paser_expr_type.constant_expr = constant_exp
+                limit_expr = ttypes.ParsedExpr()
+                limit_expr.type = paser_expr_type
+                limit_expr.i64_value = query.limit
 
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            limit_expr.type = paser_expr_type
-            limit_expr.i64_value = query.limit
-        if query.offset is not None:
-            constant_exp = ttypes.ConstantExpr()
-            constant_exp.literal_type = ttypes.LiteralType.Int64
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_exp
-            offset_expr.type = paser_expr_type
-            offset_expr.i64_value = query.offset
+        # process offset_expr
+        match query.offset:
+            case None:
+                offset_expr = None
+            case _:
+                constant_exp = ttypes.ConstantExpr()
+                constant_exp.literal_type = ttypes.LiteralType.Int64
+                paser_expr_type = ttypes.ParsedExprType()
+                paser_expr_type.constant_expr = constant_exp
+                offset_expr = ttypes.ParsedExpr()
+                offset_expr.type = paser_expr_type
+                offset_expr.i64_value = query.offset
 
+        # execute the query
         res = self._conn.client.select(db_name=self._db_name,
                                        table_name=self._table_name,
                                        select_list=select_list,
@@ -162,31 +221,8 @@ class RemoteTable(Table, ABC):
                                        search_expr=None)
 
         # process the results
-        results = dict()
-        for column_def in res.column_defs:
-            column_name = column_def.name
-            column_id = column_def.id
-            column_field = res.column_fields[column_id]
-            column_type = column_field.column_type
-            column_vector = column_field.column_vector
-            # print(column_name, column_type, column_vector)
-
-            if column_type == ttypes.ColumnType.ColumnInt32:
-                value_list = struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnInt64:
-                value_list = struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnFloat32:
-                value_list = struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
-                results[column_name] = value_list
-            elif column_type == ttypes.ColumnType.ColumnFloat64:
-                value_list = struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
-                results[column_name] = value_list
-            else:
-                raise Exception(f"unknown column type: {column_type}")
-
-        return results
+        if res.success:
+            return build_result(res)
         # todo: how to convert bytes to string?
 
 
