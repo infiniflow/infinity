@@ -29,7 +29,7 @@ namespace infinity {
 QueryResult Database::CreateTable(const String &table_name,
                                   Vector<ColumnDef *> column_defs,
                                   Vector<TableConstraint *> constraints,
-                                  const CreateTableOptions &create_table_options) {
+                                  const CreateTableOptions &) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -45,7 +45,7 @@ QueryResult Database::CreateTable(const String &table_name,
     return result;
 }
 
-QueryResult Database::DropTable(const String &table_name, const DropTableOptions &drop_table_options) {
+QueryResult Database::DropTable(const String &table_name, const DropTableOptions &) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -72,7 +72,7 @@ QueryResult Database::ListTables() {
     return result;
 }
 
-QueryResult Database::DescribeTable(const String &db_name) {
+QueryResult Database::DescribeTable(const String &) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),

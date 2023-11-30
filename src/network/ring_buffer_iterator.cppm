@@ -58,8 +58,6 @@ public:
         return iter;
     }
 
-    static inline void Copy(RingBufferIterator &begin_iter) {}
-
     static inline void Copy(const RingBufferIterator &begin_iter, const RingBufferIterator &end_iter, String &output) {
         SizeT size = Distance(begin_iter, end_iter);
         output.reserve(size);

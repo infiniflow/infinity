@@ -25,7 +25,7 @@ module column_identifer;
 
 namespace infinity {
 
-ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *query_context, const ColumnExpr &expr) {
+ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const ColumnExpr &expr) {
     if (expr.star_) {
         Error<PlannerException>("Star expression should be unfolded before.");
     }

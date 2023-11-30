@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.5)
 project("sql_parser")
 
 #execute_process(COMMAND ./generate_parser.sh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

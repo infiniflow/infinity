@@ -37,7 +37,7 @@ export struct SourcePosition {
 
     u64 bind_context_id_{u64_max};
     ExprSourceType source_type_{ExprSourceType::kInvalid};
-    String binding_name_;
+    String binding_name_{};
 };
 
 export class BaseExpression : public EnableSharedFromThis<BaseExpression> {
@@ -45,7 +45,7 @@ public:
     explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(Move(arguments)){};
 
     explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments, String alias)
-        : type_(type), arguments_(Move(arguments)), alias_(Move(alias)){};
+        : alias_(Move(alias)), type_(type), arguments_(Move(arguments)){};
 
     virtual ~BaseExpression() = default;
 
@@ -63,14 +63,14 @@ public:
 
     inline Vector<SharedPtr<BaseExpression>> &arguments() { return arguments_; }
 
-    SourcePosition source_position_;
-    String alias_;
+    SourcePosition source_position_{};
+    String alias_{};
 
 protected:
     [[nodiscard]] virtual String ToString() const = 0;
 
-    ExpressionType type_;
-    Vector<SharedPtr<BaseExpression>> arguments_;
+    ExpressionType type_{};
+    Vector<SharedPtr<BaseExpression>> arguments_{};
 };
 
 } // namespace infinity

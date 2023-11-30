@@ -1541,7 +1541,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
 
 void ColumnVector::AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
 
-void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
+void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
     if (count == 0) {
         return;
     }

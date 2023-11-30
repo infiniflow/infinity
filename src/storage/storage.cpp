@@ -117,7 +117,7 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
     return latest;
 }
 
-void Storage::InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr) {
+void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
     BaseEntry* base_entry{nullptr};
     Txn *new_txn = txn_mgr->CreateTxn();
     new_txn->Begin();

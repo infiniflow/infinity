@@ -61,14 +61,14 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
 
-BufferHandle SegmentColumnIndexEntry::GetIndex(SegmentColumnIndexEntry *segment_column_index_entry, BufferManager *buffer_mgr) {
+BufferHandle SegmentColumnIndexEntry::GetIndex(SegmentColumnIndexEntry *segment_column_index_entry, BufferManager *) {
     return segment_column_index_entry->buffer_->Load();
 }
 
-void SegmentColumnIndexEntry::UpdateIndex(SegmentColumnIndexEntry *segment_column_index_entry,
-                                          TxnTimeStamp commit_ts,
-                                          FaissIndexPtr *index,
-                                          BufferManager *buffer_mgr) {
+void SegmentColumnIndexEntry::UpdateIndex(SegmentColumnIndexEntry *,
+                                          TxnTimeStamp,
+                                          FaissIndexPtr *,
+                                          BufferManager *) {
     Error<NotImplementException>("Not implemented");
 }
 
@@ -174,7 +174,7 @@ UniquePtr<IndexFileWorker> SegmentColumnIndexEntry::CreateFileWorker(ColumnIndex
             Error<StorageException>(*err_msg);
         }
         case IndexType::kIRSFullText: {
-            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
+//            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
             UniquePtr<String> err_msg =
                     MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);

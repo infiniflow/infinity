@@ -32,9 +32,9 @@ struct AvgState {
 public:
     inline void Initialize() { Error<NotImplementException>("Initialize average state."); }
 
-    inline void Update(const ValueType *__restrict input, SizeT idx) { Error<NotImplementException>("Update average state."); }
+    inline void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Update average state."); }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         Error<NotImplementException>("Constant update average state.");
     }
 
@@ -73,7 +73,7 @@ public:
         return (ptr_t)&result_;
     }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
 template <>

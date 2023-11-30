@@ -31,7 +31,7 @@ namespace infinity {
 
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
-    static inline bool Run(TA left, TB right, TC &result) {
+    static inline bool Run(TA, TB, TC &) {
         Error<NotImplementException>("Not implement");
     }
 };
@@ -70,7 +70,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
-inline bool SubFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
+inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
@@ -97,7 +97,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 // Decimal - Decimal = Decimal
 template <>
-inline bool SubFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
+inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
@@ -110,49 +110,49 @@ inline bool SubFunction::Run(DateT left, IntervalT right, DateT &result) {
 
 // DateTime - Interval
 template <>
-inline bool SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
+inline bool SubFunction::Run(DateTimeT, IntervalT, DateTimeT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // TimestampT - Interval
 template <>
-inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
+inline bool SubFunction::Run(TimestampT, IntervalT, TimestampT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // Mixed Type - i64
 template <>
-inline bool SubFunction::Run(MixedT left, BigIntT right, MixedT &result) {
+inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // i64 - Mixed Type
 template <>
-inline bool SubFunction::Run(BigIntT left, MixedT right, MixedT &result) {
+inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // Mixed Type - f64
 template <>
-inline bool SubFunction::Run(MixedT left, DoubleT right, MixedT &result) {
+inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // f64 - Mixed Type
 template <>
-inline bool SubFunction::Run(DoubleT left, MixedT right, MixedT &result) {
+inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
-inline bool SubFunction::Run(MixedT left, MixedT right, MixedT &result) {
+inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
     Error<NotImplementException>("Not implement");
     return false;
 }

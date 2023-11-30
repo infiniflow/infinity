@@ -29,7 +29,7 @@ namespace infinity {
 
 struct ExtractYearFunction {
     template <typename TA, typename TB>
-    static inline void Run(TA input, TB &result) {
+    static inline void Run(TA, TB &) {
         Error<NotImplementException>("ExtractYear function isn't implemented");
     }
 };
@@ -41,7 +41,7 @@ inline void ExtractYearFunction::Run(DateT left, BigIntT &result) {
 
 struct ExtractMonthFunction {
     template <typename TA, typename TB>
-    static inline void Run(TA input, TB &result) {
+    static inline void Run(TA, TB &) {
         Error<NotImplementException>("ExtractMonth function isn't implemented");
     }
 };
@@ -53,7 +53,7 @@ inline void ExtractMonthFunction::Run(DateT left, BigIntT &result) {
 
 struct ExtractDayFunction {
     template <typename TA, typename TB>
-    static inline void Run(TA input, TB &result) {
+    static inline void Run(TA, TB &) {
         Error<NotImplementException>("ExtractDay function isn't implemented");
     }
 };

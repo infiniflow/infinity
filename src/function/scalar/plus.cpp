@@ -29,7 +29,7 @@ namespace infinity {
 
 struct PlusFunction {
     template <typename TA, typename TB>
-    static inline bool Run(TA value, TB &result) {
+    static inline bool Run(TA, TB &) {
         Error<NotImplementException>("Not implement");
     }
 };

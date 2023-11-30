@@ -34,13 +34,13 @@ public:
 
     void Initialize() { this->count_ = 0; }
 
-    void Update(ValueType *__restrict input, SizeT idx) { count_++; }
+    void Update(ValueType *__restrict, SizeT) { count_++; }
 
-    inline void ConstantUpdate(ValueType *__restrict input, SizeT idx, SizeT count) { count_ += count; }
+    inline void ConstantUpdate(ValueType *__restrict, SizeT, SizeT count) { count_ += count; }
 
     inline ptr_t Finalize() { return (ptr_t)&count_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(i64); }
+    inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
 void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {

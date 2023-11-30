@@ -73,13 +73,13 @@ bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, S
 
 struct LikeFunction {
     template <typename TA, typename TB, typename TC>
-    static inline void Run(TA left, TB right, TC &result) {
+    static inline void Run(TA, TB, TC &) {
         Error<NotImplementException>("Not implement");
     }
 };
 
 template <>
-inline void LikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
+inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     Error<NotImplementException>("Not implement: varchar like varchar");
 
 //    ptr_t left_ptr = left.GetDataPtr();
@@ -92,13 +92,13 @@ inline void LikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
 
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
-    static inline void Run(TA left, TB right, TC &result) {
+    static inline void Run(TA, TB, TC &) {
         Error<NotImplementException>("Not implement");
     }
 };
 
 template <>
-inline void NotLikeFunction::Run(VarcharT &left, VarcharT &right, bool &result) {
+inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     Error<NotImplementException>("Not implement: varchar not like varchar");
 
 //    ptr_t left_ptr = left.GetDataPtr();

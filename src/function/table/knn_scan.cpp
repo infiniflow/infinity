@@ -38,7 +38,7 @@ module knn_scan;
 
 namespace infinity {
 
-void KnnScanFunc(QueryContext *query_context, TableFunctionData *table_function_data_ptr, DataBlock &output) {
+void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //     auto *knn_scan_function_data_ptr = static_cast<KnnScanFunctionData *>(table_function_data_ptr);
     //     const BlockIndex *block_index = knn_scan_function_data_ptr->block_index_;
     //     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();

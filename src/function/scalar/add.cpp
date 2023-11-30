@@ -31,7 +31,7 @@ namespace infinity {
 
 struct AddFunction {
     template <typename TA, typename TB, typename TC>
-    static inline bool Run(TA left, TB right, TC &result) {
+    static inline bool Run(TA, TB, TC &) {
         Error<NotImplementException>("Not implemented");
     }
 };
@@ -74,7 +74,7 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 
 // HugeIntT + HugeIntT = HugeIntT, and check overflow
 template <>
-inline bool AddFunction::Run(HugeIntT left, HugeIntT right, HugeIntT &result) {
+inline bool AddFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT");
     return false;
 }
@@ -101,7 +101,7 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 // Decimal + Decimal = Decimal
 template <>
-inline bool AddFunction::Run(DecimalT left, DecimalT right, DecimalT &result) {
+inline bool AddFunction::Run(DecimalT, DecimalT, DecimalT &) {
     Error<NotImplementException>("Not implemented: Decimal + Decimal");
     return false;
 }
@@ -120,7 +120,7 @@ inline bool AddFunction::Run(IntervalT left, DateT right, DateT &result) {
 
 // DateTime + Interval
 template <>
-inline bool AddFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
+inline bool AddFunction::Run(DateTimeT, IntervalT, DateTimeT &) {
     Error<NotImplementException>("Not implemented: DateTimeT + IntervalT");
     return false;
 }
@@ -133,7 +133,7 @@ inline bool AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT &result)
 
 // TimestampT + Interval
 template <>
-inline bool AddFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
+inline bool AddFunction::Run(TimestampT, IntervalT, TimestampT &) {
     Error<NotImplementException>("Not implemented: TimestampT + IntervalT");
     return false;
 }
@@ -146,7 +146,7 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 
 // Mixed Type + i64
 template <>
-inline bool AddFunction::Run(MixedT left, BigIntT right, MixedT &result) {
+inline bool AddFunction::Run(MixedT, BigIntT, MixedT &) {
     Error<NotImplementException>("Not implemented: MixedT + BigIntT");
     return false;
 }
@@ -159,7 +159,7 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 
 // Mixed Type + f64
 template <>
-inline bool AddFunction::Run(MixedT left, DoubleT right, MixedT &result) {
+inline bool AddFunction::Run(MixedT, DoubleT, MixedT &) {
     Error<NotImplementException>("Not implemented: MixedT + DoubleT");
     return false;
 }
@@ -172,7 +172,7 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 
 // Mixed Type + Mixed Type
 template <>
-inline bool AddFunction::Run(MixedT left, MixedT right, MixedT &result) {
+inline bool AddFunction::Run(MixedT, MixedT, MixedT &) {
     Error<NotImplementException>("Not implemented: MixedT + MixedT");
     return false;
 }

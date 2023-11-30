@@ -35,8 +35,8 @@ String AggregateExpression::ToString() const {
     if (arguments_.empty()) {
         ss << ")";
     } else {
-        auto arguments_count = arguments_.size();
-        for (auto i = 0; i < arguments_count - 1; ++i) {
+        SizeT arguments_count = arguments_.size();
+        for (SizeT i = 0; i < arguments_count - 1; ++i) {
             ss << arguments_[i]->Name() << ", ";
         }
         ss << arguments_.back()->Name() << ")";

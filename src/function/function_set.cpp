@@ -37,13 +37,13 @@ String FunctionSet::ToString(const String &name, const Vector<SharedPtr<BaseExpr
     std::stringstream ss;
 
     ss << name;
-    auto argument_count = arguments.size();
+    SizeT argument_count = arguments.size();
     if (argument_count == 0) {
         ss << "()";
 
     } else {
         ss << "(";
-        for (auto i = 0; i < argument_count - 1; ++i) {
+        for (SizeT i = 0; i < argument_count - 1; ++i) {
             ss << arguments[i]->Type().ToString() << ", ";
         }
         ss << arguments.back()->Type().ToString();
