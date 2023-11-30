@@ -167,12 +167,6 @@ UniquePtr<IndexFileWorker> SegmentColumnIndexEntry::CreateFileWorker(ColumnIndex
                 MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_param->max_element_);
             break;
         }
-        case IndexType::kHnswLVQ: {
-            UniquePtr<String> err_msg =
-                    MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
-        }
         case IndexType::kIRSFullText: {
             auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
             UniquePtr<String> err_msg =

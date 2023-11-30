@@ -13,7 +13,6 @@
 // limitations under the License.
 
 module;
-
 #include <iostream>
 #include <random>
 
@@ -28,6 +27,14 @@ import graph_store;
 import lvq_store;
 
 export module hnsw_alg;
+
+// Fixme: some variable has implicit type conversion.
+// Fixme: some variable has confusing name.
+// Fixme: has no test for different `DataType`.
+
+// Todo: make more embedding type.
+// Todo: make module partition.
+// Todo: make the constructor of `KnnHnsw` with less confusing template
 
 namespace infinity {
 
@@ -116,8 +123,10 @@ private:
         return static_cast<i32>(r);
     }
 
-    VertexType StoreData(const DataType *data, const LabelType *labels, SizeT insert_n) {
-        auto ret = data_store_.AddVec(data, insert_n);
+    template <typename Iterator>
+        requires DataIteratorConcept<Iterator, const DataType *>
+    VertexType StoreData(Iterator iter, const LabelType *labels, SizeT insert_n) {
+        auto ret = data_store_.AddVec(iter, insert_n);
         if (ret == DataStore::ERR_IDX) {
             Error<StorageException>("Data index is not enough.");
         }
@@ -252,10 +261,10 @@ public:
         }
     }
 
-    void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
-
-    void Insert(const DataType *queries, const LabelType *label, SizeT insert_n) {
-        VertexType vertex_i1 = StoreData(queries, label, insert_n);
+    template <typename Iterator>
+        requires DataIteratorConcept<Iterator, const DataType *>
+    void InsertVecs(Iterator query_iter, const LabelType *labels, SizeT insert_n) {
+        const VertexType vertex_i1 = StoreData(Move(query_iter), labels, insert_n);
         for (SizeT i = 0; i < insert_n; ++i) {
             StoreType query = data_store_.GetVec(vertex_i1 + i);
             i32 q_layer = GenerateRandomLayer();
@@ -285,6 +294,12 @@ public:
             }
         }
     }
+
+    // this two interface is for test and benchmark
+    void Insert(const DataType *queries, const LabelType *labels, SizeT insert_n) {
+        InsertVecs(DenseVectorIter(queries, data_store_.dim(), insert_n), labels, insert_n);
+    }
+    void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
 
     MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
         auto query = data_store_.MakeQuery(q);

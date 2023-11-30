@@ -395,10 +395,6 @@ export {
 
     u64 Log2(u64 num) { return std::log2(num); }
 
-    u64 Log(u64 num) { return std::log(num); }
-
-    u64 Floor(u64 num) { return std::floor(num); }
-
     template <typename II, typename OI>
     OI Copy(II first, II last, OI d_first) {
         return std::copy(first, last, d_first);

@@ -26,6 +26,7 @@ import file_system_type;
 import plain_store;
 import lvq_store;
 import dist_func_l2;
+import dist_func_ip;
 
 using namespace infinity;
 
@@ -36,10 +37,14 @@ int main() {
     std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
 
     int dim = 128;
-    int element_size = 100000;
+    int element_size = 1000;
 
-    using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
-    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+
+    // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
+    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
+    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
 
     std::default_random_engine rng;
     std::uniform_real_distribution<float> distrib_real;

@@ -19,6 +19,7 @@
 import dist_func_l2;
 import hnsw_simd_func;
 import lvq_store;
+import hnsw_common;
 
 using namespace infinity;
 
@@ -92,7 +93,8 @@ TEST_F(DistFuncTest, test2) {
 
     auto lvq_store = LVQ8Store::Make(vec_n, dim, {0, true});
     Distance distance(lvq_store.dim());
-    lvq_store.AddVec(vecs1.get(), vec_n);
+    DenseVectorIter iter(vecs1.get(), dim, vec_n);
+    lvq_store.AddVec(std::move(iter), vec_n);
 
     for (size_t i = 0; i < vec_n; ++i) {
         // const float *v1 = vecs1.get() + i * dim;

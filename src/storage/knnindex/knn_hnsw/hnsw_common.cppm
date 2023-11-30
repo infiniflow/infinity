@@ -13,8 +13,7 @@
 // limitations under the License.
 
 module;
-
-#include <concepts>
+#include <utility>
 #include <limits>
 
 import stl;
@@ -49,7 +48,7 @@ concept LVQCacheConcept = requires(LVQCache) {
 };
 
 export template <typename DataStore, typename DataType>
-concept DataStoreConcept = requires(DataStore s, SizeT idx) {
+concept DataStoreConcept = requires(DataStore s) {
     { DataStore::Make((SizeT)0, (SizeT)0, std::declval<typename DataStore::InitArgs>()) } -> std::same_as<DataStore>;
     { s.Save(std::declval<FileHandler &>()) };
     { DataStore::Load(std::declval<FileHandler &>(), (SizeT)0, std::declval<typename DataStore::InitArgs>()) } -> std::same_as<DataStore>;
@@ -59,7 +58,8 @@ concept DataStoreConcept = requires(DataStore s, SizeT idx) {
     { s.dim() } -> std::same_as<SizeT>;
     { s.max_vec_num() } -> std::same_as<SizeT>;
 
-    { s.AddVec((const DataType *)nullptr, (SizeT)0) } -> std::same_as<SizeT>;
+    // todo: how to add constraint for a template member function.
+    // { s.AddVec(iter, (SizeT)0) } -> std::same_as<SizeT>;
     { s.GetVec((SizeT)0) } -> std::same_as<typename DataStore::StoreType>;
     { s.Prefetch((SizeT)0) };
     { s.MakeQuery((const DataType *)nullptr) } -> std::same_as<typename DataStore::QueryType>;
@@ -124,4 +124,55 @@ public:
 export using VertexType = i32;
 export using VertexListSize = i32;
 export using LayerSize = i32;
+
+export template <typename Iterator, typename DataType>
+concept DataIteratorConcept = requires(Iterator iter) {
+    { ++iter } -> std::same_as<Optional<DataType>>;
+};
+
+export template <typename DataType>
+class DenseVectorIter {
+    const DataType *ptr_;
+    const SizeT dim_;
+    const SizeT vec_num_;
+    const DataType *ptr_end_;
+
+public:
+    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num) : ptr_(ptr), dim_(dim), vec_num_(vec_num), ptr_end_(ptr_ + dim * vec_num) {}
+
+    // overload prefix++ operator
+    Optional<const DataType *> operator++() {
+        auto ret = ptr_;
+        if (ret == ptr_end_) {
+            return None;
+        }
+        ptr_ += dim_;
+        return ret;
+    }
+};
+
+// this iterator is temp
+export template <typename DataType>
+class TmpIterator {
+    Vector<Pair<const DataType *, SizeT>> vecs_;
+    const SizeT dim_;
+    SizeT idx1_;
+    SizeT idx2_;
+
+public:
+    TmpIterator(Vector<Pair<const DataType *, SizeT>> vecs, SizeT dim) : vecs_(Move(vecs)), dim_(dim), idx1_(0), idx2_(0) {}
+    Optional<const DataType *> operator++() {
+        if (idx1_ == vecs_.size()) {
+            return None;
+        }
+        auto ret = vecs_[idx1_].first + idx2_ * dim_;
+        idx2_++;
+        if (idx2_ == vecs_[idx1_].second) {
+            idx1_++;
+            idx2_ = 0;
+        }
+        return ret;
+    }
+};
+
 } // namespace infinity

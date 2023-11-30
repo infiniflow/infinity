@@ -73,11 +73,20 @@ public:
     SizeT dim() const { return meta_.dim_; }
 
 public:
-    SizeT AddVec(const DataType *vecs, SizeT vec_num) {
+    SizeT AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIterator(vec, dim()), vec_num); }
+
+    template <typename Iterator>
+        requires DataIteratorConcept<Iterator, const DataType *>
+    SizeT AddVec(Iterator query_iter, SizeT vec_num) {
         SizeT new_idx = meta_.AllocateVec(vec_num);
         if (new_idx != ERR_IDX) {
             DataType *ptr = ptr_.get() + new_idx * dim();
-            Copy(vecs, vecs + vec_num * dim(), ptr);
+            while (vec_num--) {
+                // not check optional here. because vec_num already contains the number of elements in the iterator.
+                auto vec = *(++query_iter);
+                Copy(vec, vec + dim(), ptr);
+                ptr += dim();
+            }
         }
         return new_idx;
     }

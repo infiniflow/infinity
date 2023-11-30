@@ -69,8 +69,6 @@ private:
 
     SizeT GetDimension() const;
 
-    // template <typename DataType>
-    // UniquePtr<SpaceBase<DataType>> GetDistFunc(SizeT dimension) const;
 };
 
 } // namespace infinity

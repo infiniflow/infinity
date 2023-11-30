@@ -460,12 +460,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
                                                    *(index_info->index_param_list_));
                 break;
             }
-            //            case IndexType::kHnswLVQ: {
-            //                base_index_ptr =
-            //                        HnswLVQ::Make(MakeShared<String>(table_name + "_" + index_name), {index_info->column_name_},
-            //                        *(index_info->index_param_list_));
-            //                break;
-            //            }
             case IndexType::kHnsw: {
                 base_index_ptr = IndexHnsw::Make(create_index_info->table_name_ + "_" + *index_name,
                                                {index_info->column_name_},

@@ -40,6 +40,7 @@ import base_entry;
 import knn_expression;
 import column_expression;
 
+import index_base;
 import buffer_manager;
 import merge_knn;
 import faiss;
@@ -47,13 +48,18 @@ import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
-import hnsw_alg;
-import plain_store;
 import table_index_meta;
 import segment_column_index_entry;
 import column_index_entry;
 import table_index_entry;
 import data_block;
+import index_hnsw;
+
+import hnsw_alg;
+import plain_store;
+import lvq_store;
+import dist_func_l2;
+import dist_func_ip;
 
 module physical_knn_scan;
 
@@ -140,7 +146,7 @@ PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return ba
         // Fill the segment with index
         ColumnIndexEntry *column_index_entry = table_index_entry->column_index_map_[knn_column_id].get();
         index_entry_map.reserve(column_index_entry->index_by_segment.size());
-        for(auto& [segment_id, segment_column_index] : column_index_entry->index_by_segment) {
+        for (auto &[segment_id, segment_column_index] : column_index_entry->index_by_segment) {
             index_entry_map[segment_id].emplace_back(segment_column_index.get());
         }
     }
@@ -242,46 +248,87 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             }
             case IndexType::kHnsw: {
                 BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
-                // auto index = static_cast<const KnnHnsw<DataType, u64, PlainStore<DataType>> *>(index_handle.GetData());
+                auto index_hnsw = static_cast<IndexHnsw *>(segment_column_index_entry->column_index_entry_->index_base_.get());
+                auto KnnScan = [&](auto *index) {
+                    Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
+                    Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
 
-                Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
-                Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
-
-                i64 result_n = -1;
-                for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
-                    const DataType *query =
-                        static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                    // MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
-                    MaxHeap<Pair<DataType, u64>> heap;
-                    if (result_n < 0) {
-                        result_n = heap.size();
-                    } else if (result_n != heap.size()) {
-                        throw ExecutorException("Bug");
+                    i64 result_n = -1;
+                    for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+                        const DataType *query =
+                            static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
+                        MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                        if (result_n < 0) {
+                            result_n = heap.size();
+                        } else if (result_n != heap.size()) {
+                            throw ExecutorException("Bug");
+                        }
+                        u64 id = 0;
+                        while (!heap.empty()) {
+                            const auto &[dist, row_id] = heap.top();
+                            row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
+                            switch (knn_scan_shared_data->knn_distance_type_) {
+                                case KnnDistanceType::kInvalid: {
+                                    throw ExecutorException("Bug");
+                                }
+                                case KnnDistanceType::kL2:
+                                case KnnDistanceType::kHamming: {
+                                    dists[query_idx * knn_scan_shared_data->topk_ + id] = +dist;
+                                    break;
+                                }
+                                case KnnDistanceType::kCosine:
+                                case KnnDistanceType::kInnerProduct: {
+                                    dists[query_idx * knn_scan_shared_data->topk_ + id] = -dist;
+                                    break;
+                                }
+                            }
+                            ++id;
+                            heap.pop();
+                        }
                     }
-                    u64 id = 0;
-                    while (!heap.empty()) {
-                        const auto &[dist, row_id] = heap.top();
-                        row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
-                        switch (knn_scan_shared_data->knn_distance_type_) {
-                            case KnnDistanceType::kInvalid: {
-                                throw ExecutorException("Bug");
-                            }
-                            case KnnDistanceType::kL2:
-                            case KnnDistanceType::kHamming: {
-                                dists[query_idx * knn_scan_shared_data->topk_ + id] = +dist;
+                    merge_heap->Search(dists.data(), row_ids.data(), result_n);
+                };
+                switch (index_hnsw->encode_type_) {
+                    case HnswEncodeType::kPlain: {
+                        switch (index_hnsw->metric_type_) {
+                            case MetricType::kMerticInnerProduct: {
+                                using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
                                 break;
                             }
-                            case KnnDistanceType::kCosine:
-                            case KnnDistanceType::kInnerProduct: {
-                                dists[query_idx * knn_scan_shared_data->topk_ + id] = -dist;
+                            case MetricType::kMerticL2: {
+                                using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
                                 break;
+                            }
+                            default: {
+                                Error<ExecutorException>("Not implemented");
                             }
                         }
-                        ++id;
-                        heap.pop();
+                        break;
+                    }
+                    case HnswEncodeType::kLVQ: {
+                        switch (index_hnsw->metric_type_) {
+                            case MetricType::kMerticInnerProduct: {
+                                using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                break;
+                            }
+                            case MetricType::kMerticL2: {
+                                using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                break;
+                            }
+                            default: {
+                                Error<ExecutorException>("Not implemented");
+                            }
+                        }
+                        break;
+                    }
+                    default: {
+                        Error<ExecutorException>("Not implemented");
                     }
                 }
-                merge_heap->Search(dists.data(), row_ids.data(), result_n);
                 break;
             }
             default: {

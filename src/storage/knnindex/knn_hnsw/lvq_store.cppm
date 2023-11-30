@@ -13,8 +13,8 @@
 // limitations under the License.
 
 module;
-
 #include <cassert>
+#include <cmath>
 #include <new>
 #include <type_traits>
 #include <xmmintrin.h>
@@ -196,7 +196,7 @@ private:
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
-                auto c = Floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
+                auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
                 assert(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>());
                 compress[j] = c;
             }
@@ -206,7 +206,10 @@ private:
         *lvq.GetLocalCacheMut() = LVQCache::MakeLocalCache(compress, scale, dim(), mean);
     }
 
-    SizeT MergeCompress(const DataType *vecs, SizeT vec_num) {
+    // TODO SIMD optimization here
+    template <typename Iterator>
+        requires DataIteratorConcept<Iterator, const DataType *>
+    SizeT MergeCompress(Iterator query_iter, SizeT vec_num) {
         SizeT compress_n = meta_.cur_vec_num();
         if (auto ret = meta_.AllocateVec(vec_num + plain_data_.cur_vec_num()); ret > max_vec_num()) {
             return ERR_IDX;
@@ -225,8 +228,10 @@ private:
                 mean[j] += buffer_vecs[j];
             }
         }
-        for (SizeT vec_i = 0; vec_i < vec_num; ++vec_i) {
-            const DataType *vec = vecs + vec_i * dim();
+        Iterator query_iter1 = query_iter;
+
+        for (SizeT i = 0; i < vec_num; ++i) {
+            auto vec = *(++query_iter1);
             for (SizeT j = 0; j < dim(); ++j) {
                 mean[j] += vec[j];
             }
@@ -235,25 +240,34 @@ private:
             mean[i] /= cur_vec_num();
         }
 
-        for (SizeT vec_i = 0; vec_i < compress_n; ++vec_i) {
+        SizeT vec_i = 0;
+        while (vec_i < compress_n) {
             CompressVec(decompress_vecs.get() + vec_i * dim(), GetLVQData(vec_i));
+            ++vec_i;
         }
-        for (SizeT vec_i = compress_n; vec_i < compress_n + plain_data_.cur_vec_num(); ++vec_i) {
+        while (vec_i < compress_n + plain_data_.cur_vec_num()) {
             CompressVec(plain_data_.GetVec(vec_i - compress_n), GetLVQData(vec_i));
+            ++vec_i;
         }
-        for (SizeT vec_i = compress_n + plain_data_.cur_vec_num(); vec_i < compress_n + plain_data_.cur_vec_num() + vec_num; ++vec_i) {
-            CompressVec(vecs + (vec_i - (compress_n + plain_data_.cur_vec_num())) * dim(), GetLVQData(vec_i));
+        while (vec_i < compress_n + plain_data_.cur_vec_num() + vec_num) {
+            auto vec = *(++query_iter);
+            CompressVec(vec, GetLVQData(vec_i));
+            ++vec_i;
         }
         *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
         plain_data_ = PlainStore<DataType>::Make(Min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
-        return compress_n + plain_data_.cur_vec_num() + vec_num;
+        return cur_vec_num() - vec_num;
     }
 
 public:
-    SizeT AddVec(const DataType *vecs, SizeT vec_num) {
-        if (SizeT idx = plain_data_.AddVec(vecs, vec_num); idx != DataStoreMeta::ERR_IDX) {
+    SizeT AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIter(vec, dim(), vec_num), vec_num); }
+
+    template <typename Iterator>
+        requires DataIteratorConcept<Iterator, const DataType *>
+    SizeT AddVec(Iterator query_iter, SizeT vec_num) {
+        if (SizeT idx = plain_data_.AddVec(query_iter, vec_num); idx != DataStoreMeta::ERR_IDX) {
             return meta_.cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(vecs, vec_num); idx != DataStoreMeta::ERR_IDX) {
+        } else if (SizeT idx = MergeCompress(Move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
             return idx;
         } else {
             return ERR_IDX;
@@ -280,7 +294,9 @@ public:
     }
 
     void Compress() {
-        SizeT ret = MergeCompress(nullptr, 0);
+        // query_iter is empty here. Should implement better
+        DenseVectorIter<DataType> empty_iter(nullptr, dim(), 0);
+        SizeT ret = MergeCompress(empty_iter, 0);
         assert(ret != DataStoreMeta::ERR_IDX);
     }
 };
