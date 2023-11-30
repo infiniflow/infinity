@@ -23,6 +23,7 @@ import physical_operator_type;
 import table_collection_entry;
 import base_expression;
 import match_expression;
+import base_table_ref;
 
 export module physical_match;
 
@@ -30,7 +31,7 @@ namespace infinity {
 
 export class PhysicalMatch final : public PhysicalOperator {
 public:
-    explicit PhysicalMatch(u64 id, TableCollectionEntry *table_entry_ptr, SharedPtr<MatchExpression> match_expr);
+    explicit PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr);
 
     ~PhysicalMatch() override;
 
@@ -44,7 +45,7 @@ public:
 
     String ToString(i64 &space) const;
 
-    TableCollectionEntry *table_entry_ptr_;
+    SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<MatchExpression> match_expr_;
 };
 
