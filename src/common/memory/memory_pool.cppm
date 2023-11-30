@@ -32,7 +32,7 @@ public:
 
     void *AllocateUnsafe(SizeT num_bytes, SizeT alignment);
 
-    virtual void Deallocate(void *ptr, SizeT size) {}
+    virtual void Deallocate(void *, SizeT) {}
 
     virtual void Release() {
         ScopedSpinLock lock(mutex_);

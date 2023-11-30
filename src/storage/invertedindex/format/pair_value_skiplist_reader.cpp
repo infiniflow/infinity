@@ -33,7 +33,7 @@ void PairValueSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, co
     Load_(start, end, item_count);
 }
 
-void PairValueSkipListReader::Load_(u32 start, u32 end, const u32 &item_count) {
+void PairValueSkipListReader::Load_(u32, u32, const u32 &item_count) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;

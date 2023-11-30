@@ -47,7 +47,7 @@ export class ColumnBuffer {
     UniquePtr<OutlineBuffer> outline_buffer_{};
 
 public:
-    ColumnBuffer(u64 column_id, BufferObj *buffer, BufferManager *buffer_mgr) : column_id_(column_id){};
+    ColumnBuffer(u64 column_id, BufferObj *, BufferManager *) : column_id_(column_id){};
 
     ColumnBuffer(u64 column_id, const BufferHandle &buffer_handle, BufferManager *buffer_mgr, SharedPtr<String> base_dir = nullptr)
         : column_id_(column_id), inline_col_(buffer_handle) {

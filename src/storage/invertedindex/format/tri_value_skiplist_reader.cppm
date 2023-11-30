@@ -17,9 +17,9 @@ public:
     ~TriValueSkipListReader();
 
 public:
-    virtual void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);
+    void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);
 
-    virtual void Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count);
+    void Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count);
 
     bool SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32 &offset, u32 &delta);
 

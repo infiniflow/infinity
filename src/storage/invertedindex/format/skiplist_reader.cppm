@@ -14,11 +14,11 @@ public:
     virtual ~SkipListReader();
 
 public:
-    virtual void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);
+    void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);
 
-    virtual void Load(ByteSlice *byteSlice, u32 start, u32 end);
+    void Load(ByteSlice *byteSlice, u32 start, u32 end);
 
-    virtual bool SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &prev_value, u32 &value_delta) { return false; }
+    virtual bool SkipTo(u32 , u32 &, u32 &, u32 &, u32 &) { return false; }
 
     u32 GetStart() const { return start_; }
 

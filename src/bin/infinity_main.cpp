@@ -32,7 +32,7 @@ infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 //infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
-void SignalHandler(int signal_number, siginfo_t *signal_info, void *reserved) {
+void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:

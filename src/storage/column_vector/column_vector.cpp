@@ -1017,8 +1017,6 @@ Value ColumnVector::GetValue(SizeT index) const {
                 this->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr, varchar.vector_.chunk_id_, varchar.vector_.chunk_offset_, varchar.length_);
                 return Value::MakeVarchar(varchar_ptr, true);
             }
-            SizeT varchar_len = varchar.length_;
-            return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
         }
         case kDate: {
             return Value::MakeDate(((DateT *)data_ptr_)[index]);

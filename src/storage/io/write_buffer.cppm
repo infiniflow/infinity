@@ -43,8 +43,8 @@ public:
                          SizeT initial_chunk_size = DEFAULT_BUFFER_SIZE,
                          double growth_rate = 2.0,
                          SizeT max_chunk_size = 128 * DEFAULT_BUFFER_SIZE)
-        : max_total_size_(max_total_size), initial_chunk_size_(initial_chunk_size), growth_rate_(growth_rate), max_chunk_size_(max_chunk_size),
-          BufferBase(nullptr, 0, 0) {
+        : BufferBase(nullptr, 0, 0), max_total_size_(max_total_size), initial_chunk_size_(initial_chunk_size), growth_rate_(growth_rate),
+          max_chunk_size_(max_chunk_size) {
         AddChunk();
     }
 

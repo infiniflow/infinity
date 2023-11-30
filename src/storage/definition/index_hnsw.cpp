@@ -108,6 +108,11 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, ef_);
 }
 
+SharedPtr<IndexBase> IndexHnsw::ReadAdv(char *&, int32_t) {
+    Error<StorageException>("Not implemented");
+    return nullptr;
+}
+
 String IndexHnsw::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_;
@@ -122,6 +127,11 @@ Json IndexHnsw::Serialize() const {
     res["ef_construction"] = ef_construction_;
     res["ef"] = ef_;
     return res;
+}
+
+SharedPtr<IndexHnsw> IndexHnsw::Deserialize(const Json &) {
+    Error<StorageException>("Not implemented");
+    return nullptr;
 }
 
 } // namespace infinity

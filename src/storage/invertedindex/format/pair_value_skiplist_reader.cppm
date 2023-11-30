@@ -17,9 +17,9 @@ public:
     virtual ~PairValueSkipListReader();
 
 public:
-    virtual void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);
+    void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);
 
-    virtual void Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count);
+    void Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count);
 
     bool SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &value, u32 &delta) override;
 

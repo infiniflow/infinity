@@ -69,7 +69,10 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, metric_type_);
 }
 
-SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&ptr, int32_t maxbytes) { Error<StorageException>("Not implemented"); }
+SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
+    Error<StorageException>("Not implemented");
+    return nullptr;
+}
 
 String IndexIVFFlat::ToString() const {
     std::stringstream ss;
@@ -84,6 +87,9 @@ Json IndexIVFFlat::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &index_def_json) { Error<StorageException>("Not implemented"); }
+SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &) {
+    Error<StorageException>("Not implemented");
+    return nullptr;
+}
 
 } // namespace infinity

@@ -60,7 +60,7 @@ public:
 private:
     i64 total_count_{};
     bool begin_{false};
-    i64 query_count_{};
+    u64 query_count_{};
     i64 topk_{};
     UniquePtr<RowID[]> idx_array_{};
     UniquePtr<DataType[]> distance_array_{};

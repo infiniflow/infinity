@@ -64,7 +64,7 @@ private:
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
 
-    ViewMeta *view_meta_{};
+//    ViewMeta *view_meta_{};
 };
 
 } // namespace infinity
