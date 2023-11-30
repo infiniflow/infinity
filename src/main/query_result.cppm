@@ -37,6 +37,7 @@ public:
     [[nodiscard]] inline ErrorCode ErrorCode() const { return status_.code(); }
     [[nodiscard]] inline DataTable* ResultTable() const { return result_table_.get(); }
     [[nodiscard]] inline const char *ErrorMsg() const { return status_.message(); }
+    [[nodiscard]] inline String& ErrorStr() const { return *status_.msg_; }
 
 public:
     Status status_{};

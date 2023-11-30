@@ -321,6 +321,9 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     SizeT column_count = create_table_info->column_defs_.size();
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
+        if (!ValidIdentifier(create_table_info->column_defs_[idx]->name())) {
+            return Status(ErrorCode::kInvalidIdentifier, "invalid column name");
+        }
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
@@ -329,6 +332,10 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_table_info->schema_name_);
+
+    if (!ValidIdentifier(create_table_info->table_name_)) {
+        return Status(ErrorCode::kInvalidIdentifier, "invalid table name");
+    }
 
     SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
 
@@ -371,6 +378,10 @@ Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, S
 
 Status LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_schema_info = (CreateSchemaInfo *)statement->create_info_.get();
+
+    if (!ValidIdentifier(create_schema_info->schema_name_)) {
+        return Status(ErrorCode::kInvalidIdentifier, "invalid schema name");
+    }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);
 
@@ -761,6 +772,9 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
         case ShowStmtType::kProfiles: {
             return BuildShowProfiles(statement, bind_context_ptr);
         }
+        case ShowStmtType::kSegments: {
+            return BuildShowSegments(statement, bind_context_ptr);
+        }
         default: {
             Error<PlannerException>("Unexpected show statement type.");
         }
@@ -804,6 +818,19 @@ Status LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPt
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
+Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSegments,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_);
 
     this->logical_plan_ = logical_show;
     return Status();

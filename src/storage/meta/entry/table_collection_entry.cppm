@@ -136,7 +136,7 @@ public:
 
     // From data table
     Atomic<SizeT> row_count_{};
-    HashMap<u32, SharedPtr<SegmentEntry>> segment_map_{};
+    Map<u32, SharedPtr<SegmentEntry>> segment_map_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 

@@ -453,7 +453,11 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
         case ShowStmtType::kDatabases: {
-            result->emplace_back(MakeShared<String>("SHOW DATABASES"));
+            result->emplace_back(MakeShared<String>("SHOW DATABASES: "));
+            break;
+        }
+        case ShowStmtType::kSegments : {
+            result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
             break;
         }
         case ShowStmtType::kIndexes: {

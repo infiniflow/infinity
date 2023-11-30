@@ -350,6 +350,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
         BlockColumnEntry *block_column_entry = last_block_entry->columns_[column_idx].get();
         auto column_type = block_column_entry->column_type_.get();
+        // FIXME: Variable length types cannot use type inference addresses
         SizeT dst_offset = write_row * column_type->Size();
         if (column_type->type() == kVarchar) {
             AppendVarcharData(block_column_entry, str_view, dst_offset);

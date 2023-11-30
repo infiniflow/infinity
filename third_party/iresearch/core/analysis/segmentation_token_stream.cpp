@@ -85,6 +85,8 @@ segmentation_token_stream::segmentation_token_stream(
   segmentation_token_stream::options_t&& options)
   : state_{new state_t()}, options_{options} {}
 
+segmentation_token_stream::segmentation_token_stream(const segmentation_token_stream &other) : state_{new state_t()}, options_(other.options_) {}
+
 bool segmentation_token_stream::next() {
   while (true) {
     const auto gr_begin = state_->begin;
@@ -123,13 +125,11 @@ bool segmentation_token_stream::next() {
         term_buf_.clear();
         to_lower(begin, begin, end, from_utf32_back_inserter(term_buf_));
         term.value = irs::ViewCast<byte_type>(std::string_view{term_buf_});
-        std::cout << "term " << term_buf_ << std::endl;
         break;
       case options_t::case_convert_t::UPPER:
         term_buf_.clear();
         to_upper(begin, begin, end, from_utf32_back_inserter(term_buf_));
         term.value = irs::ViewCast<byte_type>(std::string_view{term_buf_});
-        std::cout << "term " << term_buf_ << std::endl;
         break;
     }
 

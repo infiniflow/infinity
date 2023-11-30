@@ -64,6 +64,8 @@ public:
         }
     }
 
+    void ClearQueue();
+
     template <typename T>
     void Queue(SizeT id, T &&fn);
 
@@ -74,7 +76,12 @@ private:
 
 struct MaintenanceState;
 export class IRSDataStore {
+private:
+    IRSDataStore();
+
 public:
+    IRSDataStore(const IRSDataStore &) = delete;
+    IRSDataStore &operator=(const IRSDataStore &) = delete;
     explicit IRSDataStore(const String &table_name, const String &directory);
 
     struct DataSnapshot {
@@ -105,6 +112,8 @@ public:
     void ScheduleConsolidation();
 
     void ScheduleOptimize();
+
+    void StopSchedule();
 
     void BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 

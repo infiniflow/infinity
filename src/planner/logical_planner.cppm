@@ -96,6 +96,8 @@ public:
 
     Status BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowSegments(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
@@ -125,6 +127,23 @@ public:
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:
+    static bool ValidIdentifier(const String &identifier) {
+        if (identifier.empty()) {
+            return false;
+        }
+        if (!IsAlpha(identifier[0]) && identifier[0] != '_') {
+            return false;
+        }
+        for (SizeT i = 1; i < identifier.length(); i++) {
+            char ch = identifier[i];
+            if (!IsAlNum(ch) && ch != '_') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     QueryContext *query_context_ptr_{};
 
     SharedPtr<Vector<String>> names_ptr_{};

@@ -20,6 +20,7 @@ import base_entry;
 import third_party;
 import block_column_entry;
 import parser;
+import local_file_system;
 
 export module block_entry;
 
@@ -31,6 +32,8 @@ class SegmentEntry;
 class DataBlock;
 
 export struct BlockVersion {
+    constexpr static String PATH = "version";
+
     BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
@@ -39,7 +42,7 @@ export struct BlockVersion {
     void SaveToFile(const String &version_path);
 
     Vector<Pair<TxnTimeStamp, i32>> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                                // risk to write uninitialized buffer.
+                                                // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
 };
 
@@ -113,6 +116,12 @@ public:
     static i32 Room(BlockEntry *block_entry);
 
     void MergeFrom(BaseEntry &other) override;
+
+    const String &DirPath() { return *base_dir_; }
+
+    String VersionFilePath() {
+        return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH);
+    }
 
 private:
     static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);

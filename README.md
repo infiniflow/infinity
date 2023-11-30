@@ -61,8 +61,6 @@ $ make
 $ sudo make install
 $ export LZ4_ROOT=/usr/local
 
-# dependencies for brpc
-$ sudo apt install libgrpc++-dev libgrpc-dev protobuf-compiler-grpc libprotobuf-dev python3-grpcio python3-grpc-tools libprotoc-dev libprotoc-dev
 ```
 
 ### Step3 Build source code
@@ -80,4 +78,11 @@ $ ninja -j 12
 
 ```shell
 $ ./src/infinity_main
+```
+
+## SDK develop
+### how to generate thrift rpc code
+```shell
+$ apt install thrift-compiler 
+$ cd tools && python generate_rpc_code.py
 ```

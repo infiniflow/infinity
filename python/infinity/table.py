@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 import typing as tp
-from typing import Literal, Optional, Type, Union
+from abc import ABC, abstractmethod
+from typing import Optional, Union
+
+from infinity.index import IndexInfo
+
+
 class Table(ABC):
 
     @abstractmethod
-    def create_index(self, index_name: str, column_names: list[str], method_type: str, index_para_list: list[dict],
-                     options=None):
+    def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
         pass
 
     @abstractmethod
@@ -53,3 +56,32 @@ class Table(ABC):
     @abstractmethod
     def _execute_query(self, query: Query) -> list[dict]:
         pass
+
+
+def binary_exp_to_paser_exp(binary_expr_key) -> str:
+    if binary_expr_key == "eq":
+        return "="
+    elif binary_expr_key == "gt":
+        return ">"
+    elif binary_expr_key == "lt":
+        return "<"
+    elif binary_expr_key == "gte":
+        return ">="
+    elif binary_expr_key == "lte":
+        return "<="
+    elif binary_expr_key == "neq":
+        return "!="
+    elif binary_expr_key == "and":
+        return "and"
+    elif binary_expr_key == "or":
+        return "or"
+    elif binary_expr_key == "add":
+        return "+"
+    elif binary_expr_key == "sub":
+        return "-"
+    elif binary_expr_key == "mul":
+        return "*"
+    elif binary_expr_key == "div":
+        return "/"
+    else:
+        raise Exception(f"unknown binary expression: {binary_expr_key}")

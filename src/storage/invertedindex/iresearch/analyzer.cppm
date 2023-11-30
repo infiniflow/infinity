@@ -22,15 +22,16 @@ export module iresearch_analyzer;
 
 namespace infinity {
 
-export using AnalyzerFactory = StdFunction<IRSAnalyzer::ptr>;
+export constexpr StringView JIEBA = "jieba";
+export constexpr StringView SEGMENT = "segmentation";
 
 export class AnalyzerPool : public Singleton<AnalyzerPool> {
 public:
-    using CacheType = FlatHashMap<StringView, IRSAnalyzer::ptr>;
+    using CacheType = FlatHashMap<StringView, UniquePtr<IRSAnalyzer>>;
 
-    IRSAnalyzer::ptr Get(const String &name);
+    UniquePtr<IRSAnalyzer> Get(const StringView &name);
 
-    void Set(const String &name, const String &args);
+    void Set(const StringView &name, const String &args = "");
 
 private:
     CacheType cache_;

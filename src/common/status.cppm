@@ -34,6 +34,7 @@ export enum class ErrorCode : long {
     kWWConflict,
     kDuplicate,
     kUndefined,
+    kInvalidIdentifier
 };
 
 export class Status {

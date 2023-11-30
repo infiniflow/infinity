@@ -107,7 +107,12 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         // Build unoptimized logical plan for each SQL statement.
         query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
-        logical_planner_->Build(statement, bind_context);
+        auto state = logical_planner_->Build(statement, bind_context);
+        // FIXME
+        if (!state.ok()) {
+            Error<PlannerException>(state.message());
+        }
+
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
         query_metrics_->StopPhase(QueryPhase::kLogicalPlan);
