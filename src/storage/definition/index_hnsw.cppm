@@ -24,12 +24,29 @@ export module index_hnsw;
 
 namespace infinity {
 
+export enum class HnswEncodeType {
+    kPlain,
+    kLVQ,
+    kInvalid,
+};
+
+export String HnswEncodeTypeToString(HnswEncodeType encode_type);
+
+export HnswEncodeType StringToHnswEncodeType(const String &str);
+
 export class IndexHnsw : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexHnsw(String file_name, Vector<String> column_names, MetricType metric_type, SizeT M, SizeT ef_construction, SizeT ef)
-        : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), M_(M), ef_construction_(ef_construction), ef_(ef) {}
+    IndexHnsw(String file_name,
+              Vector<String> column_names,
+              MetricType metric_type,
+              HnswEncodeType encode_type,
+              SizeT M,
+              SizeT ef_construction,
+              SizeT ef)
+        : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
+          ef_construction_(ef_construction), ef_(ef) {}
 
     ~IndexHnsw() = default;
 
@@ -42,17 +59,13 @@ public:
 
     virtual void WriteAdv(char *&ptr) const override;
 
-    static SharedPtr<IndexBase> ReadAdv(char *&ptr, i32 maxbytes);
-
     virtual String ToString() const override;
 
     virtual Json Serialize() const override;
 
-    static SharedPtr<IndexHnsw> Deserialize(const Json &index_def_json);
-
 public:
     const MetricType metric_type_{MetricType::kInvalid};
-
+    const HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
     const SizeT M_{};
     const SizeT ef_construction_{};
     const SizeT ef_{};

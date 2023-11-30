@@ -16,11 +16,9 @@ module;
 
 import stl;
 import index_file_worker;
-import dist_func;
-import knn_hnsw;
+import hnsw_alg;
 import parser;
 import index_base;
-import dist_func;
 
 export module hnsw_file_worker;
 
@@ -71,8 +69,6 @@ private:
 
     SizeT GetDimension() const;
 
-    template <typename DataType>
-    UniquePtr<SpaceBase<DataType>> GetDistFunc(SizeT dimension) const;
 };
 
 } // namespace infinity

@@ -526,8 +526,6 @@ private:
         switch (type) {
             case infinity_thrift_rpc::IndexType::IVFFlat:
                 return IndexType::kIVFFlat;
-            case infinity_thrift_rpc::IndexType::HnswLVQ:
-                return IndexType::kHnswLVQ;
             case infinity_thrift_rpc::IndexType::Hnsw:
                 return IndexType::kHnsw;
             case infinity_thrift_rpc::IndexType::IRSFullText:

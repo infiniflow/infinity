@@ -3,7 +3,6 @@ module;
 import stl;
 import buffer_obj;
 import third_party;
-import cmp;
 
 export module specific_concurrent_queue;
 
