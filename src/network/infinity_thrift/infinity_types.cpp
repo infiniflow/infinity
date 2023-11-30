@@ -6367,4 +6367,348 @@ void SelectResponse::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+DeleteRequest::~DeleteRequest() noexcept {
+}
+
+
+void DeleteRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void DeleteRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void DeleteRequest::__set_where_expr(const ParsedExpr& val) {
+  this->where_expr = val;
+}
+
+void DeleteRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const DeleteRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t DeleteRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->where_expr.read(iprot);
+          this->__isset.where_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t DeleteRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("DeleteRequest");
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("where_expr", ::apache::thrift::protocol::T_STRUCT, 3);
+  xfer += this->where_expr.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(DeleteRequest &a, DeleteRequest &b) {
+  using ::std::swap;
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.where_expr, b.where_expr);
+  swap(a.session_id, b.session_id);
+  swap(a.__isset, b.__isset);
+}
+
+DeleteRequest::DeleteRequest(const DeleteRequest& other198) {
+  db_name = other198.db_name;
+  table_name = other198.table_name;
+  where_expr = other198.where_expr;
+  session_id = other198.session_id;
+  __isset = other198.__isset;
+}
+DeleteRequest& DeleteRequest::operator=(const DeleteRequest& other199) {
+  db_name = other199.db_name;
+  table_name = other199.table_name;
+  where_expr = other199.where_expr;
+  session_id = other199.session_id;
+  __isset = other199.__isset;
+  return *this;
+}
+void DeleteRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "DeleteRequest(";
+  out << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "where_expr=" << to_string(where_expr);
+  out << ", " << "session_id=" << to_string(session_id);
+  out << ")";
+}
+
+
+UpdateRequest::~UpdateRequest() noexcept {
+}
+
+
+void UpdateRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void UpdateRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+
+void UpdateRequest::__set_where_expr(const ParsedExpr& val) {
+  this->where_expr = val;
+}
+
+void UpdateRequest::__set_update_list(const std::vector<ParsedExpr> & val) {
+  this->update_list = val;
+}
+
+void UpdateRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t UpdateRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->where_expr.read(iprot);
+          this->__isset.where_expr = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->update_list.clear();
+            uint32_t _size200;
+            ::apache::thrift::protocol::TType _etype203;
+            xfer += iprot->readListBegin(_etype203, _size200);
+            this->update_list.resize(_size200);
+            uint32_t _i204;
+            for (_i204 = 0; _i204 < _size200; ++_i204)
+            {
+              xfer += this->update_list[_i204].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.update_list = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t UpdateRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("UpdateRequest");
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 1);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("where_expr", ::apache::thrift::protocol::T_STRUCT, 3);
+  xfer += this->where_expr.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("update_list", ::apache::thrift::protocol::T_LIST, 4);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->update_list.size()));
+    std::vector<ParsedExpr> ::const_iterator _iter205;
+    for (_iter205 = this->update_list.begin(); _iter205 != this->update_list.end(); ++_iter205)
+    {
+      xfer += (*_iter205).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(UpdateRequest &a, UpdateRequest &b) {
+  using ::std::swap;
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.where_expr, b.where_expr);
+  swap(a.update_list, b.update_list);
+  swap(a.session_id, b.session_id);
+  swap(a.__isset, b.__isset);
+}
+
+UpdateRequest::UpdateRequest(const UpdateRequest& other206) {
+  db_name = other206.db_name;
+  table_name = other206.table_name;
+  where_expr = other206.where_expr;
+  update_list = other206.update_list;
+  session_id = other206.session_id;
+  __isset = other206.__isset;
+}
+UpdateRequest& UpdateRequest::operator=(const UpdateRequest& other207) {
+  db_name = other207.db_name;
+  table_name = other207.table_name;
+  where_expr = other207.where_expr;
+  update_list = other207.update_list;
+  session_id = other207.session_id;
+  __isset = other207.__isset;
+  return *this;
+}
+void UpdateRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "UpdateRequest(";
+  out << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ", " << "where_expr=" << to_string(where_expr);
+  out << ", " << "update_list=" << to_string(update_list);
+  out << ", " << "session_id=" << to_string(session_id);
+  out << ")";
+}
+
 } // namespace

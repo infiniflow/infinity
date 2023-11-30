@@ -170,3 +170,6 @@ class TestCase:
     def test_traverse_conditions(self):
         res = traverse_conditions(condition("c1>1 and c2<2 or c3=3.3"))
         print(res)
+
+        res = traverse_conditions(condition("c1=1"))
+        print(res)

@@ -334,6 +334,21 @@ struct SelectResponse {
 4: list<ColumnField> column_fields = [];
 }
 
+struct DeleteRequest {
+1:  string db_name,
+2:  string table_name,
+3:  ParsedExpr where_expr,
+4:  i64 session_id,
+}
+
+struct UpdateRequest {
+1:  string db_name,
+2:  string table_name,
+3:  ParsedExpr where_expr,
+4:  list<ParsedExpr> update_list = [],
+5:  i64 session_id,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(),
@@ -346,6 +361,8 @@ CommonResponse DropTable(1:DropTableRequest request),
 CommonResponse Insert(1:InsertRequest request),
 CommonResponse Import(1:ImportRequest request),
 SelectResponse Select(1:SelectRequest request),
+CommonResponse Delete(1:DeleteRequest request),
+CommonResponse Update(1:UpdateRequest request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),

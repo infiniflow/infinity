@@ -242,6 +242,10 @@ class SelectRequest;
 
 class SelectResponse;
 
+class DeleteRequest;
+
+class UpdateRequest;
+
 
 class Option : public virtual ::apache::thrift::TBase {
  public:
@@ -2657,6 +2661,139 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
 void swap(SelectResponse &a, SelectResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const SelectResponse& obj);
+
+typedef struct _DeleteRequest__isset {
+  _DeleteRequest__isset() : db_name(false), table_name(false), where_expr(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool where_expr :1;
+  bool session_id :1;
+} _DeleteRequest__isset;
+
+class DeleteRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  DeleteRequest(const DeleteRequest&);
+  DeleteRequest& operator=(const DeleteRequest&);
+  DeleteRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  session_id(0) {
+  }
+
+  virtual ~DeleteRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  ParsedExpr where_expr;
+  int64_t session_id;
+
+  _DeleteRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_where_expr(const ParsedExpr& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const DeleteRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(where_expr == rhs.where_expr))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const DeleteRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DeleteRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DeleteRequest &a, DeleteRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const DeleteRequest& obj);
+
+typedef struct _UpdateRequest__isset {
+  _UpdateRequest__isset() : db_name(false), table_name(false), where_expr(false), update_list(true), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool where_expr :1;
+  bool update_list :1;
+  bool session_id :1;
+} _UpdateRequest__isset;
+
+class UpdateRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  UpdateRequest(const UpdateRequest&);
+  UpdateRequest& operator=(const UpdateRequest&);
+  UpdateRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  session_id(0) {
+
+  }
+
+  virtual ~UpdateRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  ParsedExpr where_expr;
+  std::vector<ParsedExpr>  update_list;
+  int64_t session_id;
+
+  _UpdateRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_where_expr(const ParsedExpr& val);
+
+  void __set_update_list(const std::vector<ParsedExpr> & val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const UpdateRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(where_expr == rhs.where_expr))
+      return false;
+    if (!(update_list == rhs.update_list))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const UpdateRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const UpdateRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(UpdateRequest &a, UpdateRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const UpdateRequest& obj);
 
 } // namespace
 

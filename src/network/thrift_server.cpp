@@ -239,6 +239,25 @@ public:
         }
     }
 
+    void Delete(infinity_thrift_rpc::CommonResponse& _return, const infinity_thrift_rpc::DeleteRequest& request) override {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        auto table = database->GetTable(request.table_name);
+
+        ParsedExpr *filter = nullptr;
+        if (request.__isset.where_expr == true) {
+            filter = GetParsedExprFromProto(request.where_expr);
+        }
+
+        auto result = table->Delete(filter);
+
+        ProcessCommonResult(_return, result);
+    };
+
+    void Update(infinity_thrift_rpc::CommonResponse &_return, const infinity_thrift_rpc::UpdateRequest &request) override {
+
+    }
+
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto result = infinity->ListDatabases();

@@ -49,7 +49,7 @@ class TestDelete:
             - 'table_3'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -74,7 +74,8 @@ class TestDelete:
         assert res.success
 
         res = table_obj.search().output(["*"]).to_df()
-        assert res == {}
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = db_obj.drop_table("table_3")
         assert res.success

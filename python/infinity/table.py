@@ -38,7 +38,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def delete(self, condition):
+    def delete(self, cond: Optional[str] = None):
         pass
 
     @abstractmethod

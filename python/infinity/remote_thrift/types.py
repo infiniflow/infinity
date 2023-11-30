@@ -19,7 +19,7 @@ from numpy import dtype
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
-def ttype_to_pd_type(ttype: ttypes.ColumnType):
+def column_type_to_dtype(ttype: ttypes.ColumnType):
     match ttype:
         case ttypes.ColumnType.ColumnBool:
             return dtype('bool')
@@ -36,6 +36,28 @@ def ttype_to_pd_type(ttype: ttypes.ColumnType):
         case ttypes.ColumnType.ColumnFloat64:
             return dtype('float64')
         case ttypes.ColumnType.ColumnVarchar:
+            return dtype('str')
+        case _:
+            raise NotImplementedError(f"Unsupported type {ttype}")
+
+
+def logic_type_to_dtype(ttype: ttypes.LogicType):
+    match ttype:
+        case ttypes.LogicType.Boolean:
+            return dtype('bool')
+        case ttypes.LogicType.TinyInt:
+            return dtype('int8')
+        case ttypes.LogicType.SmallInt:
+            return dtype('int16')
+        case ttypes.LogicType.Integer:
+            return dtype('int32')
+        case ttypes.LogicType.BigInt:
+            return dtype('int64')
+        case ttypes.LogicType.Float:
+            return dtype('float32')
+        case ttypes.LogicType.Double:
+            return dtype('float64')
+        case ttypes.LogicType.Varchar:
             return dtype('str')
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
@@ -61,11 +83,17 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
     types = []
     for column_def in res.column_defs:
         column_names.append(column_def.name)
-        column_field = res.column_fields[column_def.id]
-        column_type = column_field.column_type
-        types.append(ttype_to_pd_type(column_type))
-        column_vector = column_field.column_vector
-        data_dict[column_def.name] = column_vector_to_tuple_list(column_type, column_vector)
+        types.append(logic_type_to_dtype(column_def.data_type.logic_type))
+        # print()
+        # print(res.column_fields)
+        match res.column_fields.__len__():
+            case 0:
+                data_dict[column_def.name] = []
+            case _:
+                column_field = res.column_fields[column_def.id]
+                column_type = column_field.column_type
+                column_vector = column_field.column_vector
+                data_dict[column_def.name] = column_vector_to_tuple_list(column_type, column_vector)
 
     type_dict = dict(zip(column_names, types))
     # print()

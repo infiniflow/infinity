@@ -121,6 +121,12 @@ class ThriftInfinityClient:
                                                 offset_expr=offset_expr,
                                                 ))
 
+    def delete(self, db_name: str, table_name: str, where_expr):
+        return self.client.Delete(DeleteRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                where_expr=where_expr))
+
     def disconnect(self):
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
         self.transport.close()

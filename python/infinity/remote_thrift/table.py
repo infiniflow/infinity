@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import struct
 from abc import ABC
 from typing import Optional, Union, List
 
@@ -97,10 +96,16 @@ class RemoteTable(Table, ABC):
         return self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
                                              import_options=options)
 
-    def delete(self, condition):
-        pass
+    def delete(self, cond: Optional[str] = None):
+        match cond:
+            case None:
+                where_expr = None
+            case _:
+                where_expr = traverse_conditions(condition(cond))
+        return self._conn.client.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
 
-    def update(self, condition, data):
+    def update(self, cond, data):
+
         pass
 
     def search(
