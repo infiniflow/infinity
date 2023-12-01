@@ -409,7 +409,7 @@ void hnsw_bench(const char *test_data_path, int64_t to_query, size_t M, size_t e
     hnswlib::L2Space l2space(dimension);
     hnswlib::HierarchicalNSW<float> *hnsw_index = nullptr;
 
-    size_t max_elements = 10000000; // create index
+    size_t max_elements = 1000000; // create index
 
     hnsw_index = new hnswlib::HierarchicalNSW<float>(&l2space, max_elements, M, ef_construction);
 
