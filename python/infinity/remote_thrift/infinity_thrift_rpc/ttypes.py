@@ -322,15 +322,7 @@ class NumberType(object):
 
 
 class VarcharType(object):
-    """
-    Attributes:
-     - dimension
 
-    """
-
-
-    def __init__(self, dimension=None,):
-        self.dimension = dimension
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -341,11 +333,6 @@ class VarcharType(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
-            if fid == 1:
-                if ftype == TType.I64:
-                    self.dimension = iprot.readI64()
-                else:
-                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -356,10 +343,6 @@ class VarcharType(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('VarcharType')
-        if self.dimension is not None:
-            oprot.writeFieldBegin('dimension', TType.I64, 1)
-            oprot.writeI64(self.dimension)
-            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -4117,8 +4100,6 @@ NumberType.thrift_spec = (
 )
 all_structs.append(VarcharType)
 VarcharType.thrift_spec = (
-    None,  # 0
-    (1, TType.I64, 'dimension', None, None, ),  # 1
 )
 all_structs.append(EmbeddingType)
 EmbeddingType.thrift_spec = (
