@@ -20,6 +20,7 @@ from numpy import dtype
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
+
 def column_type_to_dtype(ttype: ttypes.ColumnType):
     match ttype:
         case ttypes.ColumnType.ColumnBool:
@@ -74,8 +75,22 @@ def column_vector_to_tuple_list(column_type: ttypes.ColumnType, column_vector) -
             return struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
         case ttypes.ColumnType.ColumnFloat64:
             return struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
+        case ttypes.ColumnType.ColumnVarchar:
+            return tuple(parse_bytes(column_vector))
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
+
+
+def parse_bytes(bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        length = struct.unpack('Q', bytes_data[offset:offset + 8])[0]
+        offset += 8
+        string_data = bytes_data[offset:offset + length].decode('utf-8')
+        results.append(string_data)
+        offset += length
+    return results
 
 
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:

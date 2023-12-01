@@ -43,6 +43,8 @@ import third_party;
 import parser;
 import file_writer;
 import local_file_system;
+import table_def;
+
 #include "parser/statement/extra/create_index_info.h"
 
 namespace infinity {
@@ -165,6 +167,18 @@ public:
         ProcessCommonResult(response, result);
     }
 
+    void handeleColumnDefs(infinity_thrift_rpc::SelectResponse &response, SizeT column_count, SharedPtr<TableDef> table_def) {
+        for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+            auto column_def = table_def->columns()[col_index];
+            infinity_thrift_rpc::ColumnDef proto_column_def;
+            proto_column_def.__set_id(column_def->id());
+            proto_column_def.__set_name(column_def->name());
+            infinity_thrift_rpc::DataType proto_data_type;
+            proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
+            response.column_defs.emplace_back(proto_column_def);
+        }
+    }
+
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
@@ -219,33 +233,101 @@ public:
             }
 
             for (auto &column_vector : all_column_vectors) {
-                auto size = column_vector->data_type()->Size() * all_row_count;
-                String dst;
-                dst.resize(size);
-                Memcpy(dst.data(), column_vector->data(), size);
-                infinity_thrift_rpc::ColumnField columnField;
-                columnField.__set_column_vector(Move(dst));
-                columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-                response.column_fields.emplace_back(columnField);
+                switch (column_vector->data_type_->type()) {
+                    case LogicalType::kBoolean:
+                    case LogicalType::kTinyInt:
+                    case LogicalType::kSmallInt:
+                    case LogicalType::kInteger:
+                    case LogicalType::kBigInt:
+                    case LogicalType::kHugeInt:
+                    case LogicalType::kFloat:
+                    case LogicalType::kDouble: {
+                        handleLogicalType(column_vector, all_row_count, response);
+                        break;
+                    }
+                    case LogicalType::kVarchar: {
+                        handleVarcharType(column_vector, all_row_count, response);
+                        break;
+                    }
+                    case LogicalType::kEmbedding: {
+                        handleEmbeddingType(column_vector, all_row_count, response);
+                        break;
+                    }
+                    default:
+                        Error<NetworkException>("Not implemented data type", __FILE_NAME__, __LINE__);
+                }
             }
 
             auto table_def = result.result_table_->definition_ptr_;
 
-            for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-                auto column_def = table_def->columns()[col_index];
-                infinity_thrift_rpc::ColumnDef proto_column_def;
-                proto_column_def.__set_id(column_def->id());
-                proto_column_def.__set_name(column_def->name());
-                infinity_thrift_rpc::DataType proto_data_type;
-                proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
-                response.column_defs.emplace_back(proto_column_def);
-            }
+            handeleColumnDefs(response, column_count, result.result_table_->definition_ptr_);
+
             response.__set_success(true);
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
+    }
+
+    void handleLogicalType(const std::shared_ptr<ColumnVector> &column_vector, int all_row_count, infinity_thrift_rpc::SelectResponse &response) {
+        auto size = column_vector->data_type()->Size() * all_row_count;
+        String dst;
+        dst.resize(size);
+        Memcpy(dst.data(), column_vector->data(), size);
+        infinity_thrift_rpc::ColumnField columnField;
+        columnField.__set_column_vector(Move(dst));
+        columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        response.column_fields.emplace_back(columnField);
+    }
+
+    void handleVarcharType(const std::shared_ptr<ColumnVector> &column_vector, int all_row_count, infinity_thrift_rpc::SelectResponse &response) {
+        String dst;
+        SizeT total_varchar_data_size = 0;
+        for (int index = 0; index < all_row_count; ++index) {
+            VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
+            total_varchar_data_size += varchar.length_;
+        }
+        auto all_size = total_varchar_data_size + all_row_count * sizeof(u64);
+        dst.resize(all_size);
+
+        u64 current_offset = 0;
+        for (int index = 0; index < all_row_count; ++index) {
+            VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
+            u64 length = varchar.length_;
+            if (varchar.IsInlined()) {
+                Memcpy(dst.data() + current_offset, &length, sizeof(u64));
+                Memcpy(dst.data() + current_offset + sizeof(u64), varchar.short_.data_, varchar.length_);
+            } else {
+                char *varchar_ptr = new char[varchar.length_ + 1]{0};
+                column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr,
+                                                                    varchar.vector_.chunk_id_,
+                                                                    varchar.vector_.chunk_offset_,
+                                                                    varchar.length_);
+                Memcpy(dst.data() + current_offset, &length, sizeof(u64));
+                Memcpy(dst.data() + current_offset + sizeof(u64), varchar_ptr, varchar.length_);
+                delete[] varchar_ptr;
+            }
+            current_offset += sizeof(u64) + varchar.length_;
+        }
+
+        Assert<NetworkException>(current_offset == all_size, "Bug");
+
+        infinity_thrift_rpc::ColumnField columnField;
+        columnField.__set_column_vector(Move(dst));
+        columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        response.column_fields.emplace_back(columnField);
+    }
+
+    void handleEmbeddingType(const std::shared_ptr<ColumnVector> &column_vector, int all_row_count, infinity_thrift_rpc::SelectResponse &response) {
+        auto size = column_vector->data_type()->Size() * all_row_count;
+        String dst;
+        dst.resize(size);
+        Memcpy(dst.data(), column_vector->data(), size);
+        infinity_thrift_rpc::ColumnField columnField;
+        columnField.__set_column_vector(Move(dst));
+        columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        response.column_fields.emplace_back(columnField);
     }
 
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {

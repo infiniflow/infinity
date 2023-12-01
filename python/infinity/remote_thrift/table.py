@@ -282,6 +282,9 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
         elif cons.is_number:
             constant_expr.literal_type = ttypes.LiteralType.Double
             constant_expr.f64_value = float(cons.output_name)
+        elif cons.is_string:
+            constant_expr.literal_type = ttypes.LiteralType.String
+            constant_expr.str_value = cons.output_name
         else:
             raise Exception(f"unknown literal type: {cons}")
 
