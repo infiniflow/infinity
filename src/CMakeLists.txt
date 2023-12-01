@@ -183,7 +183,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
@@ -214,7 +213,6 @@ target_link_libraries(infinity
         onnxruntime_mlas
         zsv_parser
         roaring
-        fastpfor
         newpfor
         openfst
 #        iresearch
@@ -337,7 +335,6 @@ target_link_libraries(unit_test
         onnxruntime_mlas
         zsv_parser
         roaring
-        fastpfor
         newpfor
         openfst
         iresearch
