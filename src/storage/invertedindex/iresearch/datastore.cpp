@@ -186,7 +186,6 @@ void CommitTask::Finalize() {
     CommitTask task(*this);
     state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
     async_->Queue(0, Move(task));
-    LOG_INFO(Format("pending_commits  {} pending_consolidations {} ", state_->pending_commits_, state_->pending_consolidations_));
     if (state_->pending_consolidations_.load(MemoryOrderRelease) < kMaxPendingConsolidations) {
         store_->ScheduleConsolidation();
     }
@@ -255,7 +254,6 @@ void IRSDataStore::Commit() {
 }
 
 void IRSDataStore::ScheduleCommit() {
-    LOG_INFO(Format("schedule commit "));
     CommitTask task;
     task.state_ = maintenance_state_;
     task.async_ = async_.get();
