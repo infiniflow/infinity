@@ -74,7 +74,7 @@ class TestSelect:
             - 'table_1'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('192.168.1.5', 9080))
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -105,7 +105,7 @@ class TestSelect:
 
         res = table_obj.search().output(["c1 + c2"]).filter("c1 = 3").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)})
-                                      .astype({'(c1 + c2)': dtype('int64')}))
+                                      .astype({'(c1 + c2)': dtype('int32')}))
 
         res = table_obj.search().output(["c1"]).filter("c1 > 2 and c2 < 4").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
@@ -113,35 +113,34 @@ class TestSelect:
 
         res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
         # todo: fix this negative test case
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = table_obj.search().output(["c2"]).filter(
             "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = table_obj.search().output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = table_obj.search().output(["c2"]).filter("(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = table_obj.search().output(["c2"]).filter(
             "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-7, 1)})
-                                      .astype({'c1': dtype('int32')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
+                                      .astype({'c2': dtype('int32')}))
 
         res = db_obj.drop_table("table_1")
         assert res.success
 
         # disconnect
         res = infinity_obj.disconnect()
-
         assert res.success

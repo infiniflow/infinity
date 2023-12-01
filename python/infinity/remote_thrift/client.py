@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing as tp
+from thrift.protocol import TBinaryProtocol
+from thrift.transport import TSocket
 
 from infinity import URI
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from thrift import Thrift
-from thrift.transport import TSocket
-from thrift.transport import TTransport
-from thrift.protocol import TBinaryProtocol
+
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
         match uri.port:
             case 9070:
-                self.transport = TTransport.TFramedTransport(TSocket.TSocket(uri.ip, uri.port)) # async
+                self.transport = TTransport.TFramedTransport(TSocket.TSocket(uri.ip, uri.port))  # async
             case _:
-                self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port)) # sync
+                self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port))  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
@@ -102,11 +100,12 @@ class ThriftInfinityClient:
                                                 column_names=column_names,
                                                 fields=fields))
 
-    def import_data(self, db_name: str, table_name: str, file_path: str, import_options):
+    def import_data(self, db_name: str, table_name: str, file_name: str, file_content, import_options):
         return self.client.Import(ImportRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
-                                                file_path=file_path,
+                                                file_name=file_name,
+                                                file_content=file_content,
                                                 import_option=import_options))
 
     def select(self, db_name: str, table_name: str, select_list, where_expr, group_by_list, limit_expr, offset_expr,
@@ -133,7 +132,6 @@ class ThriftInfinityClient:
                                                 table_name=table_name,
                                                 where_expr=where_expr,
                                                 update_expr_array=update_expr_array))
-
 
     def disconnect(self):
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
