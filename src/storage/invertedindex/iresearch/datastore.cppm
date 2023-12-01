@@ -98,7 +98,7 @@ public:
     IRSDataStore(const IRSDataStore &) = delete;
     IRSDataStore &operator=(const IRSDataStore &) = delete;
     explicit IRSDataStore(const String &table_name, const String &directory);
-
+    ~IRSDataStore();
     struct DataSnapshot {
         DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
         DataSnapshot &operator=(DataSnapshot &&rhs) noexcept {
