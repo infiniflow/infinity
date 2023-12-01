@@ -3506,17 +3506,19 @@ class ImportRequest(object):
     Attributes:
      - db_name
      - table_name
-     - file_path
+     - file_name
+     - file_content
      - import_option
      - session_id
 
     """
 
 
-    def __init__(self, db_name=None, table_name=None, file_path=None, import_option=None, session_id=None,):
+    def __init__(self, db_name=None, table_name=None, file_name=None, file_content=None, import_option=None, session_id=None,):
         self.db_name = db_name
         self.table_name = table_name
-        self.file_path = file_path
+        self.file_name = file_name
+        self.file_content = file_content
         self.import_option = import_option
         self.session_id = session_id
 
@@ -3541,16 +3543,21 @@ class ImportRequest(object):
                     iprot.skip(ftype)
             elif fid == 3:
                 if ftype == TType.STRING:
-                    self.file_path = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.file_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
+                if ftype == TType.STRING:
+                    self.file_content = iprot.readBinary()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
                 if ftype == TType.STRUCT:
                     self.import_option = ImportOption()
                     self.import_option.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 5:
+            elif fid == 6:
                 if ftype == TType.I64:
                     self.session_id = iprot.readI64()
                 else:
@@ -3573,16 +3580,20 @@ class ImportRequest(object):
             oprot.writeFieldBegin('table_name', TType.STRING, 2)
             oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
             oprot.writeFieldEnd()
-        if self.file_path is not None:
-            oprot.writeFieldBegin('file_path', TType.STRING, 3)
-            oprot.writeString(self.file_path.encode('utf-8') if sys.version_info[0] == 2 else self.file_path)
+        if self.file_name is not None:
+            oprot.writeFieldBegin('file_name', TType.STRING, 3)
+            oprot.writeString(self.file_name.encode('utf-8') if sys.version_info[0] == 2 else self.file_name)
+            oprot.writeFieldEnd()
+        if self.file_content is not None:
+            oprot.writeFieldBegin('file_content', TType.STRING, 4)
+            oprot.writeBinary(self.file_content)
             oprot.writeFieldEnd()
         if self.import_option is not None:
-            oprot.writeFieldBegin('import_option', TType.STRUCT, 4)
+            oprot.writeFieldBegin('import_option', TType.STRUCT, 5)
             self.import_option.write(oprot)
             oprot.writeFieldEnd()
         if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 5)
+            oprot.writeFieldBegin('session_id', TType.I64, 6)
             oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -4388,9 +4399,10 @@ ImportRequest.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
-    (3, TType.STRING, 'file_path', 'UTF8', None, ),  # 3
-    (4, TType.STRUCT, 'import_option', [ImportOption, None], None, ),  # 4
-    (5, TType.I64, 'session_id', None, None, ),  # 5
+    (3, TType.STRING, 'file_name', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'file_content', 'BINARY', None, ),  # 4
+    (5, TType.STRUCT, 'import_option', [ImportOption, None], None, ),  # 5
+    (6, TType.I64, 'session_id', None, None, ),  # 6
 )
 all_structs.append(SelectRequest)
 SelectRequest.thrift_spec = (

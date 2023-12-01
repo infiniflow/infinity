@@ -5871,8 +5871,12 @@ void ImportRequest::__set_table_name(const std::string& val) {
   this->table_name = val;
 }
 
-void ImportRequest::__set_file_path(const std::string& val) {
-  this->file_path = val;
+void ImportRequest::__set_file_name(const std::string& val) {
+  this->file_name = val;
+}
+
+void ImportRequest::__set_file_content(const std::string& val) {
+  this->file_content = val;
 }
 
 void ImportRequest::__set_import_option(const ImportOption& val) {
@@ -5928,13 +5932,21 @@ uint32_t ImportRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
         break;
       case 3:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->file_path);
-          this->__isset.file_path = true;
+          xfer += iprot->readString(this->file_name);
+          this->__isset.file_name = true;
         } else {
           xfer += iprot->skip(ftype);
         }
         break;
       case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readBinary(this->file_content);
+          this->__isset.file_content = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
         if (ftype == ::apache::thrift::protocol::T_STRUCT) {
           xfer += this->import_option.read(iprot);
           this->__isset.import_option = true;
@@ -5942,7 +5954,7 @@ uint32_t ImportRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 6:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->session_id);
           this->__isset.session_id = true;
@@ -5975,15 +5987,19 @@ uint32_t ImportRequest::write(::apache::thrift::protocol::TProtocol* oprot) cons
   xfer += oprot->writeString(this->table_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("file_path", ::apache::thrift::protocol::T_STRING, 3);
-  xfer += oprot->writeString(this->file_path);
+  xfer += oprot->writeFieldBegin("file_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->file_name);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("import_option", ::apache::thrift::protocol::T_STRUCT, 4);
+  xfer += oprot->writeFieldBegin("file_content", ::apache::thrift::protocol::T_STRING, 4);
+  xfer += oprot->writeBinary(this->file_content);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("import_option", ::apache::thrift::protocol::T_STRUCT, 5);
   xfer += this->import_option.write(oprot);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 6);
   xfer += oprot->writeI64(this->session_id);
   xfer += oprot->writeFieldEnd();
 
@@ -5996,7 +6012,8 @@ void swap(ImportRequest &a, ImportRequest &b) {
   using ::std::swap;
   swap(a.db_name, b.db_name);
   swap(a.table_name, b.table_name);
-  swap(a.file_path, b.file_path);
+  swap(a.file_name, b.file_name);
+  swap(a.file_content, b.file_content);
   swap(a.import_option, b.import_option);
   swap(a.session_id, b.session_id);
   swap(a.__isset, b.__isset);
@@ -6005,7 +6022,8 @@ void swap(ImportRequest &a, ImportRequest &b) {
 ImportRequest::ImportRequest(const ImportRequest& other170) {
   db_name = other170.db_name;
   table_name = other170.table_name;
-  file_path = other170.file_path;
+  file_name = other170.file_name;
+  file_content = other170.file_content;
   import_option = other170.import_option;
   session_id = other170.session_id;
   __isset = other170.__isset;
@@ -6013,7 +6031,8 @@ ImportRequest::ImportRequest(const ImportRequest& other170) {
 ImportRequest& ImportRequest::operator=(const ImportRequest& other171) {
   db_name = other171.db_name;
   table_name = other171.table_name;
-  file_path = other171.file_path;
+  file_name = other171.file_name;
+  file_content = other171.file_content;
   import_option = other171.import_option;
   session_id = other171.session_id;
   __isset = other171.__isset;
@@ -6024,7 +6043,8 @@ void ImportRequest::printTo(std::ostream& out) const {
   out << "ImportRequest(";
   out << "db_name=" << to_string(db_name);
   out << ", " << "table_name=" << to_string(table_name);
-  out << ", " << "file_path=" << to_string(file_path);
+  out << ", " << "file_name=" << to_string(file_name);
+  out << ", " << "file_content=" << to_string(file_content);
   out << ", " << "import_option=" << to_string(import_option);
   out << ", " << "session_id=" << to_string(session_id);
   out << ")";
