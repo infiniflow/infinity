@@ -206,10 +206,27 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kIntegerArray: {
-            Error<PlannerException>("Unexpected literal type: integer array.");
+            // cannot transfer ownership from vector to a raw pointer, copy data here.
+            // the `new` raw pointer is managed by `Value`
+            SizeT dim = expr.long_array_.size();
+            auto data_ptr = new int64_t[expr.long_array_.size()];
+            Copy(expr.long_array_.begin(), expr.long_array_.end(), data_ptr);
+
+            auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemInt64, dim);
+
+            Value value = Value::MakeEmbedding(reinterpret_cast<ptr_t>(data_ptr), Move(embedding_info));
+            return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDoubleArray: {
-            Error<PlannerException>("Unexpected literal type: float array.");
+            // same problem as above
+            SizeT dim = expr.double_array_.size();
+            auto data_ptr = new double[expr.double_array_.size()];
+            Copy(expr.double_array_.begin(), expr.double_array_.end(), data_ptr);
+
+            auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemDouble, dim);
+
+            Value value = Value::MakeEmbedding(reinterpret_cast<ptr_t>(data_ptr), Move(embedding_info));
+            return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kNull: {
             Value value = Value::MakeNull();

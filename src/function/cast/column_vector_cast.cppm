@@ -41,7 +41,7 @@ template <typename Operator>
 struct TryCastValue {
     template <typename SourceValueType, typename TargetValueType>
     inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
-        if (Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
+        if (Operator::template Run<SourceValueType, TargetValueType>(Move(input), result)) {
             return;
         }
 

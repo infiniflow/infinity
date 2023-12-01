@@ -19,6 +19,7 @@ import bound_cast_func;
 import bool_cast;
 import integer_cast;
 import float_cast;
+import embedding_cast;
 import varchar_cast;
 import parser;
 import third_party;
@@ -124,26 +125,26 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case kBox: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-//        case kPath: {
-//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-//        }
-//        case kPolygon: {
-//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-//        }
+            //        case kPath: {
+            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            //        }
+            //        case kPolygon: {
+            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            //        }
         case kCircle: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-//        case kBitmap: {
-//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-//        }
+            //        case kBitmap: {
+            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            //        }
         case kUuid: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-//        case kBlob: {
-//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-//        }
+            //        case kBlob: {
+            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            //        }
         case kEmbedding: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            return BindEmbeddingCast(target);
         }
         case kRowID: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));

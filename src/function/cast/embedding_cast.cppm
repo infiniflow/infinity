@@ -29,18 +29,37 @@ export module embedding_cast;
 
 namespace infinity {
 
+struct EmbeddingTryCastToFixlen;
 struct EmbeddingTryCastToVarlen;
 
-export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
+export inline BoundCastFunc BindEmbeddingCast(const DataType &target) {
     switch (target.type()) {
-        case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
+        case LogicalType::kEmbedding: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<EmbeddingT, EmbeddingT, EmbeddingTryCastToFixlen>);
         }
+        // case LogicalType::kVarchar: {
+        //    return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
+        // }
         default: {
             Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
+}
+
+struct EmbeddingTryCastToFixlen {
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(SourceType source, TargetType &target) {
+        Error<FunctionException>(
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
+    }
+};
+
+template <>
+inline bool EmbeddingTryCastToFixlen::Run(const EmbeddingT &source, EmbeddingT &target) {
+
+    return true;
 }
 
 struct EmbeddingTryCastToVarlen {
@@ -78,8 +97,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         // inline varchar
         Memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer.");
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer.");
 
         // Set varchar prefix
         Memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);

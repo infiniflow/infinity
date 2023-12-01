@@ -121,6 +121,7 @@ public:
     }
 
     inline ~EmbeddingType() {
+        // the ptr must be owned by this class
         if (ptr != nullptr) {
             Reset();
         }

@@ -60,8 +60,7 @@ public:
                     } else {
                         result_null->SetFalse(0);
                     }
-                }
-                else {
+                } else {
                     Operator::template Execute<InputType, ResultType>(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                 }
                 result->tail_index_ = 1;
