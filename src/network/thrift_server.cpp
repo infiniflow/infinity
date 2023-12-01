@@ -284,30 +284,31 @@ public:
     void handleVarcharType(const std::shared_ptr<ColumnVector> &column_vector, int all_row_count, infinity_thrift_rpc::SelectResponse &response) {
         String dst;
         SizeT total_varchar_data_size = 0;
-        for (int index = 0; index < all_row_count; ++index) {
+        for (SizeT index = 0; index < all_row_count; ++index) {
             VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
             total_varchar_data_size += varchar.length_;
         }
-        auto all_size = total_varchar_data_size + all_row_count * sizeof(u64);
+
+        auto all_size = total_varchar_data_size + all_row_count * sizeof(i32);
         dst.resize(all_size);
 
-        u64 current_offset = 0;
-        for (int index = 0; index < all_row_count; ++index) {
+        i32 current_offset = 0;
+        for (SizeT index = 0; index < all_row_count; ++index) {
             VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
-            u64 length = varchar.length_;
+            i32 length = varchar.length_;
             if (varchar.IsInlined()) {
-                Memcpy(dst.data() + current_offset, &length, sizeof(u64));
-                Memcpy(dst.data() + current_offset + sizeof(u64), varchar.short_.data_, varchar.length_);
+                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                Memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
             } else {
                 auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
                 column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
                                                                     varchar.vector_.chunk_id_,
                                                                     varchar.vector_.chunk_offset_,
                                                                     varchar.length_);
-                Memcpy(dst.data() + current_offset, &length, sizeof(u64));
-                Memcpy(dst.data() + current_offset + sizeof(u64), varchar_ptr.get(), varchar.length_);
+                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                Memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
             }
-            current_offset += sizeof(u64) + varchar.length_;
+            current_offset += sizeof(i32) + varchar.length_;
         }
 
         Assert<NetworkException>(current_offset == all_size, "Bug");

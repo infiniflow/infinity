@@ -85,8 +85,8 @@ def parse_bytes(bytes_data):
     results = []
     offset = 0
     while offset < len(bytes_data):
-        length = struct.unpack('Q', bytes_data[offset:offset + 8])[0]
-        offset += 8
+        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
         string_data = bytes_data[offset:offset + length].decode('utf-8')
         results.append(string_data)
         offset += length
