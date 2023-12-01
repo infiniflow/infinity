@@ -96,12 +96,20 @@ bool SegmentColumnIndexEntry::Flush(SegmentColumnIndexEntry *segment_column_inde
     return true;
 }
 
-Json SegmentColumnIndexEntry::Serialize(const SegmentColumnIndexEntry *segment_column_index_entry) {
+Json SegmentColumnIndexEntry::Serialize(SegmentColumnIndexEntry *segment_column_index_entry) {
+    if (segment_column_index_entry->deleted_) {
+        Error<StorageException>("Segment Column index entry can't be deleted.");
+    }
+
     Json index_entry_json;
-    index_entry_json["segment_id"] = segment_column_index_entry->segment_id_;
-    index_entry_json["min_ts"] = segment_column_index_entry->min_ts_;
-    index_entry_json["max_ts"] = segment_column_index_entry->max_ts_;
-    index_entry_json["checkpoint_ts"] = segment_column_index_entry->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
+    {
+        SharedLock<RWMutex> lck(segment_column_index_entry->rw_locker_);
+        index_entry_json["segment_id"] = segment_column_index_entry->segment_id_;
+        index_entry_json["min_ts"] = segment_column_index_entry->min_ts_;
+        index_entry_json["max_ts"] = segment_column_index_entry->max_ts_;
+        index_entry_json["checkpoint_ts"] = segment_column_index_entry->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
+    }
+
     return index_entry_json;
 }
 
@@ -111,6 +119,9 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const Js
                                                                         TableCollectionEntry *table_collection_entry) {
     u32 segment_id = index_entry_json["segment_id"];
     SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_collection_entry, segment_id);
+    if(segment_entry == nullptr) {
+        return nullptr;
+    }
     u64 column_id = column_index_entry->column_id_;
     UniquePtr<CreateIndexParam> create_index_param =
         SegmentEntry::GetCreateIndexParam(segment_entry, column_index_entry->index_base_.get(), table_collection_entry->columns_[column_id].get());

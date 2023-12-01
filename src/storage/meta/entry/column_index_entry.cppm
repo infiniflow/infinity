@@ -48,7 +48,7 @@ public:
 
     static void CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry);
 
-    static Json Serialize(const ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts);
+    static Json Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts);
 
     static UniquePtr<ColumnIndexEntry> Deserialize(const Json &column_index_entry_json,
                                                    TableIndexEntry *table_index_entry,

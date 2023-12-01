@@ -51,8 +51,12 @@ SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const Json &index_def_entry_
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
-    auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
+
+    auto irs_index_entry = NewIrsIndexEntry(table_index_entry, txn_id, index_dir, begin_ts);
     irs_index_entry->commit_ts_.store(commit_ts);
+    irs_index_entry->txn_id_.store(txn_id);
+    irs_index_entry->begin_ts_ = begin_ts;
+    irs_index_entry->index_dir_ = index_dir;
 
     return irs_index_entry;
 }
@@ -62,8 +66,7 @@ SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String 
     return nullptr;
 }
 
-SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexFullText>>,
-                                                         TableIndexEntry *table_index_entry,
+SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry,
                                                          u64 txn_id,
                                                          SharedPtr<String> index_dir,
                                                          TxnTimeStamp begin_ts) {

@@ -42,7 +42,8 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                  TableIndexMeta *table_index_meta,
                                  SharedPtr<String> index_dir,
                                  u64 txn_id,
-                                 TxnTimeStamp begin_ts)
+                                 TxnTimeStamp begin_ts,
+                                 bool is_replay)
     : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_def_(Move(index_def)), index_dir_(Move(index_dir)) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
@@ -65,8 +66,8 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
             column_index_map_[column_id] = column_index_entry;
         }
     }
-    if (!index_info_map.empty()) {
-        irs_index_entry_ = IrsIndexEntry::NewIrsIndexEntry(index_info_map, this, txn_id, index_dir_, begin_ts);
+    if (!index_info_map.empty() && !is_replay) {
+        irs_index_entry_ = IrsIndexEntry::NewIrsIndexEntry(this, txn_id, index_dir_, begin_ts);
     }
 }
 
@@ -100,24 +101,39 @@ void TableIndexEntry::CommitCreateIndex(TableIndexEntry *table_index_entry, Shar
     table_index_entry->irs_index_entry_ = irs_index_entry;
 }
 
-Json TableIndexEntry::Serialize(const TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts) {
+Json TableIndexEntry::Serialize(TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts) {
     Json json;
-    json["txn_id"] = table_index_entry->txn_id_.load();
-    json["begin_ts"] = table_index_entry->begin_ts_;
-    json["commit_ts"] = table_index_entry->commit_ts_.load();
-    json["deleted"] = table_index_entry->deleted_;
-    if (table_index_entry->deleted_) {
-        return json;
+
+    Vector<ColumnIndexEntry *> column_index_entry_candidates;
+    IrsIndexEntry *irs_index_entry_candidate_{};
+    {
+        SharedLock<RWMutex> lck(table_index_entry->rw_locker_);
+        json["txn_id"] = table_index_entry->txn_id_.load();
+        json["begin_ts"] = table_index_entry->begin_ts_;
+        json["commit_ts"] = table_index_entry->commit_ts_.load();
+        json["deleted"] = table_index_entry->deleted_;
+        if (table_index_entry->deleted_) {
+            return json;
+        }
+
+        json["index_dir"] = *table_index_entry->index_dir_;
+        json["index_def"] = table_index_entry->index_def_->Serialize();
+
+        for (const auto &[index_name, column_index_entry] : table_index_entry->column_index_map_) {
+            column_index_entry_candidates.emplace_back((ColumnIndexEntry *)column_index_entry.get());
+        }
+
+        irs_index_entry_candidate_ = table_index_entry->irs_index_entry_.get();
     }
 
-    json["index_dir"] = *table_index_entry->index_dir_;
-    json["index_def"] = table_index_entry->index_def_->Serialize();
-    for (const auto &[index_name, column_index_entry] : table_index_entry->column_index_map_) {
-        json["column_indexes"].emplace_back(ColumnIndexEntry::Serialize(column_index_entry.get(), max_commit_ts));
+    for (const auto &column_index_entry : column_index_entry_candidates) {
+        json["column_indexes"].emplace_back(ColumnIndexEntry::Serialize(column_index_entry, max_commit_ts));
     }
-    if (table_index_entry->irs_index_entry_.get() != nullptr) {
-        json["irs_index_entry"] = IrsIndexEntry::Serialize(table_index_entry->irs_index_entry_.get(), max_commit_ts);
+
+    if(irs_index_entry_candidate_ != nullptr) {
+        json["irs_index_entry"] = IrsIndexEntry::Serialize(irs_index_entry_candidate_, max_commit_ts);
     }
+
     return json;
 }
 
@@ -141,7 +157,7 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     auto index_def = IndexDef::Deserialize(index_def_entry_json["index_def"]);
 
-    UniquePtr<TableIndexEntry> table_index_entry = MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+    UniquePtr<TableIndexEntry> table_index_entry = MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts, true);
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 
@@ -155,10 +171,8 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Deserialize(const Json &index_def_en
     }
 
     if (index_def_entry_json.contains("irs_index_entry")) {
-        if (index_def_entry_json.contains("irs_index_entry")) {
-            table_index_entry->irs_index_entry_ =
-                IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
-        }
+        table_index_entry->irs_index_entry_ =
+            IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
     }
     return table_index_entry;
 }

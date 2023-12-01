@@ -235,19 +235,33 @@ Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_m
 
 SharedPtr<String> TableIndexMeta::ToString(TableIndexMeta *) { throw StorageException("Not implemented"); }
 
-Json TableIndexMeta::Serialize(const TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts) {
-    Json json;
+Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts) {
+    Json json_res;
 
-    for (const auto &entry : table_index_meta->entry_list_) {
-        if (entry->entry_type_ == EntryType::kTableIndex) {
-            json["entries"].emplace_back(TableIndexEntry::Serialize(static_cast<TableIndexEntry *>(entry.get()), max_commit_ts));
-        } else if (entry->entry_type_ == EntryType::kDummy) {
-            continue;
-        } else {
-            Error<StorageException>("Unexpected entry type.");
+    Vector<TableIndexEntry *> table_index_entry_candidates;
+    {
+        SharedLock<RWMutex> lck(table_index_meta->rw_locker_);
+        json_res["index_name"] = *table_index_meta->index_name_;
+
+        table_index_entry_candidates.reserve(table_index_meta->entry_list_.size());
+        for(const auto& base_entry: table_index_meta->entry_list_) {
+            if(base_entry->entry_type_ == EntryType::kDummy) {
+                continue;
+            }
+            if(base_entry->entry_type_ != EntryType::kTableIndex) {
+                Error<StorageException>("Unexpected entry type during serialize table index meta");
+            }
+            if(base_entry->commit_ts_ <= max_commit_ts) {
+                // Put it to candidate list
+                table_index_entry_candidates.push_back((TableIndexEntry *)base_entry.get());
+            }
         }
     }
-    return json;
+
+    for (const auto &table_index_entry : table_index_entry_candidates) {
+        json_res["entries"].emplace_back(TableIndexEntry::Serialize(table_index_entry, max_commit_ts));
+    }
+    return json_res;
 }
 
 UniquePtr<TableIndexMeta>
