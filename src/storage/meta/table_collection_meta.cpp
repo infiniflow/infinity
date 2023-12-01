@@ -357,7 +357,7 @@ Json TableCollectionMeta::Serialize(TableCollectionMeta *table_meta, TxnTimeStam
         }
     }
     for (TableCollectionEntry *table_entry : table_candidates) {
-        json_res["entries"].emplace_back(TableCollectionEntry::Serialize(table_entry, max_commit_ts, is_full_checkpoint));
+        json_res["table_entries"].emplace_back(TableCollectionEntry::Serialize(table_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -379,8 +379,8 @@ UniquePtr<TableCollectionMeta> TableCollectionMeta::Deserialize(const Json &tabl
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE(Format("load table {}", *table_name));
     UniquePtr<TableCollectionMeta> res = MakeUnique<TableCollectionMeta>(db_entry_dir, table_name, db_entry);
-    if (table_meta_json.contains("entries")) {
-        for (const auto &table_entry_json : table_meta_json["entries"]) {
+    if (table_meta_json.contains("table_entries")) {
+        for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableCollectionEntry> table_entry = TableCollectionEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
             res->entry_list_.emplace_back(Move(table_entry));
         }

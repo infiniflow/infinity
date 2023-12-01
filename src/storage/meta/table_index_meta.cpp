@@ -259,7 +259,7 @@ Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp ma
     }
 
     for (const auto &table_index_entry : table_index_entry_candidates) {
-        json_res["entries"].emplace_back(TableIndexEntry::Serialize(table_index_entry, max_commit_ts));
+        json_res["index_entries"].emplace_back(TableIndexEntry::Serialize(table_index_entry, max_commit_ts));
     }
     return json_res;
 }
@@ -270,8 +270,8 @@ TableIndexMeta::Deserialize(const Json &table_index_meta_json, TableCollectionEn
 
     SharedPtr<String> index_name = MakeShared<String>(table_index_meta_json["index_name"]);
     auto res = MakeUnique<TableIndexMeta>(table_entry, index_name);
-    if (table_index_meta_json.contains("entries")) {
-        auto &entries = table_index_meta_json["entries"];
+    if (table_index_meta_json.contains("index_entries")) {
+        auto &entries = table_index_meta_json["index_entries"];
         // traverse reversely because a dummy head has been inserted
         for (auto iter = entries.rbegin(); iter != entries.rend(); iter++) {
             auto entry = TableIndexEntry::Deserialize(*iter, res.get(), buffer_mgr, table_entry);

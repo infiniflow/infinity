@@ -280,7 +280,7 @@ Json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full
         }
     }
     for (DBEntry *db_entry : db_candidates) {
-        json_res["entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
+        json_res["db_entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -290,8 +290,8 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *b
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
     UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir, db_name);
 
-    if (db_meta_json.contains("entries")) {
-        for (const auto &db_entry_json : db_meta_json["entries"]) {
+    if (db_meta_json.contains("db_entries")) {
+        for (const auto &db_entry_json : db_meta_json["db_entries"]) {
             res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
         }
     }
