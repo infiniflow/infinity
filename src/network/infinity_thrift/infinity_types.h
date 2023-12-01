@@ -310,31 +310,19 @@ void swap(NumberType &a, NumberType &b);
 
 std::ostream& operator<<(std::ostream& out, const NumberType& obj);
 
-typedef struct _VarcharType__isset {
-  _VarcharType__isset() : dimension(false) {}
-  bool dimension :1;
-} _VarcharType__isset;
 
 class VarcharType : public virtual ::apache::thrift::TBase {
  public:
 
   VarcharType(const VarcharType&) noexcept;
   VarcharType& operator=(const VarcharType&) noexcept;
-  VarcharType() noexcept
-              : dimension(0) {
+  VarcharType() noexcept {
   }
 
   virtual ~VarcharType() noexcept;
-  int64_t dimension;
 
-  _VarcharType__isset __isset;
-
-  void __set_dimension(const int64_t val);
-
-  bool operator == (const VarcharType & rhs) const
+  bool operator == (const VarcharType & /* rhs */) const
   {
-    if (!(dimension == rhs.dimension))
-      return false;
     return true;
   }
   bool operator != (const VarcharType &rhs) const {

@@ -490,6 +490,8 @@ private:
                 auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kEmbedding, embedding_info);
             };
+            case infinity_thrift_rpc::LogicType::Varchar:
+                return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
             default:
                 Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
         }
@@ -702,7 +704,6 @@ private:
             case LogicalType::kVarchar: {
                 auto *data_type_proto = new infinity_thrift_rpc::DataType();
                 infinity_thrift_rpc::VarcharType varchar_type;
-                varchar_type.__set_dimension(0);
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Varchar);
                 infinity_thrift_rpc::PhysicalType physical_type;
                 physical_type.__set_varchar_type(varchar_type);

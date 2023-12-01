@@ -455,10 +455,6 @@ void NumberType::printTo(std::ostream& out) const {
 VarcharType::~VarcharType() noexcept {
 }
 
-
-void VarcharType::__set_dimension(const int64_t val) {
-  this->dimension = val;
-}
 std::ostream& operator<<(std::ostream& out, const VarcharType& obj)
 {
   obj.printTo(out);
@@ -485,20 +481,7 @@ uint32_t VarcharType::read(::apache::thrift::protocol::TProtocol* iprot) {
     if (ftype == ::apache::thrift::protocol::T_STOP) {
       break;
     }
-    switch (fid)
-    {
-      case 1:
-        if (ftype == ::apache::thrift::protocol::T_I64) {
-          xfer += iprot->readI64(this->dimension);
-          this->__isset.dimension = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      default:
-        xfer += iprot->skip(ftype);
-        break;
-    }
+    xfer += iprot->skip(ftype);
     xfer += iprot->readFieldEnd();
   }
 
@@ -512,10 +495,6 @@ uint32_t VarcharType::write(::apache::thrift::protocol::TProtocol* oprot) const 
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("VarcharType");
 
-  xfer += oprot->writeFieldBegin("dimension", ::apache::thrift::protocol::T_I64, 1);
-  xfer += oprot->writeI64(this->dimension);
-  xfer += oprot->writeFieldEnd();
-
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -523,23 +502,20 @@ uint32_t VarcharType::write(::apache::thrift::protocol::TProtocol* oprot) const 
 
 void swap(VarcharType &a, VarcharType &b) {
   using ::std::swap;
-  swap(a.dimension, b.dimension);
-  swap(a.__isset, b.__isset);
+  (void) a;
+  (void) b;
 }
 
 VarcharType::VarcharType(const VarcharType& other4) noexcept {
-  dimension = other4.dimension;
-  __isset = other4.__isset;
+  (void) other4;
 }
 VarcharType& VarcharType::operator=(const VarcharType& other5) noexcept {
-  dimension = other5.dimension;
-  __isset = other5.__isset;
+  (void) other5;
   return *this;
 }
 void VarcharType::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "VarcharType(";
-  out << "dimension=" << to_string(dimension);
   out << ")";
 }
 
