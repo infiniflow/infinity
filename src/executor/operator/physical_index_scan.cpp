@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalIndexScan::Init() {}
 
-void PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalIndexScan::Execute(QueryContext *, OperatorState *) {}
 
 } // namespace infinity

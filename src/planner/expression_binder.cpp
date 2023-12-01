@@ -121,7 +121,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
     return SharedPtr<BaseExpression>();
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     auto value_ptr = BuildExpression(*expr.value_, bind_context_ptr, depth, false);
     auto lower_ptr = BuildExpression(*expr.lower_bound_, bind_context_ptr, depth, false);
     auto upper_ptr = BuildExpression(*expr.upper_bound_, bind_context_ptr, depth, false);
@@ -168,7 +168,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildBetweenExpr(const BetweenExpr &
     return MakeShared<FunctionExpression>(scalar_function, arguments);
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &expr, BindContext *, i64, bool) {
     switch (expr.literal_type_) {
         case LiteralType::kInteger: {
             Value value = Value::MakeBigInt(expr.integer_value_);
@@ -220,7 +220,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
     Error<PlannerException>("Unreachable.");
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     SharedPtr<ColumnExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
     if (column_expr != nullptr && column_expr->IsCorrelated()) {
@@ -231,19 +231,18 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr,
     return column_expr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
     if (special_function != nullptr) {
         String &table_name = bind_context_ptr->table_names_[0];
         TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr =
-            ColumnExpression::Make(special_function->data_type(),
-                                   table_name,
-                                   bind_context_ptr->table_name2table_index_[table_name],
-                                   special_function->name(),
-                                   table_entry->columns_.size() + special_function->extra_idx(),
-                                   depth,
-                                   true);
+        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
+                                                                               table_name,
+                                                                               bind_context_ptr->table_name2table_index_[table_name],
+                                                                               special_function->name(),
+                                                                               table_entry->columns_.size() + special_function->extra_idx(),
+                                                                               depth,
+                                                                               true);
         return bound_column_expr;
     }
 
@@ -310,12 +309,12 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
     return nullptr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     SharedPtr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
     return CastExpression::AddCastToType(source_expr_ptr, expr.data_type_);
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Assert<PlannerException>(expr.case_check_array_, "No when and then expression");
     Assert<PlannerException>(!expr.case_check_array_->empty(), "No when and then expression list");
 
@@ -378,7 +377,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, 
     return case_expression_ptr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, BindContext *bind_context_ptr, i64 depth, bool ) {
     auto bound_left_expr = BuildExpression(*expr.left_, bind_context_ptr, depth, false);
 
     SizeT argument_count = expr.arguments_->size();
@@ -400,7 +399,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     return in_expression_ptr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_knn_expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_knn_expr, BindContext *bind_context_ptr, i64 depth, bool ) {
     // Bind KNN expression
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(1);
@@ -425,7 +424,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     return bound_knn_expr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *, i64 , bool ) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     SharedPtr<FusionExpression> fusion_expr = nullptr;
@@ -441,7 +440,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
 
 // Bind subquery expression.
 SharedPtr<SubqueryExpression>
-ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool root) {
+ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_context_ptr, SubqueryType subquery_type, i64 depth, bool ) {
 
     switch (subquery_type) {
 

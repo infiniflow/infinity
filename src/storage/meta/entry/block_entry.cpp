@@ -163,7 +163,7 @@ u16 BlockEntry::AppendData(BlockEntry *block_entry,
                            DataBlock *input_data_block,
                            u16 input_block_offset,
                            u16 append_rows,
-                           BufferManager *buffer_mgr) {
+                           BufferManager *) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
     Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
                              Format("Multiple transactions are changing data of Segment: {}, Block: {}",
@@ -309,7 +309,7 @@ void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
 }
 
 // TODO: introduce BlockColumnMeta
-Json BlockEntry::Serialize(BlockEntry *block_entry, TxnTimeStamp max_commit_ts) {
+Json BlockEntry::Serialize(BlockEntry *block_entry, TxnTimeStamp ) {
     Json json_res;
     SharedLock<RWMutex> lck(block_entry->rw_locker_);
 

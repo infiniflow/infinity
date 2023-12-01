@@ -8,7 +8,7 @@ module buffered_byte_slice;
 
 namespace infinity {
 
-BufferedByteSlice::BufferedByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) {}
+BufferedByteSlice::BufferedByteSlice(MemoryPool *, MemoryPool *) {}
 
 void BufferedByteSlice::Init(const PostingValues *value) { buffer_.Init(value); }
 

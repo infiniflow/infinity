@@ -37,7 +37,8 @@ public:
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
                     u64 txn_id,
-                    TxnTimeStamp begin_ts);
+                    TxnTimeStamp begin_ts,
+                    bool replay = false);
 
     TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
@@ -49,7 +50,7 @@ public:
     static void CommitCreateIndex(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry);
     static void CommitCreateIndex(TableIndexEntry *table_index_entry, SharedPtr<IrsIndexEntry> irs_index_entry);
 
-    static Json Serialize(const TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts);
+    static Json Serialize(TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexEntry>
     Deserialize(const Json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableCollectionEntry *table_entry);

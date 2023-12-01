@@ -38,7 +38,7 @@ void TableScanFunc(QueryContext *query_context, TableFunctionData *table_functio
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
-    i64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
+    u64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
     if (block_ids_idx >= block_ids->size()) {
         // No data or all data is read
         return;

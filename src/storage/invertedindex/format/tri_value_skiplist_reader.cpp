@@ -41,7 +41,7 @@ void TriValueSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, con
     Load_(start, end, item_count);
 }
 
-void TriValueSkipListReader::Load_(u32 start, u32 end, const u32 &item_count) {
+void TriValueSkipListReader::Load_(u32, u32, const u32 &item_count) {
     InitMember();
     if (item_count <= MAX_UNCOMPRESSED_SKIP_LIST_SIZE) {
         byte_slice_reader_.Read(doc_id_buffer_, item_count * sizeof(doc_id_buffer_[0]));

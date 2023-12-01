@@ -34,7 +34,7 @@ namespace infinity {
 
 void PhysicalAggregate::Init() {}
 
-void PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *output_state) {
+void PhysicalAggregate::Execute(QueryContext *, OperatorState *) {
 #if 0
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");
@@ -268,8 +268,8 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                         }
                         case kVarchar: {
                             Error<NotImplementException>("Varchar data shuffle isn't implemented.");
-                            VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
-                            VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
+//                            VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
+//                            VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
 //                            if (src_ref.IsInlined()) {
 //                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
 //                            } else {
@@ -339,7 +339,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 
     SharedPtr<DataBlock> output_datablock = nullptr;
     const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-    SizeT row_count = hash_table_.hash_table_.size();
+//    SizeT row_count = hash_table_.hash_table_.size();
 #if 1
     for (SizeT block_row_idx = 0; const auto &item : hash_table_.hash_table_) {
         // Each hash bucket will generate one data block.
@@ -551,7 +551,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 #endif
 }
 
-void PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table) {
+void PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &) {
 #if 0
     SizeT aggregates_count = aggregates_.size();
     ExecutorAssert(aggregates_count > 0, "Simple Aggregate without aggregate expression");

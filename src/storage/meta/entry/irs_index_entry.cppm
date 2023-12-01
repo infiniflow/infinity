@@ -33,8 +33,7 @@ export struct IrsIndexEntry : public BaseEntry {
 public:
     IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static SharedPtr<IrsIndexEntry> NewIrsIndexEntry(HashMap<u64, SharedPtr<IndexFullText>> index_info_map,
-                                                     TableIndexEntry *table_index_entry,
+    static SharedPtr<IrsIndexEntry> NewIrsIndexEntry(TableIndexEntry *table_index_entry,
                                                      u64 txn_id,
                                                      SharedPtr<String> index_dir,
                                                      TxnTimeStamp begin_ts);

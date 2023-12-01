@@ -50,7 +50,7 @@ String FunctionExpression::ToString() const {
         ss << ")";
     } else {
         auto arguments_count = arguments_.size();
-        for (auto i = 0; i < arguments_count - 1; ++i) {
+        for (SizeT i = 0; i < arguments_count - 1; ++i) {
             ss << arguments_[i]->Name() << ", ";
         }
         ss << arguments_.back()->Name() << ")";

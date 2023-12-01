@@ -36,7 +36,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
-    for (auto i = 0; i < function_count; ++i) {
+    for (SizeT i = 0; i < function_count; ++i) {
         AggregateFunction &function = functions_[i];
         i64 cost = MatchFunctionCost(function, input_argument);
         if (cost >= 0 && cost <= lowest_cost) {

@@ -54,7 +54,7 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
 
 struct DateTimeTryCastToFixlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target) {
+    static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -63,7 +63,7 @@ struct DateTimeTryCastToFixlen {
 
 struct DateTimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
+    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -71,25 +71,25 @@ struct DateTimeTryCastToVarlen {
 };
 
 template <>
-inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, DateT &target) {
+inline bool DateTimeTryCastToFixlen::Run(DateTimeT, DateT &) {
     Error<FunctionException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, TimeT &target) {
+inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimeT &) {
     Error<FunctionException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool DateTimeTryCastToFixlen::Run(DateTimeT source, TimestampT &target) {
+inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimestampT &) {
     Error<FunctionException>("Not implemented");
     return false;
 }
 
 template <>
-inline bool DateTimeTryCastToVarlen::Run(DateTimeT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
+inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, const SharedPtr<ColumnVector> &) {
     Error<FunctionException>("Not implemented");
     return false;
 }

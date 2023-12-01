@@ -59,7 +59,7 @@ public:
 
     static bool Flush(SegmentColumnIndexEntry *segment_column_index_entry, TxnTimeStamp checkpoint_ts);
 
-    static Json Serialize(const SegmentColumnIndexEntry *segment_column_index_entry);
+    static Json Serialize(SegmentColumnIndexEntry *segment_column_index_entry);
 
     static UniquePtr<SegmentColumnIndexEntry> Deserialize(const Json &index_entry_json,
                                                           ColumnIndexEntry *column_index_entry,
@@ -79,6 +79,8 @@ public:
 
 private:
     BufferObj *const buffer_{};
+
+    RWMutex rw_locker_{};
 
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentColumnIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentColumnIndexEntry

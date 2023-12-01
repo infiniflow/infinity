@@ -57,7 +57,7 @@ public:
         return table_index_meta->table_collection_entry_;
     }
 
-    static Json Serialize(const TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts);
+    static Json Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexMeta> Deserialize(const Json &index_def_meta_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr);
 

@@ -43,7 +43,7 @@ public:
         value_ = input[idx];
     }
 
-    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const ValueType *__restrict input, SizeT idx, SizeT) {
         if (is_set_)
             return;
 
@@ -53,7 +53,7 @@ public:
 
     [[nodiscard]] inline ptr_t Finalize() const { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<ValueType, ResultType>); }
+    inline static SizeT Size(const DataType &) { return sizeof(FirstState<ValueType, ResultType>); }
 };
 
 template <>
@@ -73,7 +73,7 @@ public:
         value_ = input[idx];
     }
 
-    inline void ConstantUpdate(const VarcharT *__restrict input, SizeT idx, SizeT count) {
+    inline void ConstantUpdate(const VarcharT *__restrict input, SizeT idx, SizeT) {
         if (is_set_)
             return;
 
@@ -84,7 +84,7 @@ public:
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 
-    inline static SizeT Size(const DataType &data_type) { return sizeof(FirstState<VarcharT, VarcharT>); }
+    inline static SizeT Size(const DataType &) { return sizeof(FirstState<VarcharT, VarcharT>); }
 };
 //
 //template <>
@@ -104,7 +104,7 @@ public:
 //        value_ = input[idx];
 //    }
 //
-//    inline void ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT count) {
+//    inline void ConstantUpdate(const PathT *__restrict input, SizeT idx, SizeT) {
 //        if (is_set_)
 //            return;
 //

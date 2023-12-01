@@ -35,7 +35,7 @@ SharedPtr<BaseExpression> InsertBinder::BuildExpression(const ParsedExpr &expr, 
     return result;
 }
 
-SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> InsertBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
     Error<PlannerException>("KNN expression isn't supported in insert clause");
     return nullptr;
 }

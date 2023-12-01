@@ -110,8 +110,8 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // Star expression will be unfolded and bound as column expressions.
     UnfoldStarExpression(query_context_ptr_, *statement.select_list_, bind_context_ptr_->select_expression_);
 
-    i64 select_column_count = bind_context_ptr_->select_expression_.size();
-    for (i64 column_index = 0; column_index < select_column_count; ++column_index) {
+    SizeT select_column_count = bind_context_ptr_->select_expression_.size();
+    for (SizeT column_index = 0; column_index < select_column_count; ++column_index) {
         const ParsedExpr *select_expr = bind_context_ptr_->select_expression_[column_index];
 
         // Check if select expression has alias.
@@ -253,7 +253,7 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
     return result;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildDummyTable(QueryContext *query_context) { return nullptr; }
+SharedPtr<TableRef> QueryBinder::BuildDummyTable(QueryContext *) { return nullptr; }
 
 SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const TableReference *from_table) {
     // There are five cases here:
@@ -291,7 +291,7 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     return nullptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *query_context, const SubqueryReference *subquery_ref) {
+SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryReference *subquery_ref) {
     // Create new bind context and add into context array;
     SharedPtr<BindContext> subquery_bind_context_ptr = BindContext::Make(this->bind_context_ptr_);
 
@@ -327,7 +327,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *query_context, cons
     return subquery_table_ref_ptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *query_context, const String &name) {
+SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     SharedPtr<CommonTableExpressionInfo> cte = this->bind_context_ptr_->GetCTE(name);
     if (cte.get() == nullptr) {
         return nullptr;
@@ -456,9 +456,9 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
     Vector<SharedPtr<BindContext>> bind_contexts;
     {
         SharedPtr<BindContext> current_bind_context = this->bind_context_ptr_;
-        auto table_count = tables.size();
+        SizeT table_count = tables.size();
         bind_contexts.reserve(table_count * 2);
-        for (auto i = 0; i < table_count - 1; ++i) {
+        for (SizeT i = 0; i < table_count - 1; ++i) {
             SharedPtr<BindContext> right_bind_context = BindContext::Make(current_bind_context);
             SharedPtr<BindContext> left_bind_context = BindContext::Make(current_bind_context);
             bind_contexts.emplace_back(right_bind_context);
@@ -480,8 +480,8 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
     SharedPtr<QueryBinder> right_query_binder{};
     SharedPtr<TableRef> right_table_ref{};
 
-    auto table_count = tables.size();
-    for (auto i = 1; i < table_count - 1; ++i) {
+    SizeT table_count = tables.size();
+    for (SizeT i = 1; i < table_count - 1; ++i) {
         right_bind_context = bind_contexts[bind_context_idx--];
         right_query_binder = MakeShared<QueryBinder>(query_context, right_bind_context);
         right_table_ref = right_query_binder->BuildFromClause(query_context, tables[i]);
@@ -645,7 +645,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
     return result;
 }
 
-void QueryBinder::UnfoldStarExpression(QueryContext *query_context,
+void QueryBinder::UnfoldStarExpression(QueryContext *,
                                        const Vector<ParsedExpr *> &input_select_list,
                                        Vector<ParsedExpr *> &output_select_list) {
     output_select_list.reserve(input_select_list.size());
@@ -742,7 +742,7 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
         // Reserve the group names used in GroupBinder::BuildExpression
         SizeT group_count = select.group_by_list_->size();
         bind_context_ptr_->group_exprs_.reserve(group_count);
-        for (i64 idx = 0; idx < group_count; ++idx) {
+        for (SizeT idx = 0; idx < group_count; ++idx) {
             // set group-by expression index
             group_binder->group_by_expr_index = idx;
             const ParsedExpr &expr = *(*select.group_by_list_)[idx];
@@ -773,7 +773,7 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
     }
 }
 
-void QueryBinder::PushOrderByToProject(QueryContext *query_context, const SelectStatement &statement) {
+void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &statement) {
     for (const OrderByExpr *order_by_expr : *statement.order_by_list) {
         if (order_by_expr->expr_->type_ == ParsedExprType::kKnn) {
             continue;
@@ -783,7 +783,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *query_context, const Select
     }
 }
 
-void QueryBinder::BuildSelectList(QueryContext *query_context, SharedPtr<BoundSelectStatement> &bound_select_statement) {
+void QueryBinder::BuildSelectList(QueryContext *, SharedPtr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
     bind_context_ptr_->project_table_name_ = "project" + ToStr(table_index);
@@ -863,7 +863,7 @@ void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement 
     }
 }
 
-void QueryBinder::PruneOutput(QueryContext *query_context, i64 select_column_count, SharedPtr<BoundSelectStatement> &bound_statement) {
+void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, SharedPtr<BoundSelectStatement> &bound_statement) {
     Vector<SharedPtr<BaseExpression>> &pruned_expressions = bound_statement->pruned_expression_;
     Vector<SharedPtr<BaseExpression>> &projection_expressions = bound_statement->projection_expressions_;
     Vector<String> &output_names = *bound_statement->names_ptr_;

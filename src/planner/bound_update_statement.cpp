@@ -67,7 +67,7 @@ BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
 }
 
 SharedPtr<LogicalNode>
-BoundUpdateStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
+BoundUpdateStatement::BuildBaseTable(SharedPtr<TableRef> &table_ref, QueryContext *, const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<BaseTableRef> base_table_ref
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref);
 
@@ -119,7 +119,7 @@ void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
 SharedPtr<BaseExpression> BoundUpdateStatement::UnnestSubquery(SharedPtr<LogicalNode> &root,
                                                                SharedPtr<BaseExpression> &condition,
                                                                QueryContext *query_context,
-                                                               const SharedPtr<BindContext> &bind_context) {
+                                                               const SharedPtr<BindContext> &) {
     building_subquery_ = true;
     //    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(query_context,
     //                                                                      bind_context);

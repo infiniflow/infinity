@@ -193,7 +193,7 @@ Status TableCollectionMeta::CreateNewEntry(TableCollectionMeta *table_meta,
 Status TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
                                          u64 txn_id,
                                          TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr,
+                                         TxnManager *,
                                          const String &table_name,
                                          ConflictType conflict_type,
                                          BaseEntry *&base_entry) {
@@ -263,7 +263,7 @@ Status TableCollectionMeta::DropNewEntry(TableCollectionMeta *table_meta,
     }
 }
 
-void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr) {
+void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *) {
     UniqueLock<RWMutex> rw_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.");
@@ -342,18 +342,21 @@ SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta)
 
 Json TableCollectionMeta::Serialize(TableCollectionMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
-    Vector<TableCollectionEntry *> table_entries;
+    Vector<TableCollectionEntry *> table_candidates;
     {
         SharedLock<RWMutex> lck(table_meta->rw_locker_);
         json_res["db_entry_dir"] = *table_meta->db_entry_dir_;
         json_res["table_name"] = *table_meta->table_collection_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
+        table_candidates.reserve(table_meta->entry_list_.size());
         for (auto &table_entry : table_meta->entry_list_) {
-            if (table_entry->entry_type_ == EntryType::kTable && table_entry->Committed() && table_entry->commit_ts_ <= max_commit_ts)
-                table_entries.push_back((TableCollectionEntry *)table_entry.get());
+            if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
+                // Put it to candidate list
+                table_candidates.push_back((TableCollectionEntry *)table_entry.get());
+            }
         }
     }
-    for (TableCollectionEntry *table_entry : table_entries) {
+    for (TableCollectionEntry *table_entry : table_candidates) {
         json_res["entries"].emplace_back(TableCollectionEntry::Serialize(table_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;

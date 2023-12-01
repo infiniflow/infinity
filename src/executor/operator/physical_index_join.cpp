@@ -26,7 +26,7 @@ namespace infinity {
 
 void PhysicalIndexJoin::Init() {}
 
-void PhysicalIndexJoin::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalIndexJoin::Execute(QueryContext *, OperatorState *) {}
 
 SharedPtr<Vector<String>> PhysicalIndexJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();

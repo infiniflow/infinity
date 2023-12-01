@@ -35,12 +35,12 @@ module fragment_task;
 namespace infinity {
 
 void FragmentTask::Init() {
-    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
+    //    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     // Init each operator input / output
     operator_states_.resize(operator_count_);
 }
 
-void FragmentTask::OnExecute(i64 worker_id) {
+void FragmentTask::OnExecute(i64) {
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -74,7 +74,7 @@ void FragmentTask::OnExecute(i64 worker_id) {
     }
     profiler.End();
 
-    if(err_msg.get() != nullptr) {
+    if (err_msg.get() != nullptr) {
         sink_state_->error_message_ = Move(err_msg);
     }
 
@@ -97,9 +97,7 @@ bool FragmentTask::Ready() const {
     return source_op->ReadyToExec(source_state_.get());
 }
 
-bool FragmentTask::IsComplete() const {
-    return sink_state_->prev_op_state_->Complete() or sink_state_->error_message_.get() != nullptr;
-}
+bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() or sink_state_->error_message_.get() != nullptr; }
 
 TaskBinding FragmentTask::TaskBinding() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;

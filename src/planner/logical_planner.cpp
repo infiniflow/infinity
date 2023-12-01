@@ -269,7 +269,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     return Status();
 }
 
-Status LogicalPlanner::BuildInsertSelect(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<BindContext> &) {
     Error<PlannerException>("Not supported");
     return Status();
 }
@@ -605,12 +605,12 @@ Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<B
     return Status();
 }
 
-Status LogicalPlanner::BuildPrepare(const PrepareStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildPrepare(const PrepareStatement *, SharedPtr<BindContext> &) {
     Error<PlannerException>("Prepare statement isn't supported.");
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildExecute(const ExecuteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindContext> &) {
     Error<PlannerException>("Execute statement isn't supported.");
     return Status::OK();
 }
@@ -684,7 +684,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     return Status();
 }
 
-Status LogicalPlanner::BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildAlter(const AlterStatement *, SharedPtr<BindContext> &) {
     Error<PlannerException>("Alter statement isn't supported.");
     return Status::OK();
 }
@@ -830,7 +830,7 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
     return Status();
 }
 
-Status LogicalPlanner::BuildShowTables(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowTables(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowTables,
@@ -844,7 +844,7 @@ Status LogicalPlanner::BuildShowTables(const ShowStatement *statement, SharedPtr
     return Status();
 }
 
-Status LogicalPlanner::BuildShowViews(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowViews(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowViews,
@@ -855,7 +855,7 @@ Status LogicalPlanner::BuildShowViews(const ShowStatement *statement, SharedPtr<
     return Status();
 }
 
-Status LogicalPlanner::BuildShowDatabases(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowDatabases,
@@ -881,19 +881,19 @@ Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<Bin
     return Status();
 }
 
-Status LogicalPlanner::BuildFlushData(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildFlushData(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kData);
     this->logical_plan_ = logical_flush;
     return Status();
 }
 
-Status LogicalPlanner::BuildFlushLog(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildFlushLog(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kLog);
     this->logical_plan_ = logical_flush;
     return Status();
 }
 
-Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kBuffer);
     this->logical_plan_ = logical_flush;
     return Status();

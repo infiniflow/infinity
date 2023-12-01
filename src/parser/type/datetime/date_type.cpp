@@ -109,7 +109,7 @@ std::string DateType::ToString() const {
 
 bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &date) {
     // trim the string
-    int32_t pos{0};
+    size_t pos{0};
 
     // skip spaces
     while (pos < length && std::isspace(date_ptr[pos])) {

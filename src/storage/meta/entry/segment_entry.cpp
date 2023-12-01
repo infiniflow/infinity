@@ -104,7 +104,7 @@ u64 SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
     if (segment_entry->row_capacity_ - segment_entry->row_count_ <= 0)
         return 0;
-    SizeT start_row = segment_entry->row_count_;
+//    SizeT start_row = segment_entry->row_count_;
     SizeT append_block_count = append_state_ptr->blocks_.size();
     u64 total_copied{0};
 
@@ -320,7 +320,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
     return segment_column_index_entry;
 }
 
-void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count) {
+void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16, u16) {
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     SharedPtr<BlockEntry> block_entry;
     {

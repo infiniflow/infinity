@@ -31,9 +31,9 @@ namespace infinity {
 
 void PhysicalSource::Init() {}
 
-void PhysicalSource::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalSource::Execute(QueryContext *, OperatorState *) {}
 
-void PhysicalSource::Execute(QueryContext *query_context, SourceState *source_state) {
+void PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
             Error<ExecutorException>("Unsupported source state type.");

@@ -281,7 +281,7 @@ private:
 export class WalListIterator {
 public:
     explicit WalListIterator(const Vector<String> &wal_list) {
-        for (int i = 0; i < wal_list.size(); ++i) {
+        for (SizeT i = 0; i < wal_list.size(); ++i) {
             wal_deque_.push_back(wal_list[i]);
         }
     }

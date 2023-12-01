@@ -11,7 +11,7 @@ module multi_posting_iterator;
 
 namespace infinity {
 
-void MultiPostingIterator::Init(Vector<Pair<i64, SharedPtr<PostingIterator>>> posting_iterators, Vector<u32> segment_ids) {
+void MultiPostingIterator::Init(Vector<Pair<i64, SharedPtr<PostingIterator>>> posting_iterators, Vector<u32>) {
     posting_iterators_ = posting_iterators;
     size_ = posting_iterators.size();
 }

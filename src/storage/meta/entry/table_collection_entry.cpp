@@ -284,7 +284,7 @@ void TableCollectionEntry::CommitAppend(TableCollectionEntry *table_entry, Txn *
     table_entry->row_count_ += row_count;
 }
 
-void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
+void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *, HashMap<String, TxnIndexStore> &txn_indexes_store_) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
         for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
@@ -299,9 +299,9 @@ void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *table_entry, 
 
 }
 
-void TableCollectionEntry::RollbackAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store) {
-    auto *txn_store_ptr = (TxnTableStore *)txn_store;
-    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
+void TableCollectionEntry::RollbackAppend(TableCollectionEntry *, Txn *, void *) {
+//    auto *txn_store_ptr = (TxnTableStore *)txn_store;
+//    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Error<NotImplementException>("TableCollectionEntry::RollbackAppend");
 }
 
@@ -321,7 +321,7 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
 }
 
 UniquePtr<String>
-TableCollectionEntry::RollbackDelete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &append_state, BufferManager *buffer_mgr) {
+TableCollectionEntry::RollbackDelete(TableCollectionEntry *, Txn *, DeleteState &, BufferManager *) {
     Error<NotImplementException>("TableCollectionEntry::RollbackDelete");
     return nullptr;
 }
@@ -366,7 +366,7 @@ SharedPtr<String> TableCollectionEntry::GetDBName(const TableCollectionEntry *ta
     return table_meta->db_entry_->db_name_;
 }
 
-SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64 txn_id, TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *table_collection_entry, u64, TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     SharedLock<RWMutex> rw_locker(table_collection_entry->rw_locker_);
@@ -382,6 +382,9 @@ SharedPtr<BlockIndex> TableCollectionEntry::GetBlockIndex(TableCollectionEntry *
 Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
 
+    Vector<SegmentEntry *> segment_candidates;
+    Vector<TableIndexMeta *> table_index_meta_candidates;
+    Vector<String> table_index_name_candidates;
     {
         SharedLock<RWMutex> lck(table_entry->rw_locker_);
         json_res["table_entry_dir"] = *table_entry->table_entry_dir_;
@@ -406,15 +409,33 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
         }
         u32 next_segment_id = table_entry->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
+
+        segment_candidates.reserve(table_entry->segment_map_.size());
+        for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
+            if(segment_entry->commit_ts_ <= max_commit_ts) {
+                segment_candidates.emplace_back(segment_entry.get());
+            }
+        }
+
+        table_index_meta_candidates.reserve(table_entry->index_meta_map_.size());
+        table_index_name_candidates.reserve(table_entry->index_meta_map_.size());
+        for (const auto &[index_name, table_index_meta] : table_entry->index_meta_map_) {
+            table_index_meta_candidates.emplace_back(table_index_meta.get());
+            table_index_name_candidates.emplace_back(index_name);
+        }
     }
 
-    for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
-        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_entry.get(), max_commit_ts, is_full_checkpoint));
+    // Serialize segments
+    for (const auto &segment_entry : segment_candidates) {
+        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_entry, max_commit_ts, is_full_checkpoint));
     }
 
-    for (const auto &[index_name, index_entry] : table_entry->index_meta_map_) {
-        Json index_def_meta_json = TableIndexMeta::Serialize(index_entry.get(), max_commit_ts);
-        index_def_meta_json["index_name"] = index_name;
+    // Serialize indexes
+    SizeT table_index_count = table_index_meta_candidates.size();
+    for(SizeT idx = 0; idx < table_index_count; ++ idx) {
+        TableIndexMeta* table_index_meta = table_index_meta_candidates[idx];
+        Json index_def_meta_json = TableIndexMeta::Serialize(table_index_meta, max_commit_ts);
+        index_def_meta_json["index_name"] = table_index_name_candidates[idx];
         json_res["table_indexes"].emplace_back(index_def_meta_json);
     }
 

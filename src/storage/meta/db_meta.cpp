@@ -135,7 +135,7 @@ Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts
     }
 }
 
-Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry) {
+Status DBMeta::DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, BaseEntry *&res_entry) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
@@ -196,7 +196,7 @@ void DBMeta::AddEntry(DBMeta* db_meta, UniquePtr<BaseEntry> db_entry) {
     db_meta->entry_list_.emplace_front(Move(db_entry));
 }
 
-void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr) {
+void DBMeta::DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
     if (db_meta->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.");
@@ -265,18 +265,21 @@ SharedPtr<String> DBMeta::ToString(DBMeta *db_meta) {
 
 Json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
-    Vector<DBEntry *> db_entries;
+    Vector<DBEntry *> db_candidates;
     {
         SharedLock<RWMutex> lck(db_meta->rw_locker_);
         json_res["data_dir"] = *db_meta->data_dir_;
         json_res["db_name"] = *db_meta->db_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
+        db_candidates.reserve(db_meta->entry_list_.size());
         for (auto &db_entry : db_meta->entry_list_) {
-            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->Committed() && db_entry->commit_ts_ <= max_commit_ts)
-                db_entries.push_back((DBEntry *)db_entry.get());
+            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
+                // Put it to candidate list
+                db_candidates.push_back((DBEntry *)db_entry.get());
+            }
         }
     }
-    for (DBEntry *db_entry : db_entries) {
+    for (DBEntry *db_entry : db_candidates) {
         json_res["entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
     }
     return json_res;

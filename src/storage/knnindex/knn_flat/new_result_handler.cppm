@@ -186,7 +186,7 @@ struct ReservoirTopN {
     }
 
     void to_result(T *heap_dis, TI *heap_ids) const {
-        for (int j = 0; j < Min(i, n); j++) {
+        for (SizeT j = 0; j < Min(i, n); j++) {
             heap_push<C>(j + 1, heap_dis, heap_ids, vals[j], ids[j]);
         }
 

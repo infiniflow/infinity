@@ -131,7 +131,7 @@ UniquePtr<String> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
     return nullptr;
 }
 
-void TxnTableStore::Scan(SharedPtr<DataBlock> &output_block) {}
+void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 
 void TxnTableStore::Rollback() {
     if (append_state_.get() != nullptr) {

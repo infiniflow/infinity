@@ -28,7 +28,7 @@ export module physical_match;
 
 namespace infinity {
 
-export class PhysicalMatch : public PhysicalOperator {
+export class PhysicalMatch final : public PhysicalOperator {
 public:
     explicit PhysicalMatch(u64 id, TableCollectionEntry *table_entry_ptr, SharedPtr<MatchExpression> match_expr);
 
@@ -38,9 +38,9 @@ public:
 
     void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const;
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     String ToString(i64 &space) const;
 

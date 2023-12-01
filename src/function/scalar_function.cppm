@@ -43,7 +43,7 @@ struct ScalarFunctionData {
 template <typename Operator>
 struct UnaryOpDirectWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT, void *) {
         return Operator::template Run<SourceValueType, TargetValueType>(input, result);
     }
 };
@@ -51,7 +51,7 @@ struct UnaryOpDirectWrapper {
 template <typename Operator>
 struct BinaryOpDirectWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT , void *) {
         return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result);
     }
 };
@@ -60,7 +60,7 @@ template <typename Operator>
 struct TernaryOpDirectWrapper {
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
     inline static void
-    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, SizeT , void *) {
         return Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first, second, third, result);
     }
 };
@@ -68,7 +68,7 @@ struct TernaryOpDirectWrapper {
 template <typename Operator>
 struct UnaryTryOpWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *) {
         if (Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
             return;
         }
@@ -81,7 +81,7 @@ struct UnaryTryOpWrapper {
 template <typename Operator>
 struct BinaryTryOpWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *) {
         if (Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result)) {
             return;
         }
@@ -95,7 +95,7 @@ template <typename Operator>
 struct TernaryTryOpWrapper {
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
     inline static void
-    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *nulls_ptr, SizeT idx, void *) {
         if (Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first, second, third, result)) {
             return;
         }
@@ -108,7 +108,7 @@ struct TernaryTryOpWrapper {
 template <typename Operator>
 struct UnaryOpDirectToVarlenWrapper {
     template <typename SourceValueType, typename TargetValueType>
-    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *, SizeT , void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<SourceValueType, TargetValueType>(input, result, function_data_ptr->column_vector_ptr_);
     }
@@ -117,7 +117,7 @@ struct UnaryOpDirectToVarlenWrapper {
 template <typename Operator>
 struct BinaryOpDirectToVarlenWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
-    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    inline static void Execute(LeftValueType left, RightValueType right, TargetValueType &result, Bitmask *, SizeT , void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<LeftValueType, RightValueType, TargetValueType>(left, right, result, function_data_ptr->column_vector_ptr_);
     }
@@ -127,7 +127,7 @@ template <typename Operator>
 struct TernaryOpDirectToVarlenWrapper {
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
     inline static void
-    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+    Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, SizeT , void *state_ptr) {
         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
         return Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first,
                                                                                     second,

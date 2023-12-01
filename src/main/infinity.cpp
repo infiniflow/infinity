@@ -80,7 +80,7 @@ void Infinity::LocalDisconnect() {
 //    Printf("To disconnect the database.\n");
 }
 
-QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &options) {
+QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &) {
     QueryResult query_result;
     if(db_name.empty()) {
         query_result.result_table_ = nullptr;
@@ -103,7 +103,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     return query_result;
 }
 
-QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOptions &options) {
+QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOptions &) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),

@@ -26,7 +26,7 @@ namespace infinity {
 
 void PhysicalNestedLoopJoin::Init() {}
 
-void PhysicalNestedLoopJoin::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+void PhysicalNestedLoopJoin::Execute(QueryContext *, OperatorState *) {}
 
 SharedPtr<Vector<String>> PhysicalNestedLoopJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();

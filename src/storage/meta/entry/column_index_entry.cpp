@@ -63,23 +63,34 @@ void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, 
     column_index_entry->index_by_segment.emplace(segment_id, Move(index_entry));
 }
 
-Json ColumnIndexEntry::Serialize(const ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts) {
+Json ColumnIndexEntry::Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts) {
     if (column_index_entry->deleted_) {
         Error<StorageException>("Column index entry can't be deleted.");
     }
 
     Json json;
-    json["txn_id"] = column_index_entry->txn_id_.load();
-    json["begin_ts"] = column_index_entry->begin_ts_;
-    json["commit_ts"] = column_index_entry->commit_ts_.load();
-    json["deleted"] = column_index_entry->deleted_;
-    json["column_id"] = column_index_entry->column_id_;
-    json["index_dir"] = *column_index_entry->index_dir_;
-    json["index_base"] = column_index_entry->index_base_->Serialize();
-    for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
-        SegmentColumnIndexEntry::Flush(index_entry.get(), max_commit_ts);
-        json["index_by_segment"].push_back(SegmentColumnIndexEntry::Serialize(index_entry.get()));
+    Vector<SegmentColumnIndexEntry *> segment_column_index_entry_candidates;
+    {
+        SharedLock<RWMutex> lck(column_index_entry->rw_locker_);
+
+        json["txn_id"] = column_index_entry->txn_id_.load();
+        json["begin_ts"] = column_index_entry->begin_ts_;
+        json["commit_ts"] = column_index_entry->commit_ts_.load();
+        json["deleted"] = column_index_entry->deleted_;
+        json["column_id"] = column_index_entry->column_id_;
+        json["index_dir"] = *column_index_entry->index_dir_;
+        json["index_base"] = column_index_entry->index_base_->Serialize();
+
+        for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
+            segment_column_index_entry_candidates.emplace_back((SegmentColumnIndexEntry*)index_entry.get());
+        }
     }
+
+    for(const auto& segment_column_index_entry: segment_column_index_entry_candidates) {
+        SegmentColumnIndexEntry::Flush(segment_column_index_entry, max_commit_ts);
+        json["index_by_segment"].push_back(SegmentColumnIndexEntry::Serialize(segment_column_index_entry));
+    }
+
     return json;
 }
 
@@ -107,6 +118,9 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_ind
         for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
             UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
                 SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_collection_entry);
+            if(segment_column_index_entry.get() == nullptr) {
+                continue;
+            }
             column_index_entry->index_by_segment.emplace(segment_column_index_entry->segment_id_, Move(segment_column_index_entry));
         }
     }

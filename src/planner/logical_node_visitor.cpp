@@ -361,26 +361,26 @@ void LogicalNodeVisitor::VisitExpressionChildren(SharedPtr<BaseExpression> &expr
     }
 }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<AggregateExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<AggregateExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<BetweenExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<BetweenExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CaseExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CaseExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CastExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<CastExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ColumnExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ColumnExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ConjunctionExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ConjunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<FunctionExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<FunctionExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<ValueExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<InExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression> &) { return nullptr; }
 
-SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression> &expression) { return nullptr; }
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression> &) { return nullptr; }
 
 } // namespace infinity

@@ -98,14 +98,14 @@ public:
 
     [[nodiscard]] inline RowID *GetIDs() const final { return single_best_result_handler_->ids_tab; }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(i64 idx) const final {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
         return single_best_result_handler_->dis_tab + idx * 1;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(i64 idx) const final {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }

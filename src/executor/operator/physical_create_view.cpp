@@ -29,6 +29,6 @@ namespace infinity {
 
 void PhysicalCreateView::Init() {}
 
-void PhysicalCreateView::Execute(QueryContext *query_context, OperatorState *operator_state) { operator_state->SetComplete(); }
+void PhysicalCreateView::Execute(QueryContext *, OperatorState *operator_state) { operator_state->SetComplete(); }
 
 } // namespace infinity

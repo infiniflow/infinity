@@ -274,7 +274,7 @@ void NewCatalog::CheckCatalog() {
                     }
                     auto table_entry = static_cast<TableCollectionEntry *>(base_entry.get());
                     if (table_entry->table_collection_meta_->db_entry_ != db_entry) {
-                        int a = 1;
+//                        int a = 1;
                     }
                 }
             }
@@ -290,7 +290,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
-    for (int i = 1; i < catalog_paths.size(); i++) {
+    for (SizeT i = 1; i < catalog_paths.size(); i++) {
         LOG_INFO(Format("Load delta catalog1 from: {}", catalog_paths[i]));
         UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
         catalog1->MergeFrom(*catalog2);

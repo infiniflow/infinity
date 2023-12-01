@@ -33,8 +33,8 @@ public:
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                               u64 id)
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id), schema_name_(Move(schema_name)),
-          view_name_(Move(view_name)), output_names_(Move(output_names)), output_types_(Move(output_types)),
-          conflict_type_(conflict_type) {}
+          view_name_(Move(view_name)), conflict_type_(conflict_type), output_names_(Move(output_names)),
+          output_types_(Move(output_types)) {}
 
     ~PhysicalDropView() override = default;
 

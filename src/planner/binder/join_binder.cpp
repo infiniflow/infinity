@@ -38,7 +38,7 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
     return result;
 }
 
-SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
     Error<PlannerException>("KNN expression isn't supported in join clause.");
     return nullptr;
 }
