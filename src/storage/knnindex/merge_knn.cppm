@@ -131,7 +131,7 @@ RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
     return heap_result_handler_->heap_ids_tab + idx * this->topk_;
 }
 
-template class MergeKnn<f32, FaissCMax>;
-template class MergeKnn<f32, FaissCMin>;
+template class MergeKnn<f32, CompareMax>;
+template class MergeKnn<f32, CompareMin>;
 
 } // namespace infinity

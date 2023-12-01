@@ -23,8 +23,8 @@ import faiss;
 import parser;
 
 import infinity_exception;
-import third_party;
 import default_values;
+import vector_distance;
 
 export module knn_flat_l2_top1;
 
@@ -33,7 +33,7 @@ namespace infinity {
 export template <typename DistType>
 class KnnFlatL2Top1 final : public KnnDistance<DistType> {
 
-    using SingleBestResultHandler = SingleBestResultHandler<FaissCMax<DistType, RowID>>;
+    using SingleBestResultHandler = SingleBestResultHandler<CompareMax<DistType, RowID>>;
     using SingleResultHandler = SingleBestResultHandler::SingleResultHandler;
 
 public:
@@ -77,7 +77,7 @@ public:
 
             for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
 
-                DistType l2_distance = fvec_L2sqr(x_i, y_j, this->dimension_);
+                auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
                 single_result_handler_->add_result(l2_distance, RowID{segment_id, segment_offset_start + j}, i);
             }
         }

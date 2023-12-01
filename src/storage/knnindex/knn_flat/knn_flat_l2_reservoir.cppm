@@ -18,23 +18,23 @@ import stl;
 import knn_heap;
 import knn_result_handler;
 import knn_distance;
-import distance;
 import knn_partition;
 import faiss;
 import parser;
 
 import infinity_exception;
-import third_party;
 import default_values;
+import vector_distance;
 
 export module knn_flat_l2_reservoir;
 
 namespace infinity {
 
+#ifdef USE_Reservoir
 export template <typename DistType>
 class KnnFlatL2Reservoir final : public KnnDistance<DistType> {
 
-    using ReservoirResultHandler = NewReservoirResultHandler<FaissCMax<float, RowID>>;
+    using ReservoirResultHandler = NewReservoirResultHandler<CompareMax<float, RowID>>;
     using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
 public:
@@ -78,7 +78,7 @@ public:
             const DistType *y_j = base;
 
             for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
-                DistType ip = fvec_L2sqr(x_i, y_j, this->dimension_);
+                auto ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
                 single_reservoir_result_handler_->add_result(ip, RowID{segment_id, segment_offset_start + j}, i);
             }
         }
@@ -125,4 +125,5 @@ private:
 
 template class KnnFlatL2Reservoir<f32>;
 
+#endif
 } // namespace infinity

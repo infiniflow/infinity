@@ -26,8 +26,10 @@
 
 #include <sys/time.h>
 
+#ifdef USE_faiss
 #include <faiss/AutoTune.h>
 #include <faiss/index_factory.h>
+#endif
 
 #include "hnswlib/hnswlib.h"
 
@@ -149,6 +151,7 @@ bool test_file_existence(const std::string &data_dir) {
     return true;
 }
 
+#ifdef USE_faiss
 void faiss_bench(const char *index_key, const char *test_data_path, int64_t to_query) {
     if (index_key == nullptr) {
         printf("No index key\n");
@@ -375,6 +378,7 @@ void faiss_bench(const char *index_key, const char *test_data_path, int64_t to_q
     delete[] idx_gt;
     delete index;
 }
+#endif
 
 void hnsw_bench(const char *test_data_path, int64_t to_query, size_t M, size_t ef_construction) {
     if (test_data_path == nullptr) {
@@ -401,7 +405,7 @@ void hnsw_bench(const char *test_data_path, int64_t to_query, size_t M, size_t e
     printf("[%.3f s] Load base data\n", elapsed() - t0);
 
     assert(dimension == 128 || !"embedding dimension isn't 128");
-    assert(embedding_count == 10000000 || !"embedding size isn't 1000000");
+    assert(embedding_count == 1000000 || !"embedding size isn't 100000");
     hnswlib::L2Space l2space(dimension);
     hnswlib::HierarchicalNSW<float> *hnsw_index = nullptr;
 
@@ -486,7 +490,7 @@ void hnsw_bench(const char *test_data_path, int64_t to_query, size_t M, size_t e
 TEST_F(KnnBenchTest, faiss_bench) {
     // const char *index_key = "Flat";
     // faiss_bench("IVF4096,Flat", infinity::test_data_path());
-    faiss_bench("Flat", infinity::test_data_path(), 1);
+    //faiss_bench("Flat", infinity::test_data_path(), 1);
 
     hnsw_bench(infinity::test_data_path(), 1, 16, 200);
 }

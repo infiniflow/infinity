@@ -32,8 +32,8 @@ import knn_flat_l2_top1_blas;
 
 import merge_knn;
 import faiss;
+import vector_distance;
 
-import third_party;
 
 module knn_scan_data;
 
@@ -43,11 +43,11 @@ template <>
 KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
     switch (dist_type) {
         case KnnDistanceType::kL2: {
-            dist_func_ = fvec_L2sqr;
+            dist_func_ = L2Distance<f32, f32, f32, SizeT>;
             break;
         }
         case KnnDistanceType::kInnerProduct: {
-            dist_func_ = fvec_inner_product;
+            dist_func_ = IPDistance<f32, f32, f32, SizeT>;
             break;
         }
         default: {
@@ -79,14 +79,14 @@ void KnnScanFunctionData1::Init() {
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeUnique<MergeKnn<DataType, FaissCMax>>(shared_data_->query_count_, shared_data_->topk_);
+            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax>>(shared_data_->query_count_, shared_data_->topk_);
             merge_knn_max->Begin();
             merge_knn_base_ = Move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeUnique<MergeKnn<DataType, FaissCMin>>(shared_data_->query_count_, shared_data_->topk_);
+            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin>>(shared_data_->query_count_, shared_data_->topk_);
             merge_knn_min->Begin();
             merge_knn_base_ = Move(merge_knn_min);
             break;

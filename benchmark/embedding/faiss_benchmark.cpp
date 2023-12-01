@@ -2,6 +2,7 @@
 // Created by jinhai on 23-5-1.
 //
 
+#ifdef USE_faiss
 #include <thread>
 
 #include "base_profiler.h"
@@ -857,3 +858,4 @@ auto main() -> int {
     //    scheduler_test();
     return 0;
 }
+#endif

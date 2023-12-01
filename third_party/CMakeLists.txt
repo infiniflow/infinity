@@ -23,9 +23,6 @@ add_subdirectory(croaring)
 # Build mlas
 add_subdirectory(mlas)
 
-# Build faiss
-add_subdirectory(faiss)
-
 # Build hnsw
 add_subdirectory(hnswlib)
 

@@ -24,6 +24,7 @@ import parser;
 import knn_flat_ip_blas_reservoir;
 import infinity_context;
 
+#ifdef USE_Reservoir
 class KnnFlatIpBlasReservoirTest : public BaseTest {};
 
 TEST_F(KnnFlatIpBlasReservoirTest, test1) {
@@ -94,3 +95,4 @@ TEST_F(KnnFlatIpBlasReservoirTest, test1) {
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
     EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
 }
+#endif

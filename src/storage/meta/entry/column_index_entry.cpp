@@ -14,7 +14,6 @@
 
 module;
 
-// #include "faiss/index_io.h"
 #include <ctime>
 #include <string>
 

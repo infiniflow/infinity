@@ -17,7 +17,7 @@ module;
 import stl;
 import parser;
 import knn_heap;
-import knn_partition;
+//import knn_partition;
 
 import infinity_exception;
 
@@ -27,7 +27,7 @@ namespace infinity {
 
 enum class ResultHandlerType {
     kHeap,
-    kReservoir,
+    //kReservoir,
     kSingleBest,
     kInvalid,
 };
@@ -135,6 +135,7 @@ struct NewHeapResultHandler : public ResultHandler {
     }
 };
 
+#ifdef USE_Reservoir
 /*****************************************************************
  * Reservoir result handler
  *
@@ -294,6 +295,7 @@ struct NewReservoirResultHandler : public ResultHandler {
         }
     }
 };
+#endif
 
 /*****************************************************************
  * Single best result handler.
@@ -318,10 +320,10 @@ struct SingleBestResultHandler : public ResultHandler {
     struct SingleResultHandler {
         SingleBestResultHandler &hr;
 
-        Vector<T> min_dis;
-        Vector<TI> min_idx;
+        T *min_dis;
+        TI *min_idx;
 
-        SingleResultHandler(SingleBestResultHandler &hr) : hr(hr), min_dis(hr.nq), min_idx(hr.nq) {}
+        SingleResultHandler(SingleBestResultHandler &hr) : hr(hr), min_dis(hr.dis_tab), min_idx(hr.ids_tab) {}
 
         /// begin results for query # i
         void begin(const SizeT current_idx) {
@@ -339,8 +341,8 @@ struct SingleBestResultHandler : public ResultHandler {
 
         /// series of results for query i is done
         void end(SizeT query_idx) {
-            hr.dis_tab[query_idx] = min_dis[query_idx];
-            hr.ids_tab[query_idx] = min_idx[query_idx];
+            //hr.dis_tab[query_idx] = min_dis[query_idx];
+            //hr.ids_tab[query_idx] = min_idx[query_idx];
         }
     };
 

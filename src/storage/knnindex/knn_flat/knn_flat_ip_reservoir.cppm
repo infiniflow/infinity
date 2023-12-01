@@ -21,19 +21,20 @@ import knn_distance;
 import knn_partition;
 import faiss;
 import parser;
-import third_party;
 
 import infinity_exception;
 import default_values;
+import vector_distance;
 
 export module knn_flat_ip_reservoir;
 
 namespace infinity {
 
+#ifdef USE_Reservoir
 export template <typename DistType>
 class KnnFlatIPReservoir final : public KnnDistance<DistType> {
 
-    using ReservoirResultHandler = NewReservoirResultHandler<FaissCMin<float, RowID>>;
+    using ReservoirResultHandler = NewReservoirResultHandler<CompareMin<float, RowID>>;
     using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
 public:
@@ -76,7 +77,7 @@ public:
             const DistType *y_j = base;
 
             for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
-                DistType ip = fvec_inner_product(x_i, y_j, this->dimension_);
+                auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
                 single_reservoir_result_handler_->add_result(ip, RowID{segment_id, segment_offset_start + j}, i);
             }
         }
@@ -123,4 +124,5 @@ private:
 
 template class KnnFlatIPReservoir<f32>;
 
+#endif
 } // namespace infinity

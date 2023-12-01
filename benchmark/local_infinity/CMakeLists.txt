@@ -7,7 +7,6 @@ target_link_libraries(
         infinity_core
         benchmark_profiler
         sql_parser
-        faiss
         onnxruntime_mlas
         zsv_parser
         iresearch
