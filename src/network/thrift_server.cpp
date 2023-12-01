@@ -299,14 +299,13 @@ public:
                 Memcpy(dst.data() + current_offset, &length, sizeof(u64));
                 Memcpy(dst.data() + current_offset + sizeof(u64), varchar.short_.data_, varchar.length_);
             } else {
-                char *varchar_ptr = new char[varchar.length_ + 1]{0};
-                column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr,
+                auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
+                column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
                                                                     varchar.vector_.chunk_id_,
                                                                     varchar.vector_.chunk_offset_,
                                                                     varchar.length_);
                 Memcpy(dst.data() + current_offset, &length, sizeof(u64));
-                Memcpy(dst.data() + current_offset + sizeof(u64), varchar_ptr, varchar.length_);
-                delete[] varchar_ptr;
+                Memcpy(dst.data() + current_offset + sizeof(u64), varchar_ptr.get(), varchar.length_);
             }
             current_offset += sizeof(u64) + varchar.length_;
         }
