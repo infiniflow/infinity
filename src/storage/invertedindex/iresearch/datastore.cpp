@@ -142,8 +142,6 @@ void ConsolidationTask::operator()(int id) {
 
     if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
         // reschedule
-        LOG_INFO(Format("pending_commits  {} pending_consolidations {} ", state_->pending_commits_, state_->pending_consolidations_));
-
         auto count = state_->pending_consolidations_.load(MemoryOrderAcquire);
         if (count > 0) {
             if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
