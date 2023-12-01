@@ -90,6 +90,7 @@ void IRSAsync::ClearQueue() {
 }
 
 struct MaintenanceState {
+    atomic_bool cancel_{false};
     atomic_u32 pending_commits_{0};
     atomic_u32 pending_consolidations_{0};
 };
@@ -127,6 +128,8 @@ struct ConsolidationTask : Task {
 
 void ConsolidationTask::operator()(int id) {
     LOG_INFO(Format("ConsolidationTask id {}", id));
+    if (true == state_->cancel_.load(MemoryOrderRelease))
+        return;
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
 
@@ -139,6 +142,8 @@ void ConsolidationTask::operator()(int id) {
 
     if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
         // reschedule
+        LOG_INFO(Format("pending_commits  {} pending_consolidations {} ", state_->pending_commits_, state_->pending_consolidations_));
+
         auto count = state_->pending_consolidations_.load(MemoryOrderAcquire);
         if (count > 0) {
             if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
@@ -167,6 +172,8 @@ struct CommitTask : Task {
 };
 
 void CommitTask::operator()(int id) {
+    if (true == state_->cancel_.load(MemoryOrderRelease))
+        return;
     LOG_INFO(Format("CommitTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(commit_interval_));
     state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
@@ -177,8 +184,9 @@ void CommitTask::operator()(int id) {
 void CommitTask::Finalize() {
     constexpr size_t kMaxPendingConsolidations = 3;
     CommitTask task(*this);
-    state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
+    state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
     async_->Queue(0, Move(task));
+    LOG_INFO(Format("pending_commits  {} pending_consolidations {} ", state_->pending_commits_, state_->pending_consolidations_));
     if (state_->pending_consolidations_.load(MemoryOrderRelease) < kMaxPendingConsolidations) {
         store_->ScheduleConsolidation();
     }
@@ -232,6 +240,8 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     StoreSnapshot(data);
 }
 
+IRSDataStore::~IRSDataStore() { StopSchedule(); }
+
 void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
 
 IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, MemoryOrderAcquire); }
@@ -245,6 +255,7 @@ void IRSDataStore::Commit() {
 }
 
 void IRSDataStore::ScheduleCommit() {
+    LOG_INFO(Format("schedule commit "));
     CommitTask task;
     task.state_ = maintenance_state_;
     task.async_ = async_.get();
@@ -273,7 +284,10 @@ void IRSDataStore::ScheduleOptimize() {
     async_->Queue<ConsolidationTask>(1, Move(task));
 }
 
-void IRSDataStore::StopSchedule() { async_->ClearQueue(); }
+void IRSDataStore::StopSchedule() {
+    async_->ClearQueue();
+    maintenance_state_->cancel_.store(true, MemoryOrderRelease);
+}
 
 void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
 
