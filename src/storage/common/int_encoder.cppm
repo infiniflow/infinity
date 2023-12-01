@@ -2,7 +2,6 @@ module;
 
 import byte_slice_reader;
 import byte_slice_writer;
-import fastpfor;
 
 import stl;
 import infinity_exception;
