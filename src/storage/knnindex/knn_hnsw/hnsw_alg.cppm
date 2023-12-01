@@ -214,7 +214,7 @@ public:
                 candidates.pop();
             }
         } else {
-            while (!candidates.empty() && result_size < M) { // TODO:: store result.size() into variable
+            while (!candidates.empty() && result_size < M) {
                 const auto &[minus_c_dist, c_idx] = candidates.top();
                 StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;

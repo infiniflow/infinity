@@ -27,6 +27,7 @@ import plain_store;
 import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
+import compilation_config;
 
 using namespace infinity;
 
@@ -34,7 +35,7 @@ int main() {
     using LabelT = uint64_t;
     using RetHeap = std::priority_queue<std::pair<float, LabelT>>;
 
-    std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
+    std::string save_dir = tmp_data_path();;
 
     int dim = 128;
     int element_size = 1000;

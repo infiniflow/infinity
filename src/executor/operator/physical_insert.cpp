@@ -44,7 +44,6 @@ void PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     if (column_count != table_collection_column_count) {
         Error<ExecutorException>(
             Format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
-        ;
     }
 
     // Prepare the output block
