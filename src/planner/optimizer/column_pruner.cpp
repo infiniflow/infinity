@@ -28,6 +28,7 @@ import logical_aggregate;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
+import logical_match;
 import parser;
 import base_table_ref;
 import function;
@@ -168,6 +169,16 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             // TODO: Scan does not currently support Filter Prune
 
             // TODO: EXISTS is not supported yet
+            return;
+        }
+        case LogicalNodeType::kMatch: {
+            VisitNodeExpression(op);
+            auto &scan = op.Cast<LogicalMatch>();
+            if (all_referenced_) {
+                return;
+            }
+            Vector<SizeT> project_indices = ClearUnusedExpressions(scan.base_table_ref_->column_ids_, scan.TableIndex());
+            scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
             return;
         }
         case LogicalNodeType::kViewScan:

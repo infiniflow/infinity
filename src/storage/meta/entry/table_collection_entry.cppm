@@ -73,8 +73,6 @@ public:
 
     static void RemoveIndexEntry(TableCollectionEntry *table_entry, const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
-    static void GetFullTextAnalyzer(TableCollectionEntry *table_entry, Map<String, String> column2analyzer);
-
 public:
     static void Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr);
 

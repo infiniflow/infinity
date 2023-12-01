@@ -38,6 +38,12 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
+    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
+
+    [[nodiscard]] String TableAlias() const;
+
+    [[nodiscard]] u64 TableIndex() const;
+
     String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalMatch"; }

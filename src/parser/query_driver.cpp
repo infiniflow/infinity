@@ -66,18 +66,25 @@ int QueryDriver::ParseSingleWithFields(const std::string &fields_str, const std:
     std::vector<std::pair<std::string, float>> fields;
     ParseFields(fields_str, fields);
     if (fields.empty()) {
-        std::cerr << "fields are empty" << std::endl;
-        return -1;
-    } else if (fields.size() == 1) {
         rc = ParseSingle(query);
         if (rc != 0)
             return rc;
+        return -1;
+    } else if (fields.size() == 1) {
+        auto it = fields.begin();
+        default_field = it->first;
+        rc = ParseSingle(query);
+        if (rc != 0)
+            return rc;
+        result->boost(it->second);
     } else {
         auto flt = std::make_unique<irs::Or>();
         for (auto &field_boost : fields) {
+            default_field = field_boost.first;
             rc = ParseSingle(query);
             if (rc != 0)
                 return rc;
+            result->boost(field_boost.second);
             flt->add(std::move(result));
         }
         result = std::move(flt);
@@ -142,6 +149,10 @@ void QueryDriver::Analyze(const std::string &field, const std::string &text, std
         return;
     }
     std::string &analyzer_name = it->second;
+    if (analyzer_name.empty()) {
+        terms.push_back(text);
+        return;
+    }
     analyze_func_(analyzer_name, text, terms);
 }
 

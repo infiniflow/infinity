@@ -815,7 +815,7 @@ static const yytype_int16 yyrline[] =
     2365,  2371,  2377,  2383,  2389,  2395,  2401,  2407,  2413,  2419,
     2425,  2431,  2442,  2446,  2451,  2470,  2480,  2486,  2490,  2491,
     2493,  2494,  2496,  2497,  2509,  2517,  2522,  2525,  2529,  2533,
-    2538,  2543,  2551,  2558,  2569,  2619
+    2538,  2543,  2551,  2558,  2569,  2617
 };
 #endif
 
@@ -6390,11 +6390,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6396 "parser.cpp"
+#line 6394 "parser.cpp"
     break;
 
   case 335: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 2619 "parser.y"
+#line 2617 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -6444,11 +6444,11 @@ yyreduce:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 6452 "parser.cpp"
+#line 6448 "parser.cpp"
     break;
 
 
-#line 6456 "parser.cpp"
+#line 6452 "parser.cpp"
 
       default: break;
     }
@@ -6677,7 +6677,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 2671 "parser.y"
+#line 2667 "parser.y"
 
 
 void

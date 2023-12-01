@@ -180,7 +180,7 @@ void TableCollectionEntry::GetFullTextAnalyzers(TableCollectionEntry *table_entr
     for (auto &[_, tableIndexMeta] : table_entry->index_meta_map_) {
         if (TableIndexMeta::GetEntry(tableIndexMeta.get(), txn_id, begin_ts, base_entry).ok()) {
             Assert<StorageException>(EntryType::kTableIndex == base_entry->entry_type_, "unexpected entry type under TableIndexMeta");
-            TableIndexEntry *table_index_entry = dynamic_cast<TableIndexEntry *>(base_entry);
+            TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
             irs_index_entry = table_index_entry->irs_index_entry_;
             for (SharedPtr<IndexBase> &indexBase : table_index_entry->index_def_->index_array_) {
                 if (indexBase->index_type_ != IndexType::kIRSFullText)

@@ -55,6 +55,12 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatch::GetOutputTypes() const {
     return result_types;
 }
 
+TableCollectionEntry *LogicalMatch::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+
+String LogicalMatch::TableAlias() const { return base_table_ref_->alias_; }
+
+u64 LogicalMatch::TableIndex() const { return base_table_ref_->table_index_; }
+
 String LogicalMatch::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;

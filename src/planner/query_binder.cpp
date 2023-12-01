@@ -151,7 +151,7 @@ SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     if (statement.search_expr_ != nullptr) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> search_expr = where_binder->Bind(*statement.search_expr_, this->bind_context_ptr_.get(), 0, true);
-        bound_select_statement->search_expr_ = dynamic_pointer_cast<SearchExpression>(search_expr);
+        bound_select_statement->search_expr_ = static_pointer_cast<SearchExpression>(search_expr);
     }
 
     // 6.2 WHERE
@@ -938,8 +938,8 @@ SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     }
     Assert<PlannerException>(statement.update_expr_array_ != nullptr, Format("Update expr array is empty"));
 
-    const Vector<String> &column_names = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
-    const Vector<SharedPtr<DataType>> &column_types = *std::dynamic_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
+    const Vector<String> &column_names = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
+    const Vector<SharedPtr<DataType>> &column_types = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
     //    const Vector<String> &column_names = *static_cast<BaseTableRef *>(base_table_ref.get())->column_names_;
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
