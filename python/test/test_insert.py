@@ -23,7 +23,7 @@ class TestInsert:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_infinity_thrift(self):
+    def test_insert_basic(self):
         """
         target: test table insert apis
         method:
@@ -72,3 +72,27 @@ class TestInsert:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+    def test_insert_varchar(self):
+        """
+        target: test insert varchar
+        method: create table with varchar column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
+        res = db_obj.create_table("test_insert_varchar", {"c1": "varchar"}, None)
+        assert res.success
+        table_obj = db_obj.get_table("test_insert_varchar")
+        assert table_obj
+        res = table_obj.insert([{"c1": "test_insert_varchar"}])
+        assert res.success
+        res = table_obj.insert([{"c1": " test insert varchar "}])
+        assert res.success
+        res = table_obj.insert([{"c1": "^789$ test insert varchar"}])
+        assert res.success
+
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
+                                                                "^789$ test insert varchar")}))
+        db_obj.drop_table("test_insert_varchar")

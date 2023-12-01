@@ -144,3 +144,79 @@ class TestSelect:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.success
+
+    def test_select_varchar(self):
+        """
+        target: test table select apis
+        method:
+        1. create tables
+            - 'table_1'
+                - c1 varchar primary key
+                - c2 varchar not null
+        2. insert
+            - ('a', 'a')
+            - ('b', 'b')
+            - ('c', 'c')
+            - ('d', 'd')
+            - ('e', 'e')
+            - ('f', 'f')
+            - ('g', 'g')
+            - ('h', 'h')
+            - ('i', 'i')
+            - ('j', 'j')
+            - ('k', 'k')
+            - ('l', 'l')
+            - ('m', 'm')
+        3. select
+            - select * from table_1
+                - Consistent with 2. Insert
+            - select c1, c2 from table_1
+                - Consistent with 2. Insert
+            - select c1 + c2 from table_1 where (c1 = 'a')
+                - 'aa'
+            - select c1 from table_1 where c1 > 'a' and c2 < 'c'
+                - 'b'
+            - select c2 from table_1 where ('a' < c1 or 'm' <= c1) and (c1 = 'a')
+                - 'a'
+            - select c2 from table_1 where ('a' < c1 and c1 <= 'b') or (c1 >= 'c' and 'd' > c1)
+                - 'b'
+                - 'c'
+            - select c2 from table_1 where ((c1 >= 'a' and 'd' >= c1) or (c1 >= 'e' and 'j' > c1)) and ((c1 > 'e' and c1 <= 'f') or (c1 > 'a' and c1 < 'c'))
+                - 'b'
+                - 'c'
+            - select c2 from table_1 where ('a' < c1 or 'm' <= c1) and (c2 = 'a')
+                - 'a'
+            - select c2 from table_1 where ('a' < c1 and c2 <= 'b') or (c1 >= 'c' and 'd' > c2)`
+                - 'b'
+                - 'c'
+        4. drop tables
+               - 'table_1'
+        expect: all operations successfully
+
+        """
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
+        db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
+                            None)
+        table_obj = db_obj.get_table("test_select_varchar")
+        table_obj.insert([{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
+                          {"c1": 'e', "c2": 'e'}, {"c1": 'f', "c2": 'f'}, {"c1": 'g', "c2": 'g'}, {"c1": 'h', "c2": 'h'},
+                          {"c1": 'i', "c2": 'i'}, {"c1": 'j', "c2": 'j'}, {"c1": 'k', "c2": 'k'}, {"c1": 'l', "c2": 'l'},
+                          {"c1": 'm', "c2": 'm'}])
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
+                                                                 'l', 'm'),
+                                                         'c2': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
+                                                                 'l', 'm')})
+                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        res = table_obj.search().output(["c1", "c2"]).filter("c1 = 'a'").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype({'c1': dtype('O'), 'c2': dtype('O')}))
+
+        # TODO NotImplement Error: Not implement: varchar > varchar
+        # res = table_obj.search().output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
+        res = db_obj.drop_table("test_select_varchar")
+        assert res.success
+
+

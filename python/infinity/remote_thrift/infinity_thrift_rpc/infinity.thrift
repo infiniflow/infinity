@@ -18,13 +18,11 @@ Embedding,
 Invalid
 }
 
-struct Option { }
+struct Option {}
 
-struct NumberType { }
+struct NumberType {}
 
-struct VarcharType {
-1: i64 dimension,
-}
+struct VarcharType {}
 
 enum ElementType {
 ElementBit,
