@@ -206,7 +206,7 @@ export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
 
     _mm512_store_ps(TmpRes, sum512);
     float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7] + TmpRes[8] + TmpRes[9] + TmpRes[10] +
-                TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + pVect2v TmpRes[15];
+                TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + TmpRes[15];
 
     return sum;
 }

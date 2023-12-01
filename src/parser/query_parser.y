@@ -163,7 +163,7 @@ basic_filter
 : STRING {
     std::string &field = driver.default_field;
     if(field.empty()){
-        error(@1, "");
+        error(@1, "driver.default_field is empty");
         YYERROR;
     }
     std::vector<std::string> terms;

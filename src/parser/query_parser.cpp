@@ -973,7 +973,7 @@ namespace infinity {
          {
     std::string &field = driver.default_field;
     if(field.empty()){
-        error(yystack_[0].location, "");
+        error(yystack_[0].location, "driver.default_field is empty");
         YYERROR;
     }
     std::vector<std::string> terms;

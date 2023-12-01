@@ -93,6 +93,10 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     // 2 full text search
     ScoredIds result;
     SharedPtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
+    if (dataStore == nullptr) {
+        throw ExecutorException(
+            Format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->table_collection_name_));
+    }
     rc = dataStore->Search(flt.get(), search_ops.options_, result);
     if (rc != 0) {
         Error<ExecutorException>("IRSDataStore::Search failed");
@@ -104,14 +108,7 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     Vector<SizeT> &column_ids = base_table_ref_->column_ids_;
     SizeT column_n = column_ids.size();
     SharedPtr<DataBlock> output_data_block = DataBlock::Make();
-    Vector<SharedPtr<ColumnVector>> column_vectors;
-    for (SizeT column_id = 0; column_id < column_n; ++column_id) {
-        SharedPtr<ColumnDef> &columnDef = base_table_ref_->table_entry_ptr_->columns_[column_ids[column_id]];
-        column_vectors.push_back(ColumnVector::Make(columnDef->column_type_));
-    }
-    column_vectors.push_back(ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat)));
-    column_vectors.push_back(ColumnVector::Make(MakeShared<DataType>(LogicalType::kRowID)));
-    output_data_block->Init(column_vectors);
+    output_data_block->Init(*GetOutputTypes());
 
     for (ScoredId &scoredId : result) {
         // 3.2 enrich columns needed by later operators
@@ -132,14 +129,13 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         for (; column_id < column_n; ++column_id) {
             UniquePtr<BlockColumnEntry> &column = block_entry->columns_[column_ids[column_id]];
             ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(column.get(), query_context->storage()->buffer_manager());
-            const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column->column_type_);
-            column_vectors[column_id]->AppendByPtr(ptr);
+            output_data_block->column_vectors[column_id]->AppendWith(column_buffer, block_offset, 1);
         }
 
         // 3.3 add hiden columns: score, row_id
         Value v = Value::MakeFloat(scoredId.first);
-        column_vectors[column_id++]->AppendValue(v);
-        column_vectors[column_id]->AppendWith(row_id, 1);
+        output_data_block->column_vectors[column_id++]->AppendValue(v);
+        output_data_block->column_vectors[column_id]->AppendWith(row_id, 1);
     }
     output_data_block->Finalize();
     operator_state->data_block_ = output_data_block;
@@ -149,15 +145,21 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 
 SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    result_names->emplace_back(COLUMN_NAME_ROW_ID);
+    result_names->reserve(base_table_ref_->column_names_->size() + 2);
+    for (auto &name : *base_table_ref_->column_names_)
+        result_names->emplace_back(name);
     result_names->emplace_back(COLUMN_NAME_SCORE);
+    result_names->emplace_back(COLUMN_NAME_ROW_ID);
     return result_names;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatch::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->reserve(base_table_ref_->column_types_->size() + 2);
+    for (auto &type : *base_table_ref_->column_types_)
+        result_types->emplace_back(type);
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
+    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
