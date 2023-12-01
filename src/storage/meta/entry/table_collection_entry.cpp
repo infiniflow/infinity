@@ -412,9 +412,9 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
 
         segment_candidates.reserve(table_entry->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
-            if(segment_entry->commit_ts_ <= max_commit_ts) {
-                segment_candidates.emplace_back(segment_entry.get());
-            }
+//            if(segment_entry->commit_ts_ <= max_commit_ts) {
+            segment_candidates.emplace_back(segment_entry.get());
+//            }
         }
 
         table_index_meta_candidates.reserve(table_entry->index_meta_map_.size());
