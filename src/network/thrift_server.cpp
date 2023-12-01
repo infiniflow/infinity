@@ -41,6 +41,8 @@ import data_block;
 import value;
 import third_party;
 import parser;
+import file_writer;
+import local_file_system;
 #include "parser/statement/extra/create_index_info.h"
 
 namespace infinity {
@@ -151,7 +153,14 @@ public:
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
-        auto result = table->Import(request.file_path, (const ImportOptions &)request.import_option);
+
+        LocalFileSystem fs;
+        Path path(Format("/tmp/{}_{}_{}", request.db_name, request.table_name, request.file_name));
+        FileWriter file_writer(fs, path.c_str(), 1024 * 1024);
+        file_writer.Write(request.file_content.data(), request.file_content.size());
+        file_writer.Flush();
+
+        auto result = table->Import(path.c_str(), (const ImportOptions &)request.import_option);
 
         ProcessCommonResult(response, result);
     }
@@ -289,8 +298,8 @@ public:
 
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(0, i);
-                VarcharT& varchar_ref = value.value_.varchar;
-                if(!varchar_ref.IsValue()) {
+                VarcharT &varchar_ref = value.value_.varchar;
+                if (!varchar_ref.IsValue()) {
                     Error<NetworkException>("Varchar should be value type");
                 }
                 if (varchar_ref.IsInlined()) {
@@ -320,8 +329,8 @@ public:
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(1, i);
-                VarcharT& varchar_ref = value.value_.varchar;
-                if(!varchar_ref.IsValue()) {
+                VarcharT &varchar_ref = value.value_.varchar;
+                if (!varchar_ref.IsValue()) {
                     Error<NetworkException>("Varchar should be value type");
                 }
                 if (varchar_ref.IsInlined()) {

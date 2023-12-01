@@ -42,13 +42,36 @@ execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_
 string(REGEX REPLACE "\n" "" CURRENT_SYS_TIME ${CURRENT_SYS_TIME})
 message(STATUS "Build time = ${CURRENT_SYS_TIME}")
 
-# Get git branch name
-execute_process(COMMAND "git" symbolic-ref --short HEAD OUTPUT_VARIABLE GIT_BRANCH_NAME)
-string(REGEX REPLACE "\n" "" GIT_BRANCH_NAME ${GIT_BRANCH_NAME})
-message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
+# Get git information
+function(gitInformation)
+    find_package(Git)
+    if(NOT Git_FOUND)
+        message(FATAL_ERROR "Git not found.")
+    endif()
 
-execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD OUTPUT_VARIABLE GIT_COMMIT_ID OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
+    execute_process(
+            COMMAND "${GIT_EXECUTABLE}" symbolic-ref --short HEAD
+            OUTPUT_VARIABLE BRANCH_NAME
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+            OUTPUT_VARIABLE COMMIT_ID
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if("${BRANCH_NAME}" STREQUAL "")
+        message(WARNING "Branch name not found.")
+    else()
+        message(STATUS "Branch name = ${BRANCH_NAME}")
+    endif()
+
+    if("${COMMIT_ID}" STREQUAL "")
+        message(WARNING "Commit id not found.")
+    else()
+        message(STATUS "Commit-id = ${COMMIT_ID}")
+    endif()
+endfunction()
+
+gitInformation()
 
 # attach additional cmake modules
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")

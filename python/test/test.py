@@ -168,8 +168,11 @@ class TestCase:
             assert res.success
 
     def test_traverse_conditions(self):
-        res = traverse_conditions(condition("c1>1 and c2<2 or c3=3.3"))
+        res = traverse_conditions(condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
         print(res)
-
-        res = traverse_conditions(condition("c1=1"))
+        res = traverse_conditions(condition("c1 = 1"))
+        print(res)
+        res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
+        print(res)
+        res = traverse_conditions(condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
         print(res)

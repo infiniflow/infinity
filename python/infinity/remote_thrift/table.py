@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
+import time
 from abc import ABC
 from typing import Optional, Union, List
 
@@ -92,8 +93,17 @@ class RemoteTable(Table, ABC):
                                         fields=fields)
 
     def import_data(self, file_path: str, options=None):
+        st = time.process_time()
+        with open(file_path, "rb", buffering=1024 * 1024) as file:
+            file_content = file.read()
 
-        return self._conn.client.import_data(db_name=self._db_name, table_name=self._table_name, file_path=file_path,
+        # print(f"read file time: {time.process_time() - st}")
+        file_name = os.path.basename(file_path)
+
+        return self._conn.client.import_data(db_name=self._db_name,
+                                             table_name=self._table_name,
+                                             file_name=file_name,
+                                             file_content=file_content,
                                              import_options=options)
 
     def delete(self, cond: Optional[str] = None):
@@ -231,7 +241,7 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = binary_exp_to_paser_exp(
-            cons.key)  # key is the function name cover to >, <, =, and, or, etc.
+            cons.key)  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
         for value in cons.hashable_args:
@@ -283,6 +293,24 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
 
     elif isinstance(cons, exp.Paren):
         for value in cons.hashable_args:
-            traverse_conditions(value)
+            return traverse_conditions(value)
+    elif isinstance(cons, exp.Neg):
+        parsed_expr = ttypes.ParsedExpr()
+        if isinstance(cons.hashable_args[0], exp.Literal):
+            constant_expr = ttypes.ConstantExpr()
+            if cons.hashable_args[0].is_int:
+                constant_expr.literal_type = ttypes.LiteralType.Int64
+                constant_expr.i64_value = -int(cons.hashable_args[0].output_name)
+            elif cons.hashable_args[0].is_number:
+                constant_expr.literal_type = ttypes.LiteralType.Double
+                constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
+            else:
+                raise Exception(f"unknown literal type: {cons}")
+
+            paser_expr_type = ttypes.ParsedExprType()
+            paser_expr_type.constant_expr = constant_expr
+            parsed_expr.type = paser_expr_type
+
+            return parsed_expr
     else:
-        raise Exception(f"unknown condition: {cons}")
+        raise Exception(f"unknown condition type: {cons}")

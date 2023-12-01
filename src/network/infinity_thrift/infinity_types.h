@@ -2494,10 +2494,11 @@ void swap(InsertRequest &a, InsertRequest &b);
 std::ostream& operator<<(std::ostream& out, const InsertRequest& obj);
 
 typedef struct _ImportRequest__isset {
-  _ImportRequest__isset() : db_name(false), table_name(false), file_path(false), import_option(false), session_id(false) {}
+  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), file_content(false), import_option(false), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
-  bool file_path :1;
+  bool file_name :1;
+  bool file_content :1;
   bool import_option :1;
   bool session_id :1;
 } _ImportRequest__isset;
@@ -2510,14 +2511,16 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
   ImportRequest() noexcept
                 : db_name(),
                   table_name(),
-                  file_path(),
+                  file_name(),
+                  file_content(),
                   session_id(0) {
   }
 
   virtual ~ImportRequest() noexcept;
   std::string db_name;
   std::string table_name;
-  std::string file_path;
+  std::string file_name;
+  std::string file_content;
   ImportOption import_option;
   int64_t session_id;
 
@@ -2527,7 +2530,9 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
 
   void __set_table_name(const std::string& val);
 
-  void __set_file_path(const std::string& val);
+  void __set_file_name(const std::string& val);
+
+  void __set_file_content(const std::string& val);
 
   void __set_import_option(const ImportOption& val);
 
@@ -2539,7 +2544,9 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(table_name == rhs.table_name))
       return false;
-    if (!(file_path == rhs.file_path))
+    if (!(file_name == rhs.file_name))
+      return false;
+    if (!(file_content == rhs.file_content))
       return false;
     if (!(import_option == rhs.import_option))
       return false;

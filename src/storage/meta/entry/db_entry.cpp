@@ -157,7 +157,7 @@ Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 
         BaseEntry *table_collection_entry{nullptr};
         Status status = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts, table_collection_entry);
         if (!status.ok()) {
-            LOG_WARN(Format("error when get table/collection entry: {}", *status.message()));
+            LOG_TRACE(Format("error when get table/collection entry: {}", status.message()));
         } else {
             results.emplace_back((TableCollectionEntry *)table_collection_entry);
         }
