@@ -190,7 +190,8 @@ export {
     using ptr_t = char *;
     using const_ptr_t = const char *;
     using char_t = char;
-    using SizeT = size_t;
+    using SizeT = u64;
+
     using StreamSize = std::streamsize;
 
     using TxnTimeStamp = u64;

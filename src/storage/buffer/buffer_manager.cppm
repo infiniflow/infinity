@@ -41,6 +41,15 @@ public:
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
 
+    u64 memory_limit() const {
+        // memory_limit is const var, no need to lock
+        return memory_limit_;
+    }
+
+    u64 memory_usage() const {
+        return current_memory_size_.load();
+    }
+
 private:
     friend class BufferObj;
 

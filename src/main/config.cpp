@@ -84,7 +84,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     // Default profiler config
     bool default_enable_profiler = false;
-    bool default_profile_record_capacity = 100;
+    u64 default_profile_record_capacity = 100;
 
     // Default network config
     String default_listen_address = "0.0.0.0";
@@ -345,6 +345,10 @@ void Config::PrintAll() const {
     Printf(" - total_memory_size: {}\n", system_option_.total_memory_size);
     Printf(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
     Printf(" - query_memory_limit: {}\n", system_option_.query_memory_limit);
+
+    // Profiler
+    Printf(" - enable_profiler: {}\n", system_option_.enable_profiler);
+    Printf(" - profile_record_capacity: {}\n", system_option_.profile_record_capacity);
 
     // Network
     Printf(" - listen address: {}\n", system_option_.listen_address);

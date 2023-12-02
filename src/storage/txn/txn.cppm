@@ -69,9 +69,9 @@ public:
     void Rollback();
 
     // Database OPs
-    Status CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& db_entry);
+    Status CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&db_entry);
 
-    Status DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry*& db_entry);
+    Status DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&db_entry);
 
     Status GetDatabase(const String &db_name, BaseEntry *&new_db_entry);
 
@@ -93,7 +93,7 @@ public:
     Status GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
     // Index OPs
-    Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef>& index_def, ConflictType conflict_type);
+    Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -105,7 +105,7 @@ public:
 
     Status GetViewByName(const String &db_name, const String &view_name, BaseEntry *&view_entry);
 
-    Vector<BaseEntry *> GetViews(const String &db_name);
+    Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);

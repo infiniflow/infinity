@@ -18,8 +18,9 @@ import stl;
 
 export module utility;
 
-namespace infinity {
+export namespace infinity::Utility {
 
-export SizeT NextPowerOfTwo(SizeT input);
+SizeT NextPowerOfTwo(SizeT input);
+String FormatByteSize(u64 byte_size);
 
 }

@@ -1154,12 +1154,121 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             show_column_table_str += show_node->object_name();
             result->emplace_back(MakeShared<String>(show_column_table_str));
 
-            String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, ...]";
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, method_type, column_names, other_parameters]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
-        default: {
-            Error<PlannerException>("Invalid show type");
+        case ShowType::kShowDatabases: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DATABASES ";
+            } else {
+                show_str = "SHOW DATABASES ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [database]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowConfigs: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CONFIGS ";
+            } else {
+                show_str = "SHOW CONFIGS ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [config_name, value, description]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowProfiles: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW PROFILES ";
+            } else {
+                show_str = "SHOW PROFILES ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [record_no, parser, logical planner, optimizer, physical planner, pipeline builder, task "
+                                  "builder, executor, total_cost]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSegments: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SEGMENTS ";
+            } else {
+                show_str = "SHOW SEGMENTS ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [path, size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowSessionStatus: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SESSION STATUS ";
+            } else {
+                show_str = "SHOW SESSION STATUS ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowGlobalStatus: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW GLOBAL STATUS ";
+            } else {
+                show_str = "SHOW GLOBAL STATUS ";
+            }
+            show_str += "(";
+            show_str += ToStr(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kInvalid: {
+            Error<ExecutorException>("Invalid show type");
         }
     }
 

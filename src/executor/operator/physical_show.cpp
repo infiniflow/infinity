@@ -55,6 +55,8 @@ import options;
 import status;
 import block_column_entry;
 import local_file_system;
+import utility;
+import buffer_manager;
 
 module physical_show;
 
@@ -180,6 +182,28 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowSessionStatus: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowGlobalStatus: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Error<NotImplementException>("Not implemented show type");
         }
@@ -219,7 +243,19 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
-        default: {
+        case ShowType::kShowViews: {
+            ExecuteShowViews(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowSessionStatus: {
+            ExecuteShowSessionStatus(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowGlobalStatus: {
+            ExecuteShowGlobalStatus(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kInvalid: {
             Error<ExecutorException>("Invalid chunk scan type");
         }
     }
@@ -422,6 +458,60 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     show_operator_state->output_.emplace_back(output_block_ptr);
 }
 
+void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    // Define output table schema
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    Vector<ViewDetail> views_detail;
+    Status status = txn->GetViews(db_name_, views_detail);
+    if (!status.ok()) {
+        Error<ExecutorException>(status.message());
+    }
+
+    // Prepare the output data block
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
+
+    output_block_ptr->Init(column_types);
+
+    for (auto &view_detail : views_detail) {
+
+        SizeT column_id = 0;
+        {
+            // Append schema name to the 0 column
+            const String *db_name = view_detail.db_name_.get();
+            Value value = Value::MakeVarchar(*db_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append table name to the 1 column
+            const String *table_name = view_detail.view_name_.get();
+            Value value = Value::MakeVarchar(*table_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append base table type to the 2 column
+            Value value = Value::MakeBigInt(static_cast<i64>(view_detail.column_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(output_block_ptr);
+}
+
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -588,7 +678,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(LocalFileSystem::FormatFileSize(file_size_func(path)));
+            Value value = Value::MakeVarchar(Utility::FormatByteSize(file_size_func(path)));
 
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1159,7 +1249,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Status table_status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = Move(table_status.msg_);
-        Error<ExecutorException>(table_status.message());
+//        Error<ExecutorException>(table_status.message());
         return;
     }
 
@@ -1245,239 +1335,6 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     }
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(Move(output_block_ptr));
-}
-
-void PhysicalShow::ExecuteShowTable(QueryContext *query_context) {
-    // Define output table schema
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "table", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(2, varchar_type, "type", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(4, bigint_type, "row_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(5, bigint_type, "block_count", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(6, bigint_type, "block_size", HashSet<ConstraintType>()),
-    };
-
-    auto table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-    // Get tables from catalog
-    // TODO: Use context to carry runtime information, such as current schema
-    Txn *txn = query_context->GetTxn();
-
-    Vector<TableCollectionDetail> table_collections_detail;
-    Status status = txn->GetTableCollections(db_name_, table_collections_detail);
-    if (!status.ok()) {
-        Error<ExecutorException>(status.message());
-    }
-
-    // Prepare the output data block
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type};
-
-    output_block_ptr->Init(column_types);
-
-    for (auto &table_collection_detail : table_collections_detail) {
-
-        SizeT column_id = 0;
-        {
-            // Append schema name to the 0 column
-            const String *db_name = table_collection_detail.db_name_.get();
-            Value value = Value::MakeVarchar(*db_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append table name to the 1 column
-            const String *table_name = table_collection_detail.table_collection_name_.get();
-            Value value = Value::MakeVarchar(*table_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        TableCollectionType table_type = table_collection_detail.table_collection_type_;
-        {
-            // Append base table type to the 2 column
-            const String &base_table_type_str = ToString(table_type);
-            Value value = Value::MakeVarchar(base_table_type_str);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append column count the 3 column
-            switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.column_count_));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                case TableCollectionType::kCollectionEntry: {
-                    // TODO: column count need to be given for table.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-            }
-        }
-
-        ++column_id;
-        {
-            // Append row count the 4 column
-            switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.row_count_));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                case TableCollectionType::kCollectionEntry: {
-                    // TODO: row count need to be given for collection.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                default: {
-                    Error<ExecutorException>("Invalid table type");
-                }
-            }
-        }
-
-        ++column_id;
-        {
-            // Append segment count the 5 column
-            switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.segment_count_));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                case TableCollectionType::kCollectionEntry: {
-                    // TODO: segment count need to be given for collection.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                default: {
-                    Error<ExecutorException>("Invalid table type");
-                }
-            }
-        }
-
-        ++column_id;
-        {
-            // Append block limit the 6 column
-            SizeT default_row_size = table_collection_detail.segment_capacity_;
-            Value value = Value::MakeBigInt(default_row_size);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    output_block_ptr->Finalize();
-    output_->Append(output_block_ptr);
-}
-
-void PhysicalShow::ExecuteShowViews(QueryContext *query_context) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    SharedPtr<DataType> bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
-
-    // Define output table schema
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "schema", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "view", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, bigint_type, "column_count", HashSet<ConstraintType>()),
-    };
-
-    SharedPtr<TableDef> table_def = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-    // Get tables from catalog
-    // TODO: Use context to carry runtime information, such as current schema
-    Txn *txn = query_context->GetTxn();
-    Vector<BaseEntry *> views = txn->GetViews(db_name_);
-
-    // Prepare the output data block
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        bigint_type,
-    };
-
-    output_block_ptr->Init(column_types);
-
-    for (auto &base_entry : views) {
-        ViewEntry *view_entry = static_cast<ViewEntry *>(base_entry);
-
-        SizeT column_id = 0;
-        {
-            // Append schema name to the first column
-            String &db_name = db_name_;
-            Value value = Value::MakeVarchar(db_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append table name to the second column
-            const String &table_name = *view_entry->view_name();
-            Value value = Value::MakeVarchar(table_name);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append column count to the third column
-            Value value = Value::MakeBigInt(view_entry->column_names()->size());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    output_block_ptr->Finalize();
-    output_->Append(output_block_ptr);
-}
-
-void PhysicalShow::ExecuteShowColumns(QueryContext *query_context) {
-
-    Txn *txn = query_context->GetTxn();
-
-    BaseEntry *base_table_entry{nullptr};
-    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
-    if (!status.ok()) {
-        Error<ExecutorException>(status.message());
-    }
-
-    TableCollectionEntry *table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
-    ExecuteShowTableDetail(query_context, table_collection_entry->columns_);
-
-    BaseEntry *base_entry{nullptr};
-    status = txn->GetViewByName(db_name_, object_name_, base_entry);
-    if (!status.ok()) {
-        Error<PlannerException>(status.message());
-    }
-
-    ViewEntry *view_entry = static_cast<ViewEntry *>(base_entry);
-
-    ExecuteShowViewDetail(query_context, view_entry->column_types(), view_entry->column_names());
-
-    Error<ExecutorException>(Format("No table, collection, or view name is {}.{}", this->db_name_, this->object_name_));
 }
 
 void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_collecton_columns) {
@@ -1580,6 +1437,84 @@ void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,
 
     output_block_ptr->Finalize();
     output_->Append(output_block_ptr);
+}
+
+void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("session status"), output_column_defs);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> output_column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(output_column_types);
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("query count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option value
+            SizeT query_count = query_context->current_session()->query_count();
+            Value value = Value::MakeVarchar(ToStr(query_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "value", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("global status"), output_column_defs);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    Vector<SharedPtr<DataType>> output_column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(output_column_types);
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("buffer pool usage");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option value
+            BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+            u64 memory_limit = buffer_manager->memory_limit();
+            u64 memory_usage = buffer_manager->memory_usage();
+            Value value = Value::MakeVarchar(Format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 } // namespace infinity

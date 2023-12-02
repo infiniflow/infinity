@@ -32,4 +32,10 @@ export struct TableCollectionDetail {
     i64 segment_capacity_{};
 };
 
+export struct ViewDetail {
+    SharedPtr<String> db_name_{};
+    SharedPtr<String> view_name_{};
+    i64 column_count_{};
+};
+
 } // namespace infinity

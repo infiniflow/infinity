@@ -68,7 +68,11 @@ public:
     void Init(ErrorCode code, const char* msg);
 
     [[nodiscard]] const char* message() const {
-        return msg_->c_str();
+        if(msg_.get() != nullptr) {
+            return msg_->c_str();
+        } else{
+            return nullptr;
+        }
     }
 
     void MoveStatus(Status &s);

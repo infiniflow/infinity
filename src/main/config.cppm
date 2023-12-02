@@ -53,6 +53,8 @@ public:
     // Profiler
     [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler; }
 
+    [[nodiscard]] inline SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
+
     // Log
     [[nodiscard]] inline SharedPtr<String> log_filename() const { return system_option_.log_filename; }
 

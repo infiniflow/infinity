@@ -42,11 +42,17 @@ String ToString(ShowType type) {
             return "Show configs";
         case ShowType::kShowProfiles:
             return "Show profiles";
-        default: {
+        case ShowType::kShowSegments:
+            return "Show segments";
+        case ShowType::kShowSessionStatus:
+            return "Show session status";
+        case ShowType::kShowGlobalStatus:
+            return "Show global status";
+        case ShowType::kInvalid: {
             Error<PlannerException>("Invalid chunk scan type");
         }
     }
-    return String();
+    return {};
 }
 
 Vector<ColumnBinding> LogicalShow::GetColumnBindings() const { return {}; }

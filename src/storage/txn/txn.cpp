@@ -480,32 +480,32 @@ Status Txn::GetTableByName(const String &db_name, const String &table_name, Base
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
-    return Status(ErrorCode::kNotImplemented, "Not Implemented");
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
-    return Status(ErrorCode::kNotImplemented, "Not Implemented");
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
-    return Status(ErrorCode::kNotImplemented, "Not Implemented");
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::DropViewByName(const String &, const String &, ConflictType , BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
-    return Status(ErrorCode::kNotImplemented, "Not Implemented");
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
     Error<TransactionException>("Not Implemented");
-    return Status(ErrorCode::kNotImplemented, "Not Implemented");
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
-Vector<BaseEntry *> Txn::GetViews(const String &) {
+Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     Error<TransactionException>("Not Implemented");
-    return Vector<BaseEntry *>();
+    return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
