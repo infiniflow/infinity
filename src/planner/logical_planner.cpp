@@ -769,6 +769,12 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
+        case ShowStmtType::kSessionStatus: {
+            return BuildShowSessionStatus(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kGlobalStatus: {
+            return BuildShowGlobalStatus(statement, bind_context_ptr);
+        }
         default: {
             Error<PlannerException>("Unexpected show statement type.");
         }
@@ -862,6 +868,32 @@ Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindC
                                                                   query_context_ptr_->schema_name(),
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
+Status LogicalPlanner::BuildShowSessionStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowSessionStatus,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status();
+}
+
+Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowGlobalStatus,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_);
+
     this->logical_plan_ = logical_show;
     return Status();
 }

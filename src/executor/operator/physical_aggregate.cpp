@@ -211,7 +211,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         for (const auto &vec_pair : item.second) {
             datablock_size += vec_pair.second.size();
         }
-        SizeT datablock_capacity = NextPowerOfTwo(datablock_size);
+        SizeT datablock_capacity = Utility::NextPowerOfTwo(datablock_size);
         output_datablock->Init(types, datablock_capacity);
 
         // Loop each block

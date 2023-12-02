@@ -56,11 +56,6 @@ public:
     inline const String &object_name() const { return object_name_; };
 
 private:
-    void ExecuteShowTable(QueryContext *query_context);
-
-    void ExecuteShowViews(QueryContext *query_context);
-
-    void ExecuteShowColumns(QueryContext *query_context);
 
     void ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_columns);
 
@@ -70,10 +65,10 @@ private:
 
     void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    /// Execute push based show table
     void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
 
-    /// Execute push based describe table
+    void ExecuteShowViews(QueryContext *query_context, ShowOperatorState *operator_state);
+
     void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state);
@@ -83,6 +78,10 @@ private:
     void ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowSessionStatus(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *operator_state);
 
 private:
     ShowType scan_type_{ShowType::kInvalid};

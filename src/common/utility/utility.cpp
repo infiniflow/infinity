@@ -14,11 +14,15 @@
 
 module;
 
+
+#include <sstream>
+#include <iomanip>
+
 import stl;
 
 module utility;
 
-namespace infinity {
+namespace infinity::Utility {
 
 SizeT NextPowerOfTwo(SizeT input) {
     --input;
@@ -30,5 +34,21 @@ SizeT NextPowerOfTwo(SizeT input) {
     input |= input >> 32;
     return ++input;
 }
+
+String FormatByteSize(u64 byte_size) {
+    static const char* sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+
+    if (byte_size == 0) {
+        return "0B";
+    }
+
+    int suffixIndex = static_cast<int>(Log2(byte_size) / 10);
+    double size = static_cast<double>(byte_size) / (1 << (suffixIndex * 10));
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << size << sizeSuffixes[suffixIndex];
+    return oss.str();
+}
+
 
 } // namespace infinity

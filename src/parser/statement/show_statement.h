@@ -29,6 +29,8 @@ enum class ShowStmtType {
     kConfigs,
     kProfiles,
     kSegments,
+    kSessionStatus,
+    kGlobalStatus
 };
 
 class ShowStatement : public BaseStatement {

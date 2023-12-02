@@ -40,18 +40,18 @@ public:
     SessionOptions *options() { return &session_options; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
-    inline Txn* GetTxn() const { return txn_; }
-    inline void SetTxn(Txn* txn) { txn_ = txn; }
+    [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
+    inline void SetTxn(Txn *txn) { txn_ = txn; }
 
     inline static u64 GetNextSessionID() { return ++session_id_generator_; }
 
-    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) {
-        txn_->GetCatalog()->AppendProfilerRecord(Move(profiler));
-    }
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { txn_->GetCatalog()->AppendProfilerRecord(Move(profiler)); }
 
-    const QueryProfiler *GetProfilerRecord(SizeT index) {
-        return txn_->GetCatalog()->GetProfilerRecord(index);
-    }
+    const QueryProfiler *GetProfilerRecord(SizeT index) { return txn_->GetCatalog()->GetProfilerRecord(index); }
+
+    void IncreaseQueryCount() { ++query_count_; }
+
+    [[nodiscard]] u64 query_count() const { return query_count_; }
 
 protected:
     // Current schema
@@ -66,6 +66,9 @@ protected:
 
     u64 session_id_{0};
 
+    u64 query_count_{0};
+
+protected:
     static atomic_u64 session_id_generator_;
 };
 

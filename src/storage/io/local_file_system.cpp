@@ -240,21 +240,6 @@ u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
     return totalSize;
 }
 
-String LocalFileSystem::FormatFileSize(u64 file_size) {
-    static const char* sizeSuffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-
-    if (file_size == 0) {
-        return "0B";
-    }
-
-    int suffixIndex = static_cast<int>(Log2(file_size) / 10);
-    double size = static_cast<double>(file_size) / (1 << (suffixIndex * 10));
-
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << size << sizeSuffixes[suffixIndex];
-    return oss.str();
-}
-
 String LocalFileSystem::ConcatenateFilePath(const String& dir_path, const String& file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();

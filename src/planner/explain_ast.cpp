@@ -475,6 +475,14 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW PROFILES"));
             break;
         }
+        case ShowStmtType::kSessionStatus: {
+            result->emplace_back(MakeShared<String>("SHOW SESSION STATUS"));
+            break;
+        }
+        case ShowStmtType::kGlobalStatus: {
+            result->emplace_back(MakeShared<String>("SHOW GLOBAL STATUS"));
+            break;
+        }
     }
 }
 

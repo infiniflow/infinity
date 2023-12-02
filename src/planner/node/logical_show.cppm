@@ -34,6 +34,8 @@ export enum class ShowType {
     kShowProfiles,
     kShowIndexes,
     kShowSegments,
+    kShowSessionStatus,
+    kShowGlobalStatus,
 };
 
 export String ToString(ShowType type);
