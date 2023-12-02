@@ -22,6 +22,7 @@ import config;
 import resource_manager;
 import task_scheduler;
 import storage;
+import session_manager;
 
 namespace infinity {
 
@@ -42,6 +43,8 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
 
+        session_mgr_ = MakeUnique<SessionManager>();
+
         initialized_ = true;
     }
 }
@@ -52,10 +55,13 @@ void InfinityContext::UnInit() {
     }
     initialized_ = false;
 
+    session_mgr_.reset();
+
     storage_->UnInit();
     storage_.reset();
 
     task_scheduler_->UnInit();
+    task_scheduler_.reset();
 
     resource_manager_.reset();
 

@@ -30,7 +30,7 @@ namespace infinity {
 
 export class Infinity {
 public:
-    Infinity();
+    Infinity() = default;
 
     ~Infinity() = default;
 
@@ -60,7 +60,7 @@ public:
     QueryResult Query(const String& query_text);
 
 private:
-    SharedPtr<SessionBase> session_{};
+    SharedPtr<BaseSession> session_{};
 };
 
 } // namespace infinity

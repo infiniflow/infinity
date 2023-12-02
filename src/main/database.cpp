@@ -34,7 +34,8 @@ QueryResult Database::CreateTable(const String &table_name,
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     create_table_info->table_name_ = table_name;
@@ -50,7 +51,8 @@ QueryResult Database::DropTable(const String &table_name, const DropTableOptions
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
     SharedPtr<DropTableInfo> drop_table_info = MakeShared<DropTableInfo>();
     drop_table_info->schema_name_ = db_name_;
@@ -65,7 +67,8 @@ QueryResult Database::ListTables() {
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -77,7 +80,8 @@ QueryResult Database::DescribeTable(const String &) {
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kColumns;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -89,7 +93,8 @@ SharedPtr<Table> Database::GetTable(const String &table_name) {
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
     QueryResult result= query_context_ptr->QueryStatement(command_statement.get());
