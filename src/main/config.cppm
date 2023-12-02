@@ -21,6 +21,11 @@ import options;
 
 namespace infinity {
 
+export constexpr StringView profile_history_capacity_name = "profile_history_capacity";
+export constexpr StringView enable_profiling_name = "enable_profile";
+export constexpr StringView worker_cpu_limit = "cpu_count";
+export constexpr StringView log_level = "log_level";
+
 export struct Config {
 public:
     SharedPtr<String> Init(const SharedPtr<String> &config_path);
@@ -34,7 +39,8 @@ public:
 
     [[nodiscard]] inline i32 time_zone_bias() const { return system_option_.time_zone_bias; }
 
-    [[nodiscard]] inline u64 total_cpu_number() const { return system_option_.total_cpu_number; }
+    inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
+    [[nodiscard]] inline u64 worker_cpu_limit() const { return system_option_.worker_cpu_limit; }
 
     [[nodiscard]] inline u64 total_memory_size() const { return system_option_.total_memory_size; }
 

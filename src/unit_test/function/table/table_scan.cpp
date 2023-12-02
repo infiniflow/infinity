@@ -74,7 +74,7 @@ TEST_F(TableScanTest, block_read_test) {
     // create dummy query_context
     UniquePtr<RemoteSession> session_ptr = MakeUnique<RemoteSession>();
 
-    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.total_cpu_number(), config.total_memory_size());
+    UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.worker_cpu_limit(), config.total_memory_size());
 
     UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>(session_ptr.get());
     query_context->Init(&config, nullptr, &storage, resource_manager.get());

@@ -130,7 +130,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
         // System
         {
-            system_option_.total_cpu_number = default_total_cpu_number;
+            system_option_.worker_cpu_limit = default_total_cpu_number;
             system_option_.total_memory_size = default_total_memory_size;
             system_option_.query_cpu_limit = default_query_cpu_limit;
             system_option_.query_memory_limit = default_query_memory_limit;
@@ -211,7 +211,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // System
         {
             auto system_config = config["system"];
-            system_option_.total_cpu_number = system_config["total_cpu_number"].value_or(default_total_cpu_number);
+            system_option_.worker_cpu_limit = system_config["worker_cpu_limit"].value_or(default_total_cpu_number);
 
             String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
             result = ParseByteSize(total_memory_size_str, system_option_.total_memory_size);
@@ -341,7 +341,7 @@ void Config::PrintAll() const {
     Printf(" - timezone: {}{}\n", system_option_.time_zone, system_option_.time_zone_bias);
 
     // System
-    Printf(" - total_cpu_number: {}\n", system_option_.total_cpu_number);
+    Printf(" - worker_cpu_limit: {}\n", system_option_.worker_cpu_limit);
     Printf(" - total_memory_size: {}\n", system_option_.total_memory_size);
     Printf(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
     Printf(" - query_memory_limit: {}\n", system_option_.query_memory_limit);

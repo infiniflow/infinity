@@ -24,7 +24,7 @@
 
 namespace infinity {
 QueryDriver::QueryDriver(const std::map<std::string, std::string> &field2analyzer_, const std::string &default_field_)
-    : field2analyzer(field2analyzer_), default_field(default_field_) {}
+    : default_field(default_field_), field2analyzer(field2analyzer_) {}
 
 QueryDriver::~QueryDriver() {}
 

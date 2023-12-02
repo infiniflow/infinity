@@ -1620,13 +1620,13 @@ command_statement: USE IDENTIFIER {
 | SET GLOBAL IDENTIFIER LONG_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kInteger, $3, $4);
     free($3);
 }
 | SET GLOBAL IDENTIFIER DOUBLE_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 };
 

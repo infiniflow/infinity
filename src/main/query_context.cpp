@@ -52,7 +52,7 @@ QueryContext::QueryContext(BaseSession *session) : session_ptr_(session){};
 
 QueryContext::~QueryContext() { UnInit(); }
 
-void QueryContext::Init(const Config *global_config_ptr,
+void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr,

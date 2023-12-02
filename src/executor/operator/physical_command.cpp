@@ -14,7 +14,8 @@
 
 module;
 
-#include <fstream>
+//#include <fstream>
+#include <string>
 import stl;
 import query_context;
 import operator_state;
@@ -27,8 +28,10 @@ import data_table;
 import options;
 import third_party;
 import defer_op;
+import config;
 
 import infinity_exception;
+#include "statement/command_statement.h"
 
 module physical_command;
 
@@ -46,17 +49,76 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kSet: {
             SetCmd *set_command = (SetCmd *)(command_info_.get());
-            if(IsEqual(set_command->var_name(), enable_profiling_name)) {
+            if(set_command->var_name() == enable_profiling_name) {
                 if(set_command->value_type() != SetVarType::kBool) {
                     Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
-            } else if(IsEqual(set_command->var_name(), profile_history_capacity_name)) {
+                return ;
+            }
+
+            if(set_command->var_name() == profile_history_capacity_name) {
                 if(set_command->value_type() != SetVarType::kInteger) {
                     Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
-            } else {
+                return ;
+            }
+
+            if(set_command->var_name() == log_level) {
+                if(set_command->value_type() != SetVarType::kString) {
+                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                }
+
+                if(set_command->scope() != SetScope::kGlobal) {
+                    Error<ExecutorException>(Format("log_level is a global config parameter.", set_command->var_name()));
+                }
+
+                if(set_command->value_str() == "trace") {
+                    SetLogLevel(LogLevel::kTrace);
+                    return ;
+                }
+
+                if(set_command->value_str() == "info") {
+                    SetLogLevel(LogLevel::kInfo);
+                    return ;
+                }
+
+                if(set_command->value_str() == "warning") {
+                    SetLogLevel(LogLevel::kWarning);
+                    return ;
+                }
+
+                if(set_command->value_str() == "error") {
+                    SetLogLevel(LogLevel::kError);
+                    return ;
+                }
+
+                if(set_command->value_str() == "fatal") {
+                    SetLogLevel(LogLevel::kFatal);
+                    return ;
+                }
+
+                Error<ExecutorException>(Format("Unknown log level: {}.", set_command->value_str()));
+                //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
+                return ;
+            }
+
+            if(set_command->var_name() == worker_cpu_limit) {
+                if(set_command->value_type() != SetVarType::kInteger) {
+                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                }
+
+                if(set_command->scope() != SetScope::kGlobal) {
+                    Error<ExecutorException>(Format("cpu_count is a global config parameter.", set_command->var_name()));
+                }
+
+                Error<ExecutorException>(Format("You need to change the CPU limit before start the system.", set_command->var_name()));
+//                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
+                return ;
+            }
+
+            {
                 Error<ExecutorException>(Format("Unknown command: {}", set_command->var_name()));
             }
             break;

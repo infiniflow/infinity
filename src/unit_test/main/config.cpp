@@ -38,7 +38,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.time_zone(), "UTC");
     EXPECT_EQ(config.time_zone_bias(), 8);
 
-    EXPECT_EQ(config.total_cpu_number(), std::thread::hardware_concurrency());
+    EXPECT_EQ(config.worker_cpu_limit(), std::thread::hardware_concurrency());
     EXPECT_EQ(config.total_memory_size(), GetAvailableMem());
     EXPECT_EQ(config.query_cpu_limit(), std::thread::hardware_concurrency());
     EXPECT_EQ(config.query_memory_limit(), GetAvailableMem());
@@ -76,7 +76,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.time_zone(), "UTC");
     EXPECT_EQ(config.time_zone_bias(), -9);
 
-    EXPECT_EQ(config.total_cpu_number(), 2);
+    EXPECT_EQ(config.worker_cpu_limit(), 2);
     EXPECT_EQ(config.total_memory_size(), 8 * 1024ul * 1024ul * 1024ul);
     EXPECT_EQ(config.query_cpu_limit(), 2);
     EXPECT_EQ(config.query_memory_limit(), 4 * 1024ul * 1024ul);

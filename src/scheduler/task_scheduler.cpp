@@ -40,7 +40,7 @@ namespace infinity {
 TaskScheduler::TaskScheduler(const Config *config_ptr) { Init(config_ptr); }
 
 void TaskScheduler::Init(const Config *config_ptr) {
-    worker_count_ = config_ptr->total_cpu_number();
+    worker_count_ = config_ptr->worker_cpu_limit();
     worker_array_.reserve(worker_count_);
     for (u64 cpu_id = 0; cpu_id < worker_count_; ++cpu_id) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();

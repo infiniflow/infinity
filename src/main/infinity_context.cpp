@@ -36,7 +36,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
 
         Logger::Initialize(config_.get());
 
-        resource_manager_ = MakeUnique<ResourceManager>(config_->total_cpu_number(), config_->total_memory_size());
+        resource_manager_ = MakeUnique<ResourceManager>(config_->worker_cpu_limit(), config_->total_memory_size());
 
         task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 

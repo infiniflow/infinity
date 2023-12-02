@@ -1011,19 +1011,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar("CPU count");
+            Value value = Value::MakeVarchar("worker CPU limit");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(ToStr(global_config->total_cpu_number()));
+            Value value = Value::MakeVarchar(ToStr(global_config->worker_cpu_limit()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
         {
             // option name type
-            Value value = Value::MakeVarchar("Total cpu count used for computation");
+            Value value = Value::MakeVarchar("Total worker count used for computation");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }

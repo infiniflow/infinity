@@ -45,7 +45,7 @@ public:
 
     ~QueryContext();
 
-    void Init(const Config *global_config_ptr,
+    void Init(Config *global_config_ptr,
               TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr,
@@ -106,7 +106,7 @@ public:
 
     [[nodiscard]] inline TaskScheduler *scheduler() const { return scheduler_; }
 
-    [[nodiscard]] inline const Config *global_config() const { return global_config_; }
+    [[nodiscard]] inline Config *global_config() const { return global_config_; }
 
     [[nodiscard]] inline ResourceManager *resource_manager() { return resource_manager_; }
 
@@ -129,7 +129,7 @@ private:
 
     SharedPtr<QueryProfiler> query_metrics_;
 
-    const Config *global_config_{};
+    Config *global_config_{};
     TaskScheduler *scheduler_{};
     Storage *storage_{};
     BaseSession *session_ptr_{};
