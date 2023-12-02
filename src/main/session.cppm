@@ -25,15 +25,16 @@ export module session;
 
 namespace infinity {
 
-enum class SessionType {
-    kEmbedded,
+export enum class SessionType {
+    kLocal,
     kRemote,
 };
 
-export class SessionBase {
+export class BaseSession {
 
 public:
-    explicit SessionBase(SessionType session_type) : current_database_("default"), session_type_(session_type) { session_id_ = GetNextSessionID(); }
+    BaseSession(u64 session_id, SessionType session_type)
+        : current_database_("default"), session_type_(session_type), session_id_(session_id) {}
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
@@ -42,8 +43,6 @@ public:
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
-
-    inline static u64 GetNextSessionID() { return ++session_id_generator_; }
 
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { txn_->GetCatalog()->AppendProfilerRecord(Move(profiler)); }
 
@@ -67,23 +66,18 @@ protected:
     u64 session_id_{0};
 
     u64 query_count_{0};
-
-protected:
-    static atomic_u64 session_id_generator_;
 };
 
-atomic_u64 SessionBase::session_id_generator_{0};
-
-export class LocalSession : public SessionBase {
+export class LocalSession : public BaseSession {
 
 public:
-    LocalSession() : SessionBase(SessionType::kEmbedded) {}
+    explicit LocalSession(u64 session_id) : BaseSession(session_id, SessionType::kLocal) {}
 };
 
-export class RemoteSession : public SessionBase {
+export class RemoteSession : public BaseSession {
 
 public:
-    RemoteSession() : SessionBase(SessionType::kRemote) {}
+    explicit RemoteSession(u64 session_id) : BaseSession(session_id, SessionType::kRemote) {}
 
     [[nodiscard]] inline const String &user_name() const { return user_name_; }
 

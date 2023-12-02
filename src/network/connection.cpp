@@ -31,17 +31,30 @@ import data_table;
 import parser;
 import logical_node_type;
 import query_result;
+import session_manager;
 
 module connection;
 
 namespace infinity {
 
 Connection::Connection(AsioIOService &io_service)
-    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())), session_(MakeUnique<RemoteSession>()) {}
+    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
+
+Connection::~Connection() {
+    if(session_ == nullptr) {
+        // To avoid null ptr access
+        return ;
+    }
+    SessionManager* session_mgr = InfinityContext::instance().session_manager();
+    session_mgr->RemoveSessionByID(session_->session_id());
+}
 
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
+
+    SessionManager* session_manager = InfinityContext::instance().session_manager();
+    session_ = session_manager->CreateRemoteSession();
 
     HandleConnection();
 
@@ -83,7 +96,8 @@ void Connection::HandleRequest() {
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
-                            InfinityContext::instance().resource_manager());
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
     query_context_ptr->set_current_schema(session_->current_database());
 
     switch (cmd_type) {

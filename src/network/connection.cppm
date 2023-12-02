@@ -32,6 +32,8 @@ export class Connection {
 public:
     explicit Connection(AsioIOService &io_service);
 
+    ~Connection();
+
     void Run();
 
     inline SharedPtr<AsioSocket> socket() { return socket_; }

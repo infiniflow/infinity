@@ -19,6 +19,7 @@ import stl;
 import config;
 import session;
 import resource_manager;
+import session_manager;
 import profiler;
 import storage;
 import txn;
@@ -40,14 +41,15 @@ class TaskScheduler;
 export class QueryContext {
 
 public:
-    explicit QueryContext(SessionBase* session);
+    explicit QueryContext(BaseSession* session);
 
     ~QueryContext();
 
-    void Init(const Config *global_config_ptr,
+    void Init(Config *global_config_ptr,
               TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
-              ResourceManager *resource_manager_ptr);
+              ResourceManager *resource_manager_ptr,
+              SessionManager* session_manager);
 
     inline void UnInit() {
         initialized_ = false;
@@ -104,9 +106,11 @@ public:
 
     [[nodiscard]] inline TaskScheduler *scheduler() const { return scheduler_; }
 
-    [[nodiscard]] inline const Config *global_config() const { return global_config_; }
+    [[nodiscard]] inline Config *global_config() const { return global_config_; }
 
     [[nodiscard]] inline ResourceManager *resource_manager() { return resource_manager_; }
+
+    [[nodiscard]] inline SessionManager *session_manager() { return session_manager_; }
 
     [[nodiscard]] inline SQLParser *parser() const { return parser_.get(); }
     [[nodiscard]] inline LogicalPlanner *logical_planner() const { return logical_planner_.get(); }
@@ -114,7 +118,7 @@ public:
     [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
 
-    [[nodiscard]] SessionBase* current_session() const { return session_ptr_; }
+    [[nodiscard]] BaseSession* current_session() const { return session_ptr_; }
 private:
     // Parser
     UniquePtr<SQLParser> parser_{};
@@ -125,11 +129,12 @@ private:
 
     SharedPtr<QueryProfiler> query_metrics_;
 
-    const Config *global_config_{};
+    Config *global_config_{};
     TaskScheduler *scheduler_{};
     Storage *storage_{};
-    SessionBase *session_ptr_{};
+    BaseSession *session_ptr_{};
     ResourceManager *resource_manager_{};
+    SessionManager* session_manager_{};
 
     // Get following information from session.
     // Current schema

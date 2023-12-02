@@ -42,23 +42,27 @@ import third_party;
 import logger;
 import query_result;
 import status;
+import session_manager;
 
 module query_context;
 
 namespace infinity {
 
-QueryContext::QueryContext(SessionBase *session) : session_ptr_(session){};
+QueryContext::QueryContext(BaseSession *session) : session_ptr_(session){};
 
 QueryContext::~QueryContext() { UnInit(); }
 
-void QueryContext::Init(const Config *global_config_ptr,
+void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
-                        ResourceManager *resource_manager_ptr) {
+                        ResourceManager *resource_manager_ptr,
+                        SessionManager* session_manager) {
     global_config_ = global_config_ptr;
     scheduler_ = scheduler_ptr;
     storage_ = storage_ptr;
     resource_manager_ = resource_manager_ptr;
+    session_manager_ = session_manager;
+
     initialized_ = true;
     cpu_number_limit_ = resource_manager_ptr->GetCpuResource();
     memory_size_limit_ = resource_manager_ptr->GetMemoryResource();
@@ -152,6 +156,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_metrics_->Stop();
     }
 //    ProfilerStop();
+    session_ptr_->IncreaseQueryCount();
     return query_result;
 }
 

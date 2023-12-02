@@ -57,6 +57,7 @@ import block_column_entry;
 import local_file_system;
 import utility;
 import buffer_manager;
+import session_manager;
 
 module physical_show;
 
@@ -1010,6 +1011,27 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
+            Value value = Value::MakeVarchar("worker CPU limit");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(ToStr(global_config->worker_cpu_limit()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Total worker count used for computation");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
             Value value = Value::MakeVarchar("data_dir");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -1508,6 +1530,23 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
             u64 memory_limit = buffer_manager->memory_limit();
             u64 memory_usage = buffer_manager->memory_usage();
             Value value = Value::MakeVarchar(Format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar("session count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option value
+            SessionManager* session_manager = query_context->session_manager();
+            u64 session_count = session_manager->GetSessionCount();
+            Value value = Value::MakeVarchar(ToStr(session_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }

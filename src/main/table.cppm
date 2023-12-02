@@ -25,7 +25,7 @@ namespace infinity {
 
 export class Table {
 public:
-    Table(String table_name, SharedPtr<SessionBase> session)
+    Table(String table_name, SharedPtr<BaseSession> session)
         : table_name_(Move(table_name)), session_(Move(session)) {}
 
     QueryResult CreateIndex(const String &index_name,
@@ -51,7 +51,7 @@ public:
 
 private:
     String table_name_{};
-    SharedPtr<SessionBase> session_{};
+    SharedPtr<BaseSession> session_{};
 };
 
 } // namespace infinity

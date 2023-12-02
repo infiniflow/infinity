@@ -21,9 +21,6 @@ import third_party;
 
 namespace infinity {
 
-export const String profile_history_capacity_name = "profile_history_capacity";
-export const String enable_profiling_name = "enable_profile";
-
 export struct SessionOptions {
     inline bool enable_profiling() const { return enable_profiling_; }
     inline u64 profile_history_capacity() const { return profile_history_capacity_; }
@@ -39,7 +36,7 @@ export struct SystemOptions {
     i32 time_zone_bias{};
 
     // System
-    u64 total_cpu_number{};
+    u64 worker_cpu_limit{};
     u64 total_memory_size{};
     u64 query_cpu_limit{};
     u64 query_memory_limit{};
