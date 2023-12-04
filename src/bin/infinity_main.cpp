@@ -32,31 +32,55 @@ infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 //infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
+infinity::Mutex server_mutex;
+infinity::CondVar server_cv;
+
+bool server_running = false;
+
+infinity::Thread shut_down_thread;
+
+void ShutdownServer() {
+
+    infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+    server_running = true;
+    server_cv.wait(lock, [&]{ return !server_running; });
+
+    //            threaded_thrift_server.Shutdown();
+    //            threaded_thrift_thread.join();
+
+    pool_thrift_server.Shutdown();
+    pool_thrift_thread.join();
+
+    //            non_block_pool_thrift_server.Shutdown();
+
+    db_server.Shutdown();
+
+}
+
 void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
-//            threaded_thrift_server.Shutdown();
-//            threaded_thrift_thread.join();
 
-            pool_thrift_server.Shutdown();
-            pool_thrift_thread.join();
+            infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+            server_running = false;
+            server_cv.notify_one();
 
-//            non_block_pool_thrift_server.Shutdown();
-
-            db_server.Shutdown();
             break;
         }
         case SIGSEGV: {
             // Print back strace
+            printf("SEGMENT FAULTS\n");
+            exit(0);
             break;
         }
         default: {
             // Ignore
+            printf("Other type of signal: %d\n", signal_number);
         }
     }
-    exit(0);
+//    exit(0);
 }
 
 void RegisterSignal() {
@@ -67,6 +91,7 @@ void RegisterSignal() {
     sigaction(SIGINT, &sig_action, NULL);
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
+    sigaction(SIGSEGV, &sig_action, NULL);
 }
 
 } // namespace
@@ -130,8 +155,11 @@ auto main(int argc, char **argv) -> int {
 
 //    non_block_pool_thrift_server.Init(9070, 64);
 //    non_block_pool_thrift_server.Start();
-
+    shut_down_thread = infinity::Thread([&]() { ShutdownServer(); });
     db_server.Run();
 
+    shut_down_thread.join();
+
+    printf("Server is shutdown\n");
     return 0;
 }
