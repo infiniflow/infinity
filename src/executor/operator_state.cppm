@@ -77,7 +77,7 @@ export struct UnionAllOperatorState : public OperatorState {
 export struct TableScanOperatorState : public OperatorState {
     inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
 
-    SharedPtr<TableScanFunctionData> table_scan_function_data_{};
+    UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
 
 // KnnScan
