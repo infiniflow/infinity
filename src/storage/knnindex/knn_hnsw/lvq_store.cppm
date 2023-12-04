@@ -35,7 +35,7 @@ public:
     static_assert(std::is_same<CompressType, i8>());
 
     using This = LVQStore<DataType, CompressType, LVQCache>;
-    using InitArgs = Pair<SizeT, bool>; // first is buffer size, second is whether to make padding
+    using InitArgs = SizeT; // buffer size
     class LVQData;
     using StoreType = LVQData;
     struct QueryLVQ;
@@ -114,21 +114,26 @@ public:
 
 private:
     LVQStore(DataStoreMeta meta, This::InitArgs init_args)
-        : meta_(Move(meta)),                                                                                                                  //
-          compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), init_args.second ? PADDING_SIZE : 1)),                       //
-          compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), init_args.second ? PADDING_SIZE : 1)),             //
-          ptr_(new(std::align_val_t(init_args.second ? PADDING_SIZE : 8)) char[compress_data_offset_ + compress_data_size_ * max_vec_num()]), //
-          buffer_plain_size_(init_args.first),                                                                                                //
-          plain_data_(PlainStore<DataType>::Make(0, dim()))                                                                                   //
-    {
-        MeanType *mean = GetMeanMut();
-        Fill(mean, mean + dim(), 0);
+        : meta_(Move(meta)),                                                                                                                      //
+          compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), PADDING_SIZE)),                                                  //
+          compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), PADDING_SIZE)),                                        //
+          ptr_(static_cast<char *>(operator new[](compress_data_offset_ + compress_data_size_ * max_vec_num(), std::align_val_t(PADDING_SIZE)))), //
+          buffer_plain_size_(init_args),                                                                                                          //
+          plain_data_(PlainStore<DataType>::Make(0, dim()))                                                                                       //
+    {}
+
+    void Init() {
+        // MeanType *mean = GetMeanMut();
+        // Fill(mean, mean + dim(), 0);
+        Fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
     }
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
         DataStoreMeta meta(max_vec_num, dim);
-        return This(Move(meta), Move(init_args));
+        auto ret = This(Move(meta), Move(init_args));
+        ret.Init();
+        return ret;
     }
 
     LVQStore(const This &) = delete;
@@ -148,7 +153,7 @@ public:
 
     ~LVQStore() {
         if (ptr_ != nullptr) {
-            delete[] ptr_;
+            operator delete[](ptr_, std::align_val_t(PADDING_SIZE));
         }
     }
 

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 module;
-#include <new>
 #include <cassert>
 #include <iostream>
+#include <new>
 
 import stl;
 import hnsw_common;
@@ -91,32 +91,29 @@ private:
         }
     };
     VertexL0Mut GetLevel0Mut(VertexType vertex_i) { return VertexL0Mut(graph_ + level0_size_ * vertex_i); }
-    VertexLXMut GetLevelXMut(VertexL0Mut &level0, LayerSize layer_i) {
-        return VertexLXMut(*level0.GetLayers().first + levelx_size_ * (layer_i - 1));
-    }
+    VertexLXMut GetLevelXMut(VertexL0Mut &level0, LayerSize layer_i) { return VertexLXMut(*level0.GetLayers().first + levelx_size_ * (layer_i - 1)); }
     VertexL0 GetLevel0(VertexType vertex_i) const { return VertexL0(graph_ + level0_size_ * vertex_i); }
-    VertexLX GetLevelX(const VertexL0 &level0, LayerSize layer_i) const {
-        return VertexLX(level0.GetLayers().first + levelx_size_ * (layer_i - 1));
-    }
+    VertexLX GetLevelX(const VertexL0 &level0, LayerSize layer_i) const { return VertexLX(level0.GetLayers().first + levelx_size_ * (layer_i - 1)); }
 
 private:
     GraphStore(SizeT max_vertex, SizeT Mmax, SizeT Mmax0, SizeT loaded_vertex_n, char *loaded_layers)
-        : level0_size_(AlignTo(l0_neighbors_offset_ + sizeof(VertexType) * Mmax0, 8)), //
-          levelx_size_(AlignTo(lx_neighbors_offset_ + sizeof(VertexType) * Mmax, 8)),  //
-          max_vertex_num_(max_vertex),                                                    //
-          graph_(new(std::align_val_t(8)) char[max_vertex * level0_size_]),               //
-          loaded_vertex_n_(loaded_vertex_n),                                              //
-          loaded_layers_(loaded_layers)                                                   //
+        : level0_size_(AlignTo(l0_neighbors_offset_ + sizeof(VertexType) * Mmax0, 8)),                 //
+          levelx_size_(AlignTo(lx_neighbors_offset_ + sizeof(VertexType) * Mmax, 8)),                  //
+          max_vertex_num_(max_vertex),                                                                 //
+          graph_(static_cast<char *>(operator new[](max_vertex * level0_size_, std::align_val_t(8)))), //
+          loaded_vertex_n_(loaded_vertex_n),                                                           //
+          loaded_layers_(loaded_layers)                                                                //
     {}
 
     void Init() {
         max_layer_ = -1;
         enterpoint_ = -1;
-        for (VertexType vertex_i = 0; vertex_i < max_vertex_num_; ++vertex_i) {
-            VertexL0Mut vertex = GetLevel0Mut(vertex_i);
-            *vertex.GetNeighbors().second = 0;
-            *vertex.GetLayers().first = nullptr;
-        }
+        Fill(graph_, graph_ + max_vertex_num_ * level0_size_, 0);
+        // for (VertexType vertex_i = 0; vertex_i < max_vertex_num_; ++vertex_i) {
+        //     VertexL0Mut vertex = GetLevel0Mut(vertex_i);
+        //     *vertex.GetNeighbors().second = 0;
+        //     *vertex.GetLayers().first = nullptr;
+        // }
     }
 
 public:
@@ -149,7 +146,7 @@ public:
             for (VertexType vertex_i = loaded_vertex_n_; vertex_i < max_vertex_num_; ++vertex_i) {
                 delete[] GetLevel0(vertex_i).GetLayers().first;
             }
-            delete[] graph_;
+            operator delete[](graph_, std::align_val_t(8));
         }
         if (loaded_layers_) {
             delete[] loaded_layers_;
@@ -163,7 +160,7 @@ public:
         *layer_n_p = layer_n;
         *layers = nullptr;
         if (layer_n) {
-            *layers = new char[levelx_size_ * layer_n];
+            *layers = new char[levelx_size_ * layer_n]{0};
             for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
                 *GetLevelXMut(vertex, layer_i).GetNeighbors().second = 0;
             }

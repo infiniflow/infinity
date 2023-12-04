@@ -53,7 +53,7 @@ TEST_F(DistFuncTest2, test2) {
         }
     }
 
-    auto lvq_store = LVQ8Store::Make(vec_n, dim, {0, true});
+    auto lvq_store = LVQ8Store::Make(vec_n, dim, 0);
     Distance distance(lvq_store.dim());
     lvq_store.AddVec(vecs1.get(), vec_n);
 
