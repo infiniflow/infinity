@@ -68,10 +68,7 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
     size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size();
     if (num_sub_expr <= 0) {
         ParserError("Need at least one KNN/MATCH/QUERY expression");
-    } else if (num_sub_expr == 1) {
-        if (fusion_expr_ != nullptr)
-            ParserError("Need no FUSION expr since there's only one KNN/MATCH/QUERY expression");
-    } else {
+    } else if (num_sub_expr >= 2) {
         if (fusion_expr_ == nullptr)
             ParserError("Need FUSION expr since there are multiple KNN/MATCH/QUERY expressions");
     }

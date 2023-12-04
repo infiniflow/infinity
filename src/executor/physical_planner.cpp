@@ -661,6 +661,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
                                       Move(left_phy),
                                       Move(right_phy),
                                       logical_fusion->fusion_expr_,
+                                      logical_fusion->GetOutputNames(),
+                                      logical_fusion->GetOutputTypes(),
                                       logical_operator->load_metas());
 }
 

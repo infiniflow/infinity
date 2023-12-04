@@ -60,7 +60,7 @@ void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<
         Vector<SharedPtr<String>> paragraphs1(array1.begin() + start_1, array1.begin() + end1);
         Vector<SharedPtr<String>> paragraphs2(array2.begin() + start_2, array2.begin() + end2);
 
-        SizeT length_diff = paragraphs1.size() - paragraphs2.size();
+        int length_diff = (int)paragraphs1.size() - (int)paragraphs2.size();
 
         if (length_diff > 0) {
             array2.insert(array2.begin() + end2, length_diff, MakeShared<String>());

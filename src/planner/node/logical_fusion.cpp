@@ -28,24 +28,19 @@ module logical_fusion;
 
 namespace infinity {
 
-LogicalFusion::LogicalFusion(u64 node_id, SharedPtr<FusionExpression> fusion_expr)
-    : LogicalNode(node_id, LogicalNodeType::kMatch), fusion_expr_(fusion_expr) {}
+LogicalFusion::LogicalFusion(u64 node_id,
+                             SharedPtr<FusionExpression> fusion_expr,
+                             const Vector<ColumnBinding> &column_bindings,
+                             SharedPtr<Vector<String>> output_names,
+                             SharedPtr<Vector<SharedPtr<DataType>>> output_types)
+    : LogicalNode(node_id, LogicalNodeType::kFusion), fusion_expr_(fusion_expr), column_bindings_(column_bindings), output_names_(Move(output_names)),
+      output_types_(Move(output_types)) {}
 
-Vector<ColumnBinding> LogicalFusion::GetColumnBindings() const { return {}; }
+Vector<ColumnBinding> LogicalFusion::GetColumnBindings() const { return column_bindings_; }
 
-SharedPtr<Vector<String>> LogicalFusion::GetOutputNames() const {
-    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    result_names->emplace_back(COLUMN_NAME_ROW_ID);
-    result_names->emplace_back(COLUMN_NAME_SCORE);
-    return result_names;
-}
+SharedPtr<Vector<String>> LogicalFusion::GetOutputNames() const { return output_names_; };
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalFusion::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
-    return result_types;
-}
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalFusion::GetOutputTypes() const { return output_types_; };
 
 String LogicalFusion::ToString(i64 &space) const {
     std::stringstream ss;
