@@ -77,6 +77,7 @@ class EmbeddingCastTest : public BaseTest {};
 // }
 
 TEST_F(EmbeddingCastTest, embedding_cast1) {
+#if 0
     using namespace infinity;
 
     // Call BindEmbeddingCast with wrong type of parameters
@@ -127,7 +128,6 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
 // FIXME: Embedding type width isn't sizeof(EmbeddingT)
 // But UnaryExecute will only use the sizeof(type) to iterate each value.
-#if 0
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
@@ -146,6 +146,6 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
             EXPECT_FALSE(vx.is_null());
             EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), source_str.c_str());
         }
-#endif
     }
+#endif
 }

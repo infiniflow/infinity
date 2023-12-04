@@ -144,7 +144,7 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
             //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
             //        }
         case kEmbedding: {
-            return BindEmbeddingCast(target);
+            return BindEmbeddingCast(source, target);
         }
         case kRowID: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));

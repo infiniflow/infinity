@@ -20,6 +20,7 @@ import parser;
 import bitmask;
 import bound_cast_func;
 import unary_operator;
+import embedding_unary_operator;
 import null_value;
 
 export module column_vector_cast;
@@ -127,6 +128,26 @@ struct TryCastValueToVarlenWithType {
     }
 };
 
+template <typename Operator>
+struct TryCastValueEmbedding {
+    template <typename SourceElemType, typename TargetElemType>
+    inline static void Execute(const SourceElemType *input, TargetElemType *result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+        auto cast_data = (ColumnVectorCastData *)(state_ptr);
+        auto embedding_info = static_cast<EmbeddingInfo *>(cast_data->source_type_.type_info().get());
+        SizeT dim = embedding_info->Dimension();
+        if (Operator::template Run<SourceElemType, TargetElemType>(input, result, dim)) {
+            return;
+        }
+
+        nulls_ptr->SetFalse(idx);
+
+        SetEmbeddingNullValue(result, dim);
+
+        // This convert is failed
+        cast_data->all_converted_ = false;
+    }
+};
+
 export struct ColumnVectorCast {
 
     template <class SourceType, class TargetType, class Operator>
@@ -165,6 +186,14 @@ export struct ColumnVectorCast {
     TryCastColumnVectorWithType(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueWithType<Operator>>(source, target, count, parameters);
         return result;
+    }
+
+    template <class SourceElemType, class TargetElemType, class Operator>
+    inline static bool
+    TryCastColumnVectorEmbedding(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
+        ColumnVectorCastData input(parameters.strict, target, *source->data_type_, *target->data_type_);
+        EmbeddingUnaryOperator::Execute<SourceElemType, TargetElemType, TryCastValueEmbedding<Operator>>(source, target, count, &input, true);
+        return input.all_converted_;
     }
 };
 
