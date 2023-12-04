@@ -89,8 +89,8 @@ void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operat
     }
 
     prev_op_state->data_block_.reset();
+    project_operator_state->data_block_->Finalize();
     if (prev_op_state->Complete()) {
-        project_operator_state->data_block_->Finalize();
         project_operator_state->SetComplete();
     }
 }
