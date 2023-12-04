@@ -33,6 +33,7 @@ namespace infinity {
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
+    virtual ~OperatorState() = default;
 
     // Input status
     OperatorState *prev_op_state_{nullptr};
@@ -360,6 +361,8 @@ export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kK
 
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}
+
+    virtual ~SourceState() = default;
 
     inline void SetNextOpState(OperatorState *op_state) { next_op_state_ = op_state; }
 

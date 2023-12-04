@@ -18,6 +18,9 @@ export module function_data;
 
 namespace infinity {
 
-export class FunctionData {};
+export class FunctionData {
+public:
+    virtual ~FunctionData() = default;
+};
 
 } // namespace infinity
