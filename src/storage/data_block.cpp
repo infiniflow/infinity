@@ -157,6 +157,9 @@ void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
 }
 
 void DataBlock::Finalize() {
+    if(finalized) {
+        return ;
+    }
     bool first_flat_column_vector = false;
     SizeT row_count = 0;
     for (SizeT idx = 0; idx < column_count_; ++idx) {

@@ -88,9 +88,9 @@ void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operat
         evaluator.Execute(expressions_[expr_idx], expr_states[expr_idx], project_operator_state->data_block_->column_vectors[expr_idx]);
     }
 
-    project_operator_state->data_block_->Finalize();
     prev_op_state->data_block_.reset();
     if (prev_op_state->Complete()) {
+        project_operator_state->data_block_->Finalize();
         project_operator_state->SetComplete();
     }
 }

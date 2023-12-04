@@ -68,7 +68,7 @@ namespace infinity {
 void PhysicalKnnScan::Init() {}
 
 void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    if(operator_state->data_block_.get() == nullptr) {
+    if (operator_state->data_block_.get() == nullptr) {
         operator_state->data_block_ = DataBlock::Make();
 
         // Performance issue here.
@@ -343,6 +343,22 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
         i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
+
+        SharedPtr<DataBlock> data_block = DataBlock::Make();
+        data_block->Init(*GetOutputTypes());
+        operator_state->output_data_blocks_.emplace_back(data_block);
+        SizeT row_idx = DEFAULT_BLOCK_CAPACITY;
+
+        SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
+        for (; row_idx < total_data_row_count; row_idx += DEFAULT_BLOCK_CAPACITY) {
+            data_block = DataBlock::Make();
+            data_block->Init(*GetOutputTypes());
+            operator_state->output_data_blocks_.emplace_back(data_block);
+        }
+
+        SizeT output_block_row_id = 0;
+        SizeT output_block_idx = 0;
+        DataBlock* output_block_ptr = operator_state->output_data_blocks_[0].get();
         for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
             DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
             RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
@@ -360,19 +376,28 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     throw ExecutorException(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
+                if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
+                    output_block_ptr->Finalize();
+                    output_block_row_id -= 0;
+                    ++output_block_idx;
+                    output_block_ptr = operator_state->output_data_blocks_[output_block_idx].get();
+                }
+
                 SizeT column_id = 0;
                 for (; column_id < column_n; ++column_id) {
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
                     const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
-                    operator_state->data_block_->AppendValueByPtr(column_id, ptr);
+                    output_block_ptr->AppendValueByPtr(column_id, ptr);
                 }
-                operator_state->data_block_->AppendValueByPtr(column_id++, (ptr_t)&result_dists[id]);
-                operator_state->data_block_->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
+                output_block_ptr->AppendValueByPtr(column_id++, (ptr_t)&result_dists[id]);
+                output_block_ptr->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
+
+                ++ output_block_row_id;
             }
         }
-        operator_state->data_block_->Finalize();
+        output_block_ptr->Finalize();
         operator_state->SetComplete();
     }
 }

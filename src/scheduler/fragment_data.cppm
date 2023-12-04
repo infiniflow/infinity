@@ -25,8 +25,8 @@ export struct FragmentData {
     SharedPtr<DataBlock> data_block_{};
 
     i64 task_id_{-1};
-    i64 data_idx_{-1};
-    i64 data_count_{-1};
+    SizeT data_idx_{u64_max};
+    SizeT data_count_{u64_max};
 };
 
 } // namespace infinity
