@@ -1,19 +1,3 @@
-add_executable(hnsw_benchmark
-        hnsw_benchmark.cpp
-        helper.cpp
-        helper.h
-        )
-
-target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
-target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(
-        hnsw_benchmark
-        infinity_core
-        roaring
-        zsv_parser
-        benchmark_profiler
-)
-
 add_executable(hnsw_benchmark2
     hnsw_benchmark2.cpp
     helper.cpp
