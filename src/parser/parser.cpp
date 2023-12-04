@@ -838,12 +838,20 @@ static const yytype_int16 yyrline[] =
     2072,  2080,  2110,  2118,  2127,  2135,  2144,  2152,  2158,  2165,
     2171,  2178,  2183,  2190,  2197,  2205,  2229,  2235,  2241,  2248,
     2256,  2263,  2270,  2275,  2285,  2290,  2295,  2300,  2305,  2310,
+<<<<<<< HEAD
     2315,  2318,  2321,  2324,  2328,  2331,  2335,  2340,  2345,  2350,
     2354,  2359,  2364,  2370,  2376,  2382,  2388,  2394,  2400,  2406,
     2412,  2418,  2424,  2430,  2441,  2445,  2450,  2469,  2479,  2485,
     2489,  2490,  2492,  2493,  2495,  2496,  2508,  2516,  2521,  2524,
     2528,  2532,  2537,  2542,  2550,  2557,  2568,  2616
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+    2315,  2318,  2321,  2324,  2328,  2331,  2335,  2339,  2344,  2349,
+    2353,  2358,  2363,  2369,  2375,  2381,  2387,  2393,  2399,  2405,
+    2411,  2417,  2423,  2429,  2440,  2444,  2449,  2468,  2478,  2484,
+    2488,  2489,  2491,  2492,  2494,  2495,  2507,  2515,  2520,  2523,
+    2527,  2531,  2536,  2541,  2549,  2556,  2567,  2615
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
 };
 #endif
 
@@ -7906,9 +7914,9 @@ yyreduce:
 #line 2335 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
                                               {
-    fprintf(stderr, "hello\n");
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 5982 "parser.cpp"
     break;
@@ -7922,11 +7930,19 @@ yyreduce:
   case 297: /* unclosed_long_array_expr: '[' LONG_VALUE  */
 #line 2340 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 5984 "parser.cpp"
+    break;
+
+  case 297: /* unclosed_long_array_expr: '[' LONG_VALUE  */
+#line 2339 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                          {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kIntegerArray);
     const_expr->long_array_.emplace_back((yyvsp[0].long_value));
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 5992 "parser.cpp"
     break;
@@ -7940,10 +7956,18 @@ yyreduce:
   case 298: /* unclosed_long_array_expr: unclosed_long_array_expr ',' LONG_VALUE  */
 #line 2345 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 5994 "parser.cpp"
+    break;
+
+  case 298: /* unclosed_long_array_expr: unclosed_long_array_expr ',' LONG_VALUE  */
+#line 2344 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                           {
     (yyvsp[-2].const_expr_t)->long_array_.emplace_back((yyvsp[0].long_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6001 "parser.cpp"
     break;
@@ -7960,24 +7984,32 @@ yyreduce:
 #line 2363 "parser.y"
 =======
 #line 6004 "parser.cpp"
+=======
+#line 6003 "parser.cpp"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
     break;
 
   case 299: /* double_array_expr: unclosed_double_array_expr ']'  */
-#line 2350 "parser.y"
+#line 2349 "parser.y"
                                                   {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 6012 "parser.cpp"
+#line 6011 "parser.cpp"
     break;
 
   case 300: /* unclosed_double_array_expr: '[' DOUBLE_VALUE  */
+<<<<<<< HEAD
 #line 2354 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 2353 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                              {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleArray);
     const_expr->double_array_.emplace_back((yyvsp[0].double_value));
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6019 "parser.cpp"
     break;
@@ -7991,10 +8023,18 @@ yyreduce:
   case 301: /* unclosed_double_array_expr: unclosed_double_array_expr ',' DOUBLE_VALUE  */
 #line 2359 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6021 "parser.cpp"
+    break;
+
+  case 301: /* unclosed_double_array_expr: unclosed_double_array_expr ',' DOUBLE_VALUE  */
+#line 2358 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                               {
     (yyvsp[-2].const_expr_t)->double_array_.emplace_back((yyvsp[0].double_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6028 "parser.cpp"
     break;
@@ -8008,12 +8048,20 @@ yyreduce:
   case 302: /* interval_expr: LONG_VALUE SECONDS  */
 #line 2364 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6030 "parser.cpp"
+    break;
+
+  case 302: /* interval_expr: LONG_VALUE SECONDS  */
+#line 2363 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6039 "parser.cpp"
     break;
@@ -8027,12 +8075,20 @@ yyreduce:
   case 303: /* interval_expr: LONG_VALUE SECOND  */
 #line 2370 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6041 "parser.cpp"
+    break;
+
+  case 303: /* interval_expr: LONG_VALUE SECOND  */
+#line 2369 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6050 "parser.cpp"
     break;
@@ -8046,12 +8102,20 @@ yyreduce:
   case 304: /* interval_expr: LONG_VALUE MINUTES  */
 #line 2376 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6052 "parser.cpp"
+    break;
+
+  case 304: /* interval_expr: LONG_VALUE MINUTES  */
+#line 2375 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                      {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6061 "parser.cpp"
     break;
@@ -8065,12 +8129,20 @@ yyreduce:
   case 305: /* interval_expr: LONG_VALUE MINUTE  */
 #line 2382 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6063 "parser.cpp"
+    break;
+
+  case 305: /* interval_expr: LONG_VALUE MINUTE  */
+#line 2381 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6072 "parser.cpp"
     break;
@@ -8084,12 +8156,20 @@ yyreduce:
   case 306: /* interval_expr: LONG_VALUE HOURS  */
 #line 2388 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6074 "parser.cpp"
+    break;
+
+  case 306: /* interval_expr: LONG_VALUE HOURS  */
+#line 2387 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6083 "parser.cpp"
     break;
@@ -8103,12 +8183,20 @@ yyreduce:
   case 307: /* interval_expr: LONG_VALUE HOUR  */
 #line 2394 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6085 "parser.cpp"
+    break;
+
+  case 307: /* interval_expr: LONG_VALUE HOUR  */
+#line 2393 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6094 "parser.cpp"
     break;
@@ -8122,12 +8210,20 @@ yyreduce:
   case 308: /* interval_expr: LONG_VALUE DAYS  */
 #line 2400 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6096 "parser.cpp"
+    break;
+
+  case 308: /* interval_expr: LONG_VALUE DAYS  */
+#line 2399 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6105 "parser.cpp"
     break;
@@ -8141,12 +8237,20 @@ yyreduce:
   case 309: /* interval_expr: LONG_VALUE DAY  */
 #line 2406 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6107 "parser.cpp"
+    break;
+
+  case 309: /* interval_expr: LONG_VALUE DAY  */
+#line 2405 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                  {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6116 "parser.cpp"
     break;
@@ -8160,12 +8264,20 @@ yyreduce:
   case 310: /* interval_expr: LONG_VALUE MONTHS  */
 #line 2412 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6118 "parser.cpp"
+    break;
+
+  case 310: /* interval_expr: LONG_VALUE MONTHS  */
+#line 2411 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6127 "parser.cpp"
     break;
@@ -8179,12 +8291,20 @@ yyreduce:
   case 311: /* interval_expr: LONG_VALUE MONTH  */
 #line 2418 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6129 "parser.cpp"
+    break;
+
+  case 311: /* interval_expr: LONG_VALUE MONTH  */
+#line 2417 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6138 "parser.cpp"
     break;
@@ -8198,12 +8318,20 @@ yyreduce:
   case 312: /* interval_expr: LONG_VALUE YEARS  */
 #line 2424 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6140 "parser.cpp"
+    break;
+
+  case 312: /* interval_expr: LONG_VALUE YEARS  */
+#line 2423 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6149 "parser.cpp"
     break;
@@ -8217,12 +8345,20 @@ yyreduce:
   case 313: /* interval_expr: LONG_VALUE YEAR  */
 #line 2430 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6151 "parser.cpp"
+    break;
+
+  case 313: /* interval_expr: LONG_VALUE YEAR  */
+#line 2429 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6160 "parser.cpp"
     break;
@@ -8236,10 +8372,18 @@ yyreduce:
   case 314: /* copy_option_list: copy_option  */
 #line 2441 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6162 "parser.cpp"
+    break;
+
+  case 314: /* copy_option_list: copy_option  */
+#line 2440 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                {
     (yyval.copy_option_array) = new std::vector<infinity::CopyOption*>();
     (yyval.copy_option_array)->push_back((yyvsp[0].copy_option_t));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6169 "parser.cpp"
     break;
@@ -8253,10 +8397,18 @@ yyreduce:
   case 315: /* copy_option_list: copy_option_list ',' copy_option  */
 #line 2445 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6171 "parser.cpp"
+    break;
+
+  case 315: /* copy_option_list: copy_option_list ',' copy_option  */
+#line 2444 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                    {
     (yyvsp[-2].copy_option_array)->push_back((yyvsp[0].copy_option_t));
     (yyval.copy_option_array) = (yyvsp[-2].copy_option_array);
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6178 "parser.cpp"
     break;
@@ -8270,6 +8422,13 @@ yyreduce:
   case 316: /* copy_option: FORMAT IDENTIFIER  */
 #line 2450 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6180 "parser.cpp"
+    break;
+
+  case 316: /* copy_option: FORMAT IDENTIFIER  */
+#line 2449 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                 {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kFormat;
@@ -8290,6 +8449,7 @@ yyreduce:
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 #line 6202 "parser.cpp"
     break;
 
@@ -8302,6 +8462,13 @@ yyreduce:
   case 317: /* copy_option: DELIMITER STRING  */
 #line 2469 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6204 "parser.cpp"
+    break;
+
+  case 317: /* copy_option: DELIMITER STRING  */
+#line 2468 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                    {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kDelimiter;
@@ -8312,6 +8479,7 @@ yyreduce:
     }
     free((yyvsp[0].str_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6217 "parser.cpp"
     break;
@@ -8325,11 +8493,19 @@ yyreduce:
   case 318: /* copy_option: HEADER  */
 #line 2479 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6219 "parser.cpp"
+    break;
+
+  case 318: /* copy_option: HEADER  */
+#line 2478 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
          {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kHeader;
     (yyval.copy_option_t)->header_ = true;
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6227 "parser.cpp"
     break;
@@ -8370,43 +8546,50 @@ yyreduce:
 #line 2517 "parser.y"
 =======
 #line 6230 "parser.cpp"
+=======
+#line 6229 "parser.cpp"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
     break;
 
   case 319: /* file_path: STRING  */
-#line 2485 "parser.y"
+#line 2484 "parser.y"
                    {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
-#line 6238 "parser.cpp"
+#line 6237 "parser.cpp"
     break;
 
   case 320: /* if_exists: IF EXISTS  */
-#line 2489 "parser.y"
+#line 2488 "parser.y"
                      { (yyval.bool_value) = true; }
-#line 6244 "parser.cpp"
+#line 6243 "parser.cpp"
     break;
 
   case 321: /* if_exists: %empty  */
-#line 2490 "parser.y"
+#line 2489 "parser.y"
   { (yyval.bool_value) = false; }
-#line 6250 "parser.cpp"
+#line 6249 "parser.cpp"
     break;
 
   case 322: /* if_not_exists: IF NOT EXISTS  */
-#line 2492 "parser.y"
+#line 2491 "parser.y"
                               { (yyval.bool_value) = true; }
-#line 6256 "parser.cpp"
+#line 6255 "parser.cpp"
     break;
 
   case 323: /* if_not_exists: %empty  */
-#line 2493 "parser.y"
+#line 2492 "parser.y"
   { (yyval.bool_value) = false; }
-#line 6262 "parser.cpp"
+#line 6261 "parser.cpp"
     break;
 
   case 326: /* if_not_exists_info: if_not_exists IDENTIFIER  */
+<<<<<<< HEAD
 #line 2508 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 2507 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                               {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
     (yyval.if_not_exists_info_t)->exists_ = true;
@@ -8415,6 +8598,7 @@ yyreduce:
     (yyval.if_not_exists_info_t)->info_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6272 "parser.cpp"
     break;
@@ -8447,39 +8631,47 @@ yyreduce:
 #line 2537 "parser.y"
 =======
 #line 6275 "parser.cpp"
+=======
+#line 6274 "parser.cpp"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
     break;
 
   case 327: /* if_not_exists_info: %empty  */
-#line 2516 "parser.y"
+#line 2515 "parser.y"
   {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
 }
-#line 6283 "parser.cpp"
+#line 6282 "parser.cpp"
     break;
 
   case 328: /* with_index_param_list: WITH '(' index_param_list ')'  */
-#line 2521 "parser.y"
+#line 2520 "parser.y"
                                                       {
     (yyval.with_index_param_list_t) = std::move((yyvsp[-1].index_param_list_t));
 }
-#line 6291 "parser.cpp"
+#line 6290 "parser.cpp"
     break;
 
   case 329: /* with_index_param_list: %empty  */
-#line 2524 "parser.y"
+#line 2523 "parser.y"
   {
     (yyval.with_index_param_list_t) = new std::vector<infinity::InitParameter*>();
 }
-#line 6299 "parser.cpp"
+#line 6298 "parser.cpp"
     break;
 
   case 330: /* index_param_list: index_param  */
+<<<<<<< HEAD
 #line 2528 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 2527 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                {
     (yyval.index_param_list_t) = new std::vector<infinity::InitParameter*>();
     (yyval.index_param_list_t)->push_back((yyvsp[0].index_param_t));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6305 "parser.cpp"
     break;
@@ -8493,10 +8685,18 @@ yyreduce:
   case 331: /* index_param_list: index_param_list ',' index_param  */
 #line 2532 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6307 "parser.cpp"
+    break;
+
+  case 331: /* index_param_list: index_param_list ',' index_param  */
+#line 2531 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                    {
     (yyvsp[-2].index_param_list_t)->push_back((yyvsp[0].index_param_t));
     (yyval.index_param_list_t) = (yyvsp[-2].index_param_list_t);
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6314 "parser.cpp"
     break;
@@ -8510,11 +8710,19 @@ yyreduce:
   case 332: /* index_param: IDENTIFIER  */
 #line 2537 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6316 "parser.cpp"
+    break;
+
+  case 332: /* index_param: IDENTIFIER  */
+#line 2536 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                          {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6324 "parser.cpp"
     break;
@@ -8528,6 +8736,13 @@ yyreduce:
   case 333: /* index_param: IDENTIFIER '=' IDENTIFIER  */
 #line 2542 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6326 "parser.cpp"
+    break;
+
+  case 333: /* index_param: IDENTIFIER '=' IDENTIFIER  */
+#line 2541 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                             {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -8536,6 +8751,7 @@ yyreduce:
     (yyval.index_param_t)->param_value_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6337 "parser.cpp"
     break;
@@ -8549,6 +8765,13 @@ yyreduce:
   case 334: /* index_param: IDENTIFIER '=' LONG_VALUE  */
 #line 2550 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6339 "parser.cpp"
+    break;
+
+  case 334: /* index_param: IDENTIFIER '=' LONG_VALUE  */
+#line 2549 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                             {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -8556,6 +8779,7 @@ yyreduce:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].long_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6349 "parser.cpp"
     break;
@@ -8569,6 +8793,13 @@ yyreduce:
   case 335: /* index_param: IDENTIFIER '=' DOUBLE_VALUE  */
 #line 2557 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6351 "parser.cpp"
+    break;
+
+  case 335: /* index_param: IDENTIFIER '=' DOUBLE_VALUE  */
+#line 2556 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                               {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -8576,6 +8807,7 @@ yyreduce:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].double_value));
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 #line 6361 "parser.cpp"
     break;
@@ -8589,6 +8821,13 @@ yyreduce:
   case 336: /* index_info_list: '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
 #line 2568 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6363 "parser.cpp"
+    break;
+
+  case 336: /* index_info_list: '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
+#line 2567 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -8638,6 +8877,7 @@ yyreduce:
     delete (yyvsp[-4].identifier_array_t);
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 #line 6414 "parser.cpp"
     break;
 
@@ -8650,6 +8890,13 @@ yyreduce:
   case 337: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
 #line 2616 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6416 "parser.cpp"
+    break;
+
+  case 337: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
+#line 2615 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -8700,6 +8947,7 @@ yyreduce:
     delete (yyvsp[-4].identifier_array_t);
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 #line 6468 "parser.cpp"
     break;
 
@@ -8712,6 +8960,13 @@ yyreduce:
 
 #line 6475 "parser.cpp"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 6470 "parser.cpp"
+    break;
+
+
+#line 6474 "parser.cpp"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
 
       default: break;
     }
@@ -8941,10 +9196,14 @@ yyreturnlab:
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #line 2675 "parser.y"
 =======
 #line 2666 "parser.y"
 >>>>>>> 13445115 (Add insert embedding syntax.)
+=======
+#line 2665 "parser.y"
+>>>>>>> 3b7827ea (Fix parser.y debug info before pr.)
 
 
 void

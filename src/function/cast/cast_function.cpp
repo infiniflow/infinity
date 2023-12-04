@@ -125,24 +125,24 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case kBox: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-            //        case kPath: {
-            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-            //        }
-            //        case kPolygon: {
-            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-            //        }
+//        case kPath: {
+//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//        }
+//        case kPolygon: {
+//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//        }
         case kCircle: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-            //        case kBitmap: {
-            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-            //        }
+//        case kBitmap: {
+//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//        }
         case kUuid: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
-            //        case kBlob: {
-            //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
-            //        }
+//        case kBlob: {
+//            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//        }
         case kEmbedding: {
             return BindEmbeddingCast(source, target);
         }

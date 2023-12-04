@@ -2341,7 +2341,6 @@ array_expr: long_array_expr {
 }
 
 long_array_expr: unclosed_long_array_expr ']' {
-    fprintf(stderr, "hello\n");
     $$ = $1;
 };
 

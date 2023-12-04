@@ -153,7 +153,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     // memory copy here.
     output_column_vector->SetValue(0, expr->GetValue());
-    expr->GetValueMut().Reset();
     output_column_vector->Finalize(1);
 }
 
