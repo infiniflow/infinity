@@ -107,8 +107,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 Error<ExecutorException>("Empty projection output");
             }
             DataBlock* data_block_ptr = task_op_state->data_block_.get();
-            if(data_block_ptr->Finalized() && data_block_ptr->row_count() > 0) {
-                materialize_sink_state->data_block_array_.emplace_back(task_op_state->data_block_);
+            if(data_block_ptr->Finalized()) {
+                if(data_block_ptr->row_count() > 0) {
+                    materialize_sink_state->data_block_array_.emplace_back(task_op_state->data_block_);
+                }
                 task_op_state->data_block_.reset();
             }
 
