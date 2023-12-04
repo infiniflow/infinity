@@ -26,8 +26,6 @@ export module search_top_k_sgemm;
 
 namespace infinity {
 
-float vector_norm_l2(const float *x, u32 d) { return IPDistance<f32>(x, x, d); }
-
 export template <typename ID>
 void search_top_k_with_sgemm(u32 k,
                              u32 dimension,
@@ -52,12 +50,8 @@ void search_top_k_with_sgemm(u32 k,
     Vector<f32> square_x(nx);
     Vector<f32> square_y(ny);
     Vector<f32> x_y_inner_product_buffer(block_size_x * block_size_y);
-    for (u32 i = 0; i < nx; ++i) {
-        square_x[i] = vector_norm_l2(x + i * dimension, dimension);
-    }
-    for (u32 i = 0; i < ny; ++i) {
-        square_y[i] = vector_norm_l2(y + i * dimension, dimension);
-    }
+    L2NormsSquares(square_x.data(), x, dimension, nx);
+    L2NormsSquares(square_y.data(), y, dimension, ny);
     for (u32 x_part_begin = 0; x_part_begin < nx; x_part_begin += block_size_x) {
         u32 x_part_end = std::min(nx, x_part_begin + block_size_x);
         for (u32 y_part_begin = 0; y_part_begin < ny; y_part_begin += block_size_y) {

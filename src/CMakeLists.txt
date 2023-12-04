@@ -181,7 +181,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/croaring/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/openfst")
@@ -209,7 +208,6 @@ target_sources(infinity
 target_link_libraries(infinity
         infinity_core
         sql_parser
-        faiss
         onnxruntime_mlas
         zsv_parser
         roaring
@@ -331,7 +329,6 @@ target_link_libraries(unit_test
         gmock_main
         sql_parser
         infinity_core
-        faiss
         onnxruntime_mlas
         zsv_parser
         roaring
@@ -360,7 +357,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mag
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/faiss")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")

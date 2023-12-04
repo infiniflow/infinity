@@ -4,25 +4,21 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
+#ifdef USE_Reservoir
 module;
-
 #include <cassert>
 #include <cmath>
 
-#include <faiss/impl/FaissAssert.h>
-#include <faiss/utils/AlignedTable.h>
-#include <faiss/utils/ordered_key_value.h>
-#include <faiss/utils/simdlib.h>
-
-#include <faiss/impl/platform_macros.h>
+#include "faiss_includes.h"
 
 import stl;
 import parser;
+import faiss;
 
 module knn_partition;
 
 namespace infinity {
-using namespace faiss;
+using namespace part_faiss;
 // global var that collects them all
 FAISS_API extern PartitionStats partition_stats;
 
@@ -182,7 +178,8 @@ typename C::T partition_fuzzy_median3(typename C::T *vals, typename C::TI *ids, 
 
     if (n_eq_1 < 0) { // happens when > q elements are at lower bound
         q = q_min;
-        thresh = C::Crev::nextafter(thresh);
+        //thresh = C::Crev::nextafter(thresh);
+        thresh = std::nextafterf(thresh, (C::is_max ? HUGE_VALF : -HUGE_VALF));
         n_eq_1 = q;
     } else {
         assert(n_eq_1 <= n_eq);
@@ -670,21 +667,21 @@ typename C::T partition_fuzzy(typename C::T *vals, typename C::TI *ids, size_t n
 
 // explicit template instanciations
 
-template float partition_fuzzy<CMin<float, int64_t>>(float *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template float partition_fuzzy<CompareMin<float, int64_t>>(float *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template float partition_fuzzy<CMax<float, int64_t>>(float *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template float partition_fuzzy<CompareMax<float, int64_t>>(float *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template float partition_fuzzy<CMin<float, RowID>>(float *vals, RowID *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template float partition_fuzzy<CompareMin<float, RowID>>(float *vals, RowID *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template float partition_fuzzy<CMax<float, RowID>>(float *vals, RowID *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template float partition_fuzzy<CompareMax<float, RowID>>(float *vals, RowID *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template uint16_t partition_fuzzy<CMin<uint16_t, int64_t>>(uint16_t *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template uint16_t partition_fuzzy<CompareMin<uint16_t, int64_t>>(uint16_t *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template uint16_t partition_fuzzy<CMax<uint16_t, int64_t>>(uint16_t *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template uint16_t partition_fuzzy<CompareMax<uint16_t, int64_t>>(uint16_t *vals, int64_t *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template uint16_t partition_fuzzy<CMin<uint16_t, int>>(uint16_t *vals, int *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template uint16_t partition_fuzzy<CompareMin<uint16_t, int>>(uint16_t *vals, int *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
-template uint16_t partition_fuzzy<CMax<uint16_t, int>>(uint16_t *vals, int *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
+template uint16_t partition_fuzzy<CompareMax<uint16_t, int>>(uint16_t *vals, int *ids, size_t n, size_t q_min, size_t q_max, size_t *q_out);
 
 /******************************************************************
  * Histogram subroutines
@@ -1096,3 +1093,4 @@ void PartitionStats::reset() { memset(this, 0, sizeof(*this)); }
 PartitionStats partition_stats;
 
 } // namespace infinity
+#endif

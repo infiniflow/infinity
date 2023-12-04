@@ -13,8 +13,10 @@
 // limitations under the License.
 
 module;
-#include "faiss/index_io.h"
-#include <time.h>
+
+#include <ctime>
+#include <vector>
+#include <string>
 
 import stl;
 import third_party;
@@ -37,7 +39,6 @@ import annivfflat_index_data;
 import annivfflat_index_file_worker;
 import index_file_worker;
 import hnsw_file_worker;
-import faiss_index_file_worker;
 import logger;
 import local_file_system;
 import random;

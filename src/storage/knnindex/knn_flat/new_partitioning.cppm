@@ -13,6 +13,7 @@ export module knn_partition;
 
 namespace infinity {
 
+#ifdef USE_Reservoir
 /** partitions the table into 0:q and q:n where all elements above q are >= all
  * elements below q (for C = CMax, for CMin comparisons are reversed)
  *
@@ -45,5 +46,6 @@ struct PartitionStats {
 
     void reset();
 };
+#endif
 
 } // namespace infinity
