@@ -2326,14 +2326,12 @@ constant_expr: STRING {
 | interval_expr {
     $$ = $1;
 }
-/*
 | long_array_expr {
     $$ = $1;
 }
 | double_array_expr {
     $$ = $1;
 };
-*/
 
 array_expr: long_array_expr {
     $$ = $1;

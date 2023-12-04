@@ -20,6 +20,7 @@ import parser;
 import bitmask;
 import bound_cast_func;
 import unary_operator;
+import embedding_unary_operator;
 import null_value;
 
 export module column_vector_cast;
@@ -41,7 +42,7 @@ template <typename Operator>
 struct TryCastValue {
     template <typename SourceValueType, typename TargetValueType>
     inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
-        if (Operator::template Run<SourceValueType, TargetValueType>(input, result)) {
+        if (Operator::template Run<SourceValueType, TargetValueType>(Move(input), result)) {
             return;
         }
 
@@ -127,6 +128,24 @@ struct TryCastValueToVarlenWithType {
     }
 };
 
+template <typename Operator>
+struct TryCastValueEmbedding {
+    template <typename SourceElemType, typename TargetElemType>
+    inline static void Execute(const SourceElemType *input, TargetElemType *result, SizeT dim, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
+        if (Operator::template Run<SourceElemType, TargetElemType>(input, result, dim)) {
+            return;
+        }
+
+        nulls_ptr->SetFalse(idx);
+
+        SetEmbeddingNullValue(result, dim);
+
+        auto *data_ptr = (ColumnVectorCastData *)(state_ptr);
+        // This convert is failed
+        data_ptr->all_converted_ = false;
+    }
+};
+
 export struct ColumnVectorCast {
 
     template <class SourceType, class TargetType, class Operator>
@@ -165,6 +184,14 @@ export struct ColumnVectorCast {
     TryCastColumnVectorWithType(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
         bool result = GenericTryCastColumnVector<SourceType, TargetType, TryCastValueWithType<Operator>>(source, target, count, parameters);
         return result;
+    }
+
+    template <class SourceElemType, class TargetElemType, class Operator>
+    inline static bool
+    TryCastColumnVectorEmbedding(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
+        ColumnVectorCastData input(parameters.strict, target, *source->data_type_, *target->data_type_);
+        EmbeddingUnaryOperator::Execute<SourceElemType, TargetElemType, TryCastValueEmbedding<Operator>>(source, target, count, &input, true);
+        return input.all_converted_;
     }
 };
 

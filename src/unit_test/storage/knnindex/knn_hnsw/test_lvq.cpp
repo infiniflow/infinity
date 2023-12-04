@@ -21,6 +21,7 @@ import local_file_system;
 import file_system;
 import file_system_type;
 import dist_func_l2;
+import compilation_config;
 
 using namespace infinity;
 
@@ -32,7 +33,7 @@ public:
     static constexpr size_t dim_ = 16;
     static constexpr size_t vec_n_ = 20;
     static constexpr size_t buffer_size_ = 4;
-    const std::string file_dir_ = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
+    const std::string file_dir_ = tmp_data_path();
 
     bool dump_ = false;
 

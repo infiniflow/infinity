@@ -14,16 +14,17 @@ import plain_store;
 import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
-
-static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/l2_groundtruth.ivecs";
+import compilation_config;
 
 using namespace infinity;
 
 int main() {
+    String base_file = String(benchmark_data_path()) + "/sift/base.fvecs";
+    String query_file = String(benchmark_data_path()) + "/sift/query.fvecs";
+    String groundtruth_file = String(benchmark_data_path()) + "/sift/l2_groundtruth.ivecs";
+
     LocalFileSystem fs;
-    std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
+    std::string save_dir = tmp_data_path();
 
     size_t dimension = 128;
     size_t M = 16;
@@ -58,7 +59,7 @@ int main() {
 
         size_t dim = -1;
         size_t eb_cnt = -1;
-        float *input_embeddings = fvecs_read(base_file, &dim, &eb_cnt);
+        float *input_embeddings = fvecs_read(base_file.c_str(), &dim, &eb_cnt);
         assert(dimension == dim || !"embedding dimension isn't correct");
         assert(embedding_count == eb_cnt || !"embedding size isn't correct");
 
@@ -105,7 +106,7 @@ int main() {
     const float *queries = nullptr;
     {
         size_t dim = -1;
-        queries = const_cast<const float *>(fvecs_read(query_file, &dim, &number_of_queries));
+        queries = const_cast<const float *>(fvecs_read(query_file.c_str(), &dim, &number_of_queries));
         assert(dimension == dim || !"query does not have same dimension as train set");
     }
 
@@ -116,7 +117,7 @@ int main() {
         // size_t *ground_truth;
         // load ground-truth and convert int to long
         size_t nq2;
-        int *gt_int = ivecs_read(groundtruth_file, &top_k, &nq2);
+        int *gt_int = ivecs_read(groundtruth_file.c_str(), &top_k, &nq2);
         assert(nq2 == number_of_queries || !"incorrect nb of ground truth entries");
         assert(top_k >= test_top || !"dataset does not provide enough ground truth data");
 

@@ -20,7 +20,8 @@ import vector_buffer;
 import bound_cast_func;
 import parser;
 import column_vector_cast;
-
+import float_cast;
+import integer_cast;
 import infinity_exception;
 import third_party;
 import logger;
@@ -29,19 +30,97 @@ export module embedding_cast;
 
 namespace infinity {
 
+struct EmbeddingTryCastToFixlen;
 struct EmbeddingTryCastToVarlen;
 
-export inline BoundCastFunc BindEmbeddingCast(DataType &target) {
-    switch (target.type()) {
-        case LogicalType::kVarchar: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
+template <typename SourceElemType>
+BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
+
+export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
+    Assert<TypeException>(source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kEmbedding,
+                          Format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+    auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
+    auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
+    if (source_info->Dimension() != target_info->Dimension()) {
+        Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
+    }
+    switch (source_info->Type()) {
+        case EmbeddingDataType::kElemInt8: {
+            return BindEmbeddingCast<TinyIntT>(target_info);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return BindEmbeddingCast<SmallIntT>(target_info);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return BindEmbeddingCast<IntegerT>(target_info);
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return BindEmbeddingCast<BigIntT>(target_info);
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return BindEmbeddingCast<FloatT>(target_info);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return BindEmbeddingCast<DoubleT>(target_info);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
+            Error<TypeException>(Format("Can't cast from {} to Embedding type", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
 }
+
+template <typename SourceElemType>
+inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
+    switch (target->Type()) {
+        case EmbeddingDataType::kElemInt8: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, TinyIntT, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, SmallIntT, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, IntegerT, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BigIntT, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, FloatT, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, DoubleT, EmbeddingTryCastToFixlen>);
+        }
+        default: {
+            Error<TypeException>(Format("Can't cast from Embedding type to {}", target->ToString()));
+        }
+    }
+    return BoundCastFunc(nullptr);
+}
+
+struct EmbeddingTryCastToFixlen {
+    template <typename SourceElemType, typename TargetElemType>
+    static inline bool Run(const SourceElemType *source, TargetElemType *target, SizeT len) {
+        if constexpr (IsSame<SourceElemType, TinyIntT>() || IsSame<SourceElemType, SmallIntT>() || IsSame<SourceElemType, IntegerT>() ||
+                      IsSame<SourceElemType, BigIntT>()) {
+            for (SizeT i = 0; i < len; ++i) {
+                if (!IntegerTryCastToFixlen::Run(source[i], target[i])) {
+                    return false;
+                }
+            }
+            return true;
+        } else if constexpr (IsSame<SourceElemType, FloatT>() || IsSame<SourceElemType, DoubleT>()) {
+            for (SizeT i = 0; i < len; ++i) {
+                if (!FloatTryCastToFixlen::Run(source[i], target[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        Error<FunctionException>(
+            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
+    }
+};
 
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
@@ -78,8 +157,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         // inline varchar
         Memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer.");
+        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer.");
 
         // Set varchar prefix
         Memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
