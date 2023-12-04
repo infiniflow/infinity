@@ -46,12 +46,16 @@ public:
         if (auto ret = segment_iter_->Next(); ret) {
             return ret;
         }
-        segment_idx_++;
         if (segment_idx_ == entry_->segment_map_.end()) {
             segment_iter_ = None;
             return None;
         }
-        segment_iter_ = SegmentIter(segment_idx_->second.get(), segment_iter_->GetColumnIds());
+        segment_idx_++;
+        if (segment_idx_ == entry_->segment_map_.end()) {
+            segment_iter_ = SegmentIter(entry_->unsealed_segment_, segment_iter_->GetColumnIds());
+        } else {
+            segment_iter_ = SegmentIter(segment_idx_->second.get(), segment_iter_->GetColumnIds());
+        }
         return Next();
     }
 

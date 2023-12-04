@@ -151,28 +151,4 @@ public:
     }
 };
 
-// this iterator is temp
-export template <typename DataType>
-class TmpIterator {
-    Vector<Pair<const DataType *, SizeT>> vecs_;
-    const SizeT dim_;
-    SizeT idx1_;
-    SizeT idx2_;
-
-public:
-    TmpIterator(Vector<Pair<const DataType *, SizeT>> vecs, SizeT dim) : vecs_(Move(vecs)), dim_(dim), idx1_(0), idx2_(0) {}
-    Optional<const DataType *> operator++() {
-        if (idx1_ == vecs_.size()) {
-            return None;
-        }
-        auto ret = vecs_[idx1_].first + idx2_ * dim_;
-        idx2_++;
-        if (idx2_ == vecs_[idx1_].second) {
-            idx1_++;
-            idx2_ = 0;
-        }
-        return ret;
-    }
-};
-
 } // namespace infinity
