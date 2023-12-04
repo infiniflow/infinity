@@ -226,34 +226,48 @@ class TestSelect:
     def test_select_big(self):
         infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
         db_obj = infinity_obj.get_database("default")
+        res = db_obj.drop_table("test_select_big")
 
         db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             None)
 
         table_obj = db_obj.get_table("test_select_big")
 
-        for i in range(8195):
+        for i in range(8000):
             table_obj.insert(
-                [{"c1": 'a', "c2": 'a'}])
+                [{"c1": 'a', "c2": 'a'},{ "c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
         res = table_obj.search().output(["*"]).to_df()
-        print(res)
+        assert res.row_count == 32000
 
-        res = db_obj.drop_table("test_select_big")
-        assert res.success
 
 
     def test_select_embedding(self):
+        """
+
+        TestSelect.test_select_embedding()
+
+        This method tests the functionality of selecting embeddings from a table in the database.
+
+        Parameters:
+        None
+
+        Return Type:
+        None
+
+        Example Usage:
+        test_obj = TestSelect()
+        test_obj.test_select_embedding()
+
+        """
         infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
         db_obj = infinity_obj.get_database("default")
 
+        db_obj.drop_table("test_select_embedding")
 
         res = db_obj.create_table("test_select_embedding", {"c1": "int", "c2": "vector,3,int"}, None)
 
         table_obj = db_obj.get_table("test_select_embedding")
-
-        # res = table_obj.insert([{"c1": 1, "c2": [1, 2, 3]}, {"c1": 2, "c2": [4, 5, 6]}])
-        # assert res.success
 
         parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
         test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
@@ -262,14 +276,50 @@ class TestSelect:
         res = table_obj.import_data(test_csv_dir, None)
         assert res.success
 
-        res = table_obj.search().output(["c1"]).to_df()
-        print(res)
-
         res = table_obj.search().output(["c2"]).to_df()
         print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])}))
 
         res = table_obj.search().output(["*"]).to_df()
         print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
 
+    def test_select_big_embedding(self):
+        """
 
+        Method: test_select_big_embedding
 
+        Description:
+        This method performs a series of operations to test the selection of a large embedding from a table. It imports
+        data from a CSV file, creates a table, imports the data into the table,
+        and then searches for and retrieves a specific column from the table.
+
+        Parameters:
+        None
+
+        Return Type:
+        None
+
+        Example Usage:
+        test_select_big_embedding()
+        """
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
+
+        db_obj.drop_table("test_select_big_embedding")
+
+        db_obj.create_table("test_select_big_embedding", {"c1": "int", "c2": "vector,3,int"}, None)
+
+        table_obj = db_obj.get_table("test_select_big_embedding")
+
+        parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
+        test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
+        assert os.path.exists(test_csv_dir)
+
+        for i in range(10000):
+            res = table_obj.import_data(test_csv_dir, None)
+            assert res.success
+
+        res = table_obj.search().output(["c2"]).to_df()
+        assert res.row_count == 30000

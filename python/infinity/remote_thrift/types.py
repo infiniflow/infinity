@@ -82,43 +82,43 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
             raise NotImplementedError(f"Unsupported type {ttype}")
 
 
-def column_vector_to_tuple_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
-        tuple[Any, ...]:
+def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
+        list[Any, ...]:
     column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
-            return struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
+            return list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
         case ttypes.ColumnType.ColumnInt64:
-            return struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector)
+            return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnFloat32:
-            return struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector)
+            return list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
         case ttypes.ColumnType.ColumnFloat64:
-            return struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector)
+            return list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnVarchar:
-            return tuple(parse_bytes(column_vector))
+            return list(parse_bytes(column_vector))
         case ttypes.ColumnType.ColumnEmbedding:
             dimension = column_data_type.physical_type.embedding_type.dimension
             # print(dimension)
             # print(len(column_vector))
             # print(len(column_vector) // dimension)
             if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
-                all_tuples = tuple(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
-                all_tuples = tuple(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt32:
-                all_tuples = tuple(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat32:
-                all_tuples = tuple(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
-                all_tuples = tuple(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
-                all_tuples = tuple(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
-                return tuple([all_tuples[i:i + dimension] for i in range(0, len(all_tuples), dimension)])
+                all_list = list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             else:
                 raise NotImplementedError(
                     f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
@@ -139,7 +139,7 @@ def parse_bytes(bytes_data):
 
 
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
-    data_dict: Dict[str, tuple[Any, ...]] = {}
+    data_dict: Dict[str, list[Any, ...]] = {}
     column_names = []
     types = []
     for column_def in res.column_defs:
@@ -149,18 +149,18 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         # print(column_def.id)
         match res.column_fields.__len__():
             case 0:
-                data_dict[column_def.name] = tuple()
+                data_dict[column_def.name] = []
             case _:
                 column_field = res.column_fields[column_def.id]
                 column_type = column_field.column_type
                 column_data_type = column_def.data_type
                 column_vectors = column_field.column_vectors
-                data_dict[column_def.name] = column_vector_to_tuple_list(column_type, column_data_type, column_vectors)
+                data_dict[column_def.name] = column_vector_to_list(column_type, column_data_type, column_vectors)
 
     type_dict = dict(zip(column_names, types))
     # print()
-    print(data_dict)
-    print(type_dict)
+    # print(data_dict)
+    # print(type_dict)
     # print()
     # print(pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict))
     return pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict)
