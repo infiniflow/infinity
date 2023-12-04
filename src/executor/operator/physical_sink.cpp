@@ -309,13 +309,22 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *message_si
     switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kKnnScan: {
             KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_operator_state);
-            SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
 
-            fragment_data->data_block_ = knn_output_state->data_block_;
-            fragment_data->data_count_ = 1; // TODO:: bug here
-            fragment_data->data_idx_ = 1;
-            for (const auto &next_fragment_queue : message_sink_state->fragment_data_queues_) {
-                next_fragment_queue->Enqueue(fragment_data);
+            SizeT output_data_block_count = knn_output_state->output_data_blocks_.size();
+            if(output_data_block_count == 0) {
+                Error<ExecutorException>("No output from knn scan");
+            }
+
+            for(SizeT idx = 0; idx < output_data_block_count; ++ idx) {
+                SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
+
+                fragment_data->data_block_ = knn_output_state->output_data_blocks_[idx];
+                fragment_data->data_count_ = output_data_block_count;
+                fragment_data->data_idx_ = idx;
+
+                for (const auto &next_fragment_queue : message_sink_state->fragment_data_queues_) {
+                    next_fragment_queue->Enqueue(fragment_data);
+                }
             }
             break;
         }

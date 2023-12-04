@@ -47,6 +47,9 @@ void PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         case SourceStateType::kQueue: {
             QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);
             queue_source_state->source_queue_.Dequeue(queue_source_state->current_fragment_data_);
+
+            // FIXME: Need to handle task id of fragment.
+
             queue_source_state->SetTotalDataCount(queue_source_state->current_fragment_data_->data_count_);
             queue_source_state->PushData(queue_source_state->current_fragment_data_->data_block_.get());
             break;
