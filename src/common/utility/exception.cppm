@@ -19,6 +19,8 @@ import stl;
 
 namespace infinity {
 
+export void PrintStacktrace(const String& err_msg);
+
 export class Exception : public StdException {
 public:
     explicit Exception(String message) : message_(Move(message)) {}

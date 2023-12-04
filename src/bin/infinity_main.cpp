@@ -20,6 +20,7 @@ import compilation_config;
 import stl;
 import third_party;
 import db_server;
+import infinity_exception;
 
 namespace {
 
@@ -71,7 +72,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         }
         case SIGSEGV: {
             // Print back strace
-            printf("SEGMENT FAULTS\n");
+            infinity::PrintStacktrace("SEGMENT FAULTS");
             exit(0);
             break;
         }
