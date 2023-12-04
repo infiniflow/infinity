@@ -23,9 +23,6 @@ add_subdirectory(croaring)
 # Build mlas
 add_subdirectory(mlas)
 
-# Build hnsw
-add_subdirectory(hnswlib)
-
 # Build concurrentqueue
 add_subdirectory(concurrentqueue)
 
