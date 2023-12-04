@@ -2,17 +2,11 @@
 
 /*
  * This benchmark includes:
- * 1. faiss IndexIVFFlatL2 (train, add, search)
- * 2. faiss IndexIVFFlatIP (train, add, search)
- * 3. ann_ivfflatl2 (train, add, search, save to / load from file)
- * 4. ann_ivfflatip (train, add, search, save to / load from file)
+ * 1. ann_ivfflatl2 (train, add, search, save to / load from file)
+ * 2. ann_ivfflatip (train, add, search, save to / load from file)
  */
 
 #include "base_profiler.h"
-#include "faiss/Index.h"
-#include "faiss/IndexFlat.h"
-#include "faiss/IndexIVF.h"
-#include "faiss/IndexIVFFlat.h"
 #include "helper.h"
 #include <cmath>
 #include <cstdio>
@@ -86,131 +80,6 @@ void compute_recall(const T1 *Igt, const T2 I_comp, size_t nq, size_t k) {
     printf("R@10 = %.4f\n", n_10 / float(nq * 10));
     printf("R@100 = %.4f\n", n_100 / float(nq * 100));
     std::cout << "############################" << std::endl;
-}
-
-void benchmark_faiss_ivfflatl2(double t0,
-                               size_t d,
-                               size_t nt,
-                               const float *xt,
-                               size_t nb,
-                               const float *xb,
-                               size_t nq,
-                               const float *xq,
-                               int k,
-                               const int *gt,
-                               size_t n_probes,
-                               size_t n_centroids) {
-    auto I_faiss_l2 = std::make_unique<int64_t[]>(nq * k);
-    auto D_faiss_l2 = std::make_unique<float[]>(nq * k);
-    faiss::IndexFlatL2 quantizer(d);
-    quantizer.verbose = true;
-    faiss::IndexIVFFlat index(&quantizer, d, n_centroids, faiss::METRIC_L2);
-    index.verbose = true;
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Training on %ld vectors, with %zu centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        index.train(nt, xt);
-        profiler.End();
-        std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        index.add(nb, xb);
-        profiler.End();
-        std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        faiss::IVFSearchParameters p;
-        p.nprobe = n_probes;
-        index.search(nq, xq, k, D_faiss_l2.get(), I_faiss_l2.get(), &p);
-        profiler.End();
-        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        std::cout << "############################" << std::endl;
-        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
-        std::cout << "############################" << std::endl;
-        auto I = [&I_faiss_l2](size_t i) { return I_faiss_l2[i]; };
-        compute_recall(gt, I, nq, k);
-    }
-}
-
-void benchmark_faiss_ivfflatip(double t0,
-                               size_t d,
-                               size_t nt,
-                               const float *xt,
-                               size_t nb,
-                               const float *xb,
-                               size_t nq,
-                               const float *xq,
-                               int k,
-                               const int *gt,
-                               size_t n_probes,
-                               size_t n_centroids) {
-    auto I_faiss_ip = std::make_unique<int64_t[]>(nq * k);
-    auto D_faiss_ip = std::make_unique<float[]>(nq * k);
-
-    faiss::IndexFlatL2 quantizer(d);
-    quantizer.verbose = true;
-    faiss::IndexIVFFlat index(&quantizer, d, n_centroids, faiss::METRIC_INNER_PRODUCT);
-    index.verbose = true;
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Training on %ld vectors , with %zu centroids\n", ann_benchmark_elapsed() - t0, nt, n_centroids);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        index.train(nt, xt);
-        profiler.End();
-        std::cout << "training data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Indexing database, size %ld*%ld\n", ann_benchmark_elapsed() - t0, nb, d);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        index.add(nb, xb);
-        profiler.End();
-        std::cout << "adding data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        if (ann_ivfflat_benchmark_verbose) {
-            printf("[%.3f s] Perform a search on %ld queries\n", ann_benchmark_elapsed() - t0, nq);
-        }
-        infinity::BaseProfiler profiler;
-        std::cout << "Begin memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-        profiler.Begin();
-        faiss::IVFSearchParameters p;
-        p.nprobe = n_probes;
-        index.search(nq, xq, k, D_faiss_ip.get(), I_faiss_ip.get(), &p);
-        profiler.End();
-        std::cout << "searching data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / 1000000 << "MB" << std::endl;
-    }
-    {
-        std::cout << "############################" << std::endl;
-        printf("[%.3f s] Compute recalls\n", ann_benchmark_elapsed() - t0);
-        std::cout << "############################" << std::endl;
-        auto I = [&I_faiss_ip](size_t i) { return I_faiss_ip[i]; };
-        compute_recall(gt, I, nq, k);
-    }
 }
 
 void benchmark_annivfflatl2(double t0,
@@ -412,14 +281,6 @@ int main() {
     if (ann_ivfflat_benchmark_verbose) {
         printf("[%.3f s] Data loaded\n", ann_benchmark_elapsed() - t0);
         std::cout << "##########################################################" << std::endl;
-        printf("[%.3f s] Begin faiss ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
-        std::cout << "##########################################################" << std::endl;
-    }
-    benchmark_faiss_ivfflatl2(t0 = ann_benchmark_elapsed(), d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
-    if (ann_ivfflat_benchmark_verbose) {
-        std::cout << "##########################################################" << std::endl;
-        printf("[%.3f s] End faiss ivfflatl2\n", ann_benchmark_elapsed() - t0);
-        std::cout << "##########################################################" << std::endl;
         printf("[%.3f s] Begin ann ivfflatl2\n", ((t0 = ann_benchmark_elapsed()), 0.0));
         std::cout << "##########################################################" << std::endl;
     }
@@ -429,14 +290,6 @@ int main() {
         printf("[%.3f s] End ann ivfflatl2\n", ann_benchmark_elapsed() - t0);
         std::cout << "##########################################################" << std::endl;
         printf("[%.3f s] Test inner product\n", ann_benchmark_elapsed() - t0);
-        std::cout << "##########################################################" << std::endl;
-        printf("[%.3f s] Begin faiss ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
-        std::cout << "##########################################################" << std::endl;
-    }
-    benchmark_faiss_ivfflatip(t0 = ann_benchmark_elapsed(), d, nt, xt, nb, xb, nq, xq, k, gt_int, n_probes, n_centroids);
-    if (ann_ivfflat_benchmark_verbose) {
-        std::cout << "##########################################################" << std::endl;
-        printf("[%.3f s] End faiss ivfflatip\n", ann_benchmark_elapsed() - t0);
         std::cout << "##########################################################" << std::endl;
         printf("[%.3f s] Begin ann ivfflatip\n", ((t0 = ann_benchmark_elapsed()), 0.0));
         std::cout << "##########################################################" << std::endl;

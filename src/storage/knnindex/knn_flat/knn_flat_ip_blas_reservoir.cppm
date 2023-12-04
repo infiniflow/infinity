@@ -14,21 +14,6 @@
 
 module;
 
-#define FINTEGER int
-extern int sgemm_(const char *transa,
-                  const char *transb,
-                  FINTEGER *m,
-                  FINTEGER *n,
-                  FINTEGER *k,
-                  const float *alpha,
-                  const float *a,
-                  FINTEGER *lda,
-                  const float *b,
-                  FINTEGER *ldb,
-                  float *beta,
-                  float *c,
-                  FINTEGER *ldc);
-
 import stl;
 import knn_heap;
 import knn_result_handler;
@@ -38,17 +23,18 @@ import faiss;
 import parser;
 
 import infinity_exception;
-import third_party;
 import default_values;
 
 export module knn_flat_ip_blas_reservoir;
 
 namespace infinity {
 
+#ifdef USE_Reservoir
+
 export template <typename DistType>
 class KnnFlatIPBlasReservoir final : public KnnDistance<DistType> {
 
-    using ReservoirResultHandler = NewReservoirResultHandler<FaissCMin<float, RowID>>;
+    using ReservoirResultHandler = NewReservoirResultHandler<CompareMin<float, RowID>>;
     using ReservoirSingleResultHandler = ReservoirResultHandler::ReservoirSingleResultHandler;
 
 public:
@@ -102,10 +88,10 @@ public:
                 u16 j1 = j0 + bs_y;
                 if (j1 > base_count)
                     j1 = base_count;
-                /* compute the actual dot products */
+                // compute the actual dot products
                 {
                     float one = 1, zero = 0;
-                    FINTEGER nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
+                    int nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
                     sgemm_("Transpose",
                            "Not transpose",
                            &nyi,
@@ -172,4 +158,5 @@ private:
 
 template class KnnFlatIPBlasReservoir<f32>;
 
+#endif
 } // namespace infinity

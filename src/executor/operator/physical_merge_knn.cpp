@@ -64,11 +64,11 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
                     Error<ExecutorException>("Invalid heap type");
                 }
                 case MergeKnnHeapType::kMaxHeap: {
-                    ExecuteInner<f32, FaissCMax>(query_context, merge_knn_op_state);
+                    ExecuteInner<f32, CompareMax>(query_context, merge_knn_op_state);
                     break;
                 }
                 case MergeKnnHeapType::kMinHeap: {
-                    ExecuteInner<f32, FaissCMin>(query_context, merge_knn_op_state);
+                    ExecuteInner<f32, CompareMin>(query_context, merge_knn_op_state);
                     break;
                 }
             }

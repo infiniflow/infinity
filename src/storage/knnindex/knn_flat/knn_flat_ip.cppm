@@ -14,17 +14,15 @@
 
 module;
 
+#include <functional>
 import stl;
-import knn_heap;
-import knn_result_handler;
 import knn_distance;
-import knn_partition;
-import faiss;
 import parser;
-import third_party;
 
 import infinity_exception;
 import default_values;
+import vector_distance;
+import heap_twin_operation;
 
 export module knn_flat_ip;
 
@@ -32,19 +30,14 @@ namespace infinity {
 
 export template <typename DistType>
 class KnnFlatIP final : public KnnDistance<DistType> {
-
-    using HeapResultHandler = NewHeapResultHandler<FaissCMin<DistType, RowID>>;
-    using HeapSingleHandler = HeapResultHandler::HeapSingleResultHandler;
-
 public:
     explicit KnnFlatIP(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, topk), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->top_k_ * this->query_count_);
-
-        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), topk);
-        single_heap_result_handler_ = MakeUnique<HeapSingleHandler>(*heap_result_handler_, query_count);
+        distance_array_ = MakeUnique<Vector<DistType>>(sizeof(DistType) * this->top_k_ * this->query_count_);
+        heap_twin_min_multiple_ =
+            MakeUnique<heap_twin_multiple<std::less<DistType>, DistType, RowID>>(query_count, topk, distance_array_->data(), id_array_->data());
     }
 
     void Begin() final {
@@ -52,9 +45,7 @@ public:
             return;
         }
 
-        for (u64 i = 0; i < this->query_count_; ++i) {
-            single_heap_result_handler_.get()->begin(i);
-        }
+        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, std::numeric_limits<DistType>::lowest());
 
         begin_ = true;
     }
@@ -77,8 +68,8 @@ public:
             const DistType *y_j = base;
 
             for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
-                DistType ip = fvec_inner_product(x_i, y_j, this->dimension_);
-                single_heap_result_handler_->add_result(ip, RowID{segment_id, segment_offset_start + j}, i);
+                auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
+                heap_twin_min_multiple_->add(i, ip, RowID(segment_id, segment_offset_start + j));
             }
         }
     }
@@ -87,37 +78,34 @@ public:
         if (!begin_)
             return;
 
-        for (u64 i = 0; i < this->query_count_; ++i) {
-            single_heap_result_handler_->end(i);
-        }
+        heap_twin_min_multiple_->sort();
 
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return heap_result_handler_->heap_dis_tab; }
+    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_->data(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return heap_result_handler_->heap_ids_tab; }
+    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return heap_result_handler_->heap_dis_tab + idx * this->top_k_;
+        return distance_array_->data() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return heap_result_handler_->heap_ids_tab + idx * this->top_k_;
+        return id_array_->data() + idx * this->top_k_;
     }
 
 private:
     UniquePtr<Vector<RowID>> id_array_{};
-    UniquePtr<DistType[]> distance_array_{};
+    UniquePtr<Vector<DistType>> distance_array_{};
 
-    UniquePtr<HeapResultHandler> heap_result_handler_{};
-    UniquePtr<HeapSingleHandler> single_heap_result_handler_{};
+    UniquePtr<heap_twin_multiple<std::less<DistType>, DistType, RowID>> heap_twin_min_multiple_{};
     const DistType *queries_{};
     bool begin_{false};
 };

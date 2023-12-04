@@ -14,21 +14,6 @@
 
 module;
 
-#define FINTEGER int
-extern int sgemm_(const char *transa,
-                  const char *transb,
-                  FINTEGER *m,
-                  FINTEGER *n,
-                  FINTEGER *k,
-                  const float *alpha,
-                  const float *a,
-                  FINTEGER *lda,
-                  const float *b,
-                  FINTEGER *ldb,
-                  float *beta,
-                  float *c,
-                  FINTEGER *ldc);
-
 import stl;
 import knn_heap;
 import knn_result_handler;
@@ -36,10 +21,9 @@ import knn_distance;
 import knn_partition;
 import faiss;
 import parser;
-import third_party;
-
 import infinity_exception;
 import default_values;
+import use_mlas;
 
 export module knn_flat_ip_blas;
 
@@ -48,7 +32,7 @@ namespace infinity {
 export template <typename DistType>
 class KnnFlatIPBlas final : public KnnDistance<DistType> {
 
-    using HeapResultHandler = NewHeapResultHandler<FaissCMin<DistType, RowID>>;
+    using HeapResultHandler = NewHeapResultHandler<CompareMin<DistType, RowID>>;
 
 public:
     explicit KnnFlatIPBlas(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
@@ -104,21 +88,10 @@ public:
                     j1 = base_count;
                 /* compute the actual dot products */
                 {
-                    float one = 1, zero = 0;
-                    FINTEGER nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
-                    sgemm_("Transpose",
-                           "Not transpose",
-                           &nyi,
-                           &nxi,
-                           &di,
-                           &one,
-                           base + j0 * this->dimension_,
-                           &di,
-                           queries_ + i0 * this->dimension_,
-                           &di,
-                           &zero,
-                           ip_block_.get(),
-                           &nyi);
+                    int nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
+                    matrixA_multiply_transpose_matrixB_output_to_C
+                            (queries_ + i0 * this->dimension_, base + j0 * this->dimension_, nxi, nyi, di,
+                             ip_block_.get());
                 }
 
                 heap_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start);

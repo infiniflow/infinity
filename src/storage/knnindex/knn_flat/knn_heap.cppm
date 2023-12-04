@@ -17,7 +17,6 @@ module;
 #include <cassert>
 #include <cstring>
 
-import faiss;
 import stl;
 
 export module knn_heap;
@@ -125,37 +124,37 @@ inline void heap_replace_top(SizeT k, typename C::T *bh_val, typename C::TI *bh_
     bh_ids[i] = id;
 }
 
-/* Partial instanciation for heaps with TI = i64 */
-
-template <typename T>
-inline void minheap_pop(SizeT k, T *bh_val, i64 *bh_ids) {
-    heap_pop<FaissCMin<T, i64>>(k, bh_val, bh_ids);
-}
-
-template <typename T>
-inline void minheap_push(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
-    heap_push<FaissCMin<T, i64>>(k, bh_val, bh_ids, val, ids);
-}
-
-template <typename T>
-inline void minheap_replace_top(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
-    heap_replace_top<FaissCMin<T, i64>>(k, bh_val, bh_ids, val, ids);
-}
-
-template <typename T>
-inline void maxheap_pop(SizeT k, T *bh_val, i64 *bh_ids) {
-    heap_pop<FaissCMax<T, i64>>(k, bh_val, bh_ids);
-}
-
-template <typename T>
-inline void maxheap_push(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
-    heap_push<FaissCMax<T, i64>>(k, bh_val, bh_ids, val, ids);
-}
-
-template <typename T>
-inline void maxheap_replace_top(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
-    heap_replace_top<FaissCMax<T, i64>>(k, bh_val, bh_ids, val, ids);
-}
+// /* Partial instanciation for heaps with TI = i64 */
+//
+// template <typename T>
+// inline void minheap_pop(SizeT k, T *bh_val, i64 *bh_ids) {
+//     heap_pop<CMin<T, i64>>(k, bh_val, bh_ids);
+// }
+//
+// template <typename T>
+// inline void minheap_push(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
+//     heap_push<CMin<T, i64>>(k, bh_val, bh_ids, val, ids);
+// }
+//
+// template <typename T>
+// inline void minheap_replace_top(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
+//     heap_replace_top<CMin<T, i64>>(k, bh_val, bh_ids, val, ids);
+// }
+//
+// template <typename T>
+// inline void maxheap_pop(SizeT k, T *bh_val, i64 *bh_ids) {
+//     heap_pop<CMax<T, i64>>(k, bh_val, bh_ids);
+// }
+//
+// template <typename T>
+// inline void maxheap_push(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
+//     heap_push<CMax<T, i64>>(k, bh_val, bh_ids, val, ids);
+// }
+//
+// template <typename T>
+// inline void maxheap_replace_top(SizeT k, T *bh_val, i64 *bh_ids, T val, i64 ids) {
+//     heap_replace_top<CMax<T, i64>>(k, bh_val, bh_ids, val, ids);
+// }
 
 /*******************************************************************
  * Heap initialization
@@ -201,17 +200,17 @@ inline void heap_addn(SizeT k, typename C::T *bh_val, typename C::TI *bh_ids, co
     }
 }
 
-/* Partial instanciation for heaps with TI = i64 */
-
-template <typename T>
-inline void minheap_addn(SizeT k, T *bh_val, i64 *bh_ids, const T *x, const i64 *ids, SizeT n) {
-    heap_addn<FaissCMin<T, i64>>(k, bh_val, bh_ids, x, ids, n);
-}
-
-template <typename T>
-inline void maxheap_addn(SizeT k, T *bh_val, i64 *bh_ids, const T *x, const i64 *ids, SizeT n) {
-    heap_addn<FaissCMax<T, i64>>(k, bh_val, bh_ids, x, ids, n);
-}
+// /* Partial instanciation for heaps with TI = i64 */
+//
+// template <typename T>
+// inline void minheap_addn(SizeT k, T *bh_val, i64 *bh_ids, const T *x, const i64 *ids, SizeT n) {
+//     heap_addn<CMin<T, i64>>(k, bh_val, bh_ids, x, ids, n);
+// }
+//
+// template <typename T>
+// inline void maxheap_addn(SizeT k, T *bh_val, i64 *bh_ids, const T *x, const i64 *ids, SizeT n) {
+//     heap_addn<CMax<T, i64>>(k, bh_val, bh_ids, x, ids, n);
+// }
 
 /*******************************************************************
  * Heap finalization (reorder elements)
@@ -248,14 +247,14 @@ inline SizeT heap_reorder(SizeT k, typename C::T *bh_val, typename C::TI *bh_ids
     return nel;
 }
 
-template <typename T>
-inline SizeT minheap_reorder(SizeT k, T *bh_val, i64 *bh_ids) {
-    return heap_reorder<FaissCMin<T, i64>>(k, bh_val, bh_ids);
-}
-
-template <typename T>
-inline SizeT maxheap_reorder(SizeT k, T *bh_val, i64 *bh_ids) {
-    return heap_reorder<FaissCMax<T, i64>>(k, bh_val, bh_ids);
-}
+// template <typename T>
+// inline SizeT minheap_reorder(SizeT k, T *bh_val, i64 *bh_ids) {
+//     return heap_reorder<CMin<T, i64>>(k, bh_val, bh_ids);
+// }
+//
+// template <typename T>
+// inline SizeT maxheap_reorder(SizeT k, T *bh_val, i64 *bh_ids) {
+//     return heap_reorder<CMax<T, i64>>(k, bh_val, bh_ids);
+// }
 
 } // namespace infinity

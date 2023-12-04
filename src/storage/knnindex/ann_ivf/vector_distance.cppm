@@ -20,8 +20,8 @@ import some_simd_functions;
 export module vector_distance;
 
 namespace infinity {
-export template <typename DiffType, typename ElemType1, typename ElemType2>
-DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, u32 dimension) {
+export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
+DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
         return L2Distance_simd(vector1, vector2, dimension);
     } else {
@@ -34,8 +34,8 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, u32 dime
     }
 }
 
-export template <typename DiffType, typename ElemType1, typename ElemType2>
-DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, u32 dimension) {
+export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
+DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
     if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
         return IPDistance_simd(vector1, vector2, dimension);
     } else {
@@ -44,6 +44,18 @@ DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, u32 dime
             distance += ((DiffType)vector1[i]) * ((DiffType)vector2[i]);
         }
         return distance;
+    }
+}
+
+export template <typename DiffType, typename ElemType, typename DimType = u32>
+DiffType L2NormSquare(const ElemType *vector, const DimType dimension) {
+    return IPDistance<DiffType>(vector, vector, dimension);
+}
+
+export template <typename DiffType, typename ElemType, typename DimType = u32, typename CntType = u32>
+void L2NormsSquares(DiffType *__restrict output, const ElemType *__restrict vectors, const DimType dimension, const CntType count) {
+    for (u32 i = 0; i < count; ++i) {
+        output[i] = L2NormSquare<DiffType>(vectors + i * dimension, dimension);
     }
 }
 

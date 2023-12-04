@@ -83,12 +83,12 @@ void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
             switch (dist_type) {
                 case KnnDistanceType::kL2:
                 case KnnDistanceType::kHamming: {
-                    ExecuteInternal<f32, FaissCMax>(query_context, knn_scan_operator_state);
+                    ExecuteInternal<f32, CompareMax>(query_context, knn_scan_operator_state);
                     break;
                 }
                 case KnnDistanceType::kCosine:
                 case KnnDistanceType::kInnerProduct: {
-                    ExecuteInternal<f32, FaissCMin>(query_context, knn_scan_operator_state);
+                    ExecuteInternal<f32, CompareMin>(query_context, knn_scan_operator_state);
                     break;
                 }
                 default: {

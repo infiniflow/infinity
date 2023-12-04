@@ -14,34 +14,18 @@
 
 module;
 
-
-#define FINTEGER int
-extern int sgemm_(const char *transa,
-                  const char *transb,
-                  FINTEGER *m,
-                  FINTEGER *n,
-                  FINTEGER *k,
-                  const float *alpha,
-                  const float *a,
-                  FINTEGER *lda,
-                  const float *b,
-                  FINTEGER *ldb,
-                  float *beta,
-                  float *c,
-                  FINTEGER *ldc);
-
 import stl;
 import knn_heap;
 import knn_result_handler;
 import knn_distance;
 import knn_partition;
-import distance;
 import faiss;
 import parser;
 
 import infinity_exception;
-import third_party;
 import default_values;
+import vector_distance;
+import use_mlas;
 
 export module knn_flat_l2_top1_blas;
 
@@ -50,7 +34,7 @@ namespace infinity {
 export template <typename DistType>
 class KnnFlatL2Top1Blas final : public KnnDistance<DistType> {
 
-    using SingleBestResultHandler = SingleBestResultHandler<FaissCMax<DistType, RowID>>;
+    using SingleBestResultHandler = SingleBestResultHandler<CompareMax<DistType, RowID>>;
     using SingleResultHandler = SingleBestResultHandler::SingleResultHandler;
 
 public:
@@ -77,7 +61,7 @@ public:
         ip_block_ = MakeUnique<DistType[]>(bs_x * bs_y);
         x_norms_ = MakeUnique<DistType[]>(this->query_count_);
 
-        fvec_norms_L2sqr(x_norms_.get(), queries_, this->dimension_, this->query_count_);
+        L2NormsSquares(x_norms_.get(), queries_, this->dimension_, this->query_count_);
 
         for (SizeT i0 = 0; i0 < this->query_count_; i0 += bs_x) {
             SizeT i1 = i0 + bs_x;
@@ -101,7 +85,7 @@ public:
         }
 
         y_norms_ = MakeUnique<DistType[]>(base_count);
-        fvec_norms_L2sqr(y_norms_.get(), base, this->dimension_, base_count);
+        L2NormsSquares(y_norms_.get(), base, this->dimension_, base_count);
 
         // block sizes
         const SizeT bs_x = faiss_distance_compute_blas_query_bs;
@@ -118,21 +102,10 @@ public:
                     j1 = base_count;
                 /* compute the actual dot products */
                 {
-                    float one = 1, zero = 0;
-                    FINTEGER nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
-                    sgemm_("Transpose",
-                           "Not transpose",
-                           &nyi,
-                           &nxi,
-                           &di,
-                           &one,
-                           base + j0 * this->dimension_,
-                           &di,
-                           queries_ + i0 * this->dimension_,
-                           &di,
-                           &zero,
-                           ip_block_.get(),
-                           &nyi);
+                    int nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
+                    matrixA_multiply_transpose_matrixB_output_to_C
+                            (queries_ + i0 * this->dimension_, base + j0 * this->dimension_, nxi, nyi, di,
+                             ip_block_.get());
                 }
                 for (i64 i = i0; i < i1; i++) {
                     DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);

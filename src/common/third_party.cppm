@@ -30,9 +30,6 @@ module;
 #include "concurrentqueue.h"
 #include "blockingconcurrentqueue.h"
 
-#include "faiss/Index.h"
-#include "faiss/utils/distances.h"
-
 #include "analysis/analyzers.hpp"
 #include "analysis/jieba_analyzer.hpp"
 #include "analysis/segmentation_token_stream.hpp"
@@ -165,22 +162,6 @@ using ConcurrentQueue = moodycamel::ConcurrentQueue<T>;
 
 export template<typename T>
 using BlockingConcurrentQueue = moodycamel::BlockingConcurrentQueue<T>;
-
-// Faiss
-export using FaissIndex = faiss::Index;
-
-export inline float fvec_inner_product(const float* x, const float* y, size_t d) {
-    return faiss::fvec_inner_product(x, y, d);
-}
-
-export inline float fvec_L2sqr(const float* x, const float* y, size_t d) {
-    return faiss::fvec_L2sqr(x, y, d);
-}
-
-export constexpr int faiss_distance_compute_blas_threshold = 20;
-export constexpr int faiss_distance_compute_blas_query_bs = 4096;
-export constexpr int faiss_distance_compute_blas_database_bs = 1024;
-export constexpr int faiss_distance_compute_min_k_reservoir = 100;
 
 export using Features = irs::features_t;
 export using IndexFeatures = irs::IndexFeatures;
