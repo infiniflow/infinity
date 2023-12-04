@@ -40,6 +40,7 @@ import session;
 import storage;
 import resource_manager;
 import query_context;
+import session_manager;
 
 class TableScanTest : public BaseTest {
     void SetUp() override {
@@ -72,12 +73,16 @@ TEST_F(TableScanTest, block_read_test) {
     storage.Init();
 
     // create dummy query_context
-    UniquePtr<RemoteSession> session_ptr = MakeUnique<RemoteSession>();
+    UniquePtr<SessionManager> session_manager = MakeUnique<SessionManager>();
+    SharedPtr<RemoteSession> session_ptr = session_manager->CreateRemoteSession();
 
     UniquePtr<ResourceManager> resource_manager = MakeUnique<ResourceManager>(config.worker_cpu_limit(), config.total_memory_size());
 
     UniquePtr<QueryContext> query_context = MakeUnique<QueryContext>(session_ptr.get());
-    query_context->Init(&config, nullptr, &storage, resource_manager.get());
+
+
+
+    query_context->Init(&config, nullptr, &storage, resource_manager.get(), session_manager.get());
 
     Vector<SharedPtr<DataType>> column_types;
     column_types.push_back(MakeShared<DataType>(LogicalType::kInteger));
