@@ -14,8 +14,8 @@
 
 module;
 
-#include <execinfo.h>
 #include <cstdlib>
+#include <execinfo.h>
 
 import stl;
 import logger;
@@ -25,12 +25,11 @@ module infinity_exception;
 
 namespace infinity {
 
-void
-PrintStacktrace(const String& err_msg) {
+void PrintStacktrace(const String &err_msg) {
     int trace_stack_depth = 256;
-    void* array[256];
+    void *array[256];
     int stack_num = backtrace(array, trace_stack_depth);
-    char** stacktrace = backtrace_symbols(array, stack_num);
+    char **stacktrace = backtrace_symbols(array, stack_num);
 
     LOG_CRITICAL(Format("Error: {}", err_msg));
     for (int i = 0; i < stack_num; ++i) {
@@ -40,10 +39,7 @@ PrintStacktrace(const String& err_msg) {
     free(stacktrace);
 }
 
-void Assert(bool is_true,
-                   const String &message,
-                   const char *file_name,
-                   u32 line) {
+void Assert(bool is_true, const String &message, const char *file_name, u32 line) {
     if (!(is_true)) {
         String err_msg = message;
         err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
@@ -52,9 +48,6 @@ void Assert(bool is_true,
     }
 }
 
-void
-Error(const String &message, const char *file_name, u32 line) {
-    return Assert(false, message, file_name, line);
-}
+void Error(const String &message, const char *file_name, u32 line) { return Assert(false, message, file_name, line); }
 
-}
+} // namespace infinity

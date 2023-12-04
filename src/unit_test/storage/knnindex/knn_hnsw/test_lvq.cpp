@@ -130,6 +130,10 @@ TEST_F(HnswLVQTest, test1) {
     {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
         LocalFileSystem fs;
+        if (fs.Exists(file_dir_)) {
+            fs.DeleteDirectory(file_dir_);
+        }
+        fs.CreateDirectory(file_dir_);
 
         size_t idx = 0;
         {
