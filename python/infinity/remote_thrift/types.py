@@ -65,7 +65,8 @@ def logic_type_to_dtype(ttype: ttypes.LogicType):
             raise NotImplementedError(f"Unsupported type {ttype}")
 
 
-def column_vector_to_tuple_list(column_type: ttypes.ColumnType, column_vector) -> tuple[Any, ...]:
+def column_vector_to_tuple_list(column_type: ttypes.ColumnType, column_vectors) -> tuple[Any, ...]:
+    column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
             return struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
@@ -102,14 +103,15 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         types.append(logic_type_to_dtype(column_def.data_type.logic_type))
         # print()
         # print(res.column_fields)
+        # print(column_def.id)
         match res.column_fields.__len__():
             case 0:
                 data_dict[column_def.name] = []
             case _:
                 column_field = res.column_fields[column_def.id]
                 column_type = column_field.column_type
-                column_vector = column_field.column_vector
-                data_dict[column_def.name] = column_vector_to_tuple_list(column_type, column_vector)
+                column_vectors = column_field.column_vectors
+                data_dict[column_def.name] = column_vector_to_tuple_list(column_type, column_vectors)
 
     type_dict = dict(zip(column_names, types))
     # print()

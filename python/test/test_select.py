@@ -74,7 +74,7 @@ class TestSelect:
             - 'table_1'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.1.5', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -199,19 +199,21 @@ class TestSelect:
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             None)
         table_obj = db_obj.get_table("test_select_varchar")
-        table_obj.insert([{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
-                          {"c1": 'e', "c2": 'e'}, {"c1": 'f', "c2": 'f'}, {"c1": 'g', "c2": 'g'}, {"c1": 'h', "c2": 'h'},
-                          {"c1": 'i', "c2": 'i'}, {"c1": 'j', "c2": 'j'}, {"c1": 'k', "c2": 'k'}, {"c1": 'l', "c2": 'l'},
-                          {"c1": 'm', "c2": 'm'}])
+        table_obj.insert(
+            [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
+             {"c1": 'e', "c2": 'e'}, {"c1": 'f', "c2": 'f'}, {"c1": 'g', "c2": 'g'}, {"c1": 'h', "c2": 'h'},
+             {"c1": 'i', "c2": 'i'}, {"c1": 'j', "c2": 'j'}, {"c1": 'k', "c2": 'k'}, {"c1": 'l', "c2": 'l'},
+             {"c1": 'm', "c2": 'm'}])
         res = table_obj.search().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
-                                                                 'l', 'm'),
+                                                                'l', 'm'),
                                                          'c2': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
-                                                                 'l', 'm')})
+                                                                'l', 'm')})
                                       .astype({'c1': dtype('O'), 'c2': dtype('O')}))
 
         res = table_obj.search().output(["c1", "c2"]).filter("c1 = 'a'").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype({'c1': dtype('O'), 'c2': dtype('O')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype(
+            {'c1': dtype('O'), 'c2': dtype('O')}))
 
         # TODO NotImplement Error: Not implement: varchar > varchar
         # res = table_obj.search().output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
@@ -219,4 +221,21 @@ class TestSelect:
         res = db_obj.drop_table("test_select_varchar")
         assert res.success
 
+    def test_select_big(self):
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
 
+        db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
+                            None)
+
+        table_obj = db_obj.get_table("test_select_big")
+
+        for i in range(8195):
+            table_obj.insert(
+                [{"c1": 'a', "c2": 'a'}])
+
+        res = table_obj.search().output(["*"]).to_df()
+        print(res)
+
+        res = db_obj.drop_table("test_select_big")
+        assert res.success
