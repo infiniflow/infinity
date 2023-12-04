@@ -9,6 +9,9 @@
 #include "unit_test/base_test.h"
 #include "utils/text_format.hpp"
 #include "utils/type_info.hpp"
+#include <fstream>
+#include <iostream>
+#include <string>
 
 import stl;
 import iresearch_document;
@@ -67,7 +70,7 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     IRSIndexWriterOptions options;
     options.segment_pool_size = 1; // number of index threads
     options.reader_options = reader_options;
-    options.segment_memory_max = 128 * (1 << 10); // 128K
+    options.segment_memory_max = 2 * (1 << 20);   // 128K
     options.lock_repository = false;              //?
     options.comparator = nullptr;
     options.features = [](irs::type_info::type_id id) {
@@ -119,6 +122,39 @@ TEST_F(IRSDatastoreTest, test1) {
 
     UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
     auto ctx = datastore.index_writer_->GetBatch();
+
+    std::fstream fin;
+    std::istream *in;
+    fin.open("/home/infominer/codebase/workspace/infinity-debug/test/data/csv/enwiki_9999.csv", std::fstream::in);
+    if (!fin) {
+        return;
+    }
+    in = &fin;
+    for (auto i = 1; i < 10000; ++i) {
+        std::string line;
+        if (std::getline(*in, line).eof()) {
+            break;
+        }
+        std::stringstream line_stream(line);
+        auto doc = ctx.Insert(i);
+        {
+            auto field = MakeShared<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            std::getline(line_stream, field->f_, '\t');
+            doc.Insert<irs::Action::INDEX>(*field);
+        }
+        {
+            auto field = MakeShared<TextField>("date", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            std::getline(line_stream, field->f_, '\t');
+            doc.Insert<irs::Action::INDEX>(*field);
+        }
+        {
+            auto field = MakeShared<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            std::getline(line_stream, field->f_, '\t');
+            doc.Insert<irs::Action::INDEX>(*field);
+        }
+    }
+    /*
+
     for (int i = 1; i < 10000; ++i) {
         auto doc = ctx.Insert(i);
         {
@@ -132,6 +168,6 @@ TEST_F(IRSDatastoreTest, test1) {
             field->f_ = "Anarchism";
             doc.Insert<irs::Action::INDEX>(*field);
         }
-    }
+    }*/
     datastore.Commit();
 }
