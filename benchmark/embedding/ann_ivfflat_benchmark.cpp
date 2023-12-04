@@ -13,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <sys/time.h>
+#include <unordered_set>
 
 import stl;
 import ann_ivf_flat;
