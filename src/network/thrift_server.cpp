@@ -46,6 +46,7 @@ import local_file_system;
 import table_def;
 
 #include "parser/statement/extra/create_index_info.h"
+#include <type/complex/embedding_type.h>
 
 namespace infinity {
 
@@ -234,15 +235,15 @@ public:
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
     }
 
-    void handleEmbeddingType(const std::shared_ptr<ColumnVector> &column_vector, int all_row_count, infinity_thrift_rpc::SelectResponse &response) {
-        auto size = column_vector->data_type()->Size() * all_row_count;
+    void handleEmbeddingType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
+                             SizeT row_count,
+                             SizeT col_index,
+                             const std::shared_ptr<ColumnVector> &column_vector) {
+        auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        infinity_thrift_rpc::ColumnField columnField;
-        // columnField.__set_column_vector(Move(dst));
-        columnField.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-        response.column_fields.emplace_back(columnField);
+        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
@@ -304,7 +305,7 @@ public:
                             break;
                         }
                         case LogicalType::kEmbedding: {
-                            // handleEmbeddingType(column_vector, row_count, response);
+                            handleEmbeddingType(all_column_vectors, row_count, col_index, column_vector);
                             break;
                         }
                         default:
@@ -786,6 +787,7 @@ private:
                 infinity_thrift_rpc::EmbeddingType embedding_type;
                 auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
                 embedding_type.__set_dimension(embedding_info->Dimension());
+                embedding_type.__set_element_type(EmbeddingDataTypeToProtoElementType(*embedding_info));
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Embedding);
                 infinity_thrift_rpc::PhysicalType physical_type;
                 physical_type.__set_embedding_type(embedding_type);
@@ -794,6 +796,25 @@ private:
             }
             default:
                 Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingInfo &embedding_info) {
+        switch (embedding_info.Type()) {
+            case kElemBit:
+                return infinity_thrift_rpc::ElementType::ElementBit;
+            case kElemInt8:
+                return infinity_thrift_rpc::ElementType::ElementInt8;
+            case kElemInt16:
+                return infinity_thrift_rpc::ElementType::ElementInt16;
+            case kElemInt32:
+                return infinity_thrift_rpc::ElementType::ElementInt32;
+            case kElemInt64:
+                return infinity_thrift_rpc::ElementType::ElementInt64;
+            case kElemFloat:
+                return infinity_thrift_rpc::ElementType::ElementFloat32;
+            case kElemDouble:
+                return infinity_thrift_rpc::ElementType::ElementFloat64;
         }
     }
 };

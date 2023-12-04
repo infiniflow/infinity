@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
 import pandas as pd
 from numpy import dtype
 
@@ -239,3 +241,35 @@ class TestSelect:
 
         res = db_obj.drop_table("test_select_big")
         assert res.success
+
+
+    def test_select_embedding(self):
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
+
+
+        res = db_obj.create_table("test_select_embedding", {"c1": "int", "c2": "vector,3,int"}, None)
+
+        table_obj = db_obj.get_table("test_select_embedding")
+
+        # res = table_obj.insert([{"c1": 1, "c2": [1, 2, 3]}, {"c1": 2, "c2": [4, 5, 6]}])
+        # assert res.success
+
+        parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
+        test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
+        assert os.path.exists(test_csv_dir)
+
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.success
+
+        res = table_obj.search().output(["c1"]).to_df()
+        print(res)
+
+        res = table_obj.search().output(["c2"]).to_df()
+        print(res)
+
+        res = table_obj.search().output(["*"]).to_df()
+        print(res)
+
+
+
