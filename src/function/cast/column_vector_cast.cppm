@@ -131,10 +131,7 @@ struct TryCastValueToVarlenWithType {
 template <typename Operator>
 struct TryCastValueEmbedding {
     template <typename SourceElemType, typename TargetElemType>
-    inline static void Execute(const SourceElemType *input, TargetElemType *result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
-        auto cast_data = (ColumnVectorCastData *)(state_ptr);
-        auto embedding_info = static_cast<EmbeddingInfo *>(cast_data->source_type_.type_info().get());
-        SizeT dim = embedding_info->Dimension();
+    inline static void Execute(const SourceElemType *input, TargetElemType *result, SizeT dim, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
         if (Operator::template Run<SourceElemType, TargetElemType>(input, result, dim)) {
             return;
         }
@@ -143,8 +140,9 @@ struct TryCastValueEmbedding {
 
         SetEmbeddingNullValue(result, dim);
 
+        auto *data_ptr = (ColumnVectorCastData *)(state_ptr);
         // This convert is failed
-        cast_data->all_converted_ = false;
+        data_ptr->all_converted_ = false;
     }
 };
 

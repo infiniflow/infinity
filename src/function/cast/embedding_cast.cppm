@@ -37,6 +37,8 @@ template <typename SourceElemType>
 BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
+    Assert<TypeException>(source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kEmbedding,
+                          Format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
@@ -73,22 +75,21 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
     switch (target->Type()) {
         case EmbeddingDataType::kElemInt8: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, TinyIntT, EmbeddingTryCastToFixlen>);
-            break;
         }
         case EmbeddingDataType::kElemInt16: {
-            break;
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, SmallIntT, EmbeddingTryCastToFixlen>);
         }
         case EmbeddingDataType::kElemInt32: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, IntegerT, EmbeddingTryCastToFixlen>);
         }
         case EmbeddingDataType::kElemInt64: {
-            break;
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BigIntT, EmbeddingTryCastToFixlen>);
         }
         case EmbeddingDataType::kElemFloat: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, FloatT, EmbeddingTryCastToFixlen>);
         }
         case EmbeddingDataType::kElemDouble: {
-            break;
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, DoubleT, EmbeddingTryCastToFixlen>);
         }
         default: {
             Error<TypeException>(Format("Can't cast from Embedding type to {}", target->ToString()));

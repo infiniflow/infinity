@@ -34,6 +34,7 @@ import default_values;
 import data_block;
 import embedding_cast;
 import column_vector;
+import bound_cast_func;
 
 class EmbeddingCastTest : public BaseTest {};
 
@@ -77,25 +78,25 @@ class EmbeddingCastTest : public BaseTest {};
 // }
 
 TEST_F(EmbeddingCastTest, embedding_cast1) {
-#if 0
     using namespace infinity;
 
     // Call BindEmbeddingCast with wrong type of parameters
     {
+        DataType source_type(LogicalType::kDecimal);
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindEmbeddingCast(target_type), TypeException);
+        EXPECT_THROW(BindEmbeddingCast(source_type, target_type), TypeException);
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
-    ColumnVector col_source(source_type);
-    col_source.Initialize();
+    auto col_source = MakeShared<ColumnVector>(source_type);
+    col_source->Initialize();
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
         for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
             ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
-        col_source.AppendValue(v);
+        col_source->AppendValue(v);
         v.value_.embedding.Reset();
     }
 
@@ -105,7 +106,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
             ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
 
-        Value vx = col_source.GetValue(i);
+        Value vx = col_source->GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
         EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
         EXPECT_EQ(vx.type().type_info()->Size(), 64);
@@ -119,33 +120,29 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
 
     // cast uuid column vector to varchar column vector
     {
-        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kVarchar);
-        auto source2target_ptr = BindEmbeddingCast(*target_type);
+        auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, 16);
+        SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
+        auto source2target_ptr = BindEmbeddingCast(*source_type, *target_type);
         EXPECT_NE(source2target_ptr.function, nullptr);
 
-        ColumnVector col_target(target_type);
-        col_target.Initialize();
+        auto col_target = MakeShared<ColumnVector>(target_type);
+        col_target->Initialize();
 
-// FIXME: Embedding type width isn't sizeof(EmbeddingT)
-// But UnaryExecute will only use the sizeof(type) to iterate each value.
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
-        for(i64 i = 0; i < 1; ++ i) {
+        for (i64 i = 0; i < 1; ++i) {
             Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-            for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
-                ((float*)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+            for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+                ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
             }
-            String source_str = EmbeddingT::Embedding2String(v.value_.embedding,
-                                                             embedding_info->Type(),
-                                                             embedding_info->Dimension());
+            String source_str = EmbeddingT::Embedding2String(v.value_.embedding, embedding_info->Type(), embedding_info->Dimension());
             v.value_.embedding.Reset();
 
-            Value vx = col_target.GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
+            Value vx = col_target->GetValue(i);
+            EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
             EXPECT_FALSE(vx.is_null());
-            EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), source_str.c_str());
+            // EXPECT_STREQ(vx.value_.embedding.ToString().c_str(), source_str.c_str());
         }
     }
-#endif
 }

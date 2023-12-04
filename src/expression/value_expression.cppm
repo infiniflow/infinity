@@ -38,6 +38,8 @@ public:
 
     const Value &GetValue() const { return value_; }
 
+    Value &GetValueMut() { return value_; }
+
 private:
     Value value_;
 };

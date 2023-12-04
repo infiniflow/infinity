@@ -496,10 +496,6 @@ Value::~Value() {
             value_.mixed_value.Reset();
             break;
         }
-        case kEmbedding: {
-            value_.embedding.~EmbeddingType();
-            break;
-        }
         default: {
         }
     }
