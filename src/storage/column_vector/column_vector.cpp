@@ -813,9 +813,50 @@ String ColumnVector::ToString() const {
             //            break;
             //        }
         case kEmbedding: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            SizeT dim = embedding_info->Dimension();
+            auto embedding_type = embedding_info->Type();
+            SizeT embedding_size = embedding_info->Size();
+            auto data_ptr = data_ptr_;
+            auto EmbeddingToStr = [&](auto *embedding_ptr) {
+                for (SizeT i = 0; i < dim; ++i) {
+                    ss << embedding_ptr[i];
+                    if (i != dim - 1) {
+                        ss << " ";
+                    }
+                }
+            };
             for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((EmbeddingT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
+                switch (embedding_type) {
+                    case kElemInt8: {
+                        EmbeddingToStr(reinterpret_cast<TinyIntT *>(data_ptr));
+                        break;
+                    }
+                    case kElemInt16: {
+                        EmbeddingToStr(reinterpret_cast<SmallIntT *>(data_ptr));
+                        break;
+                    }
+                    case kElemInt32: {
+                        EmbeddingToStr(reinterpret_cast<IntegerT *>(data_ptr));
+                        break;
+                    }
+                    case kElemInt64: {
+                        EmbeddingToStr(reinterpret_cast<BigIntT *>(data_ptr));
+                        break;
+                    }
+                    case kElemFloat: {
+                        EmbeddingToStr(reinterpret_cast<FloatT *>(data_ptr));
+                        break;
+                    }
+                    case kElemDouble: {
+                        EmbeddingToStr(reinterpret_cast<DoubleT *>(data_ptr));
+                        break;
+                    }
+                    default: {
+                        Error<NotImplementException>("Not implemented.");
+                    }
+                }
+                data_ptr += embedding_size;
             }
             break;
         }
