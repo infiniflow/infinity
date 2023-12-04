@@ -91,7 +91,7 @@ TEST_F(HnswLVQTest, test1) {
 
     // dump_ = true;
     {
-        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_);
         EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         CheckStore(lvq_store, data.get());
@@ -99,7 +99,7 @@ TEST_F(HnswLVQTest, test1) {
 
     {
         size_t idx = 0;
-        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
         EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         idx += vec_n_ / 2;
@@ -111,7 +111,7 @@ TEST_F(HnswLVQTest, test1) {
 
     {
         size_t idx = 0;
-        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+        LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
         EXPECT_NE(ret, LVQ8Store::ERR_IDX);
         idx += vec_n_ / 2;
@@ -136,7 +136,7 @@ TEST_F(HnswLVQTest, test1) {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
 
-            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
             EXPECT_NE(ret, LVQ8Store::ERR_IDX);
             idx += vec_n_ / 2;
@@ -147,7 +147,7 @@ TEST_F(HnswLVQTest, test1) {
             uint8_t file_flags = FileFlags::READ_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
 
-            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, {buffer_size_, true});
+            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, buffer_size_);
 
             CheckStore(lvq_store, data.get());
         }
@@ -162,7 +162,7 @@ TEST_F(HnswLVQTest, test1) {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
 
-            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, {buffer_size_, true});
+            LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
             EXPECT_NE(ret, LVQ8Store::ERR_IDX);
             idx += vec_n_ / 2;
@@ -178,7 +178,7 @@ TEST_F(HnswLVQTest, test1) {
             uint8_t file_flags = FileFlags::READ_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
 
-            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, {buffer_size_, true});
+            LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, buffer_size_);
 
             auto ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
             EXPECT_NE(ret, LVQ8Store::ERR_IDX);

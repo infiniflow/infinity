@@ -35,7 +35,7 @@ int main() {
     using LabelT = uint64_t;
     using RetHeap = std::priority_queue<std::pair<float, LabelT>>;
 
-    std::string save_dir = tmp_data_path();;
+    std::string save_dir = tmp_data_path();
 
     int dim = 128;
     int element_size = 1000;
@@ -63,20 +63,11 @@ int main() {
     {
         auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
 
-        if (false) {
-            for (int i = 0; i < element_size; ++i) {
-                const float *query = data.get() + i * dim;
-                hnsw_index->Insert(query, unsigned(i));
-                // hnsw_index->Dump(std::cout);
-                // hnsw_index->Check();
-            }
-        } else {
-            auto labels = std::make_unique<LabelT[]>(element_size);
-            std::iota(labels.get(), labels.get() + element_size, 0);
-            hnsw_index->Insert(data.get(), labels.get(), element_size);
-            // hnsw_index->Dump(std::cout);
-            hnsw_index->Check();
-        }
+        auto labels = std::make_unique<LabelT[]>(element_size);
+        std::iota(labels.get(), labels.get() + element_size, 0);
+        hnsw_index->Insert(data.get(), labels.get(), element_size);
+        // hnsw_index->Dump(std::cout);
+        hnsw_index->Check();
 
         // hnsw_index->Dump(std::cout);
         hnsw_index->Check();
