@@ -43,11 +43,11 @@ namespace infinity {
 Storage::Storage(const Config *config_ptr) : config_ptr_(config_ptr) {}
 
 void Storage::Init() {
-    // Construct buffer manager
-    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
-
     // Check the data dir to get latest catalog file.
     String catalog_dir = String(*config_ptr_->data_dir()) + "/" + String(CATALOG_FILE_DIR);
+
+    // Construct buffer manager
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->buffer_pool_size(), config_ptr_->data_dir(), config_ptr_->temp_dir());
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -83,8 +83,11 @@ void Storage::UnInit() {
     txn_mgr_.reset();
     wal_mgr_.reset();
 
-    new_catalog_.reset();
+    // Buffer Manager need to be destroyed before catalog. since buffer manage hold the raw pointer owned by catalog:
+    // such as index definition and index base of IndexFileWorker
     buffer_mgr_.reset();
+    new_catalog_.reset();
+
     config_ptr_ = nullptr;
     Printf("Shutdown storage successfully\n");
 }
