@@ -60,8 +60,7 @@ public:
                     } else {
                         result_null->SetFalse(0);
                     }
-                }
-                else {
+                } else {
                     Operator::template Execute<InputType, ResultType>(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                 }
                 result->tail_index_ = 1;
@@ -99,7 +98,6 @@ private:
             result_null->SetAllTrue();
 
             for (SizeT i = 0; i < count; i++) {
-                // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
                 Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
             }
         } else {
@@ -111,6 +109,7 @@ private:
                 if (input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while (start_index < end_index) {
+                        // Bug here? input_ptr[i] should be input_ptr[start_index]?
                         Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), start_index++, state_ptr);
                     }
                 } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
@@ -121,6 +120,7 @@ private:
                     while (start_index < end_index) {
                         if (input_null->IsTrue(start_index - original_start)) {
                             // This row isn't null
+                            // Bug here? input_ptr[i] should be input_ptr[start_index]?
                             Operator::template Execute<InputType, ResultType>(input_ptr[i],
                                                                               result_ptr[i],
                                                                               result_null.get(),

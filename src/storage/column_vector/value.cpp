@@ -259,7 +259,7 @@ Value Value::MakeEmbedding(EmbeddingDataType type, SizeT dimension) {
 
 Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
     Value value(LogicalType::kEmbedding, Move(embedding_info));
-    value.value_.embedding.ptr = ptr;
+    value.value_.embedding = EmbeddingT(static_cast<char *>(ptr));
     value.is_null_ = false;
     return value;
 }
@@ -491,6 +491,10 @@ Value::~Value() {
 //            value_.blob.Reset();
 //            break;
 //        }
+        case kEmbedding: {
+            value_.embedding.Reset();
+            break;
+        }
         case kMixed: {
             //            value_.mixed_value.~MixedType();
             value_.mixed_value.Reset();
@@ -808,10 +812,17 @@ void Value::CopyUnionValue(const Value &other) {
         case kEmbedding: {
             SizeT embedding_size = type_.type_info()->Size();
 
-            value_.embedding.ptr = new char_t[embedding_size]{0};
-            GlobalResourceUsage::IncrRawMemCount();
-
-            Memcpy(value_.embedding.ptr, other.value_.embedding.ptr, embedding_size);
+            if (value_.embedding.new_allocated_ && value_.embedding.ptr) {
+                delete[] value_.embedding.ptr;
+            }
+            if (other.value_.embedding.new_allocated_) {
+                const_cast<bool &>(value_.embedding.new_allocated_) = true;
+                value_.embedding.ptr = new char_t[embedding_size]{0};
+                Memcpy(value_.embedding.ptr, other.value_.embedding.ptr, embedding_size);
+            } else {
+                const_cast<bool &>(value_.embedding.new_allocated_) = false;
+                value_.embedding.ptr = other.value_.embedding.ptr;
+            }
             break;
         }
         case kRowID: {
@@ -943,8 +954,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
 //            break;
 //        }
         case kEmbedding: {
-            this->value_.embedding = other.value_.embedding;
-            other.value_.embedding.SetNull();
+            this->value_.embedding = Move(other.value_.embedding);
             break;
         }
         case kRowID: {

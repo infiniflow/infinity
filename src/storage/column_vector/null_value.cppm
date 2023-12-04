@@ -201,4 +201,11 @@ inline MixedT NullValue() {
     return null_value;
 }
 
+template <typename ElemType>
+inline void SetEmbeddingNullValue(ElemType *ptr, SizeT dim) {
+    for (SizeT i = 0; i < dim; ++i) {
+        ptr[i] = NullValue<ElemType>();
+    }
+}
+
 } // namespace infinity

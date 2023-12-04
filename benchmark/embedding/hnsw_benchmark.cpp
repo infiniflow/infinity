@@ -12,14 +12,16 @@
 #include <iostream>
 #include <thread>
 
-static const char *base_file = "/home/shenyushi/Documents/data/sift/base.fvecs";
-static const char *query_file = "/home/shenyushi/Documents/data/sift/query.fvecs";
-static const char *groundtruth_file = "/home/shenyushi/Documents/data/sift/ip_groundtruth.ivecs";
+import compilation_config;
 
 using namespace infinity;
 
 auto main() -> int {
-    std::string save_dir = "/home/shenyushi/Documents/Code/infiniflow/infinity/tmp";
+    std::string base_file = std::string(benchmark_data_path()) + "/sift/base.fvecs";
+    std::string query_file = std::string(benchmark_data_path()) + "/sift/query.fvecs";
+    std::string groundtruth_file = std::string(benchmark_data_path()) + "/sift/l2_groundtruth.ivecs";
+
+    std::string save_dir = tmp_data_path();
     std::string hnsw_index_l2_name = save_dir + "/the_sift_ip.hnsw";
     size_t dimension;
     size_t embedding_count;
@@ -32,7 +34,7 @@ auto main() -> int {
     {
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        input_embeddings = fvecs_read(base_file, &dimension, &embedding_count);
+        input_embeddings = fvecs_read(base_file.c_str(), &dimension, &embedding_count);
         profiler.End();
         std::cout << "Load sift1M base data: " << profiler.ElapsedToString() << std::endl;
     }
@@ -71,7 +73,7 @@ auto main() -> int {
         size_t dim;
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        queries = fvecs_read(query_file, &dim, &number_of_queries);
+        queries = fvecs_read(query_file.c_str(), &dim, &number_of_queries);
         assert(dimension == dim || !"query does not have same dimension as train set");
         profiler.End();
         std::cout << "Load sift1M query data: " << profiler.ElapsedToString() << std::endl;
@@ -85,7 +87,7 @@ auto main() -> int {
         infinity::BaseProfiler profiler;
         profiler.Begin();
 
-        int *gt_int = ivecs_read(groundtruth_file, &top_k, &nq2);
+        int *gt_int = ivecs_read(groundtruth_file.c_str(), &top_k, &nq2);
         assert(nq2 == number_of_queries || !"incorrect nb of ground truth entries");
 
         ground_truth_sets.resize(number_of_queries);
