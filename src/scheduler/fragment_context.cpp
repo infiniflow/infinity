@@ -52,11 +52,12 @@ module fragment_context;
 namespace infinity {
 
 template <typename OperatorStateType>
-void MakeTaskStateTemplate(UniquePtr<OperatorState> &operator_state, PhysicalOperator *physical_op) {
-    operator_state.reset(static_cast<OperatorState *>(new OperatorStateType()));
+UniquePtr<OperatorState> MakeTaskStateTemplate(PhysicalOperator *physical_op) {
+
+    return MakeUnique<OperatorStateType>();
 }
 
-void MakeTableScanState(UniquePtr<OperatorState> &operator_state, PhysicalTableScan *physical_table_scan, FragmentTask *task) {
+UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_scan, FragmentTask *task) {
     SourceState *source_state = task->source_state_.get();
 
     if (source_state->state_type_ != SourceStateType::kTableScan) {
@@ -65,28 +66,27 @@ void MakeTableScanState(UniquePtr<OperatorState> &operator_state, PhysicalTableS
 
     auto *table_scan_source_state = static_cast<TableScanSourceState *>(source_state);
 
-    operator_state = MakeUnique<TableScanOperatorState>();
+    UniquePtr<OperatorState> operator_state = MakeUnique<TableScanOperatorState>();
     TableScanOperatorState *table_scan_op_state_ptr = (TableScanOperatorState *)(operator_state.get());
-    table_scan_op_state_ptr->table_scan_function_data_ = MakeShared<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
+    table_scan_op_state_ptr->table_scan_function_data_ = MakeUnique<TableScanFunctionData>(physical_table_scan->GetBlockIndex(),
                                                                                            table_scan_source_state->global_ids_,
                                                                                            physical_table_scan->ColumnIDs());
+    return operator_state;
 }
 
-void MakeKnnScanState(UniquePtr<OperatorState> &operator_state,
-                      PhysicalKnnScan *physical_knn_scan,
-                      FragmentTask *task,
-                      ParallelMaterializedFragmentCtx *fragment_ctx) {
+UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, FragmentTask *task, ParallelMaterializedFragmentCtx *fragment_ctx) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kKnnScan) {
         Error<SchedulerException>("Expect knn scan source state");
     }
 
-    operator_state = MakeUnique<KnnScanOperatorState>();
+    UniquePtr<OperatorState> operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
     knn_scan_op_state_ptr->knn_scan_function_data1_ = MakeUnique<KnnScanFunctionData1>(fragment_ctx->shared_data_, task->TaskID());
+    return operator_state;
 }
 
-void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
+UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
     // if (physical_merge_knn->knn_expressions_.size() != 1) {
     //     Error<SchedulerException>("Currently, we only support one knn column scenario");
     // }
@@ -98,19 +98,20 @@ void MakeMergeKnnState(UniquePtr<OperatorState> &operator_state, PhysicalMergeKn
     }
     i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
 
-    operator_state = MakeUnique<MergeKnnOperatorState>();
+    UniquePtr<OperatorState> operator_state = MakeUnique<MergeKnnOperatorState>();
     MergeKnnOperatorState *merge_knn_op_state_ptr = (MergeKnnOperatorState *)(operator_state.get());
 
     // Set fake parallel number here. It will be set in SetMergeKnnState
     merge_knn_op_state_ptr->merge_knn_function_data_ =
         MakeShared<MergeKnnFunctionData>(0, 1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
+
+    return operator_state;
 }
 
-void MakeTaskState(UniquePtr<OperatorState> &operator_state,
-                   SizeT operator_id,
-                   const Vector<PhysicalOperator *> &physical_ops,
-                   FragmentTask *task,
-                   FragmentContext *fragment_ctx) {
+UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
+                                       const Vector<PhysicalOperator *> &physical_ops,
+                                       FragmentTask *task,
+                                       FragmentContext *fragment_ctx) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             Error<SchedulerException>("Invalid physical operator type");
@@ -125,156 +126,119 @@ void MakeTaskState(UniquePtr<OperatorState> &operator_state,
                 Error<SchedulerException>("Table scan shouldn't be the last operator of the fragment.");
             }
             auto physical_table_scan = static_cast<PhysicalTableScan *>(physical_ops[operator_id]);
-            MakeTableScanState(operator_state, physical_table_scan, task);
-            break;
+            return MakeTableScanState(physical_table_scan, task);
         }
         case PhysicalOperatorType::kKnnScan: {
             auto physical_knn_scan = static_cast<PhysicalKnnScan *>(physical_ops[operator_id]);
             auto knn_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-            MakeKnnScanState(operator_state, physical_knn_scan, task, knn_fragment_ctx);
-            break;
+            return MakeKnnScanState(physical_knn_scan, task, knn_fragment_ctx);
         }
         case PhysicalOperatorType::kAggregate: {
-            MakeTaskStateTemplate<AggregateOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<AggregateOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kParallelAggregate: {
-            MakeTaskStateTemplate<ParallelAggregateOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ParallelAggregateOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeParallelAggregate: {
-            MakeTaskStateTemplate<MergeParallelAggregateOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MergeParallelAggregateOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kFilter: {
-            MakeTaskStateTemplate<FilterOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<FilterOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kIndexScan: {
-            MakeTaskStateTemplate<IndexScanOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<IndexScanOperatorState>(physical_ops[operator_id]);
         }
 
         case PhysicalOperatorType::kMergeKnn: {
             auto physical_merge_knn = static_cast<PhysicalMergeKnn *>(physical_ops[operator_id]);
-            MakeMergeKnnState(operator_state, physical_merge_knn, task);
-            break;
+            return MakeMergeKnnState(physical_merge_knn, task);
         }
         case PhysicalOperatorType::kHash: {
-            MakeTaskStateTemplate<HashOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<HashOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeHash: {
-            MakeTaskStateTemplate<MergeHashOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MergeHashOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kLimit: {
-            MakeTaskStateTemplate<LimitOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<LimitOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeLimit: {
-            MakeTaskStateTemplate<MergeLimitOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MergeLimitOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kTop: {
-            MakeTaskStateTemplate<TopOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<TopOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeTop: {
-            MakeTaskStateTemplate<MergeTopOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MergeTopOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kProjection: {
-            MakeTaskStateTemplate<ProjectionOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ProjectionOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kSort: {
-            MakeTaskStateTemplate<SortOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<SortOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeSort: {
-            MakeTaskStateTemplate<MergeSortOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MergeSortOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDelete: {
-            MakeTaskStateTemplate<DeleteOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DeleteOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kUpdate: {
-            MakeTaskStateTemplate<UpdateOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<UpdateOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kInsert: {
-            MakeTaskStateTemplate<InsertOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<InsertOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kImport: {
-            MakeTaskStateTemplate<ImportOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ImportOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kExport: {
-            MakeTaskStateTemplate<ExportOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ExportOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateTable: {
-            MakeTaskStateTemplate<CreateTableOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CreateTableOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateIndex: {
-            MakeTaskStateTemplate<CreateIndexOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CreateIndexOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateCollection: {
-            MakeTaskStateTemplate<CreateCollectionOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CreateCollectionOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateDatabase: {
-            MakeTaskStateTemplate<CreateDatabaseOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CreateDatabaseOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateView: {
-            MakeTaskStateTemplate<CreateViewOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CreateViewOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDropTable: {
-            MakeTaskStateTemplate<DropTableOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DropTableOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDropIndex: {
-            MakeTaskStateTemplate<DropIndexOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DropIndexOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDropCollection: {
-            MakeTaskStateTemplate<DropCollectionOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DropCollectionOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDropDatabase: {
-            MakeTaskStateTemplate<DropDatabaseOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DropDatabaseOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kDropView: {
-            MakeTaskStateTemplate<DropViewOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<DropViewOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCommand: {
-            MakeTaskStateTemplate<CommandOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<CommandOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kExplain: {
-            MakeTaskStateTemplate<ExplainOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ExplainOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kShow: {
-            MakeTaskStateTemplate<ShowOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<ShowOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMatch: {
-            MakeTaskStateTemplate<MatchOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<MatchOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kFusion: {
-            MakeTaskStateTemplate<FusionOperatorState>(operator_state, physical_ops[operator_id]);
-            break;
+            return MakeTaskStateTemplate<FusionOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kUnionAll:
         case PhysicalOperatorType::kIntersect:
@@ -400,10 +364,8 @@ void FragmentContext::BuildTask(QueryContext *query_context,
         for (SizeT task_id = 0; task_id < tasks.size(); ++task_id) {
             FragmentTask *task = tasks[task_id].get();
 
-            UniquePtr<OperatorState> operator_state = nullptr;
-
             // build the input and output state of each opeartor
-            MakeTaskState(operator_state, operator_id, fragment_operators, task, fragment_context.get());
+             UniquePtr<OperatorState> operator_state = MakeTaskState(operator_id, fragment_operators, task, fragment_context.get());
 
             // Connect the input, output state. Connect fragment to its parent if needed
             if (operator_id == operator_count - 1) {
