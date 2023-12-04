@@ -233,6 +233,10 @@ export inline std::string ConstrainType2String(ConstraintType type) {
     return ConstrainTypeToString(type);
 }
 
+export inline std::string EmbeddingDataType2String(EmbeddingDataType type) {
+    return EmbeddingType::EmbeddingDataType2String(type);
+}
+
 //export template <typename T>
 //T ReadBuf(char *const buf);
 //

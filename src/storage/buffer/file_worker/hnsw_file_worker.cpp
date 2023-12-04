@@ -25,6 +25,7 @@ import dist_func_l2;
 import dist_func_ip;
 import lvq_store;
 import plain_store;
+import third_party;
 
 module hnsw_file_worker;
 
@@ -112,7 +113,8 @@ void HnswFileWorker::FreeInMemory() {
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
     auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
-    switch (GetType()) {
+    EmbeddingDataType embedding_type = GetType();
+    switch (embedding_type) {
         case kElemFloat: {
             switch (index_hnsw->encode_type_) {
                 case HnswEncodeType::kPlain: {
@@ -158,7 +160,7 @@ void HnswFileWorker::FreeInMemory() {
             break;
         }
         default: {
-            Error<StorageException>("Index should be created on float embedding column now.");
+            Error<StorageException>(Format("Index should be created on float embedding column now, type: {}", EmbeddingDataType2String(embedding_type)));
         }
     }
     data_ = nullptr;
