@@ -9,8 +9,6 @@ module;
 #include <cassert>
 #include <cmath>
 
-#include "faiss_includes.h"
-
 import stl;
 import parser;
 import faiss;
