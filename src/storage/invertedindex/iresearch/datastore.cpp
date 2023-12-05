@@ -18,6 +18,7 @@ module;
 #include <chrono>
 #include <ctpl_stl.h>
 #include <filesystem>
+#include <iostream>
 
 #include "formats/formats.hpp"
 #include "index/index_reader.hpp"
@@ -227,7 +228,7 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
 
     index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
     if (!path_exists) {
-        index_writer_->Commit();
+        // index_writer_->Commit();
     }
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
@@ -247,6 +248,15 @@ void IRSDataStore::Commit() {
     UniqueLock<Mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
+    reader->Reopen();
+    std::cout << "Index stats:"
+              << "\nsegments=" << reader->size() << "\ndocs=" << reader->docs_count() << "\nlive-docs=" << reader->live_docs_count() << std::endl;
+    std::cout << "reader" << std::endl;
+
+    for (auto &segment : reader) {
+        std::cout << segment.Meta().name << std::endl;
+    }
+
     auto data = MakeShared<DataSnapshot>(Move(reader));
     StoreSnapshot(data);
 }
@@ -408,6 +418,12 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                                                            analyzers[col].get());
                         auto [src_ptr, data_size] = column_buffer.GetVarcharAt(i);
                         field->f_ = String(src_ptr, data_size);
+                        std::cout << index_base->column_name() << ":";
+                        for (SizeT i = 0; i < data_size; ++i) {
+                            char v = src_ptr[i];
+                            std::cout << u32(v) << " ";
+                        }
+                        std::cout << std::endl;
                         doc.Insert<irs::Action::INDEX>(*field);
                     } break;
                     default:
@@ -416,7 +432,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
             }
         }
         if (!schedule) {
-            ScheduleCommit();
+            // ScheduleCommit();
             schedule = true;
         }
     }
