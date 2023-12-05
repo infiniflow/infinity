@@ -369,3 +369,9 @@ add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
 target_link_libraries(test_hnsw
     infinity_core
 )
+
+add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
+
+target_link_libraries(test_hnsw_bitmask
+        infinity_core
+)
