@@ -68,12 +68,12 @@ namespace infinity {
 void PhysicalKnnScan::Init() {}
 
 void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    if (operator_state->data_block_.get() == nullptr) {
-        operator_state->data_block_ = DataBlock::Make();
-
-        // Performance issue here.
-        operator_state->data_block_->Init(*GetOutputTypes());
-    }
+//    if (operator_state->data_block_.get() == nullptr) {
+//        operator_state->data_block_ = DataBlock::Make();
+//
+//        // Performance issue here.
+//        operator_state->data_block_->Init(*GetOutputTypes());
+//    }
 
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
     auto elem_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->elem_type_;
@@ -344,21 +344,21 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
         i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
-        SharedPtr<DataBlock> data_block = DataBlock::Make();
+        UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
         data_block->Init(*GetOutputTypes());
-        operator_state->output_data_blocks_.emplace_back(data_block);
+        operator_state->data_block_array_.emplace_back(Move(data_block));
         SizeT row_idx = DEFAULT_BLOCK_CAPACITY;
 
         SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
         for (; row_idx < total_data_row_count; row_idx += DEFAULT_BLOCK_CAPACITY) {
-            data_block = DataBlock::Make();
+            data_block = DataBlock::MakeUniquePtr();
             data_block->Init(*GetOutputTypes());
-            operator_state->output_data_blocks_.emplace_back(data_block);
+            operator_state->data_block_array_.emplace_back(Move(data_block));
         }
 
         SizeT output_block_row_id = 0;
         SizeT output_block_idx = 0;
-        DataBlock* output_block_ptr = operator_state->output_data_blocks_[0].get();
+        DataBlock* output_block_ptr = operator_state->data_block_array_.back().get();
         for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
             DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
             RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
@@ -380,7 +380,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     output_block_ptr->Finalize();
                     output_block_row_id -= 0;
                     ++output_block_idx;
-                    output_block_ptr = operator_state->output_data_blocks_[output_block_idx].get();
+                    output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
                 }
 
                 SizeT column_id = 0;

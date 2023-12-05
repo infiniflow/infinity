@@ -26,14 +26,12 @@ module merge_knn_data;
 
 namespace infinity {
 
-MergeKnnFunctionData::MergeKnnFunctionData(i64 total_parallel_n,
-                                           i64 query_count,
+MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
                                            i64 topk,
                                            EmbeddingDataType elem_type,
                                            KnnDistanceType knn_distance_type,
                                            SharedPtr<BaseTableRef> table_ref)
-    : total_parallel_n_(total_parallel_n), current_parallel_idx_(0), query_count_(query_count), topk_(topk), elem_type_(elem_type),
-      table_ref_(table_ref) {
+    : query_count_(query_count), topk_(topk), elem_type_(elem_type), table_ref_(table_ref) {
     switch (elem_type) {
         case kElemInvalid: {
             Error<ExecutorException>("Invalid element type");
