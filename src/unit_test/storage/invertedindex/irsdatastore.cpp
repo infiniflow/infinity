@@ -12,8 +12,11 @@
 #include "search/terms_filter.hpp"
 #include "store/fs_directory.hpp"
 #include "unit_test/base_test.h"
+#include "utils/async_utils.hpp"
 #include "utils/text_format.hpp"
 #include "utils/type_info.hpp"
+
+#include <atomic>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -33,6 +36,7 @@ using ScoredIds = Vector<ScoredId>;
 static const String DEFAULT_SCORER("bm25");
 static const String DEFAULT_SCORER_ARG("");
 static const SizeT DEFAULT_TOPN(100);
+constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
 
 class IRSDataStore {
 public:
@@ -49,6 +53,8 @@ public:
         IRSDirectoryReader reader_;
     };
     using DataSnapshotPtr = SharedPtr<IRSDataStore::DataSnapshot>;
+
+    void Open(bool reopen);
 
     IRSIndexWriter::ptr GetWriter() { return index_writer_; }
 
@@ -77,17 +83,22 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     std::error_code ec;
     std::filesystem::remove_all(path_);
     std::filesystem::create_directories(path_, ec);
-    auto open_mode = irs::OM_CREATE;
+    irs_directory_ = MakeUnique<irs::FSDirectory>(directory_.c_str());
+    AnalyzerPool::instance().Set(SEGMENT);
+    Open(false);
+}
+
+void IRSDataStore::Open(bool reopen) {
+    auto open_mode = reopen ? (irs::OM_CREATE | irs::OM_APPEND) : irs::OM_CREATE;
 
     IRSIndexReaderOptions reader_options;
     auto format = irs::formats::get("1_5simd");
-    irs_directory_ = MakeUnique<irs::FSDirectory>(directory_.c_str());
 
     IRSIndexWriterOptions options;
     options.segment_pool_size = 1; // number of index threads
     options.reader_options = reader_options;
-    options.segment_memory_max = 2 * (1 << 20);   // 128K
-    options.lock_repository = false;              //?
+    options.segment_memory_max = 2 * (1 << 20); // 128K
+    options.lock_repository = false;            //?
     options.comparator = nullptr;
     options.features = [](irs::type_info::type_id id) {
         const irs::ColumnInfo info{irs::type<irs::compression::none>::get(), {}, false};
@@ -106,17 +117,23 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
-
-    AnalyzerPool::instance().Set(SEGMENT);
     StoreSnapshot(data);
 }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { snapshot_ = snapshot; }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
 
 void IRSDataStore::Commit() {
     UniqueLock<Mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
+    reader->Reopen();
+    std::cout << "Index stats:"
+              << "\nsegments=" << reader->size() << "\ndocs=" << reader->docs_count() << "\nlive-docs=" << reader->live_docs_count() << std::endl;
+    std::cout << "reader" << std::endl;
+
+    for (auto &segment : reader) {
+        std::cout << segment.Meta().name << std::endl;
+    }
     auto data = MakeShared<DataSnapshot>(Move(reader));
     StoreSnapshot(data);
 }
@@ -233,8 +250,9 @@ TEST_F(IRSDatastoreTest, test1) {
     IRSDataStore datastore("wiki", "./");
 
     UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-    auto ctx = datastore.index_writer_->GetBatch();
-
+    {
+        auto ctx = datastore.index_writer_->GetBatch();
+#if 1
     std::fstream fin;
     std::istream *in;
     fin.open("/home/infominer/codebase/workspace/infinity-debug/test/data/csv/enwiki_9999.csv", std::fstream::in);
@@ -266,9 +284,29 @@ TEST_F(IRSDatastoreTest, test1) {
         }
     }
 
+#else
+
+        for (int i = 1; i < 10000; ++i) {
+            auto doc = ctx.Insert(i);
+            {
+                auto field = MakeShared<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+                field->f_ = "hello, world, a, b, c ";
+                doc.Insert<irs::Action::INDEX>(*field);
+            }
+
+            {
+                auto field = MakeShared<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+                field->f_ = "Anarchism";
+                doc.Insert<irs::Action::INDEX>(*field);
+            }
+        }
+#endif
+    }
+    datastore.Commit();
+
     UniquePtr<irs::filter> flt;
     auto query = std::make_unique<irs::by_term>();
-    query->mutable_options()->term = toBstring("of");
+    query->mutable_options()->term = toBstring("hello");
     *query->mutable_field() = "body";
     flt = Move(query);
 
@@ -279,22 +317,4 @@ TEST_F(IRSDatastoreTest, test1) {
         std::cout << "IRSDataStore::Search failed" << std::endl;
     }
     std::cout << "Result size:" << result.size() << std::endl;
-
-    /*
-
-    for (int i = 1; i < 10000; ++i) {
-        auto doc = ctx.Insert(i);
-        {
-            auto field = MakeShared<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
-            field->f_ = "hello, world, a, b, c ";
-            doc.Insert<irs::Action::INDEX>(*field);
-        }
-
-        {
-            auto field = MakeShared<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
-            field->f_ = "Anarchism";
-            doc.Insert<irs::Action::INDEX>(*field);
-        }
-    }*/
-    datastore.Commit();
 }
