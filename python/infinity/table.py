@@ -30,7 +30,7 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def insert(self, data: list[dict[str, tp.Union[str, int, float]]]):
+    def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
         pass
 
     @abstractmethod

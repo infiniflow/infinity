@@ -218,12 +218,12 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
         case LiteralType::kDoubleArray: {
             // same problem as above
-            SizeT dim = expr.long_array_.size();
+            SizeT dim = expr.double_array_.size();
 
             auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemDouble, dim);
 
             Value value = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-            Copy(expr.long_array_.begin(), expr.long_array_.end(), (double *)(value.value_.embedding.ptr));
+            Copy(expr.double_array_.begin(), expr.double_array_.end(), (double *)(value.value_.embedding.ptr));
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kNull: {

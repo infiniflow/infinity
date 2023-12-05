@@ -18,7 +18,7 @@ import infinity
 from infinity.infinity import NetworkAddress
 
 
-class TestDelete:
+class TestUpdate:
 
     def test_version(self):
         print(infinity.__version__)

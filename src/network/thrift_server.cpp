@@ -134,7 +134,7 @@ public:
             columns->emplace_back(column);
         }
 
-        auto values = new Vector<Vector<ParsedExpr *> *>();
+        Vector<vector<ParsedExpr *> *> * values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
 
         for (auto &value : request.fields) {
@@ -650,6 +650,7 @@ private:
                 for (auto &value : expr.i64_array_value) {
                     parsed_expr->long_array_.emplace_back(value);
                 }
+                return parsed_expr;
             }
             case infinity_thrift_rpc::LiteralType::DoubleArray: {
                 auto parsed_expr = new ConstantExpr(LiteralType::kDoubleArray);
@@ -657,6 +658,7 @@ private:
                 for (auto &value : expr.f64_array_value) {
                     parsed_expr->double_array_.emplace_back(value);
                 }
+                return parsed_expr;
             }
             default:
                 Error<TypeException>("Invalid constant type", __FILE_NAME__, __LINE__);
