@@ -43,6 +43,9 @@ class IrsIndexEntry;
 
 export struct TableCollectionEntry : public BaseEntry {
 public:
+    // for iterator unit test.
+    explicit TableCollectionEntry() : BaseEntry(EntryType::kTable) {}
+
     explicit TableCollectionEntry(const SharedPtr<String> &db_entry_dir,
                                   SharedPtr<String> table_collection_name,
                                   const Vector<SharedPtr<ColumnDef>> &columns,
@@ -53,7 +56,7 @@ public:
 
 public:
     static Status CreateIndex(TableCollectionEntry *table_entry,
-                              const SharedPtr<IndexDef>& index_def,
+                              const SharedPtr<IndexDef> &index_def,
                               ConflictType conflict_type,
                               u64 txn_id,
                               TxnTimeStamp begin_ts,

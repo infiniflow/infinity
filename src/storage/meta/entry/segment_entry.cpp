@@ -15,8 +15,8 @@
 module;
 
 #include <ctime>
-#include <vector>
 #include <string>
+#include <vector>
 
 import stl;
 import third_party;
@@ -55,6 +55,8 @@ import dist_func_ip;
 import hnsw_alg;
 import lvq_store;
 import plain_store;
+
+import segment_iter;
 
 module segment_entry;
 
@@ -105,7 +107,7 @@ u64 SegmentEntry::AppendData(SegmentEntry *segment_entry, Txn *txn_ptr, AppendSt
     UniqueLock<RWMutex> lck(segment_entry->rw_locker_);
     if (segment_entry->row_capacity_ - segment_entry->row_count_ <= 0)
         return 0;
-//    SizeT start_row = segment_entry->row_count_;
+    //    SizeT start_row = segment_entry->row_count_;
     SizeT append_block_count = append_state_ptr->blocks_.size();
     u64 total_copied{0};
 
@@ -162,11 +164,21 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-// NewIndexEntry(ColumnIndexEntry *column_index_entry,
-//               u32 segment_id,
-//               TxnTimeStamp create_ts,
-//               BufferManager *buffer_manager,
-//               UniquePtr<CreateIndexParam> param)
+template <typename DataType>
+class OneColumnIterator {
+public:
+    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
+
+    Optional<const DataType *> Next() {
+        if (auto ret = segment_iter_.Next(); ret) {
+            return reinterpret_cast<const DataType *>((*ret)[0]);
+        }
+        return None;
+    }
+
+private:
+    SegmentIter segment_iter_;
+};
 
 SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
                                                                  ColumnIndexEntry *column_index_entry,
@@ -181,10 +193,8 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
     UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
         SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, segment_entry->segment_id_, create_ts, buffer_mgr, create_index_param.get());
-    //    SharedPtr<IndexEntry> index_entry =
-    //        IndexEntry::NewIndexEntry(index_def_entry, segment_entry, create_ts, buffer_mgr, GetCreateIndexParam(segment_entry, index_def,
-    //        column_def));
     switch (index_base->index_type_) {
+
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Error<StorageException>("AnnIVFFlat supports embedding type.");
@@ -226,27 +236,21 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-            SizeT dimension = embedding_info->Dimension();
+
             BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
             auto InsertHnsw = [&](auto &hnsw_index) {
                 u32 segment_offset = 0;
-                Vector<Pair<const float *, SizeT>> segment_data;
-                Vector<BufferHandle> buffer_handles;
                 Vector<u64> row_ids;
                 for (const auto &block_entry : segment_entry->block_entries_) {
-                    auto block_column_entry = block_entry->columns_[column_id].get();
-                    BufferHandle buffer_handle = block_column_entry->buffer_->Load();
                     SizeT block_row_cnt = block_entry->row_count_;
 
                     for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
                         RowID row_id(segment_entry->segment_id_, segment_offset + block_offset);
                         row_ids.push_back(row_id.ToUint64());
                     }
-                    segment_data.emplace_back(reinterpret_cast<const float *>(buffer_handle.GetData()), block_row_cnt);
-                    buffer_handles.push_back(Move(buffer_handle));
                 }
-                TmpIterator<float> iter(Move(segment_data), dimension);
-                hnsw_index->InsertVecs(iter, row_ids.data(), row_ids.size());
+                OneColumnIterator<float> one_column_iter(segment_entry, column_id);
+                hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
             };
             switch (embedding_info->Type()) {
                 case kElemFloat: {

@@ -123,8 +123,9 @@ private:
                                                                                   result_ptr + dim * start_index,
                                                                                   dim,
                                                                                   result_null.get(),
-                                                                                  start_index++,
+                                                                                  start_index,
                                                                                   state_ptr);
+                        ++start_index;
                     }
                 } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -138,8 +139,9 @@ private:
                                                                                       result_ptr + dim * start_index,
                                                                                       dim,
                                                                                       result_null.get(),
-                                                                                      start_index++,
+                                                                                      start_index,
                                                                                       state_ptr);
+                            ++start_index;
                         }
                     }
                 }

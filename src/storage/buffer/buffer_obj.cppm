@@ -89,7 +89,7 @@ public:
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
 
-private:
+protected:
     RWMutex rw_locker_{};
 
     BufferManager *buffer_mgr_;
