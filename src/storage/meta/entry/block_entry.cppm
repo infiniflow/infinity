@@ -61,6 +61,9 @@ export struct BlockVersion {
 
 export struct BlockEntry : public BaseEntry {
 public:
+    // for iterator unit test
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
+
     /// Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
     /// Construct a new block entry For Replay
@@ -120,7 +123,7 @@ public:
 
     static void FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version);
 
-    inline static BlockColumnEntry *GetColumnDataByID(BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
+    inline static BlockColumnEntry *GetColumnDataByID(const BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
 
     static Json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
 
