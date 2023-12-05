@@ -340,9 +340,9 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
         row_count += block_entry->row_count_;
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count_);
     }
-    table_entry->row_count_ += row_count;
 
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);
+    table_entry->row_count_ += row_count;
     table_entry->segment_map_.emplace(segment->segment_id_, Move(segment));
     return nullptr;
 }
