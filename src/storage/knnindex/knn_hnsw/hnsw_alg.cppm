@@ -201,7 +201,7 @@ public:
             candidate.emplace(-dist, enter_point);
             result.emplace(dist, enter_point);
         } else {
-            candidate.emplace(limitMax<DataType>(), enter_point);
+            candidate.emplace(LimitMax<DataType>(), enter_point);
         }
 
         Vector<bool> visited(data_store_.cur_vec_num(), false);
