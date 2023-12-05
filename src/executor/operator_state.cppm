@@ -17,7 +17,6 @@ module;
 import stl;
 import global_block_id;
 import physical_operator_type;
-import fragment_data_queue;
 import fragment_data;
 import data_block;
 import table_scan_function_data;
@@ -37,14 +36,12 @@ export struct OperatorState {
 
     // Input status
     OperatorState *prev_op_state_{nullptr};
-    i64 received_data_count_{0};
-    i64 total_data_count_{0};
 
     inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
 
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
-    SharedPtr<DataBlock> data_block_{};
+    Vector<UniquePtr<DataBlock>> data_block_array_{};
     UniquePtr<String> error_message_{};
 
     bool complete_{false};
@@ -85,7 +82,7 @@ export struct TableScanOperatorState : public OperatorState {
 export struct KnnScanOperatorState : public OperatorState {
     inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 
-    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
+//    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
     UniquePtr<KnnScanFunctionData1> knn_scan_function_data1_{};
 };
 
@@ -93,7 +90,7 @@ export struct KnnScanOperatorState : public OperatorState {
 export struct MergeKnnOperatorState : public OperatorState {
     inline explicit MergeKnnOperatorState() : OperatorState(PhysicalOperatorType::kMergeKnn) {}
 
-    DataBlock *input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    UniquePtr<DataBlock> input_data_block_{nullptr}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
     bool input_complete_{false};
     SharedPtr<MergeKnnFunctionData> merge_knn_function_data_{};
 };
@@ -203,7 +200,7 @@ export struct InsertOperatorState : public OperatorState {
 export struct ImportOperatorState : public OperatorState {
     inline explicit ImportOperatorState() : OperatorState(PhysicalOperatorType::kImport) {}
 
-    Vector<SharedPtr<DataBlock>> output_{};
+//    Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
     // For insert, update, delete, update
     UniquePtr<String> result_msg_{};
@@ -281,7 +278,7 @@ export struct ExplainOperatorState : public OperatorState {
 export struct ShowOperatorState : public OperatorState {
     inline explicit ShowOperatorState() : OperatorState(PhysicalOperatorType::kShow) {}
 
-    Vector<SharedPtr<DataBlock>> output_{};
+    Vector<UniquePtr<DataBlock>> output_{};
 };
 
 // Flush
@@ -299,63 +296,6 @@ export struct FusionOperatorState : public OperatorState {
     inline explicit FusionOperatorState() : OperatorState(PhysicalOperatorType::kFusion) {}
 };
 
-// Sink
-export enum class SinkStateType {
-    kInvalid,
-    kMaterialize,
-    kResult,
-    kMessage,
-    kSummary,
-    kQueue,
-};
-
-export struct SinkState {
-    virtual ~SinkState(){};
-    inline explicit SinkState(SinkStateType state_type) : state_type_(state_type) {}
-
-    inline void SetPrevOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
-
-    inline SinkStateType state_type() const { return state_type_; }
-
-    OperatorState *prev_op_state_{};
-    SinkStateType state_type_{SinkStateType::kInvalid};
-    UniquePtr<String> error_message_{};
-};
-
-export struct QueueSinkState : public SinkState {
-    inline explicit QueueSinkState() : SinkState(SinkStateType::kQueue) {}
-
-    Vector<SharedPtr<DataBlock>> data_block_array_{};
-    Vector<BlockingQueue<SharedPtr<FragmentData>> *> fragment_data_queues_;
-};
-
-export struct MaterializeSinkState : public SinkState {
-    inline explicit MaterializeSinkState() : SinkState(SinkStateType::kMaterialize) {}
-
-    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
-    SharedPtr<Vector<String>> column_names_{};
-    Vector<SharedPtr<DataBlock>> data_block_array_{};
-};
-
-export struct ResultSinkState : public SinkState {
-    inline explicit ResultSinkState() : SinkState(SinkStateType::kResult) {}
-
-    SharedPtr<ColumnDef> result_def_{};
-};
-
-export struct MessageSinkState : public SinkState {
-    inline explicit MessageSinkState() : SinkState(SinkStateType::kMessage) {}
-
-    UniquePtr<String> message_{};
-};
-
-export struct SummarySinkState : public SinkState {
-    inline explicit SummarySinkState() : SinkState(SinkStateType::kSummary), count_(0), sum_(0) {}
-
-    u64 count_;
-    u64 sum_;
-};
-
 // Source
 export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kKnnScan, kEmpty };
 
@@ -366,6 +306,8 @@ export struct SourceState {
 
     inline void SetNextOpState(OperatorState *op_state) { next_op_state_ = op_state; }
 
+    inline bool Complete() const { return complete_; }
+
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
@@ -374,17 +316,13 @@ export struct SourceState {
 export struct QueueSourceState : public SourceState {
     inline explicit QueueSourceState() : SourceState(SourceStateType::kQueue) {}
 
-    inline void SetTotalDataCount(i64 data_count) {
-        if (next_op_state_->total_data_count_ == 0) {
-            next_op_state_->total_data_count_ = data_count;
-        }
-    }
+    inline void SetTaskNum(u64 fragment_id, u64 num_tasks) { num_tasks_[fragment_id] = num_tasks; }
 
-    void PushData(DataBlock *input_data_block);
+    bool GetData(UniquePtr<DataBlock> &output);
 
     BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
 
-    SharedPtr<FragmentData> current_fragment_data_{};
+    Map<u64, u64> num_tasks_; // fragment_id -> number of pending tasks
 };
 
 export struct AggregateSourceState : public SourceState {
@@ -396,7 +334,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
+    BlockingQueue<UniquePtr<FragmentData>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -412,6 +350,66 @@ export struct KnnScanSourceState : public SourceState {
 
 export struct EmptySourceState : public SourceState {
     explicit EmptySourceState() : SourceState(SourceStateType::kEmpty) {}
+};
+
+// Sink
+export enum class SinkStateType {
+    kInvalid,
+    kMaterialize,
+    kResult,
+    kMessage,
+    kSummary,
+    kQueue,
+};
+
+export struct SinkState {
+    virtual ~SinkState() {}
+    inline explicit SinkState(SinkStateType state_type, u64 fragment_id, u64 task_id)
+        : fragment_id_(fragment_id), task_id_(task_id), state_type_(state_type) {}
+
+    inline void SetPrevOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
+
+    [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
+
+    u64 fragment_id_{};
+    u64 task_id_{};
+    OperatorState *prev_op_state_{};
+    SinkStateType state_type_{SinkStateType::kInvalid};
+    UniquePtr<String> error_message_{};
+};
+
+export struct QueueSinkState : public SinkState {
+    inline explicit QueueSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kQueue, fragment_id, task_id) {}
+
+    Vector<UniquePtr<DataBlock>> data_block_array_{};
+    Vector<BlockingQueue<SharedPtr<FragmentData>> *> fragment_data_queues_;
+};
+
+export struct MaterializeSinkState : public SinkState {
+    inline explicit MaterializeSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kMaterialize, fragment_id, task_id) {}
+
+    SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
+    SharedPtr<Vector<String>> column_names_{};
+    Vector<UniquePtr<DataBlock>> data_block_array_{};
+};
+
+export struct ResultSinkState : public SinkState {
+    inline explicit ResultSinkState() : SinkState(SinkStateType::kResult, 0, 0) {}
+
+    SharedPtr<ColumnDef> result_def_{};
+};
+
+export struct MessageSinkState : public SinkState {
+    inline explicit MessageSinkState() : SinkState(SinkStateType::kMessage, 0, 0) {}
+
+    UniquePtr<String> message_{};
+};
+
+export struct SummarySinkState : public SinkState {
+    inline explicit SummarySinkState() : SinkState(SinkStateType::kSummary, 0, 0), count_(0), sum_(0) {}
+
+    u64 count_;
+    u64 sum_;
 };
 
 } // namespace infinity

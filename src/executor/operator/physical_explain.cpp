@@ -120,7 +120,7 @@ void PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
     auto task_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
 
-    auto output_data_block = DataBlock::Make();
+    auto output_data_block = DataBlock::MakeUniquePtr();
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
@@ -179,7 +179,7 @@ void PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     output_data_block->Init(column_vectors);
 
     ExplainOperatorState *explain_operator_state = static_cast<ExplainOperatorState *>(operator_state);
-    explain_operator_state->data_block_ = output_data_block;
+    explain_operator_state->data_block_array_.emplace_back(Move(output_data_block));
     operator_state->SetComplete();
 }
 
