@@ -991,7 +991,7 @@ void postings_writer<FormatTraits>::write(irs::doc_iterator& docs,
 
   uint32_t docs_count = 0;
   uint32_t total_freq = 0;
-  std::cout << "" << std::endl;
+  std::cout << "start " << std::endl;
   while (docs.next()) {
     IRS_ASSERT(doc_limits::valid(doc->value));
     IRS_ASSERT(attrs_.freq_);
@@ -1033,7 +1033,7 @@ void postings_writer<FormatTraits>::write(irs::doc_iterator& docs,
     total_freq += attrs_.freq_value_.value;
     EndDocument();
   }
-  std::cout << std::endl;
+  std::cout << "end" << std::endl;
   // FIXME(gnusi): do we need to write terminal skip if present?
 
   meta.docs_count = docs_count;
