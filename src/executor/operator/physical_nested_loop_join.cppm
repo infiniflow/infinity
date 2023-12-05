@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import load_meta;
 
 export module physical_nested_loop_join;
 
@@ -33,8 +34,9 @@ public:
                                     JoinType join_type,
                                     Vector<SharedPtr<BaseExpression>> conditions,
                                     UniquePtr<PhysicalOperator> left,
-                                    UniquePtr<PhysicalOperator> right)
-        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, Move(left), Move(right), id), join_type_(join_type),
+                                    UniquePtr<PhysicalOperator> right,
+                                    SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, Move(left), Move(right), id, load_metas), join_type_(join_type),
           conditions_(Move(conditions)) {}
 
     ~PhysicalNestedLoopJoin() override = default;

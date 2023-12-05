@@ -16,11 +16,76 @@ module;
 
 import stl;
 import physical_operator_type;
+import default_values;
+import operator_state;
+import table_collection_entry;
+import column_buffer;
+import column_vector;
+import segment_entry;
+import block_entry;
+import block_column_entry;
+import query_context;
+import parser;
+import base_table_ref;
+import third_party;
+import infinity_exception;
+
+#include <algorithm>
 
 module physical_operator;
 
 namespace infinity {
 
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
+
+void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {
+    if (load_metas_.get() == nullptr || load_metas_->empty()) {
+        return;
+    }
+    auto load_metas = *load_metas_.get();
+    // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas
+    auto table_ref = table_refs[load_metas[0].binding_.table_idx];
+
+    auto input_block = operator_state->prev_op_state_->data_block_;
+    Vector<SizeT> &column_ids = table_ref->column_ids_;
+    SizeT load_column_count = load_metas_->size();
+
+    u16 row_count = input_block->row_count();
+    SizeT capacity = input_block->capacity();
+
+    // Filling ColumnVector
+    for (int i = 0; i < load_column_count; ++i) {
+        SharedPtr<ColumnVector> column_vector = ColumnVector::Make(load_metas[i].type_);
+        column_vector->Initialize(ColumnVectorType::kFlat, capacity);
+
+        input_block->InsertVector(column_vector, load_metas[i].index_);
+    }
+
+    auto row_column_id = input_block->column_count() - 1;
+
+    for (int i = 0; i < row_count; ++i) {
+        // If late materialization needs to be optional, then this needs to be modified
+        RowID row_id = input_block->GetValue(row_column_id, i).value_.row;
+        u32 segment_id = row_id.segment_id_;
+        u32 segment_offset = row_id.segment_offset_;
+        u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+        u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+
+        SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_ref->table_entry_ptr_, segment_id);
+        if (segment_entry == nullptr) {
+            throw ExecutorException(Format("Cannot find segment, segment id: {}", segment_id));
+        }
+        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
+        if (block_entry == nullptr) {
+            throw ExecutorException(Format("Cannot find block, segment id: {}, block id: {}", segment_id, block_id));
+        }
+        for (int j = 0; j < load_column_count; ++j) {
+            auto binding = load_metas[j].binding_;
+            UniquePtr<BlockColumnEntry> &column = block_entry->columns_[binding.column_idx];
+            ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(column.get(), query_context->storage()->buffer_manager());
+            input_block->column_vectors[load_metas[j].index_]->AppendWith(column_buffer, block_offset, 1);
+        }
+    }
+}
 
 } // namespace infinity

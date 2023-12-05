@@ -20,6 +20,8 @@ import query_context;
 import operator_state;
 import parser;
 import data_table;
+import base_table_ref;
+import load_meta;
 
 export module physical_operator;
 
@@ -28,8 +30,10 @@ namespace infinity {
 export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 
 public:
-    inline explicit PhysicalOperator(PhysicalOperatorType type, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, u64 id)
-        : operator_id_(id), operator_type_(type), left_(Move(left)), right_(Move(right)) {}
+    inline explicit PhysicalOperator(PhysicalOperatorType type, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, u64 id, SharedPtr<Vector<LoadMeta>> &load_metas)
+        : operator_id_(id), operator_type_(type), left_(Move(left)), right_(Move(right)) {
+        load_metas_ = load_metas;
+    }
 
     virtual ~PhysicalOperator() = default;
 
@@ -54,6 +58,10 @@ public:
 
     virtual String GetName() const;
 
+    void InputLoad(QueryContext *query_context, OperatorState *output_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs);
+
+    virtual void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {}
+
 protected:
     u64 operator_id_;
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
@@ -61,6 +69,8 @@ protected:
     UniquePtr<PhysicalOperator> right_{nullptr};
 
     SharedPtr<DataTable> output_{};
+
+    SharedPtr<Vector<LoadMeta>> load_metas_{};
 
 public:
     // Operator

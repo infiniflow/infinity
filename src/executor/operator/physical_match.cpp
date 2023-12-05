@@ -42,18 +42,14 @@ import value;
 import third_party;
 import iresearch_analyzer;
 import irs_index_entry;
-import base_table_ref;
-import segment_entry;
-import block_entry;
-import column_buffer;
-import block_column_entry;
+import load_meta;
 
 module physical_match;
 
 namespace infinity {
 
-PhysicalMatch::PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr)
-    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)), match_expr_(match_expr) {}
+PhysicalMatch::PhysicalMatch(u64 id, TableCollectionEntry *table_entry_ptr, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr), match_expr_(match_expr) {}
 
 PhysicalMatch::~PhysicalMatch() {}
 
@@ -71,13 +67,13 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
 }
 
 void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    // 1 build irs::filter
+    // Build irs::filter
     // 1.1 populate column2analyzer
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SharedPtr<IrsIndexEntry> irs_index_entry;
     Map<String, String> column2analyzer;
-    TableCollectionEntry::GetFullTextAnalyzers(base_table_ref_->table_entry_ptr_, txn_id, begin_ts, irs_index_entry, column2analyzer);
+    TableCollectionEntry::GetFullTextAnalyzers(table_entry_ptr_, txn_id, begin_ts, irs_index_entry, column2analyzer);
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
     String default_field = search_ops.options_["default_field"];
@@ -90,52 +86,25 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     }
     UniquePtr<irs::filter> flt = std::move(driver.result);
 
-    // 2 full text search
+    // Search
     ScoredIds result;
     SharedPtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
-    if (dataStore == nullptr) {
-        throw ExecutorException(
-            Format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->table_collection_name_));
-    }
     rc = dataStore->Search(flt.get(), search_ops.options_, result);
     if (rc != 0) {
         Error<ExecutorException>("IRSDataStore::Search failed");
     }
 
-    // 3 populate result datablock
+    // populate result datablock
     // FIXME: what if result exceed DataBlock's capacity?
-    // 3.1 initialize output datablock
-    Vector<SizeT> &column_ids = base_table_ref_->column_ids_;
-    SizeT column_n = column_ids.size();
     SharedPtr<DataBlock> output_data_block = DataBlock::Make();
-    output_data_block->Init(*GetOutputTypes());
-
+    Vector<SharedPtr<ColumnVector>> column_vectors;
+    column_vectors.push_back(ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat)));
+    column_vectors.push_back(ColumnVector::Make(MakeShared<DataType>(LogicalType::kRowID)));
+    output_data_block->Init(column_vectors);
     for (ScoredId &scoredId : result) {
-        // 3.2 enrich columns needed by later operators
-        RowID row_id = DocID2RowID(scoredId.second);
-        u32 segment_id = row_id.segment_id_;
-        u32 segment_offset = row_id.segment_offset_;
-        u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
-        u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-        SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(base_table_ref_->table_entry_ptr_, segment_id);
-        if (segment_entry == nullptr) {
-            throw ExecutorException(Format("Cannot find segment, segment id: {}", segment_id));
-        }
-        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
-        if (block_entry == nullptr) {
-            throw ExecutorException(Format("Cannot find block, segment id: {}, block id: {}", segment_id, block_id));
-        }
-        SizeT column_id = 0;
-        for (; column_id < column_n; ++column_id) {
-            UniquePtr<BlockColumnEntry> &column = block_entry->columns_[column_ids[column_id]];
-            ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(column.get(), query_context->storage()->buffer_manager());
-            output_data_block->column_vectors[column_id]->AppendWith(column_buffer, block_offset, 1);
-        }
-
-        // 3.3 add hiden columns: score, row_id
         Value v = Value::MakeFloat(scoredId.first);
-        output_data_block->column_vectors[column_id++]->AppendValue(v);
-        output_data_block->column_vectors[column_id]->AppendWith(row_id, 1);
+        column_vectors[0]->AppendValue(v);
+        column_vectors[1]->AppendWith(DocID2RowID(scoredId.second), 1);
     }
     output_data_block->Finalize();
     operator_state->data_block_ = output_data_block;
@@ -145,21 +114,15 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 
 SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    result_names->reserve(base_table_ref_->column_names_->size() + 2);
-    for (auto &name : *base_table_ref_->column_names_)
-        result_names->emplace_back(name);
-    result_names->emplace_back(COLUMN_NAME_SCORE);
     result_names->emplace_back(COLUMN_NAME_ROW_ID);
+    result_names->emplace_back(COLUMN_NAME_SCORE);
     return result_names;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatch::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_types->reserve(base_table_ref_->column_types_->size() + 2);
-    for (auto &type : *base_table_ref_->column_types_)
-        result_types->emplace_back(type);
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
     return result_types;
 }
 
@@ -171,7 +134,7 @@ String PhysicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "PhysicalMatch ";
     }
-    String res = Format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_entry_ptr_->table_collection_name_), match_expr_->ToString());
+    String res = Format("{} Table: {}, {}", arrow_str, *(table_entry_ptr_->table_collection_name_), match_expr_->ToString());
     return res;
 }
 

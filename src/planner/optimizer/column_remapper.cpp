@@ -28,12 +28,24 @@ module column_remapper;
 namespace infinity {
 
 void BindingRemapper::VisitNode(LogicalNode &op) {
+    auto load_func = [&]() {
+        auto load_metas = op.load_metas();
+
+        if (load_metas.get() != nullptr) {
+            for (SizeT i = 0; i < load_metas->size(); ++i) {
+                bindings_.insert(bindings_.begin() + (*load_metas)[i].index_, (*load_metas)[i].binding_);
+            }
+        }
+    };
+
     if (op.operator_type() == LogicalNodeType::kJoin) {
         VisitNodeChildren(op);
+        load_func();
         bindings_ = op.GetColumnBindings();
         VisitNodeExpression(op);
     } else {
         VisitNodeChildren(op);
+        load_func();
         VisitNodeExpression(op);
         bindings_ = op.GetColumnBindings();
     }

@@ -32,6 +32,7 @@ import expression_evaluator;
 import expression_state;
 import base_expression;
 import fusion_expression;
+import load_meta;
 import default_values;
 import third_party;
 
@@ -39,8 +40,12 @@ module physical_fusion;
 
 namespace infinity {
 
-PhysicalFusion::PhysicalFusion(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<FusionExpression> fusion_expr)
-    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id), fusion_expr_(fusion_expr) {}
+PhysicalFusion::PhysicalFusion(u64 id,
+                               UniquePtr<PhysicalOperator> left,
+                               UniquePtr<PhysicalOperator> right,
+                               SharedPtr<FusionExpression> fusion_expr,
+                               SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id, load_metas), fusion_expr_(fusion_expr) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 

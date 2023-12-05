@@ -78,6 +78,8 @@ public:
 
     void AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count);
 
+    void InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index);
+
 public:
     [[nodiscard]] inline SizeT column_count() const { return column_count_; }
 

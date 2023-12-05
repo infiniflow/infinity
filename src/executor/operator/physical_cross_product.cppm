@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import data_table;
+import load_meta;
 
 export module physical_cross_product;
 
@@ -28,8 +29,8 @@ namespace infinity {
 
 export class PhysicalCrossProduct final : public PhysicalOperator {
 public:
-    explicit PhysicalCrossProduct(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right)
-        : PhysicalOperator(PhysicalOperatorType::kCrossProduct, Move(left), Move(right), id) {}
+    explicit PhysicalCrossProduct(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCrossProduct, Move(left), Move(right), id, load_metas) {}
 
     ~PhysicalCrossProduct() override = default;
 

@@ -22,6 +22,7 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import load_meta;
 
 module physical_create_collection;
 
@@ -33,14 +34,15 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
                                                    SharedPtr<Vector<String>> output_names,
                                                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                    u64 table_index,
-                                                   u64 id)
-    : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id), schema_name_(Move(schema_name)),
-      collection_name_(Move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(Move(output_names)),
-      output_types_(Move(output_types)) {}
+                                                   u64 id,
+                                                   SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
+      collection_name_(Move(collection_name)), output_names_(Move(output_names)), output_types_(Move(output_types)), conflict_type_(conflict_type),
+      table_index_(table_index) {}
 
 void PhysicalCreateCollection::Init() {}
 
-void PhysicalCreateCollection::Execute(QueryContext *, OperatorState *output_state) {
+void PhysicalCreateCollection::Execute(QueryContext *query_context, OperatorState *output_state) {
     output_state->SetComplete();
 }
 

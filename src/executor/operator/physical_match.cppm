@@ -23,15 +23,16 @@ import physical_operator_type;
 import table_collection_entry;
 import base_expression;
 import match_expression;
-import base_table_ref;
+import load_meta;
 
 export module physical_match;
 
 namespace infinity {
 
-export class PhysicalMatch final : public PhysicalOperator {
+export class PhysicalMatch : public PhysicalOperator {
 public:
-    explicit PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr);
+    explicit
+    PhysicalMatch(u64 id, TableCollectionEntry *table_entry_ptr, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalMatch() override;
 
@@ -39,13 +40,13 @@ public:
 
     void Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const;
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;
 
     String ToString(i64 &space) const;
 
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    TableCollectionEntry *table_entry_ptr_;
     SharedPtr<MatchExpression> match_expr_;
 };
 

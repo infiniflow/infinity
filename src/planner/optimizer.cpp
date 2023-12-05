@@ -19,6 +19,7 @@ import logical_node_type;
 import logical_explain;
 import column_remapper;
 import column_pruner;
+import lazy_load;
 import parser;
 import explain_logical_plan;
 
@@ -28,6 +29,7 @@ namespace infinity {
 
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
     AddRule(MakeShared<ColumnPruner>());
+    AddRule(MakeShared<LazyLoad>());
     AddRule(MakeShared<ColumnRemapper>());
 }
 

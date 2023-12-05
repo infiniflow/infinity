@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import load_meta;
 
 export module physical_project;
 
@@ -28,9 +29,13 @@ namespace infinity {
 
 export class PhysicalProject : public PhysicalOperator {
 public:
-    explicit PhysicalProject(u64 id, u64 table_index, UniquePtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions)
-        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id), expressions_(Move(expressions)),
-          projection_table_index_(table_index) {}
+    explicit PhysicalProject(u64 id,
+                             u64 table_index,
+                             UniquePtr<PhysicalOperator> left,
+                             Vector<SharedPtr<BaseExpression>> expressions,
+                             SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id, load_metas), projection_table_index_(table_index),
+          expressions_(Move(expressions)) {}
 
     ~PhysicalProject() override = default;
 

@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_drop_collection;
 
@@ -27,8 +28,12 @@ namespace infinity {
 
 export class PhysicalDropCollection : public PhysicalOperator {
 public:
-    explicit PhysicalDropCollection(SharedPtr<String> schema_name, SharedPtr<String> collection_name, ConflictType conflict_type, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kDropCollection, nullptr, nullptr, id), schema_name_(Move(schema_name)),
+    explicit PhysicalDropCollection(SharedPtr<String> schema_name,
+                                    SharedPtr<String> collection_name,
+                                    ConflictType conflict_type,
+                                    u64 id,
+                                    SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kDropCollection, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
           collection_name_(Move(collection_name)), conflict_type_(conflict_type) {}
 
     ~PhysicalDropCollection() override = default;

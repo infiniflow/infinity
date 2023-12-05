@@ -29,6 +29,7 @@ import infinity_exception;
 import operator_state;
 import physical_operator_type;
 import query_context;
+import base_table_ref;
 
 module fragment_task;
 
@@ -61,12 +62,15 @@ void FragmentTask::OnExecute(i64) {
 
     bool enable_profiler = query_context->is_enable_profiling();
     TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+    HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
     profiler.Begin();
     UniquePtr<String> err_msg = nullptr;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
             profiler.StartOperator(operator_refs[op_idx]);
+            operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
             operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+            operator_refs[op_idx]->FillingTableRefs(table_refs);
             profiler.StopOperator(operator_states_[op_idx].get());
         }
     } catch (const Exception &e) {

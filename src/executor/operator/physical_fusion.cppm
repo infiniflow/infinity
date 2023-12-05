@@ -23,6 +23,7 @@ import physical_operator_type;
 import table_collection_entry;
 import base_expression;
 import fusion_expression;
+import load_meta;
 
 export module physical_fusion;
 
@@ -30,7 +31,11 @@ namespace infinity {
 
 export class PhysicalFusion final: public PhysicalOperator {
 public:
-    explicit PhysicalFusion(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<FusionExpression> fusion_expr);
+    explicit PhysicalFusion(u64 id,
+                            UniquePtr<PhysicalOperator> left,
+                            UniquePtr<PhysicalOperator> right,
+                            SharedPtr<FusionExpression> fusion_expr,
+                            SharedPtr<Vector<LoadMeta>> load_metas);
     ~PhysicalFusion() override;
 
     void Init() override;

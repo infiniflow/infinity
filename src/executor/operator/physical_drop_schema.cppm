@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_drop_schema;
 
@@ -31,8 +32,9 @@ public:
                                 ConflictType conflict_type,
                                 SharedPtr<Vector<String>> output_names,
                                 SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kDropDatabase, nullptr, nullptr, id), schema_name_(Move(schema_name)),
+                                u64 id,
+                                SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kDropDatabase, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
           conflict_type_(conflict_type), output_names_(Move(output_names)), output_types_(Move(output_types)) {}
 
     ~PhysicalDropSchema() override = default;

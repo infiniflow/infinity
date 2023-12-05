@@ -23,6 +23,7 @@ import physical_operator_type;
 import data_table;
 import hash_table;
 import base_expression;
+import load_meta;
 
 export module physical_aggregate;
 
@@ -40,9 +41,10 @@ public:
                                Vector<SharedPtr<BaseExpression>> groups,
                                u64 groupby_index,
                                Vector<SharedPtr<BaseExpression>> aggregates,
-                               u64 aggregate_index)
-        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id), groups_(Move(groups)), aggregates_(Move(aggregates)),
-          groupby_index_(groupby_index), aggregate_index_(aggregate_index) {}
+                               u64 aggregate_index,
+                               SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id, load_metas), groups_(Move(groups)), groupby_index_(groupby_index),
+          aggregates_(Move(aggregates)), aggregate_index_(aggregate_index) {}
 
     ~PhysicalAggregate() override = default;
 
