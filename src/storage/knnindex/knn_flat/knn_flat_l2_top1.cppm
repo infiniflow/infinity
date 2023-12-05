@@ -25,6 +25,7 @@ import parser;
 import infinity_exception;
 import default_values;
 import vector_distance;
+import bitmask;
 
 export module knn_flat_l2_top1;
 
@@ -79,6 +80,36 @@ public:
 
                 auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
                 single_result_handler_->add_result(l2_distance, RowID{segment_id, segment_offset_start + j}, i);
+            }
+        }
+    }
+
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id, Bitmask &bitmask) final {
+        if (bitmask.GetData() == nullptr) {
+            Search(base, base_count, segment_id, block_id);
+            return;
+        }
+        if (!begin_) {
+            Error<ExecutorException>("KnnFlatL2Top1 isn't begin");
+        }
+
+        this->total_base_count_ += base_count;
+
+        if (base_count == 0) {
+            return;
+        }
+
+        u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+        for (u64 i = 0; i < this->query_count_; ++i) {
+            const DistType *x_i = queries_ + i * this->dimension_;
+            const DistType *y_j = base;
+
+            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+                auto segment_offset = segment_offset_start + j;
+                if (bitmask.IsTrue(segment_offset)) {
+                    auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                    single_result_handler_->add_result(l2_distance, RowID{segment_id, segment_offset}, i);
+                }
             }
         }
     }
