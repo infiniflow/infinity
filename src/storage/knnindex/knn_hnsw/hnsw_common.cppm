@@ -127,7 +127,7 @@ export using LayerSize = i32;
 
 export template <typename Iterator, typename DataType>
 concept DataIteratorConcept = requires(Iterator iter) {
-    { ++iter } -> std::same_as<Optional<DataType>>;
+    { iter.Next() } -> std::same_as<Optional<DataType>>;
 };
 
 export template <typename DataType>
@@ -140,8 +140,7 @@ class DenseVectorIter {
 public:
     DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num) : ptr_(ptr), dim_(dim), vec_num_(vec_num), ptr_end_(ptr_ + dim * vec_num) {}
 
-    // overload prefix++ operator
-    Optional<const DataType *> operator++() {
+    Optional<const DataType *> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return None;
