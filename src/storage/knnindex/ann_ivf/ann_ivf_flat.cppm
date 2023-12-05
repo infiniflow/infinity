@@ -65,20 +65,20 @@ public:
     }
 
     void Search(const DistType *, u16, u32, u16) final {
-        Error<ExecutorException>("Unsupported search function", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Unsupported search function");
     }
 
     void Search(const DistType *, u16, u32, u16, Bitmask &) final {
-        Error<ExecutorException>("Unsupported search function", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Unsupported search function");
     }
 
     void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticL2) {
-            Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("IVFFlatL2 isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -137,10 +137,10 @@ public:
         }
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticL2) {
-            Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("IVFFlatL2 isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -215,14 +215,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return distance_array_->data() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return id_array_->data() + idx * this->top_k_;
     }
@@ -276,20 +276,20 @@ public:
     }
 
     void Search(const DistType *, u16, u32, u16) final {
-        Error<ExecutorException>("Unsupported search function", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Unsupported search function");
     }
 
     void Search(const DistType *, u16, u32, u16, Bitmask &) final {
-        Error<ExecutorException>("Unsupported search function", __FILE_NAME__, __LINE__);
+        Error<ExecutorException>("Unsupported search function");
     }
 
     void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
-            Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("IVFFlatIP isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -348,10 +348,10 @@ public:
         }
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
-            Error<ExecutorException>("Metric type is invalid", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("IVFFlatIP isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -425,14 +425,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return distance_array_->data() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit", __FILE_NAME__, __LINE__);
+            Error<ExecutorException>("Query index exceeds the limit");
         }
         return id_array_->data() + idx * this->top_k_;
     }
