@@ -641,7 +641,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalN
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalMatch> logical_match = static_pointer_cast<LogicalMatch>(logical_operator);
     return MakeUnique<PhysicalMatch>(logical_match->node_id(),
-                                     logical_match->base_table_ref_->table_entry_ptr_,
+                                     logical_match->base_table_ref_,
                                      logical_match->match_expr_,
                                      logical_operator->load_metas());
 }

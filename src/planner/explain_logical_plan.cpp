@@ -852,10 +852,12 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     }
 
     // filter expression
-    String filter_str = String(intent_size, ' ');
-    filter_str += " - filter: ";
-    Explain(knn_scan_node->filter_expression_.get(), filter_str);
-    result->emplace_back(MakeShared<String>(filter_str));
+    if (knn_scan_node->filter_expression_.get() != nullptr) {
+        String filter_str = String(intent_size, ' ');
+        filter_str += " - filter: ";
+        Explain(knn_scan_node->filter_expression_.get(), filter_str);
+        result->emplace_back(MakeShared<String>(filter_str));
+    }
 
     // Output columns
     String output_columns = String(intent_size, ' ');

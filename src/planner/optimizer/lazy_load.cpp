@@ -22,6 +22,7 @@ import column_expression;
 import logical_node_type;
 import logical_table_scan;
 import logical_knn_scan;
+import logical_match;
 import base_table_ref;
 import load_meta;
 
@@ -40,6 +41,11 @@ BaseTableRef * GetScanTableRef(LogicalNode &op) {
             auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
 
             return knn_scan.base_table_ref_.get();
+        }
+        case LogicalNodeType::kMatch: {
+            auto match = dynamic_cast<LogicalMatch &>(op);
+
+            return match.base_table_ref_.get();
         }
         default: {
             return nullptr;

@@ -383,16 +383,16 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     output_block_ptr = operator_state->output_data_blocks_[output_block_idx].get();
                 }
 
-                SizeT column_id = 0;
-                for (; column_id < column_n; ++column_id) {
+                for (SizeT column_id : base_table_ref_->column_ids_) {
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
                     const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
                     output_block_ptr->AppendValueByPtr(column_id, ptr);
                 }
-                output_block_ptr->AppendValueByPtr(column_id++, (ptr_t)&result_dists[id]);
-                output_block_ptr->AppendValueByPtr(column_id, (ptr_t)&row_ids[id]);
+                SizeT last = base_table_ref_->column_ids_.size();
+                output_block_ptr->AppendValueByPtr(last++, (ptr_t)&result_dists[id]);
+                output_block_ptr->AppendValueByPtr(last, (ptr_t)&row_ids[id]);
 
                 ++ output_block_row_id;
             }
