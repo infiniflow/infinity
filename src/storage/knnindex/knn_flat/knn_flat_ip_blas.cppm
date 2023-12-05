@@ -24,6 +24,7 @@ import parser;
 import infinity_exception;
 import default_values;
 import use_mlas;
+import bitmask;
 
 export module knn_flat_ip_blas;
 
@@ -95,6 +96,47 @@ public:
                 }
 
                 heap_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start);
+            }
+        }
+    }
+
+    void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id, Bitmask &bitmask) final {
+        if (bitmask.IsAllTrue()) {
+            Search(base, base_count, segment_id, block_id);
+            return;
+        }
+        if (!begin_) {
+            Error<ExecutorException>("KnnFlatIPBlas isn't begin");
+        }
+
+        this->total_base_count_ += base_count;
+
+        if (base_count == 0) {
+            return;
+        }
+
+        const SizeT bs_x = faiss_distance_compute_blas_query_bs;
+        const SizeT bs_y = faiss_distance_compute_blas_database_bs;
+        u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+        for (SizeT i0 = 0; i0 < this->query_count_; i0 += bs_x) {
+            SizeT i1 = i0 + bs_x;
+            if (i1 > this->query_count_)
+                i1 = this->query_count_;
+
+            for (u16 j0 = 0; j0 < base_count; j0 += bs_y) {
+                u16 j1 = j0 + bs_y;
+                if (j1 > base_count)
+                    j1 = base_count;
+                /* compute the actual dot products */
+                {
+                    int nyi = j1 - j0, nxi = i1 - i0, di = this->dimension_;
+                    matrixA_multiply_transpose_matrixB_output_to_C
+                            (queries_ + i0 * this->dimension_, base + j0 * this->dimension_, nxi, nyi, di,
+                             ip_block_.get());
+                }
+
+                heap_result_handler_->add_results(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start,
+                                                  bitmask);
             }
         }
     }

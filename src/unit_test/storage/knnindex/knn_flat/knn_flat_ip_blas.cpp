@@ -23,6 +23,7 @@ import logger;
 import parser;
 import knn_flat_ip_blas;
 import infinity_context;
+import bitmask;
 
 class KnnFlatIpBlasTest : public BaseTest {};
 
@@ -93,4 +94,58 @@ TEST_F(KnnFlatIpBlasTest, test1) {
     EXPECT_FLOAT_EQ(distance_array[3], 0.20);
     EXPECT_FLOAT_EQ(id_array[3].segment_id_, 0);
     EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
+
+    {
+        KnnFlatIPBlas <f32> knn_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
+        auto p_bitmask = Bitmask::Make(64);
+        p_bitmask->SetFalse(1);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.3);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 0);
+
+            EXPECT_FLOAT_EQ(distance_array_m[1], 0.26);
+            EXPECT_FLOAT_EQ(id_array_m[1].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[1].segment_offset_, 2);
+
+            EXPECT_FLOAT_EQ(distance_array_m[2], 0.2);
+            EXPECT_FLOAT_EQ(id_array_m[2].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[2].segment_offset_, 3);
+        }
+
+        p_bitmask->SetFalse(0);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.26);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 2);
+
+            EXPECT_FLOAT_EQ(distance_array_m[1], 0.2);
+            EXPECT_FLOAT_EQ(id_array_m[1].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[1].segment_offset_, 3);
+        }
+
+        p_bitmask->SetFalse(2);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.2);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 3);
+        }
+    }
 }

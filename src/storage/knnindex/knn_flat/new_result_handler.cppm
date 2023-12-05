@@ -16,6 +16,7 @@ module;
 
 import stl;
 import parser;
+import bitmask;
 import knn_heap;
 //import knn_partition;
 
@@ -121,6 +122,26 @@ struct NewHeapResultHandler : public ResultHandler {
                 if (C::cmp(thresh, dis)) {
                     heap_replace_top<C>(k, heap_dis, heap_ids, dis, RowID(segment_id, segment_offset_start + j));
                     thresh = heap_dis[0];
+                }
+            }
+        }
+    }
+
+    void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id,
+                     u32 segment_offset_start, Bitmask &bitmask) {
+        for (i64 i = i_start; i < i_end; i++) {
+            T *heap_dis = heap_dis_tab + i * k;
+            TI *heap_ids = heap_ids_tab + i * k;
+            const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
+            T thresh = heap_dis[0];
+            for (u32 j = j0; j < j1; j++) {
+                auto segment_offset = segment_offset_start + j;
+                if (bitmask.IsTrue(segment_offset)) {
+                    T dis = dis_tab_i[j];
+                    if (C::cmp(thresh, dis)) {
+                        heap_replace_top<C>(k, heap_dis, heap_ids, dis, RowID(segment_id, segment_offset));
+                        thresh = heap_dis[0];
+                    }
                 }
             }
         }
