@@ -21,6 +21,7 @@ import third_party;
 import physical_operator;
 import plan_fragment;
 import operator_state;
+import data_block;
 
 import infinity_exception;
 
@@ -102,10 +103,21 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     }
     profiler_.End();
 
-    auto output_block = operator_state->data_block_;
-    auto input_rows = operator_state->prev_op_state_ ? operator_state->prev_op_state_->data_block_->row_count() : 0;
-    auto output_data_size = output_block && output_block->Finalized() ? output_block->GetSizeInBytes() : 0;
-    auto output_rows = output_block ? output_block->row_count() : 0;
+    uint64_t input_rows{};
+    SizeT input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
+    for(SizeT block_id = 0; block_id < input_data_block_count; ++ block_id) {
+        DataBlock* input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
+        input_rows += input_data_block->Finalized() ? input_data_block->row_count() : 0;
+    }
+
+    uint64_t output_rows{};
+    uint64_t output_data_size{};
+    SizeT output_data_block_count = operator_state->data_block_array_.size();
+    for(SizeT block_id = 0; block_id < output_data_block_count; ++ block_id) {
+        DataBlock* output_data_block = operator_state->data_block_array_[block_id].get();
+        output_data_size += output_data_block->Finalized() ? output_data_block->GetSizeInBytes() : 0;
+        output_rows += output_data_block->Finalized() ? output_data_block->row_count() : 0;
+    }
 
     OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
 

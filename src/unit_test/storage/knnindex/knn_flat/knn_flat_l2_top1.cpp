@@ -23,6 +23,7 @@ import logger;
 import parser;
 import knn_flat_l2_top1;
 import infinity_context;
+import bitmask;
 
 class KnnFlatL2Top1Test : public BaseTest {};
 
@@ -81,4 +82,46 @@ TEST_F(KnnFlatL2Top1Test, test1) {
     EXPECT_FLOAT_EQ(distance_array[0], 0);
     EXPECT_FLOAT_EQ(id_array[0].segment_id_, 0);
     EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 0);
+
+    {
+        KnnFlatL2Top1 <f32> knn_distance_m(query_embedding.get(), 1, dimension, EmbeddingDataType::kElemFloat);
+        auto p_bitmask = Bitmask::Make(64);
+        p_bitmask->SetFalse(0);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.02);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 1);
+        }
+
+        p_bitmask->SetFalse(1);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.08);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 2);
+        }
+
+        p_bitmask->SetFalse(2);
+        {
+            knn_distance_m.Begin();
+            knn_distance_m.Search(base_embedding.get(), base_embedding_count, 0, 0, *p_bitmask);
+            knn_distance_m.End();
+            f32 *distance_array_m = knn_distance_m.GetDistanceByIdx(0);
+            RowID *id_array_m = knn_distance_m.GetIDByIdx(0);
+
+            EXPECT_FLOAT_EQ(distance_array_m[0], 0.2);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_id_, 0);
+            EXPECT_FLOAT_EQ(id_array_m[0].segment_offset_, 3);
+        }
+    }
 }

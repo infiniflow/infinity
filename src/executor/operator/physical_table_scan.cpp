@@ -33,6 +33,7 @@ import block_column_entry;
 import block_index;
 import table_collection_entry;
 import default_values;
+import infinity_exception;
 
 module physical_table_scan;
 
@@ -111,14 +112,13 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
                                         TableScanOperatorState *table_scan_operator_state) {
-    if(table_scan_operator_state->data_block_.get() == nullptr) {
-        table_scan_operator_state->data_block_ = DataBlock::Make();
-
-        // Performance issue here.
-        table_scan_operator_state->data_block_->Init(*GetOutputTypes());
+    if(!table_scan_operator_state->data_block_array_.empty()) {
+        Error<ExecutorException>("Table scan output data block array should be empty");
     }
 
-    DataBlock *output_ptr = table_scan_operator_state->data_block_.get();
+    table_scan_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
+    DataBlock *output_ptr = table_scan_operator_state->data_block_array_.back().get();
+    output_ptr->Init(*GetOutputTypes());
 
     TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;

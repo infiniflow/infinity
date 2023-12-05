@@ -127,7 +127,7 @@ export using LayerSize = i32;
 
 export template <typename Iterator, typename DataType>
 concept DataIteratorConcept = requires(Iterator iter) {
-    { ++iter } -> std::same_as<Optional<DataType>>;
+    { iter.Next() } -> std::same_as<Optional<DataType>>;
 };
 
 export template <typename DataType>
@@ -140,37 +140,12 @@ class DenseVectorIter {
 public:
     DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num) : ptr_(ptr), dim_(dim), vec_num_(vec_num), ptr_end_(ptr_ + dim * vec_num) {}
 
-    // overload prefix++ operator
-    Optional<const DataType *> operator++() {
+    Optional<const DataType *> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return None;
         }
         ptr_ += dim_;
-        return ret;
-    }
-};
-
-// this iterator is temp
-export template <typename DataType>
-class TmpIterator {
-    Vector<Pair<const DataType *, SizeT>> vecs_;
-    const SizeT dim_;
-    SizeT idx1_;
-    SizeT idx2_;
-
-public:
-    TmpIterator(Vector<Pair<const DataType *, SizeT>> vecs, SizeT dim) : vecs_(Move(vecs)), dim_(dim), idx1_(0), idx2_(0) {}
-    Optional<const DataType *> operator++() {
-        if (idx1_ == vecs_.size()) {
-            return None;
-        }
-        auto ret = vecs_[idx1_].first + idx2_ * dim_;
-        idx2_++;
-        if (idx2_ == vecs_[idx1_].second) {
-            idx1_++;
-            idx2_ = 0;
-        }
         return ret;
     }
 };

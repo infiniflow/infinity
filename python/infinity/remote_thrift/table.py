@@ -57,7 +57,7 @@ class RemoteTable(Table, ABC):
         return self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
                                             index_name=index_name)
 
-    def insert(self, data: list[dict[str, Union[str, int, float]]]):
+    def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
         table_name = self._table_name
@@ -77,6 +77,13 @@ class RemoteTable(Table, ABC):
                 elif isinstance(value, float):
                     constant_expression.literal_type = ttypes.LiteralType.Double
                     constant_expression.f64_value = value
+                elif isinstance(value, list):
+                    if isinstance(value[0], int):
+                        constant_expression.literal_type = ttypes.LiteralType.IntegerArray
+                        constant_expression.i64_array_value = value
+                    elif isinstance(value[0], float):
+                        constant_expression.literal_type = ttypes.LiteralType.DoubleArray
+                        constant_expression.f64_array_value = value
                 else:
                     raise Exception("Invalid constant expression")
                 paser_expr_type = ttypes.ParsedExprType()

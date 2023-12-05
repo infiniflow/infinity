@@ -15,28 +15,33 @@
 module;
 
 import stl;
-import fragment_data;
-import third_party;
+import buffer_handle;
+import block_column_entry;
 
-export module fragment_data_queue;
+export module block_column_iter;
 
 namespace infinity {
 
-export struct FragmentDataQueue {
-    void Enqueue(const SharedPtr<FragmentData> &fragment_data);
+export class BlockColumnIter {
+public:
+    BlockColumnIter(BlockColumnEntry *entry, u16 row_count)
+        : buffer_handle_(entry->buffer_->Load()), ele_size_(entry->column_type_->Size()), row_count_(row_count), offset_(0) {}
 
-    template <class It>
-    inline void EnqueueBulk(It iter, SizeT count) {
-        queue_.enqueue_bulk(Forward<It>(iter), count);
+    Optional<const void *> Next() {
+        if (offset_ >= row_count_) {
+            return None;
+        }
+        auto ret = static_cast<const char *>(buffer_handle_.GetData()) + offset_ * ele_size_;
+        ++offset_;
+        return ret;
     }
 
-    bool TryDequeue(SharedPtr<FragmentData> &fragment_data);
+private:
+    BufferHandle buffer_handle_;
+    SizeT ele_size_;
+    SizeT row_count_;
 
-    void Dequeue(SharedPtr<FragmentData> &fragment_data);
-
-    inline SizeT ApproxSize() const { return queue_.size_approx(); }
-
-    BlockingConcurrentQueue<SharedPtr<FragmentData>> queue_;
+    SizeT offset_;
 };
 
 } // namespace infinity

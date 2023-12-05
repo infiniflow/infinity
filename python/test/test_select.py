@@ -235,14 +235,12 @@ class TestSelect:
 
         for i in range(8000):
             table_obj.insert(
-                [{"c1": 'a', "c2": 'a'},{ "c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
+                [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
         res = table_obj.search().output(["*"]).to_df()
         assert res.row_count == 32000
 
-
-
-    def test_select_embedding(self):
+    def test_select_embedding_int32(self):
         """
 
         TestSelect.test_select_embedding()
@@ -284,6 +282,53 @@ class TestSelect:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
+
+    def test_select_embedding_float(self):
+        """
+        Method: test_select_embedding_float
+
+        This method performs a series of tests on the `test_select_embedding_float` table in the Infinity database.
+
+        Parameters:
+        None
+
+        Returns:
+        None
+
+        Example Usage:
+        test_select_embedding_float()
+
+        """
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        db_obj = infinity_obj.get_database("default")
+
+        db_obj.drop_table("test_select_embedding_float")
+
+        res = db_obj.create_table("test_select_embedding_float", {"c1": "float", "c2": "vector,4,float"}, None)
+
+        table_obj = db_obj.get_table("test_select_embedding_float")
+
+        parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
+        test_csv_dir = parent_dir + "/test/data/csv/embedding_float_dim4.csv"
+        assert os.path.exists(test_csv_dir)
+
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.success
+
+        res = table_obj.search().output(["c2"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c2': ([0.1, 0.2, 0.3, -0.2], [0.2, 0.1, 0.3, 0.4],
+                    [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])}))
+
+        res = table_obj.search().output(["*"]).to_df()
+        print(res)
+
+        pd.testing.assert_frame_equal(res,
+                                      pd.DataFrame({'c1': (2, 4, 6, 8), 'c2': (
+                                          [0.1, 0.2, 0.3, -0.2], [0.2, 0.1, 0.3, 0.4],
+                                          [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])})
+                                      .astype({'c1': dtype('float32'), 'c2': dtype('O')}))
 
     def test_select_big_embedding(self):
         """

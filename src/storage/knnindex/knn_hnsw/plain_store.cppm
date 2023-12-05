@@ -83,7 +83,7 @@ public:
             DataType *ptr = ptr_.get() + new_idx * dim();
             while (vec_num--) {
                 // not check optional here. because vec_num already contains the number of elements in the iterator.
-                auto vec = *(++query_iter);
+                auto vec = *(query_iter.Next());
                 Copy(vec, vec + dim(), ptr);
                 ptr += dim();
             }

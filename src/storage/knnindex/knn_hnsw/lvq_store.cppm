@@ -236,7 +236,7 @@ private:
         Iterator query_iter1 = query_iter;
 
         for (SizeT i = 0; i < vec_num; ++i) {
-            auto vec = *(++query_iter1);
+            auto vec = *(query_iter1.Next());
             for (SizeT j = 0; j < dim(); ++j) {
                 mean[j] += vec[j];
             }
@@ -255,7 +255,7 @@ private:
             ++vec_i;
         }
         while (vec_i < compress_n + plain_data_.cur_vec_num() + vec_num) {
-            auto vec = *(++query_iter);
+            auto vec = *(query_iter.Next());
             CompressVec(vec, GetLVQData(vec_i));
             ++vec_i;
         }

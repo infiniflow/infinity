@@ -17,27 +17,29 @@ module;
 import data_block;
 import stl;
 import physical_operator_type;
+import fragment_data;
 
 module operator_state;
 
 namespace infinity {
 
-void QueueSourceState::PushData(DataBlock *input_data_block) {
-    switch(next_op_state_->operator_type_) {
-        case PhysicalOperatorType::kMergeKnn: {
-            MergeKnnOperatorState* merge_knn_op_state = (MergeKnnOperatorState*)next_op_state_;
-            merge_knn_op_state->input_data_block_ = input_data_block;
-            ++merge_knn_op_state->received_data_count_;
-            if (merge_knn_op_state->received_data_count_ >= merge_knn_op_state->total_data_count_) {
-                merge_knn_op_state->input_complete_ = true;
+bool QueueSourceState::GetData(UniquePtr<DataBlock> &output) {
+    SharedPtr<FragmentData> fragment_data = nullptr;
+    source_queue_.Dequeue(fragment_data);
+//    DataBlock* input_data_block = fragment_data->data_block_.get();
+    if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
+        auto it = num_tasks_.find(fragment_data->fragment_id_);
+        if (it != num_tasks_.end()) {
+            u64 &pending_tasks = it->second;
+            pending_tasks--;
+            if (pending_tasks == 0) {
+                num_tasks_.erase(it);
             }
-            break;
-        }
-        default: {
-            break;
         }
     }
-
+    output = Move(fragment_data->data_block_);
+    return num_tasks_.empty();
 }
+
 
 } // namespace infinity
