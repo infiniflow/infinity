@@ -141,6 +141,11 @@ class TestInsert:
         assert res.success
         res = table_obj.search().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
+        res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {"c1": [7, 8, 9]}, {"c1": [-7, -8, -9]}])
+        assert res.success
+        res = table_obj.search().output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9],
+                                                                [1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
 
         db_obj.drop_table("test_insert_embedding_2")
         db_obj.create_table("test_insert_embedding_2", {"c1": "vector,3,float"}, None)
