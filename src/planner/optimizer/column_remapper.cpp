@@ -40,8 +40,8 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
 
     if (op.operator_type() == LogicalNodeType::kJoin) {
         VisitNodeChildren(op);
-        load_func();
         bindings_ = op.GetColumnBindings();
+        load_func();
         VisitNodeExpression(op);
     } else {
         VisitNodeChildren(op);

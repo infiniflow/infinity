@@ -53,9 +53,9 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
         auto table_idx = base_table_ref->table_index_;
         auto column_types = base_table_ref->column_types_;
         auto scan_bindings = op.GetColumnBindings();
-        scan_bindings_ = op.GetColumnBindings();
 
         column_types_.insert({table_idx, column_types});
+        scan_bindings_.insert(scan_bindings_.begin(), scan_bindings.begin(), scan_bindings.end());
         unloaded_bindings_.insert(scan_bindings.begin(), scan_bindings.end());
         return;
     }
