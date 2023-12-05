@@ -131,7 +131,7 @@ public:
     }
 
     void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
-        if (bitmask.GetData() == nullptr) {
+        if (bitmask.IsAllTrue()) {
             Search(base_ivf, segment_id, n_probes);
             return;
         }
@@ -342,7 +342,7 @@ public:
     }
 
     void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
-        if (bitmask.GetData() == nullptr) {
+        if (bitmask.IsAllTrue()) {
             Search(base_ivf, segment_id, n_probes);
             return;
         }

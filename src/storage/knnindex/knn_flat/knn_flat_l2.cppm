@@ -76,7 +76,7 @@ public:
     }
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id, Bitmask &bitmask) final {
-        if (bitmask.GetData() == nullptr) {
+        if (bitmask.IsAllTrue()) {
             Search(base, base_count, segment_id, block_id);
             return;
         }
