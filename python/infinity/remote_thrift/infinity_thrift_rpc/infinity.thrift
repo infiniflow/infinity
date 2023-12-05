@@ -160,7 +160,7 @@ ColumnInvalid,
 
 struct ColumnField {
 1: ColumnType column_type,
-2: binary column_vector,
+2: list<binary> column_vectors = [],
 }
 
 struct ImportOption {

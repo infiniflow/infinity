@@ -1106,9 +1106,9 @@ void swap(Field &a, Field &b);
 std::ostream& operator<<(std::ostream& out, const Field& obj);
 
 typedef struct _ColumnField__isset {
-  _ColumnField__isset() : column_type(false), column_vector(false) {}
+  _ColumnField__isset() : column_type(false), column_vectors(true) {}
   bool column_type :1;
-  bool column_vector :1;
+  bool column_vectors :1;
 } _ColumnField__isset;
 
 class ColumnField : public virtual ::apache::thrift::TBase {
@@ -1117,8 +1117,8 @@ class ColumnField : public virtual ::apache::thrift::TBase {
   ColumnField(const ColumnField&);
   ColumnField& operator=(const ColumnField&);
   ColumnField() noexcept
-              : column_type(static_cast<ColumnType::type>(0)),
-                column_vector() {
+              : column_type(static_cast<ColumnType::type>(0)) {
+
   }
 
   virtual ~ColumnField() noexcept;
@@ -1127,19 +1127,19 @@ class ColumnField : public virtual ::apache::thrift::TBase {
    * @see ColumnType
    */
   ColumnType::type column_type;
-  std::string column_vector;
+  std::vector<std::string>  column_vectors;
 
   _ColumnField__isset __isset;
 
   void __set_column_type(const ColumnType::type val);
 
-  void __set_column_vector(const std::string& val);
+  void __set_column_vectors(const std::vector<std::string> & val);
 
   bool operator == (const ColumnField & rhs) const
   {
     if (!(column_type == rhs.column_type))
       return false;
-    if (!(column_vector == rhs.column_vector))
+    if (!(column_vectors == rhs.column_vectors))
       return false;
     return true;
   }

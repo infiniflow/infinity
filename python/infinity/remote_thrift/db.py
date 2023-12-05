@@ -137,4 +137,8 @@ class RemoteThriftDatabase(Database, ABC):
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
-        return RemoteTable(self._conn, self._db_name, table_name)
+        res = self._conn.client.get_table(db_name=self._conn.db_name, table_name=table_name)
+        if res.success is True:
+            return RemoteTable(self._conn, self._db_name, table_name)
+        else:
+            raise Exception("Get Table Error")
