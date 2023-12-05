@@ -109,8 +109,12 @@ private:
                 if (input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while (start_index < end_index) {
-                        // Bug here? input_ptr[i] should be input_ptr[start_index]?
-                        Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), start_index++, state_ptr);
+                        Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
+                                                                          result_ptr[start_index],
+                                                                          result_null.get(),
+                                                                          start_index,
+                                                                          state_ptr);
+                        ++start_index;
                     }
                 } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -120,12 +124,12 @@ private:
                     while (start_index < end_index) {
                         if (input_null->IsTrue(start_index - original_start)) {
                             // This row isn't null
-                            // Bug here? input_ptr[i] should be input_ptr[start_index]?
-                            Operator::template Execute<InputType, ResultType>(input_ptr[i],
-                                                                              result_ptr[i],
+                            Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
+                                                                              result_ptr[start_index],
                                                                               result_null.get(),
-                                                                              start_index++,
+                                                                              start_index,
                                                                               state_ptr);
+                            ++start_index;
                         }
                     }
                 }
