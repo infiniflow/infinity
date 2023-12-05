@@ -2,9 +2,14 @@
 #include "analysis/segmentation_token_stream.hpp"
 #include "index/norm.hpp"
 #include "index/segment_writer.hpp"
+#include "parser/search_options.h"
 #include "search/bm25.hpp"
 #include "search/filter.hpp"
+#include "search/proxy_filter.hpp"
+#include "search/range_filter.hpp"
 #include "search/score.hpp"
+#include "search/term_filter.hpp"
+#include "search/terms_filter.hpp"
 #include "store/fs_directory.hpp"
 #include "unit_test/base_test.h"
 #include "utils/text_format.hpp"
@@ -17,8 +22,17 @@ import stl;
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
+import logger;
 
 using namespace infinity;
+
+using IrsFilter = irs::filter;
+
+using ScoredId = Pair<float, u32>;
+using ScoredIds = Vector<ScoredId>;
+static const String DEFAULT_SCORER("bm25");
+static const String DEFAULT_SCORER_ARG("");
+static const SizeT DEFAULT_TOPN(100);
 
 class IRSDataStore {
 public:
@@ -45,6 +59,8 @@ public:
     IRSDataStore::DataSnapshotPtr LoadSnapshot() const;
 
     void Commit();
+
+    int Search(IrsFilter *flt, const Map<String, String> &options, ScoredIds &sorted);
 
 public:
     String directory_;
@@ -105,11 +121,107 @@ void IRSDataStore::Commit() {
     StoreSnapshot(data);
 }
 
+enum class ExecutionMode { kAll, kStrictTop, kTop };
+
+int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, ScoredIds &sorted) {
+    ExecutionMode mode{ExecutionMode::kTop};
+    irs::WandContext wand{.index = 0, .strict = false};
+
+    String scorer(DEFAULT_SCORER);
+    String scorer_arg(DEFAULT_SCORER_ARG);
+    if (auto it = options.find("scorer"); it != options.end()) {
+        scorer = it->second;
+    }
+    if (auto it = options.find("scorer_arg"); it != options.end()) {
+        scorer_arg = it->second;
+    }
+    auto arg_format = irs::type<irs::text_format::csv>::get();
+    auto scr = irs::scorers::get(scorer, arg_format, scorer_arg);
+    if (!scr) {
+        return -1;
+    }
+    auto *score = scr.get();
+
+    const IRSDirectoryReader &reader = GetDirectoryReader();
+    irs::Scorers order = irs::Scorers::Prepare(scr.get());
+
+    irs::filter::prepared::ptr filter = flt->prepare({
+        .index = reader,
+        .scorers = order,
+    });
+
+    SizeT topn(DEFAULT_TOPN);
+    if (auto it = options.find("topn"); it != options.end()) {
+        topn = StrToInt(it->second);
+    }
+
+    SizeT doc_count(0);
+    sorted.reserve(topn);
+    for (auto left = topn; auto &segment : reader) {
+        auto docs = filter->execute(irs::ExecutionContext{.segment = segment, .scorers = order, .wand = wand});
+        IRS_ASSERT(docs);
+
+        const irs::document *doc = irs::get<irs::document>(*docs);
+        const irs::score *score = irs::get<irs::score>(*docs);
+        auto *threshold = irs::get_mutable<irs::score>(docs.get());
+        if (!left && threshold) {
+            IRS_ASSERT(!sorted.empty());
+            IRS_ASSERT(std::is_heap(std::begin(sorted),
+                                    std::end(sorted),
+                                    [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                        return lhs.first > rhs.first;
+                                    }));
+            threshold->Min(sorted.front().first);
+        }
+
+        for (float_t score_value; docs->next();) {
+            ++doc_count;
+            (*score)(&score_value);
+            if (left) {
+                sorted.emplace_back(score_value, doc->value);
+                if (0 == --left) {
+                    std::make_heap(std::begin(sorted),
+                                   std::end(sorted),
+                                   [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                       return lhs.first > rhs.first;
+                                   });
+                    threshold->Min(sorted.front().first);
+                }
+            } else if (sorted.front().first < score_value) {
+                std::pop_heap(std::begin(sorted),
+                              std::end(sorted),
+                              [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                  return lhs.first > rhs.first;
+                              });
+                auto &[score, doc_id] = sorted.back();
+                score = score_value;
+                doc_id = doc->value;
+                std::push_heap(std::begin(sorted),
+                               std::end(sorted),
+                               [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept {
+                                   return lhs.first > rhs.first;
+                               });
+                threshold->Min(sorted.front().first);
+            }
+        }
+    }
+    std::sort(
+        std::begin(sorted),
+        std::end(sorted),
+        [](const std::pair<float_t, irs::doc_id_t> &lhs, const std::pair<float_t, irs::doc_id_t> &rhs) noexcept { return lhs.first > rhs.first; });
+    return 0;
+}
+
 class IRSDatastoreTest : public BaseTest {
     void SetUp() override {}
 
     void TearDown() override {}
 };
+
+static irs::bstring toBstring(const std::string &str) {
+    irs::bstring converted_str((uint8_t *)str.c_str(), str.length());
+    return converted_str;
+}
 
 TEST_F(IRSDatastoreTest, test1) {
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
@@ -153,6 +265,21 @@ TEST_F(IRSDatastoreTest, test1) {
             doc.Insert<irs::Action::INDEX>(*field);
         }
     }
+
+    UniquePtr<irs::filter> flt;
+    auto query = std::make_unique<irs::by_term>();
+    query->mutable_options()->term = toBstring("of");
+    *query->mutable_field() = "body";
+    flt = Move(query);
+
+    SearchOptions search_ops("");
+    ScoredIds result;
+    auto rc = datastore.Search(flt.get(), search_ops.options_, result);
+    if (rc != 0) {
+        std::cout << "IRSDataStore::Search failed" << std::endl;
+    }
+    std::cout << "Result size:" << result.size() << std::endl;
+
     /*
 
     for (int i = 1; i < 10000; ++i) {
