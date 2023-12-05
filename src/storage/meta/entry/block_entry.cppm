@@ -61,6 +61,9 @@ export struct BlockVersion {
 
 export struct BlockEntry : public BaseEntry {
 public:
+    // for iterator unit test
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
+
     /// Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
     /// Construct a new block entry For Replay

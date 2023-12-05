@@ -25,20 +25,17 @@ export module block_iter;
 namespace infinity {
 
 export class BlockIter {
-private:
-    static Vector<BlockColumnIter> MakeColumnIters(const BlockEntry *entry, const std::vector<SizeT> &column_ids) {
-        Vector<BlockColumnIter> ret;
+public:
+    BlockIter(const BlockEntry *entry, const Vector<SizeT> &column_ids) {
+        Vector<BlockColumnIter> column_iters;
         for (auto column_id : column_ids) {
-            ret.emplace_back(BlockEntry::GetColumnDataByID(entry, column_id), entry->row_count_);
+            column_iters.emplace_back(BlockEntry::GetColumnDataByID(entry, column_id), entry->row_count_);
         }
-        return ret;
+        column_iters_ = column_iters;
     }
 
-public:
-    BlockIter(const BlockEntry *entry, const Vector<SizeT> &column_ids) : column_iters_(MakeColumnIters(entry, column_ids)) {}
-
-    Optional<Vector<const void*>> Next() {
-        Vector<const void*> rets;
+    Optional<Vector<const void *>> Next() {
+        Vector<const void *> rets;
         for (auto &column_iter : column_iters_) {
             auto ret = column_iter.Next();
             if (!ret) {
@@ -47,14 +44,6 @@ public:
             rets.emplace_back(*ret);
         }
         return rets;
-    }
-
-    Vector<SizeT> GetColumnIds() const {
-        Vector<SizeT> ret;
-        for (auto &column_iter : column_iters_) {
-            ret.emplace_back(column_iter.column_id_);
-        }
-        return ret;
     }
 
 private:

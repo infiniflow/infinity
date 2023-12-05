@@ -167,7 +167,7 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
 template <typename DataType>
 class OneColumnIterator {
 public:
-    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, {column_id}) {}
+    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
 
     Optional<const DataType *> operator++() {
         if (auto ret = segment_iter_.Next(); ret) {
@@ -236,7 +236,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-            
+
             BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
             auto InsertHnsw = [&](auto &hnsw_index) {
                 u32 segment_offset = 0;

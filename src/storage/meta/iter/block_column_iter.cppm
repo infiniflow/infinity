@@ -25,8 +25,7 @@ namespace infinity {
 export class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, u16 row_count)
-        : column_id_(entry->column_id_), buffer_handle_(entry->buffer_->Load()), ele_size_(entry->column_type_->Size()), row_count_(row_count),
-          offset_(0) {}
+        : buffer_handle_(entry->buffer_->Load()), ele_size_(entry->column_type_->Size()), row_count_(row_count), offset_(0) {}
 
     Optional<const void *> Next() {
         if (offset_ >= row_count_) {
@@ -37,12 +36,10 @@ public:
         return ret;
     }
 
-    const SizeT column_id_;
-
 private:
-    const BufferHandle buffer_handle_;
-    const SizeT ele_size_;
-    const SizeT row_count_;
+    BufferHandle buffer_handle_;
+    SizeT ele_size_;
+    SizeT row_count_;
 
     SizeT offset_;
 };

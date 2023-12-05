@@ -27,15 +27,15 @@ export class TableIter {
 private:
     using SegmentIdx = Map<u32, SharedPtr<SegmentEntry>>::const_iterator;
 
-    TableIter(const TableCollectionEntry *entry, SegmentIdx idx, Optional<SegmentIter> iter)
-        : entry_(entry), segment_idx_(Move(idx)), segment_iter_(Move(iter)) {}
+    TableIter(const TableCollectionEntry *entry, SegmentIdx idx, Optional<SegmentIter> iter, SharedPtr<Vector<SizeT>> column_ids)
+        : entry_(entry), segment_idx_(Move(idx)), segment_iter_(Move(iter)), column_ids_(column_ids) {}
 
 public:
-    TableIter Make(const TableCollectionEntry *entry, const Vector<SizeT> &column_ids) {
+    static TableIter Make(const TableCollectionEntry *entry, SharedPtr<Vector<SizeT>> column_ids) {
         if (entry->segment_map_.empty()) {
-            return TableIter(entry, entry->segment_map_.end(), None);
+            return TableIter(entry, entry->segment_map_.end(), None, column_ids);
         } else {
-            return TableIter(entry, entry->segment_map_.begin(), SegmentIter(entry->segment_map_.begin()->second.get(), column_ids));
+            return TableIter(entry, entry->segment_map_.begin(), SegmentIter(entry->segment_map_.begin()->second.get(), column_ids), column_ids);
         }
     }
 
@@ -52,9 +52,9 @@ public:
         }
         segment_idx_++;
         if (segment_idx_ == entry_->segment_map_.end()) {
-            segment_iter_ = SegmentIter(entry_->unsealed_segment_, segment_iter_->GetColumnIds());
+            segment_iter_ = SegmentIter(entry_->unsealed_segment_, column_ids_);
         } else {
-            segment_iter_ = SegmentIter(segment_idx_->second.get(), segment_iter_->GetColumnIds());
+            segment_iter_ = SegmentIter(segment_idx_->second.get(), column_ids_);
         }
         return Next();
     }
@@ -63,6 +63,8 @@ private:
     const TableCollectionEntry *entry_;
     SegmentIdx segment_idx_;
     Optional<SegmentIter> segment_iter_;
+
+    SharedPtr<Vector<SizeT>> column_ids_;
 };
 
 } // namespace infinity

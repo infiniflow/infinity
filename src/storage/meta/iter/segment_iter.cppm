@@ -24,11 +24,11 @@ namespace infinity {
 
 export class SegmentIter {
 public:
-    SegmentIter(const SegmentEntry *entry, const Vector<SizeT> &column_ids) : entry_(entry), block_idx_(0) {
+    SegmentIter(const SegmentEntry *entry, SharedPtr<Vector<SizeT>> column_ids) : entry_(entry), block_idx_(0), column_ids_(column_ids) {
         if (entry->block_entries_.empty()) {
             block_iter_ = None;
         } else {
-            block_iter_ = BlockIter(entry->block_entries_[block_idx_].get(), column_ids);
+            block_iter_ = BlockIter(entry->block_entries_[block_idx_].get(), *column_ids);
         }
     }
 
@@ -44,20 +44,16 @@ public:
             block_iter_ = None;
             return None;
         }
-        block_iter_ = BlockIter(entry_->block_entries_[block_idx_].get(), block_iter_->GetColumnIds());
+        block_iter_ = BlockIter(entry_->block_entries_[block_idx_].get(), *column_ids_);
         return Next();
-    }
-
-    Vector<SizeT> GetColumnIds() const {
-        if (!block_iter_.has_value()) {
-            return {};
-        }
-        return block_iter_->GetColumnIds();
     }
 
 private:
     const SegmentEntry *entry_;
     SizeT block_idx_;
     Optional<BlockIter> block_iter_;
+
+    SharedPtr<Vector<SizeT>> column_ids_;
 };
+
 } // namespace infinity
