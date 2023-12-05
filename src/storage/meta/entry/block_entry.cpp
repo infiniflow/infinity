@@ -55,12 +55,12 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
         return 0;
     i64 idx = created_.size() - 1;
     for (; idx >= 0; idx--) {
-        if (created_[idx].first <= begin_ts)
+        if (created_[idx].create_ts_ <= begin_ts)
             break;
     }
     if (idx < 0)
         return 0;
-    return created_[idx].second;
+    return created_[idx].row_count_;
 }
 
 void BlockVersion::LoadFromFile(const String &version_path) {
@@ -79,22 +79,22 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     int32_t deleted_size = ReadBufAdv<int32_t>(ptr);
     created_.resize(created_size);
     deleted_.resize(deleted_size);
-    Memcpy(created_.data(), ptr, created_size * sizeof(Pair<TxnTimeStamp, int32_t>));
-    ptr += created_size * sizeof(Pair<TxnTimeStamp, int32_t>);
+    Memcpy(created_.data(), ptr, created_size * sizeof(CreateField));
+    ptr += created_size * sizeof(CreateField);
     Memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     Assert<StorageException>(ptr - buf.data() == buf_len, "Failed to load block_version file: " + version_path);
 }
 
 void BlockVersion::SaveToFile(const String &version_path) {
-    int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
+    int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(CreateField);
     exp_size += sizeof(int32_t) + deleted_.size() * sizeof(TxnTimeStamp);
     Vector<char> buf(exp_size, 0);
     char *ptr = buf.data();
     WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
     WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
-    Memcpy(ptr, created_.data(), created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>));
-    ptr += created_.size() * sizeof(Pair<TxnTimeStamp, int32_t>);
+    Memcpy(ptr, created_.data(), created_.size() * sizeof(CreateField));
+    ptr += created_.size() * sizeof(CreateField);
     Memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     Assert<StorageException>(ptr - buf.data() == exp_size, "Failed to save block_version file: " + version_path);
@@ -139,7 +139,7 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry,
     }
 
     block_version_ = MakeUnique<BlockVersion>(row_capacity_);
-    block_version_->created_.emplace_back(MakePair((u64)min_row_ts_, (i32)row_count_));
+    block_version_->created_.emplace_back((TxnTimeStamp)min_row_ts_, (i32)row_count_);
 }
 
 Pair<u16, u16> BlockEntry::VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin) {

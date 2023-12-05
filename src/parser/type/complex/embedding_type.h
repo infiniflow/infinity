@@ -25,8 +25,8 @@ enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, k
 
 struct EmbeddingType {
 public:
-    char *ptr = nullptr;
-    const bool new_allocated_;
+    char *ptr{};
+    const bool new_allocated_{};
 
     static size_t embedding_type_width[];
 
