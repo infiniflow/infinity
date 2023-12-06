@@ -281,19 +281,18 @@ class RemoteTable(Table, ABC):
 
                 knn_expr.column_expr = traverse_conditions(condition(vector_column_name))
 
-                match type(embedding[0]):
-                    case int():
-                        data = ttypes.EmbeddingData()
-                        data.int64_data = embedding
-                        knn_expr.embedding_data = data
-                        knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
-                    case float():
-                        data = ttypes.EmbeddingData()
-                        data.double_data = embedding
-                        knn_expr.embedding_data = data
-                        knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat64
-                    case _:
-                        raise Exception(f"Invalid embedding {embedding[0]} type")
+                if isinstance(embedding[0], int):
+                    data = ttypes.EmbeddingData()
+                    data.int64_data = embedding
+                    knn_expr.embedding_data = data
+                    knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
+                elif isinstance(embedding[0], float):
+                    data = ttypes.EmbeddingData()
+                    data.double_data = embedding
+                    knn_expr.embedding_data = data
+                    knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat64
+                else:
+                    raise Exception(f"Invalid embedding {embedding[0]} type")
 
                 match query.distance:
                     case "L2":
