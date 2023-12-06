@@ -24,6 +24,7 @@ import base_expression;
 import data_table;
 import expression_evaluator;
 import expression_selector;
+import load_meta;
 
 export module physical_filter;
 
@@ -31,8 +32,8 @@ namespace infinity {
 
 export class PhysicalFilter : public PhysicalOperator {
 public:
-    explicit PhysicalFilter(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<BaseExpression> condition)
-        : PhysicalOperator(PhysicalOperatorType::kFilter, Move(left), nullptr, id), condition_(Move(condition)) {}
+    explicit PhysicalFilter(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<BaseExpression> condition, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kFilter, Move(left), nullptr, id, load_metas), condition_(Move(condition)) {}
 
     ~PhysicalFilter() override = default;
 

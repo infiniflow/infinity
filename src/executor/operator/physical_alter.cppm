@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_alter;
 
@@ -27,9 +28,12 @@ namespace infinity {
 
 export class PhysicalAlter final : public PhysicalOperator {
 public:
-    explicit PhysicalAlter(SharedPtr<Vector<String>> output_names, SharedPtr<Vector<SharedPtr<DataType>>> output_types, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id), output_names_(Move(output_names)),
-          output_types_(Move(output_types)) {}
+    explicit PhysicalAlter(SharedPtr<Vector<String>> output_names,
+                           SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                           u64 id,
+                           SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas),
+          output_names_(Move(output_names)), output_types_(Move(output_types)) {}
 
     ~PhysicalAlter() override = default;
 

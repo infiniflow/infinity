@@ -114,8 +114,6 @@ public:
 
     void AppendValue(const Value &value);
 
-    void AppendByRawPtr(const_ptr_t raw_ptr);
-
     void AppendByPtr(const_ptr_t value_ptr);
 
     void AppendWith(const ColumnVector &other);
@@ -166,6 +164,15 @@ public:
     void WriteAdv(char *&ptr) const;
     // Read from a serialized version
     static SharedPtr<ColumnVector> ReadAdv(char *&ptr, i32 maxbytes);
+
+    template <typename T>
+    static void CopyValue(const ColumnVector &src, const ColumnVector &dst, SizeT count) {
+        auto *src_ptr = (T *)(dst.data_ptr_);
+        T *dst_ptr = &((T *)(src.data_ptr_))[src.tail_index_];
+        for (SizeT idx = 0; idx < count; ++idx) {
+            dst_ptr[idx] = src_ptr[idx];
+        }
+    }
 
 private:
     template <typename DataT>

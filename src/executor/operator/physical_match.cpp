@@ -47,13 +47,14 @@ import segment_entry;
 import block_entry;
 import column_buffer;
 import block_column_entry;
+import load_meta;
 
 module physical_match;
 
 namespace infinity {
 
-PhysicalMatch::PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr)
-    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)), match_expr_(match_expr) {}
+PhysicalMatch::PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)), match_expr_(match_expr) {}
 
 PhysicalMatch::~PhysicalMatch() {}
 

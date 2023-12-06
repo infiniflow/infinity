@@ -254,6 +254,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             }
             break;
         }
+        case ExpressionType::kReference: {
+            break;
+        }
         default: {
             Error<PlannerException>(Format("Unexpected expression type: {}", expression->Name()));
         }

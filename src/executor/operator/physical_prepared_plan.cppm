@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import load_meta;
 
 export module physical_prepared_plan;
 
@@ -28,7 +29,8 @@ namespace infinity {
 
 export class PhysicalPreparedPlan : public PhysicalOperator {
 public:
-    explicit PhysicalPreparedPlan(u64 id) : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id) {}
+    explicit PhysicalPreparedPlan(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kPreparedPlan, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalPreparedPlan() override = default;
 

@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import load_meta;
 
 export module physical_insert;
 
@@ -30,9 +31,12 @@ class TableCollectionEntry;
 
 export class PhysicalInsert : public PhysicalOperator {
 public:
-    explicit
-    PhysicalInsert(u64 id, TableCollectionEntry *table_collection_entry, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
-        : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id), table_collection_entry_(table_collection_entry),
+    explicit PhysicalInsert(u64 id,
+                            TableCollectionEntry *table_collection_entry,
+                            u64 table_index,
+                            Vector<Vector<SharedPtr<BaseExpression>>> value_list,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id, load_metas), table_collection_entry_(table_collection_entry),
           table_index_(table_index), value_list_(Move(value_list)) {}
 
     ~PhysicalInsert() override = default;

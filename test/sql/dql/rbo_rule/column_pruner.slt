@@ -57,55 +57,55 @@ EXPLAIN LOGICAL SELECT c1 + c2 FROM t1;
 query I
 EXPLAIN LOGICAL SELECT c1 + c2 FROM t1 where c4 > 1;
 ----
- PROJECT (4)
-  - table index: #4
-  - expressions: [c1 (#0) + c2 (#1)]
- -> FILTER (3)
-    - filter: CAST(c4 (#2) AS BigInt) > 1
-    - output columns: [c1, c2, c4]
-   -> TABLE SCAN (2)
-      - table name: t1(default.t1)
-      - table index: #1
-      - output columns: [c1, c2, c4]
+PROJECT (4)
+ - table index: #4
+ - expressions: [c1 (#0) + c2 (#1)]
+-> FILTER (3)
+   - filter: CAST(c4 (#0) AS BigInt) > 1
+   - output columns: [c4]
+  -> TABLE SCAN (2)
+     - table name: t1(default.t1)
+     - table index: #1
+     - output columns: [c4]
 
 query I
 EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 INNER JOIN t2 ON t1.c1 = t2.c2;
 ----
 PROJECT (5)
-  - table index: #5
-  - expressions: [c1 (#0), c2 (#1)]
- -> INNER JOIN(4)
-    - filters: [c1 (#0) = c2 (#1)
-    - output columns: [c1, c2]
-   -> TABLE SCAN (2)
-      - table name: t1(default.t1)
-      - table index: #1
-      - output columns: [c1]
-   -> TABLE SCAN (3)
-      - table name: t2(default.t2)
-      - table index: #2
-      - output columns: [c2]
+ - table index: #5
+ - expressions: [c1 (#1), c2 (#0)]
+-> INNER JOIN(4)
+   - filters: [c1 (#1) = c2 (#0)
+   - output columns: [c1, c2]
+  -> TABLE SCAN (2)
+     - table name: t1(default.t1)
+     - table index: #1
+     - output columns: [c1]
+  -> TABLE SCAN (3)
+     - table name: t2(default.t2)
+     - table index: #2
+     - output columns: [c2]
 
 query I
 EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c2 where t1.c4 > 1;
 ----
- PROJECT (6)
-  - table index: #5
-  - expressions: [c1 (#0), c2 (#2)]
- -> FILTER (5)
-    - filter: CAST(c4 (#1) AS BigInt) > 1
-    - output columns: [c1, c4, c2]
-   -> LEFT JOIN(4)
-      - filters: [c1 (#0) = c2 (#2)
-      - output columns: [c1, c4, c2]
-     -> TABLE SCAN (2)
-        - table name: t1(default.t1)
-        - table index: #1
-        - output columns: [c1, c4]
-     -> TABLE SCAN (3)
-        - table name: t2(default.t2)
-        - table index: #2
-        - output columns: [c2]
+PROJECT (6)
+ - table index: #5
+ - expressions: [c1 (#0), c2 (#1)]
+-> FILTER (5)
+   - filter: CAST(c4 (#2) AS BigInt) > 1
+   - output columns: [c1, c2]
+  -> LEFT JOIN(4)
+     - filters: [c1 (#1) = c2 (#0)
+     - output columns: [c1, c2]
+    -> TABLE SCAN (2)
+       - table name: t1(default.t1)
+       - table index: #1
+       - output columns: [c1]
+    -> TABLE SCAN (3)
+       - table name: t2(default.t2)
+       - table index: #2
+       - output columns: [c2]
 
 query I
 EXPLAIN LOGICAL SELECT MIN(c1 + 1), AVG(c2) FROM t1;

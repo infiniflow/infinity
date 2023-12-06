@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_create_collection;
 
@@ -33,7 +34,8 @@ public:
                                       SharedPtr<Vector<String>> output_names,
                                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                       u64 table_index,
-                                      u64 id);
+                                      u64 id,
+                                      SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalCreateCollection() override = default;
 

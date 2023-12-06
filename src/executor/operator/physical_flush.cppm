@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import load_meta;
 
 export module physical_flush;
 
@@ -28,8 +29,8 @@ namespace infinity {
 
 export class PhysicalFlush final : public PhysicalOperator {
 public:
-    explicit PhysicalFlush(FlushType flush_type, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kFlush, nullptr, nullptr, id), flush_type_(flush_type) {}
+    explicit PhysicalFlush(FlushType flush_type, u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kFlush, nullptr, nullptr, id, load_metas), flush_type_(flush_type) {}
 
     ~PhysicalFlush() override = default;
 

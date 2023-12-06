@@ -20,14 +20,16 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
-export module physical_merge_join;
+    export module physical_merge_join;
 
 namespace infinity {
 
 export class PhysicalSortMergeJoin : public PhysicalOperator {
 public:
-    explicit PhysicalSortMergeJoin(u64 id) : PhysicalOperator(PhysicalOperatorType::kJoinMerge, nullptr, nullptr, id) {}
+    explicit PhysicalSortMergeJoin(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kJoinMerge, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalSortMergeJoin() override = default;
 

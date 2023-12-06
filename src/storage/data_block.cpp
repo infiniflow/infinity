@@ -248,6 +248,11 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT 
     }
 }
 
+void DataBlock::InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index) {
+    column_vectors.insert(column_vectors.begin() + index, vector);
+    column_count_++;
+}
+
 bool DataBlock::operator==(const DataBlock &other) const {
     if (!this->initialized && !other.initialized)
         return true;

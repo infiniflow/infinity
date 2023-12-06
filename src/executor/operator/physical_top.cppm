@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import load_meta;
 
 export module physical_top;
 
@@ -29,7 +30,8 @@ namespace infinity {
 
 export class PhysicalTop : public PhysicalOperator {
 public:
-    explicit PhysicalTop(u64 id) : PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id) {}
+    explicit PhysicalTop(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalTop() override = default;
 

@@ -25,6 +25,7 @@ import global_block_id;
 import base_table_ref;
 import table_collection_entry;
 import block_index;
+import load_meta;
 
 export module physical_knn_scan;
 
@@ -43,8 +44,9 @@ public:
                              OrderType order_by_type,
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                             u64 knn_table_index)
-        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)),
+                             u64 knn_table_index,
+                             SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)),
           knn_expressions_(Move(knn_expressions)), limit_expression_(Move(limit_expression)), filter_expression_(Move(filter_expression)),
           order_by_type_(order_by_type), output_names_(Move(output_names)), output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
 
@@ -69,6 +71,10 @@ public:
     SizeT BlockEntryCount() const;
 
     Pair<Vector<BlockColumnEntry *>, Vector<SegmentColumnIndexEntry *>> PlanWithIndex(QueryContext *query_context);
+
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
 
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};

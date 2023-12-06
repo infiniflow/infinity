@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_dummy_scan;
 
@@ -27,7 +28,7 @@ namespace infinity {
 
 export class PhysicalDummyScan final : public PhysicalOperator {
 public:
-    explicit PhysicalDummyScan(u64 id) : PhysicalOperator(PhysicalOperatorType::kDummyScan, nullptr, nullptr, id) {}
+    explicit PhysicalDummyScan(u64 id, SharedPtr<Vector<LoadMeta>> load_metas) : PhysicalOperator(PhysicalOperatorType::kDummyScan, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalDummyScan() override = default;
 

@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_index_join;
 
@@ -27,7 +28,8 @@ namespace infinity {
 
 export class PhysicalIndexJoin : public PhysicalOperator {
 public:
-    explicit PhysicalIndexJoin(u64 id) : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id) {}
+    explicit PhysicalIndexJoin(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kJoinIndex, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalIndexJoin() override = default;
 

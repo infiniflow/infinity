@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import table_collection_entry;
 import base_expression;
+import load_meta;
 
 export module physical_update;
 
@@ -32,8 +33,10 @@ public:
     explicit PhysicalUpdate(u64 id,
                             UniquePtr<PhysicalOperator> left,
                             TableCollectionEntry *table_entry_ptr,
-                            const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
-        : PhysicalOperator(PhysicalOperatorType::kUpdate, Move(left), nullptr, id), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
+                            const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kUpdate, Move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr),
+          update_columns_(update_columns) {}
 
     ~PhysicalUpdate() override = default;
 

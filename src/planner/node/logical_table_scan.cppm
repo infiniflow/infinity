@@ -29,7 +29,7 @@ class TableCollectionEntry;
 
 export class LogicalTableScan : public LogicalNode {
 public:
-    explicit LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = false);
+    explicit LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = true);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

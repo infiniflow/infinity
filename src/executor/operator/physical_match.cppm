@@ -24,6 +24,7 @@ import table_collection_entry;
 import base_expression;
 import match_expression;
 import base_table_ref;
+import load_meta;
 
 export module physical_match;
 
@@ -31,7 +32,7 @@ namespace infinity {
 
 export class PhysicalMatch final : public PhysicalOperator {
 public:
-    explicit PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr);
+    explicit PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalMatch() override;
 
@@ -42,6 +43,10 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
 
     String ToString(i64 &space) const;
 

@@ -129,18 +129,17 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                     output_row_count -= DEFAULT_BLOCK_CAPACITY;
                 }
 
-                column_n = block_entry->columns_.size();
-                SizeT column_id = 0;
-                for (; column_id < column_n; column_id++) {
+                column_n = table_ref_->column_ids_.size();
+                for (SizeT i = 0; i < column_n; ++i) {
+                    SizeT column_id = table_ref_->column_ids_[i];
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
 
                     const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
                     output_data_block->AppendValueByPtr(column_id, ptr);
                 }
-                output_data_block->AppendValueByPtr(column_id++, (ptr_t)&result_dists[top_idx]);
-                output_data_block->AppendValueByPtr(column_id, (ptr_t)&result_row_ids[top_idx]);
-                ++ output_row_count;
+                output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
+                output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
             }
             for (SizeT column_id = 0; column_id < column_n; ++column_id) {
                 LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[column_id], output_names_->at(column_id)));

@@ -20,16 +20,19 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_hash;
-
 
 namespace infinity {
 
 export class PhysicalHash final : public PhysicalOperator {
 public:
-    explicit PhysicalHash(SharedPtr<Vector<String>> output_names, SharedPtr<Vector<SharedPtr<DataType>>> output_types, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kHash, nullptr, nullptr, id), output_names_(Move(output_names)),
+    explicit PhysicalHash(SharedPtr<Vector<String>> output_names,
+                          SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                          u64 id,
+                          SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kHash, nullptr, nullptr, id, load_metas), output_names_(Move(output_names)),
           output_types_(Move(output_types)) {}
 
     ~PhysicalHash() override = default;
