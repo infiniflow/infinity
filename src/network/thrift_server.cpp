@@ -322,9 +322,13 @@ public:
 
         // TODO:
         //    ParsedExpr *offset;
-        //    offset = new ParsedExpr();
-        //    ParsedExpr *limit;
-        //    limit = new ConstantExpr (0);
+        // offset = new ParsedExpr();
+
+        ParsedExpr *limit = nullptr;
+        if (request.__isset.limit_expr == true) {
+            limit = GetParsedExprFromProto(request.limit_expr);
+        }
+
         Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
         if (request.__isset.order_by_list == true) {
             order_by_list = new Vector<OrderByExpr *>();
@@ -335,7 +339,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(*knn_expr_list, fts_expr, filter, output_columns, nullptr, nullptr);
+        const QueryResult result = table->Search(*knn_expr_list, fts_expr, filter, output_columns, nullptr, limit);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();

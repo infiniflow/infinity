@@ -288,9 +288,9 @@ class RemoteTable(Table, ABC):
                     knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
                 elif isinstance(embedding[0], float):
                     data = ttypes.EmbeddingData()
-                    data.f64_array_value = embedding
+                    data.f32_array_value = embedding
                     knn_expr.embedding_data = data
-                    knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat64
+                    knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat32
                 else:
                     raise Exception(f"Invalid embedding {embedding[0]} type")
 

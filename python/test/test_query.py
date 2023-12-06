@@ -20,20 +20,19 @@ class TestQuery:
         res = table.insert([{"c1": [7.0] * 5}])
         assert res.success
 
-        select_res = table.search().output(["*"]).to_df()
-        print(select_res)
+        # select_res = table.search().output(["*"]).to_df()
+        # print(select_res)
         # Create a query builder
         query_builder = InfinityVectorQueryBuilder.create(
             table=table,
             embedding=[0.1, 0.2, 0.3, 0.4, 0.5],  # query embedding
-            vector_column_name="vector_column",  # vector column name
+            vector_column_name="c1",  # vector column name
             distance="L2",  # distance type
             threshold=0.5  # threshold
         )
 
-        query_builder.filter("c1 <= 3")
 
-        query_builder.output(["c1", "c2"])
+        query_builder.output(["c1"])
 
         # set topk
         query_builder.limit(10)
