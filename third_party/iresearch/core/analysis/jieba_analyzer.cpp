@@ -8,21 +8,21 @@
 #include "utils/hash_utils.hpp"
 #include "utils/rst/strings/str_cat.h"
 
-static const std::string DICT_PATH = "dict/jieba.dict.utf8";
-static const std::string HMM_PATH = "dict/hmm_model.utf8";
-static const std::string USER_DICT_PATH = "dict/user.dict.utf8";
-static const std::string IDF_PATH = "dict/idf.utf8";
-static const std::string STOP_WORD_PATH = "dict/stop_words.utf8";
+static const std::string DICT_PATH = "jieba/dict/jieba.dict.utf8";
+static const std::string HMM_PATH = "jieba/dict/hmm_model.utf8";
+static const std::string USER_DICT_PATH = "jieba/dict/user.dict.utf8";
+static const std::string IDF_PATH = "jieba/dict/idf.utf8";
+static const std::string STOP_WORD_PATH = "jieba/dict/stop_words.utf8";
 
 namespace fs = std::filesystem;
 
 namespace irs {
 namespace analysis {
-void jieba_analyzer::init() {}
 
-jieba_analyzer::jieba_analyzer(jieba_analyzer::options_t &&options) {
-    auto path_str = options.path_;
-    fs::path root(path_str);
+jieba_analyzer::jieba_analyzer(jieba_analyzer::options_t &&options) : dict_path_(options.path_), jieba_(nullptr) {}
+
+bool jieba_analyzer::load() {
+    fs::path root(dict_path_);
     fs::path dict_path(root / DICT_PATH);
     fs::path hmm_path(root / HMM_PATH);
     fs::path userdict_path(root / USER_DICT_PATH);
@@ -31,23 +31,33 @@ jieba_analyzer::jieba_analyzer(jieba_analyzer::options_t &&options) {
 
     if (!fs::exists(dict_path)) {
         IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", dict_path.string(), "' dict for jieba_analyzer does not exist"}));
+        return false;
     }
-    if (!fs::exists(hmm_path)) {
-        IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", hmm_path.string(), "' hmm for jieba_analyzer does not exist"}));
-    }
-    if (!fs::exists(userdict_path)) {
-        IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", userdict_path.string(), "' user_dict for jieba_analyzer does not exist"}));
-    }
-    if (!fs::exists(idf_path)) {
-        IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", idf_path.string(), "' idf for jieba_analyzer does not exist"}));
-    }
-    if (!fs::exists(stopwords_path)) {
-        IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", stopwords_path.string(), "' stopword for jieba_analyzer does not exist"}));
-    }
+  if (!fs::exists(hmm_path)) {
+      IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", hmm_path.string(), "' hmm for jieba_analyzer does not exist"}));
+      return false;
+  }
+  if (!fs::exists(userdict_path)) {
+      IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", userdict_path.string(), "' user_dict for jieba_analyzer does not exist"}));
+      return false;
+  }
+  if (!fs::exists(idf_path)) {
+      IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", idf_path.string(), "' idf for jieba_analyzer does not exist"}));
+      return false;
+  }
+  if (!fs::exists(stopwords_path)) {
+      IRS_LOG_WARN(rst::StrCat({"Invalid jieba config '", stopwords_path.string(), "' stopword for jieba_analyzer does not exist"}));
+      return false;
+  }
 
-    jieba_ = new cppjieba::Jieba(dict_path.string(), hmm_path.string(), userdict_path.string(), idf_path.string(), stopwords_path.string());
-    own_jieba_ = true;
-    load_stopwords_dict(stopwords_path.string());
+  try {
+      jieba_ = new cppjieba::Jieba(dict_path.string(), hmm_path.string(), userdict_path.string(), idf_path.string(), stopwords_path.string());
+  } catch (const std::exception &e) {
+      return false;
+  }
+  own_jieba_ = true;
+  load_stopwords_dict(stopwords_path.string());
+  return true;
 }
 
 jieba_analyzer::jieba_analyzer(const jieba_analyzer &other) {

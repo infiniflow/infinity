@@ -230,6 +230,7 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     auto data = MakeShared<DataSnapshot>(Move(reader));
 
     AnalyzerPool::instance().Set(SEGMENT);
+    AnalyzerPool::instance().Set(JIEBA);
 
     StoreSnapshot(data);
 }
@@ -296,15 +297,18 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
     for (const auto &ibase : index_def->index_array_) {
         auto index_base = reinterpret_cast<IndexFullText *>(ibase.get());
         if (index_base->analyzer_ == JIEBA) {
-            // TODO jieba can not work right now, use segment instead
-            // UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
-            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
+            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
+            if (!stream.get()) {
+                LOG_INFO("Dict path of Jieba analyzer is not valid, use segmentation analyzer instead");
+                stream = AnalyzerPool::instance().Get(SEGMENT);
+            }
             analyzers.push_back(Move(stream));
         } else if (index_base->analyzer_ == SEGMENT) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(Move(stream));
         } else {
-            // TODO use segmentation as default
+            // use segmentation as default
+            LOG_INFO("Analyzer required does not exist, use segmentation analyzer instead");
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(Move(stream));
         }

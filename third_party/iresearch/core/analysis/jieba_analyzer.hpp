@@ -15,7 +15,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
                              private util::noncopyable {
  public:
   static constexpr std::string_view type_name() noexcept { return "jieba"; }
-  static void init();  // for triggering registration in a static build
+  static void init() {} // for triggering registration in a static build
 
   struct options_t {
       std::string path_;
@@ -27,6 +27,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   explicit jieba_analyzer(options_t &&opts);
   jieba_analyzer(const jieba_analyzer &other);
   ~jieba_analyzer();
+  bool load();
   bool next() final;
   bool reset(std::string_view data) final;
 
@@ -39,6 +40,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   }
   using attributes = std::tuple<increment, offset, term_attribute>;
   cppjieba::Jieba* jieba_ = nullptr;
+  std::string dict_path_;
   bool own_jieba_;
   size_t cursor_;
   std::vector<cppjieba::Word> cut_words_;

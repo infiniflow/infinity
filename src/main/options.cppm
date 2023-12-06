@@ -76,6 +76,9 @@ export struct SystemOptions {
     u64 full_checkpoint_txn_interval_{};
     u64 delta_checkpoint_interval_sec_{};
     u64 delta_checkpoint_interval_wal_bytes_{};
+
+    // Resource
+    String resource_dict_path_{};
 };
 
 } // namespace infinity
