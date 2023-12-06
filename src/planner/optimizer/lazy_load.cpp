@@ -126,6 +126,14 @@ void CleanScan::VisitNode(LogicalNode &op) {
             knn_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
             break;
         }
+        case LogicalNodeType::kMatch: {
+            auto match = dynamic_cast<LogicalMatch &>(op);
+            Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
+
+            scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
+            match.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            break;
+        }
         default: {
             last_op_load_metas_= op.load_metas();
             VisitNodeChildren(op);
