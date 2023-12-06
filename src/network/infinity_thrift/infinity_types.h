@@ -196,6 +196,8 @@ class ColumnField;
 
 class ImportOption;
 
+class UploadResponse;
+
 class CommonResponse;
 
 class CommonRequest;
@@ -239,6 +241,8 @@ class DropTableRequest;
 class InsertRequest;
 
 class ImportRequest;
+
+class FileChunk;
 
 class SelectRequest;
 
@@ -1160,11 +1164,8 @@ void swap(ColumnField &a, ColumnField &b);
 std::ostream& operator<<(std::ostream& out, const ColumnField& obj);
 
 typedef struct _ImportOption__isset {
-  _ImportOption__isset() : delimiter(false), file_type(false), table_name(false), schema_name(false), copy_from(false), has_header(false), copy_file_type(false) {}
+  _ImportOption__isset() : delimiter(false), copy_from(false), has_header(false), copy_file_type(false) {}
   bool delimiter :1;
-  bool file_type :1;
-  bool table_name :1;
-  bool schema_name :1;
   bool copy_from :1;
   bool has_header :1;
   bool copy_file_type :1;
@@ -1177,9 +1178,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   ImportOption& operator=(const ImportOption&);
   ImportOption() noexcept
                : delimiter(),
-                 file_type(),
-                 table_name(),
-                 schema_name(),
                  copy_from(0),
                  has_header(0),
                  copy_file_type(static_cast<CopyFileType::type>(0)) {
@@ -1187,9 +1185,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   virtual ~ImportOption() noexcept;
   std::string delimiter;
-  std::string file_type;
-  std::string table_name;
-  std::string schema_name;
   bool copy_from;
   bool has_header;
   /**
@@ -1202,12 +1197,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   void __set_delimiter(const std::string& val);
 
-  void __set_file_type(const std::string& val);
-
-  void __set_table_name(const std::string& val);
-
-  void __set_schema_name(const std::string& val);
-
   void __set_copy_from(const bool val);
 
   void __set_has_header(const bool val);
@@ -1217,12 +1206,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   bool operator == (const ImportOption & rhs) const
   {
     if (!(delimiter == rhs.delimiter))
-      return false;
-    if (!(file_type == rhs.file_type))
-      return false;
-    if (!(table_name == rhs.table_name))
-      return false;
-    if (!(schema_name == rhs.schema_name))
       return false;
     if (!(copy_from == rhs.copy_from))
       return false;
@@ -1247,6 +1230,63 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+
+typedef struct _UploadResponse__isset {
+  _UploadResponse__isset() : success(false), error_msg(false), can_skip(false) {}
+  bool success :1;
+  bool error_msg :1;
+  bool can_skip :1;
+} _UploadResponse__isset;
+
+class UploadResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  UploadResponse(const UploadResponse&);
+  UploadResponse& operator=(const UploadResponse&);
+  UploadResponse() noexcept
+                 : success(0),
+                   error_msg(),
+                   can_skip(0) {
+  }
+
+  virtual ~UploadResponse() noexcept;
+  bool success;
+  std::string error_msg;
+  bool can_skip;
+
+  _UploadResponse__isset __isset;
+
+  void __set_success(const bool val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_can_skip(const bool val);
+
+  bool operator == (const UploadResponse & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(can_skip == rhs.can_skip))
+      return false;
+    return true;
+  }
+  bool operator != (const UploadResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const UploadResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(UploadResponse &a, UploadResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const UploadResponse& obj);
 
 typedef struct _CommonResponse__isset {
   _CommonResponse__isset() : success(false), error_msg(false), session_id(false) {}
@@ -2557,6 +2597,98 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
 void swap(ImportRequest &a, ImportRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
+
+typedef struct _FileChunk__isset {
+  _FileChunk__isset() : db_name(false), table_name(false), file_name(false), data(false), index(false), is_last(false), session_id(false), total_size(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool file_name :1;
+  bool data :1;
+  bool index :1;
+  bool is_last :1;
+  bool session_id :1;
+  bool total_size :1;
+} _FileChunk__isset;
+
+class FileChunk : public virtual ::apache::thrift::TBase {
+ public:
+
+  FileChunk(const FileChunk&);
+  FileChunk& operator=(const FileChunk&);
+  FileChunk() noexcept
+            : db_name(),
+              table_name(),
+              file_name(),
+              data(),
+              index(0),
+              is_last(0),
+              session_id(0),
+              total_size(0) {
+  }
+
+  virtual ~FileChunk() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string file_name;
+  std::string data;
+  int32_t index;
+  bool is_last;
+  int64_t session_id;
+  int64_t total_size;
+
+  _FileChunk__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_file_name(const std::string& val);
+
+  void __set_data(const std::string& val);
+
+  void __set_index(const int32_t val);
+
+  void __set_is_last(const bool val);
+
+  void __set_session_id(const int64_t val);
+
+  void __set_total_size(const int64_t val);
+
+  bool operator == (const FileChunk & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(file_name == rhs.file_name))
+      return false;
+    if (!(data == rhs.data))
+      return false;
+    if (!(index == rhs.index))
+      return false;
+    if (!(is_last == rhs.is_last))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(total_size == rhs.total_size))
+      return false;
+    return true;
+  }
+  bool operator != (const FileChunk &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FileChunk & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FileChunk &a, FileChunk &b);
+
+std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
 
 typedef struct _SelectRequest__isset {
   _SelectRequest__isset() : db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), session_id(false) {}

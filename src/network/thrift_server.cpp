@@ -15,7 +15,6 @@
 #include "thrift_server.h"
 
 #include <memory>
-#include <stdexcept>
 #include <thrift/TToString.h>
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/ThreadManager.h>
@@ -42,11 +41,12 @@ import value;
 import third_party;
 import parser;
 import file_writer;
-import local_file_system;
 import table_def;
-
-#include "parser/statement/extra/create_index_info.h"
-#include <type/complex/embedding_type.h>
+import file_system_type;
+import file_system;
+import local_file_system;
+import infinity_context;
+import config;
 
 namespace infinity {
 
@@ -134,7 +134,7 @@ public:
             columns->emplace_back(column);
         }
 
-        Vector<vector<ParsedExpr *> *> * values = new Vector<Vector<ParsedExpr *> *>();
+        Vector<vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
 
         for (auto &value : request.fields) {
@@ -152,20 +152,62 @@ public:
         ProcessCommonResult(response, result);
     }
 
+    CopyFileType GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
+        switch (copy_file_type) {
+            case infinity_thrift_rpc::CopyFileType::CSV:
+                return CopyFileType::kCSV;
+            case infinity_thrift_rpc::CopyFileType::JSON:
+                return CopyFileType::kJSON;
+            case infinity_thrift_rpc::CopyFileType::FVECS:
+                return CopyFileType::kFVECS;
+            default:
+                Error<NetworkException>("Not implemented copy file type", __FILE_NAME__, __LINE__);
+        }
+    }
+
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
-        LocalFileSystem fs;
-        Path path(Format("/tmp/{}_{}_{}", request.db_name, request.table_name, request.file_name));
-        FileWriter file_writer(fs, path.c_str(), 1024 * 1024);
-        file_writer.Write(request.file_content.data(), request.file_content.size());
-        file_writer.Flush();
+        Path path(
+            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
 
-        auto result = table->Import(path.c_str(), (const ImportOptions &)request.import_option);
+        ImportOptions import_options;
+        import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
 
+        const QueryResult result = table->Import(path.c_str(), import_options);
         ProcessCommonResult(response, result);
+    }
+
+    void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
+        LocalFileSystem fs;
+        Path path(
+            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+        if (request.index != 0) {
+            FileWriter file_writer(fs, path.c_str(), request.data.size(), FileFlags::WRITE_FLAG | FileFlags::APPEND_FLAG);
+            file_writer.Write(request.data.data(), request.data.size());
+            file_writer.Flush();
+        } else {
+            // Check file exist
+            if (fs.Exists(path.c_str())) {
+                auto exist_file_size = LocalFileSystem::GetFileSizeByPath(path.c_str());
+                if (exist_file_size != request.total_size) {
+                    LOG_TRACE(Format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
+                    fs.DeleteFile(path.c_str());
+                } else {
+                    response.__set_success(true);
+                    response.__set_can_skip(true);
+                    return;
+                }
+            }
+            FileWriter file_writer(fs, path.c_str(), request.data.size());
+            file_writer.Write(request.data.data(), request.data.size());
+            file_writer.Flush();
+        }
+        LOG_TRACE(Format("Upload file name: {} , index: {}", path.c_str(), request.index));
+        response.__set_success(true);
+        response.__set_can_skip(false);
     }
 
     void handeleColumnDefs(infinity_thrift_rpc::SelectResponse &response,
@@ -824,15 +866,19 @@ private:
 class InfinityServiceCloneFactory : virtual public infinity_thrift_rpc::InfinityServiceIfFactory {
 public:
     ~InfinityServiceCloneFactory() override = default;
+
     infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
+
         LOG_TRACE(Format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
                          sock->getSocketInfo(),
                          sock->getPeerHost(),
                          sock->getPeerAddress(),
                          sock->getPeerPort()));
+
         return new InfinityServiceHandler;
     }
+
     void releaseHandler(infinity_thrift_rpc::InfinityServiceIf *handler) override { delete handler; }
 };
 

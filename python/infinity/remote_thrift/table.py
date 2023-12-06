@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import time
 from abc import ABC
 from typing import Optional, Union, List
 
@@ -100,17 +99,50 @@ class RemoteTable(Table, ABC):
                                         fields=fields)
 
     def import_data(self, file_path: str, options=None):
-        st = time.process_time()
-        with open(file_path, "rb", buffering=1024 * 1024) as file:
-            file_content = file.read()
 
-        # print(f"read file time: {time.process_time() - st}")
+        options = ttypes.ImportOption()
+
+        total_size = os.path.getsize(file_path)
+        chunk_size = 1024 * 1024 * 10  # 10MB
         file_name = os.path.basename(file_path)
+        if file_name.endswith('.csv'):
+            options.copy_file_type = ttypes.CopyFileType.CSV
+            options.delimiter = ","
+        elif file_name.endswith('.json'):
+            options.copy_file_type = ttypes.CopyFileType.JSON
+        elif file_name.endswith('.fvecs'):
+            options.copy_file_type = ttypes.CopyFileType.FVECS
+
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+            num_chunks = len(file_data) // chunk_size + 1
+
+            for index in range(num_chunks):
+                start = index * chunk_size
+                end = min((index + 1) * chunk_size, len(file_data))
+                chunk_data = file_data[start:end]
+                is_last = (index == num_chunks - 1)
+                res = self._conn.client.upload(db_name=self._db_name,
+                                               table_name=self._table_name,
+                                               file_name=file_name,
+                                               data=chunk_data,
+                                               index=index,
+                                               is_last=is_last,
+                                               total_size=total_size)
+                match res:
+                    case None:
+                        raise Exception("upload failed")
+                    case _:
+                        if not res.success:
+                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.error_msg:
+                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.can_skip:
+                            break
 
         return self._conn.client.import_data(db_name=self._db_name,
                                              table_name=self._table_name,
                                              file_name=file_name,
-                                             file_content=file_content,
                                              import_options=options)
 
     def delete(self, cond: Optional[str] = None):

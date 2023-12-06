@@ -89,7 +89,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
     return result;
 }
 
-QueryResult Table::Import(const String &path, ImportOptions ) {
+QueryResult Table::Import(const String &path, ImportOptions import_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -104,7 +104,7 @@ QueryResult Table::Import(const String &path, ImportOptions ) {
     import_statement->table_name_ = table_name_;
 
     import_statement->header_ = false;
-    import_statement->copy_file_type_ = CopyFileType::kCSV;
+    import_statement->copy_file_type_ = import_options.copy_file_type_;
     import_statement->delimiter_ = ',';
 
     QueryResult result = query_context_ptr->QueryStatement(import_statement.get());
