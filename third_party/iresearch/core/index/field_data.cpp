@@ -24,7 +24,6 @@
 #include "index/field_data.hpp"
 
 #include <algorithm>
-#include <iostream>
 #include <set>
 
 #include "analysis/analyzer.hpp"
@@ -1133,7 +1132,6 @@ void fields_data::flush(field_writer& fw, flush_state& state) {
 
   IndexFeatures index_features{IndexFeatures::NONE};
   feature_set_t features;
-  std::cout << "flush fields" << std::endl;
   // sort fields
   sorted_fields_.resize(fields_.size());
   auto begin = sorted_fields_.begin();
@@ -1144,9 +1142,7 @@ void fields_data::flush(field_writer& fw, flush_state& state) {
     const auto& meta = entry.meta();
     index_features |= static_cast<IndexFeatures>(meta.index_features);
     accumulate_features(features, meta.features);
-    std::cout << meta.name << " ";
   }
-  std::cout << std::endl;
 
   state.index_features = static_cast<IndexFeatures>(index_features);
   state.features = &features;
