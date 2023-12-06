@@ -25,9 +25,7 @@ import parser;
 
 namespace infinity {
 
-QueryResult Table::CreateIndex(const String &index_name,
-                               Vector<IndexInfo *> *index_info_list,
-                               CreateIndexOptions ) {
+QueryResult Table::CreateIndex(const String &index_name, Vector<IndexInfo *> *index_info_list, CreateIndexOptions) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -142,7 +140,7 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     return result;
 }
 
-QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
+QueryResult Table::Search(Vector<ParsedExpr *> &knn_exprs,
                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
                           ParsedExpr *filter,
                           Vector<ParsedExpr *> *output_columns,
@@ -164,6 +162,9 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
     select_statement->where_expr_ = filter;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
+
+    // fix me: order by
+    select_statement->order_by_list = nullptr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

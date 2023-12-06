@@ -47,6 +47,7 @@ import file_system;
 import local_file_system;
 import infinity_context;
 import config;
+import data_block;
 
 namespace infinity {
 
@@ -55,7 +56,7 @@ public:
     InfinityServiceHandler() = default;
 
     void Connect(infinity_thrift_rpc::CommonResponse &response) override {
-        auto infinity = infinity::Infinity::RemoteConnect();
+        auto infinity = Infinity::RemoteConnect();
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Connect failed";
@@ -69,11 +70,11 @@ public:
         }
     }
 
-    void Disconnect(infinity_thrift_rpc::CommonResponse &_return, const infinity_thrift_rpc::CommonRequest &request) override {
+    void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         if (infinity == nullptr) {
-            _return.success = false;
-            _return.error_msg = "Disconnect failed";
+            response.success = false;
+            response.error_msg = "Disconnect failed";
             LOG_ERROR(Format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
@@ -82,7 +83,7 @@ public:
             infinity_session_map_.erase(session_id);
             infinity_session_map_mutex_.unlock();
             LOG_TRACE(Format("THRIFT : Disconnect success"));
-            _return.success = true;
+            response.success = true;
         }
     }
 
@@ -134,7 +135,7 @@ public:
             columns->emplace_back(column);
         }
 
-        Vector<vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
+        Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
 
         for (auto &value : request.fields) {
@@ -227,10 +228,10 @@ public:
         }
     }
 
-    void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                           SizeT row_count,
-                           SizeT col_index,
-                           const std::shared_ptr<ColumnVector> &column_vector) {
+    static void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
+                                  SizeT row_count,
+                                  SizeT col_index,
+                                  const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
@@ -301,7 +302,7 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<Pair<ParsedExpr *, ParsedExpr *>> vector_expr{};
+        Vector<ParsedExpr *> vector_expr{};
 
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
 
@@ -315,6 +316,16 @@ public:
         //    offset = new ParsedExpr();
         //    ParsedExpr *limit;
         //    limit = new ConstantExpr (0);
+        Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+        if (request.__isset.order_by_list == true) {
+            order_by_list = new Vector<OrderByExpr *>();
+            order_by_list->reserve(request.order_by_list.size());
+            for (auto &order_by_expr : request.order_by_list) {
+                // auto parsed_expr = GetOrderByExprFromProto(order_by_expr);
+                // order_by_list->emplace_back(parsed_expr);
+            }
+        }
+
         const QueryResult result = table->Search(vector_expr, fts_expr, filter, output_columns, nullptr, nullptr);
 
         if (result.IsOk()) {
@@ -330,6 +341,7 @@ public:
 
                 for (SizeT col_index = 0; col_index < column_count; ++col_index) {
                     auto column_vector = data_block->column_vectors[col_index];
+                    all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
                     switch (column_vector->data_type_->type()) {
                         case LogicalType::kBoolean:
                         case LogicalType::kTinyInt:

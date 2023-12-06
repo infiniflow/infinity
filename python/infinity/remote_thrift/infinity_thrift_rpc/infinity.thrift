@@ -64,6 +64,7 @@ struct ColumnDef {
 4:  list<Constraint> constraints = [],
 }
 
+
 enum LiteralType {
 Boolean,
 Double,
@@ -99,12 +100,22 @@ InnerProduct,
 Hamming,
 }
 
+union EmbeddingData {
+1: list<bool> bool_array_value,
+2: list<binary> i8_array_value,
+3: list<i16> i16_array_value,
+4: list<i32> i32_array_value,
+5: list<i64> i64_array_value,
+6: list<double> f32_array_value,
+7: list<double> f64_array_value,
+}
+
 struct KnnExpr {
 1: ParsedExpr  column_expr,
-2: list<string> embedding_data,
+2: EmbeddingData embedding_data,
 3: i64 dimension,
 4: KnnDistanceType distance_type,
-5: EmbeddingType embedding_type,
+5: ElementType embedding_data_type,
 }
 
 struct ConstantExpr {
@@ -134,6 +145,11 @@ struct UpdateExpr {
 2: ParsedExpr value,
 }
 
+struct OrderByExpr {
+1: ParsedExpr expr,
+2: bool asc,
+}
+
 
 struct Field {
 1: list<ParsedExpr> parse_exprs = [],
@@ -161,6 +177,7 @@ ColumnInvalid,
 struct ColumnField {
 1: ColumnType column_type,
 2: list<binary> column_vectors = [],
+3: string column_name,
 }
 
 struct ImportOption {
@@ -335,15 +352,16 @@ struct FileChunk {
 }
 
 struct SelectRequest {
-1:  string db_name,
-2:  string table_name,
-3:  list<ParsedExpr> select_list = [],
-4:  ParsedExpr where_expr,
-5:  list<ParsedExpr> group_by_list = [],
-6:  ParsedExpr having_expr,
-7:  ParsedExpr limit_expr,
-8:  ParsedExpr offset_expr,
-9:  i64 session_id,
+1: i64 session_id,
+2:  string db_name,
+3:  string table_name,
+4:  list<ParsedExpr> select_list = [],
+5:  ParsedExpr where_expr,
+6:  list<ParsedExpr> group_by_list = [],
+7:  ParsedExpr having_expr,
+8:  ParsedExpr limit_expr,
+9:  ParsedExpr offset_expr,
+10:  list<OrderByExpr> order_by_list = [],
 }
 
 struct SelectResponse {

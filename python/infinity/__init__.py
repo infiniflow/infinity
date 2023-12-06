@@ -16,12 +16,13 @@ import importlib.metadata
 
 __version__ = importlib.metadata.version("infinity")
 
-from infinity.infinity import URI, InfinityConnection, NetworkAddress
+from infinity.common import URI, NetworkAddress, LOCAL_HOST
+from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 
 
 def connect(
-        uri: URI = NetworkAddress("0.0.0.0", 9080),
+        uri: URI = LOCAL_HOST
 ) -> InfinityConnection:
     if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 9080 or uri.port == 9070):
         return RemoteThriftInfinityConnection(uri)

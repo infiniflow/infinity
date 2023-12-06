@@ -19,7 +19,7 @@ from sqlglot import condition
 
 import infinity
 import infinity.index as index
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 from infinity.remote_thrift.table import traverse_conditions
 
 

@@ -14,8 +14,7 @@
 
 import pytest
 import infinity
-from infinity.infinity import NetworkAddress
-from infinity.remote_thrift.table import traverse_conditions
+from infinity.common import NetworkAddress
 
 class TestConnection:
     def test_connect_and_disconnect_ok(self):

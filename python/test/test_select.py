@@ -17,7 +17,7 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 
 
 class TestSelect:
@@ -196,7 +196,7 @@ class TestSelect:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             None)
@@ -224,7 +224,7 @@ class TestSelect:
         assert res.success
 
     def test_select_big(self):
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_select_big")
 
@@ -258,7 +258,7 @@ class TestSelect:
         test_obj.test_select_embedding()
 
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_embedding")
@@ -299,7 +299,7 @@ class TestSelect:
         test_select_embedding_float()
 
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_embedding_float")
@@ -349,7 +349,7 @@ class TestSelect:
         Example Usage:
         test_select_big_embedding()
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_big_embedding")
@@ -368,3 +368,15 @@ class TestSelect:
 
         res = table_obj.search().output(["c2"]).to_df()
         assert res.row_count == 30000
+
+    def test_select_same_output(self):
+
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_select_same_output")
+        db_obj.create_table("test_select_same_output", {"c1": "int", "c2": "int"}, None)
+
+        table_obj = db_obj.get_table("test_select_same_output")
+        res = table_obj.search().output(["c1", "c2"]).to_df()
+        res = table_obj.search().output(["c1", "c1"]).to_df()
+        print(res)

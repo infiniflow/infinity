@@ -137,6 +137,11 @@ def parse_bytes(bytes_data):
         offset += length
     return results
 
+def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef])->ttypes.DataType:
+    for column_def in column_defs:
+        if column_def.name == column_name:
+            return column_def.data_type
+    raise KeyError(f"column name {column_name} not found in column defs")
 
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
     data_dict: Dict[str, list[Any, ...]] = {}
@@ -159,8 +164,8 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
 
     type_dict = dict(zip(column_names, types))
     # print()
-    # print(data_dict)
-    # print(type_dict)
+    print(data_dict)
+    print(type_dict)
     # print()
     # print(pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict))
     return pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict)
