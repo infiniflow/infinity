@@ -227,9 +227,6 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     };
 
     index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
-    if (!path_exists) {
-        // index_writer_->Commit();
-    }
     auto reader = index_writer_->GetSnapshot();
     auto data = MakeShared<DataSnapshot>(Move(reader));
 
