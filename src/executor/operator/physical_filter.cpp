@@ -55,30 +55,43 @@ void PhysicalFilter::Init() {
 }
 
 void PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
-    if(operator_state->data_block_.get() == nullptr) {
-        operator_state->data_block_ = DataBlock::Make();
-
-        // Performance issue here.
-        operator_state->data_block_->Init(*GetOutputTypes());
-    }
-
-    SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
-
     auto* prev_op_state = operator_state->prev_op_state_;
     auto* filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
 
-    SizeT selected_count = selector_.Select(condition_,
-                                            condition_state,
-                                            prev_op_state->data_block_.get(),
-                                            filter_operator_state->data_block_.get(),
-                                            prev_op_state->data_block_->row_count());
+    if(prev_op_state->data_block_array_.empty()) {
+        Error<ExecutorException>("No input data array from input");
+    }
 
-    LOG_TRACE(Format("{} rows after filter", selected_count));
+    SizeT input_block_count = prev_op_state->data_block_array_.size();
+
+    for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
+
+        UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
+        data_block->Init(*GetOutputTypes());
+        DataBlock* output_data_block = data_block.get();
+        operator_state->data_block_array_.emplace_back(Move(data_block));
+
+        SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
+        DataBlock* input_data_block = prev_op_state->data_block_array_[block_idx].get();
+
+        SizeT selected_count = selector_.Select(condition_,
+                                                condition_state,
+                                                input_data_block,
+                                                output_data_block,
+                                                input_data_block->row_count());
+
+        LOG_TRACE(Format("{} rows after filter", selected_count));
+    }
+
+    // Clean input data block array;
+    prev_op_state->data_block_array_.clear();
     if (prev_op_state->Complete()) {
-        prev_op_state->data_block_.reset();
         filter_operator_state->SetComplete();
     }
-    return;
+
+    if(prev_op_state->Complete()) {
+        filter_operator_state->SetComplete();
+    }
 }
 
 } // namespace infinity

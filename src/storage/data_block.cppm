@@ -31,6 +31,7 @@ export struct DataBlock {
 
 public:
     static inline SharedPtr<DataBlock> Make() { return MakeShared<DataBlock>(); }
+    static inline UniquePtr<DataBlock> MakeUniquePtr() { return MakeUnique<DataBlock>(); }
 
 public:
     DataBlock() = default;

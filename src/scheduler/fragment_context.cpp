@@ -103,7 +103,7 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
 
     // Set fake parallel number here. It will be set in SetMergeKnnState
     merge_knn_op_state_ptr->merge_knn_function_data_ =
-        MakeShared<MergeKnnFunctionData>(0, 1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
+        MakeShared<MergeKnnFunctionData>(1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
 
     return operator_state;
 }
@@ -270,8 +270,6 @@ void SetMergeKnnState(MergeKnnOperatorState &operator_state,
     if (child_fragment->GetOperators().back()->operator_type() != PhysicalOperatorType::kKnnScan) {
         Error<SchedulerException>("Merge Knn child must be KnnScan");
     }
-    auto real_parallel_count = child_fragment->Tasks().size();
-    operator_state.merge_knn_function_data_->total_parallel_n_ = real_parallel_count;
 }
 
 // Set the state after child is finished.
@@ -391,9 +389,9 @@ void FragmentContext::BuildTask(QueryContext *query_context,
                             auto *queue_sink_state = static_cast<QueueSinkState *>(sink_state);
                             for (const auto &next_fragment_task : parent_context->Tasks()) {
                                 auto *next_fragment_source_state = static_cast<QueueSourceState *>(next_fragment_task->source_state_.get());
+                                next_fragment_source_state->SetTaskNum(fragment_context->fragment_ptr_->FragmentID(), real_parallel_size);
                                 queue_sink_state->fragment_data_queues_.emplace_back(&next_fragment_source_state->source_queue_);
                             }
-
                             break;
                         }
                         case SinkStateType::kInvalid: {
@@ -429,8 +427,8 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             }
         }
         default: {
-            for (i64 task_id = 0; task_id < tasks.size(); task_id++) {
-                FragmentTask *task = tasks[task_id].get();
+            for (const auto & task_id : tasks) {
+                FragmentTask *task = task_id.get();
                 auto &first_operator_state = *task->operator_states_.back();
                 SetTaskState(first_operator_state, fragment_operators.back(), fragment_ptr->Children());
             }
@@ -700,8 +698,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
-            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
+            for (u64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
             }
             break;
         }
@@ -722,15 +720,15 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
-            tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
+            tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), 0);
             MaterializeSinkState *sink_state_ptr = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
             sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
             sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             break;
         }
         case PhysicalOperatorType::kMatch: {
-            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>();
+            for (u64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
             }
             break;
         }
@@ -744,9 +742,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
-            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>();
-                //                QueueSinkState* sink_state_ptr = static_cast<QueueSinkState*>(tasks_[task_id]->sink_state_.get());
+            for (u64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
             }
             break;
         }
@@ -762,8 +759,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                 Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
-            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
+            for (u64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
                 MaterializeSinkState *sink_state_ptr = static_cast<MaterializeSinkState *>(tasks_[task_id]->sink_state_.get());
                 sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
                 sink_state_ptr->column_names_ = last_operator->GetOutputNames();
@@ -776,7 +773,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                     Error<SchedulerException>("SerialMaterialize type fragment should only have 1 task.");
                 }
 
-                tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>();
+                tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), 0);
                 MaterializeSinkState *sink_state_ptr = static_cast<MaterializeSinkState *>(tasks_[0]->sink_state_.get());
                 sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
                 sink_state_ptr->column_names_ = last_operator->GetOutputNames();
@@ -785,8 +782,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
                     Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
                 }
 
-                for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                    tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>();
+                for (u64 task_id = 0; task_id < parallel_count; ++task_id) {
+                    tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
                     MaterializeSinkState *sink_state_ptr = static_cast<MaterializeSinkState *>(tasks_[task_id]->sink_state_.get());
                     sink_state_ptr->column_types_ = last_operator->GetOutputTypes();
                     sink_state_ptr->column_names_ = last_operator->GetOutputNames();
@@ -889,7 +886,10 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
-            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
+            for(auto& data_block: materialize_sink_state->data_block_array_) {
+                result_table->data_blocks_.emplace_back(Move(data_block));
+            }
+//            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {
@@ -964,8 +964,8 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
             result_table = DataTable::MakeResultTable(column_defs);
         }
 
-        for (const auto &result_data_block : materialize_sink_state->data_block_array_) {
-            result_table->Append(result_data_block);
+        for (auto &result_data_block : materialize_sink_state->data_block_array_) {
+            result_table->Append(Move(result_data_block));
         }
     }
 
@@ -1012,8 +1012,8 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
             result_table = DataTable::MakeResultTable(column_defs);
         }
 
-        for (const auto &result_data_block : materialize_sink_state->data_block_array_) {
-            result_table->Append(result_data_block);
+        for (auto &result_data_block : materialize_sink_state->data_block_array_) {
+            result_table->Append(Move(result_data_block));
         }
     }
 

@@ -1132,7 +1132,6 @@ void fields_data::flush(field_writer& fw, flush_state& state) {
 
   IndexFeatures index_features{IndexFeatures::NONE};
   feature_set_t features;
-
   // sort fields
   sorted_fields_.resize(fields_.size());
   auto begin = sorted_fields_.begin();

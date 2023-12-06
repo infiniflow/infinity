@@ -307,7 +307,7 @@ class IndexWriter : private util::noncopyable {
     // Return true, if field was successfully inserted
     template<Action action, typename Field>
     bool Insert(Field&& field) const {
-      return writer_.insert<action>(std::forward<Field>(field), doc_id_);
+        return writer_.insert<action>(std::forward<Field>(field), doc_id_);
     }
 
     // Inserts the specified field (denoted by the pointer) into the
@@ -318,7 +318,7 @@ class IndexWriter : private util::noncopyable {
     // Return true, if field was successfully inserted
     template<Action action, typename Field>
     bool Insert(Field* field) const {
-      return writer_.insert<action>(*field, doc_id_);
+        return writer_.insert<action>(*field, doc_id_);
     }
 
     // Inserts the specified range of fields, denoted by the [begin;end)

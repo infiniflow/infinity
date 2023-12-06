@@ -22,6 +22,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
+import fragment_data;
 
 import infinity_exception;
 
@@ -46,12 +47,22 @@ void PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         }
         case SourceStateType::kQueue: {
             QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);
-            queue_source_state->source_queue_.Dequeue(queue_source_state->current_fragment_data_);
+            UniquePtr<DataBlock> data_block{};
+            bool completed = queue_source_state->GetData(data_block);
 
-            // FIXME: Need to handle task id of fragment.
-
-            queue_source_state->SetTotalDataCount(queue_source_state->current_fragment_data_->data_count_);
-            queue_source_state->PushData(queue_source_state->current_fragment_data_->data_block_.get());
+            OperatorState *next_op_state = queue_source_state->next_op_state_;
+            switch(next_op_state->operator_type_) {
+                case PhysicalOperatorType::kMergeKnn: {
+                    MergeKnnOperatorState* merge_knn_op_state = (MergeKnnOperatorState*)next_op_state;
+                    merge_knn_op_state->input_data_block_ = Move(data_block);
+                    merge_knn_op_state->input_complete_ = completed;
+                    break;
+                }
+                default: {
+                    Error<ExecutorException>("Not support operator type");
+                    break;
+                }
+            }
             break;
         }
         default: {
