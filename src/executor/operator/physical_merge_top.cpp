@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalMergeTop::Init() {}
 
-void PhysicalMergeTop::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

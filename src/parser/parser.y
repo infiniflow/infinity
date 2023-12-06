@@ -1886,7 +1886,13 @@ query_expr : QUERY '(' STRING ')' {
     $$ = match_expr;
 }
 
-fusion_expr : FUSION '(' STRING ',' STRING ')' {
+fusion_expr : FUSION '(' STRING ')' {
+    infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
+    fusion_expr->method_ = std::string($3);
+    free($3);
+    $$ = fusion_expr;
+}
+| FUSION '(' STRING ',' STRING ')' {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
     fusion_expr->method_ = std::string($3);
     free($3);

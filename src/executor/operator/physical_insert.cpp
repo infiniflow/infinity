@@ -37,7 +37,7 @@ namespace infinity {
 
 void PhysicalInsert::Init() {}
 
-void PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     SizeT row_count = value_list_.size();
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_collection_entry_->columns_.size();
@@ -88,6 +88,7 @@ void PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         insert_operator_state->result_msg_ = Move(result_msg);
     }
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

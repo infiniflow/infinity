@@ -23,7 +23,10 @@ namespace infinity {
 
 void PhysicalExport::Init() {}
 
-void PhysicalExport::Execute(QueryContext *, OperatorState *operator_state) { operator_state->SetComplete(); }
+bool PhysicalExport::Execute(QueryContext *, OperatorState *operator_state) {
+    operator_state->SetComplete();
+    return true;
+}
 
 void PhysicalExport::ExportCSV(QueryContext *) {}
 

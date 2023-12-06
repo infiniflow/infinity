@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalHash::Init() {}
 
-void PhysicalHash::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalHash::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

@@ -33,8 +33,7 @@ namespace infinity {
 
 void PhysicalDropSchema::Init() {}
 
-void PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
-
+bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     BaseEntry* base_entry{};
     Status status = txn->DropDatabase(*schema_name_, conflict_type_, base_entry);
@@ -48,6 +47,7 @@ void PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *ope
     auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

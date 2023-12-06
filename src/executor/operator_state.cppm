@@ -294,6 +294,12 @@ export struct MatchOperatorState : public OperatorState {
 // Fusion
 export struct FusionOperatorState : public OperatorState {
     inline explicit FusionOperatorState() : OperatorState(PhysicalOperatorType::kFusion) {}
+
+    // Fusion is the first op, no previous operator state.
+    // This is to tell op that source is drained.
+    bool input_complete_{false};
+    // This is to cache all input data before calculation.
+    Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
 // Source
@@ -318,7 +324,7 @@ export struct QueueSourceState : public SourceState {
 
     inline void SetTaskNum(u64 fragment_id, u64 num_tasks) { num_tasks_[fragment_id] = num_tasks; }
 
-    bool GetData(UniquePtr<DataBlock> &output);
+    bool GetData();
 
     BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
 

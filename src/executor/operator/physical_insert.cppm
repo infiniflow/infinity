@@ -43,7 +43,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline const TableCollectionEntry *table_collection_entry() const { return table_collection_entry_; }
 

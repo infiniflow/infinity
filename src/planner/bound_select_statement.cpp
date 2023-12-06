@@ -167,7 +167,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         if (search_expr_->fusion_expr_ != nullptr) {
-            SharedPtr<LogicalNode> fusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), search_expr_->fusion_expr_);
+            SharedPtr<LogicalNode> fusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(),
+                                                                          search_expr_->fusion_expr_,
+                                                                          match_knn_nodes[0]->GetColumnBindings(),
+                                                                          match_knn_nodes[0]->GetOutputNames(),
+                                                                          match_knn_nodes[0]->GetOutputTypes());
             fusionNode->set_left_node(match_knn_nodes[0]);
             if (match_knn_nodes.size() > 1)
                 fusionNode->set_right_node(match_knn_nodes[1]);

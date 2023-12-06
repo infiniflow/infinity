@@ -36,7 +36,7 @@ namespace infinity {
 
 void PhysicalDelete::Init() {}
 
-void PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState* prev_op_state = operator_state->prev_op_state_;
 
     SizeT data_block_count = prev_op_state->data_block_array_.size();
@@ -64,6 +64,7 @@ void PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
     if (prev_op_state->Complete()) {
         operator_state->SetComplete();
     }
+    return true;
 }
 
 } // namespace infinity

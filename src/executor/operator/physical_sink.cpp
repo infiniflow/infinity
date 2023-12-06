@@ -33,14 +33,12 @@ namespace infinity {
 
 void PhysicalSink::Init() {}
 
-void PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+bool PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 
-void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
-
-    if(sink_state->error_message_.get() != nullptr) {
-        return;
+bool PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
+    if (sink_state->error_message_.get() != nullptr) {
+        return true;
     }
-
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
             Error<ExecutorException>("Invalid sinker type");
@@ -76,6 +74,7 @@ void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
             break;
         }
     }
+    return true;
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {
@@ -291,39 +290,26 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
-    if(!task_operator_state->Complete()) {
+    if (!task_operator_state->Complete()) {
         LOG_TRACE("Task not completed");
-        return ;
+        return;
     }
-    switch (task_operator_state->operator_type_) {
-        case PhysicalOperatorType::kKnnScan: {
-            KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_operator_state);
-
-            SizeT output_data_block_count = knn_output_state->data_block_array_.size();
-            if(output_data_block_count == 0) {
-                Error<ExecutorException>("No output from knn scan");
-            }
-
-            for(SizeT idx = 0; idx < output_data_block_count; ++ idx) {
-                SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-                fragment_data->fragment_id_ = queue_sink_state->fragment_id_;
-                fragment_data->task_id_ = queue_sink_state->task_id_;
-                fragment_data->data_block_ = Move(knn_output_state->data_block_array_[idx]);
-                fragment_data->data_count_ = output_data_block_count;
-                fragment_data->data_idx_ = idx;
-                for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-                    next_fragment_queue->Enqueue(fragment_data);
-                }
-            }
-
-            knn_output_state->data_block_array_.clear();
-            break;
-        }
-        default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
-            break;
+    SizeT output_data_block_count = task_operator_state->data_block_array_.size();
+    if (output_data_block_count == 0) {
+        Error<ExecutorException>("No output from knn scan");
+    }
+    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
+        SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
+        fragment_data->fragment_id_ = queue_sink_state->fragment_id_;
+        fragment_data->task_id_ = queue_sink_state->task_id_;
+        fragment_data->data_block_ = Move(task_operator_state->data_block_array_[idx]);
+        fragment_data->data_count_ = output_data_block_count;
+        fragment_data->data_idx_ = idx;
+        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+            next_fragment_queue->Enqueue(fragment_data);
         }
     }
+    task_operator_state->data_block_array_.clear();
 }
 
 } // namespace infinity

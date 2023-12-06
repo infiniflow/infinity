@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalTop::Init() {}
 
-void PhysicalTop::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+bool PhysicalTop::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 
 } // namespace infinity

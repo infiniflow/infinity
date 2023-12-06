@@ -71,7 +71,7 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
     }
 }
 
-void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
     // 1 build irs::filter
     // 1.1 populate column2analyzer
     u64 txn_id = query_context->GetTxn()->TxnID();
@@ -142,6 +142,7 @@ void PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     operator_state->data_block_array_.emplace_back(Move(output_data_block));
 
     operator_state->SetComplete();
+    return true;
 }
 
 SharedPtr<Vector<String>> PhysicalMatch::GetOutputNames() const {

@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalAlter::Init() {}
 
-void PhysicalAlter::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalAlter::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity
