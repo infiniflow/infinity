@@ -249,14 +249,6 @@ void IRSDataStore::Commit() {
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();
-    std::cout << "Index stats:"
-              << "\nsegments=" << reader->size() << "\ndocs=" << reader->docs_count() << "\nlive-docs=" << reader->live_docs_count() << std::endl;
-    std::cout << "reader" << std::endl;
-
-    for (auto &segment : reader) {
-        std::cout << segment.Meta().name << std::endl;
-    }
-
     auto data = MakeShared<DataSnapshot>(Move(reader));
     StoreSnapshot(data);
 }
@@ -426,7 +418,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
             }
         }
         if (!schedule) {
-            // ScheduleCommit();
+            ScheduleCommit();
             schedule = true;
         }
     }
