@@ -101,8 +101,8 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         merge_knn->End(); // reorder the heap
 
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
-        auto &output_data = *merge_knn_state->input_data_block_.get();
 
+        u64 output_row_count{0};
         i64 result_n = Min(merge_knn_data.topk_, merge_knn->total_count());
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
@@ -121,11 +121,12 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 }
 
                 DataBlock* output_data_block = merge_knn_state->data_block_array_.back().get();
-                if(output_data_block->available_capacity() == 0) {
+                if(output_row_count == DEFAULT_BLOCK_CAPACITY) {
                     output_data_block->Finalize();
                     merge_knn_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
                     merge_knn_state->data_block_array_.back()->Init(*GetOutputTypes());
                     output_data_block = merge_knn_state->data_block_array_.back().get();
+                    output_row_count -= DEFAULT_BLOCK_CAPACITY;
                 }
 
                 column_n = block_entry->columns_.size();
@@ -139,6 +140,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 }
                 output_data_block->AppendValueByPtr(column_id++, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_id, (ptr_t)&result_row_ids[top_idx]);
+                ++ output_row_count;
             }
             for (SizeT column_id = 0; column_id < column_n; ++column_id) {
                 LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[column_id], output_names_->at(column_id)));
