@@ -29,7 +29,7 @@ namespace infinity {
 
 void PhysicalDropIndex::Init() {}
 
-void PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     Status status = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
 
@@ -43,6 +43,7 @@ void PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *oper
     auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

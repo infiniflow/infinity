@@ -34,39 +34,13 @@ module physical_explain;
 namespace infinity {
 
 void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2) {
-    Vector<SizeT> paragraph_indices_1;
-    Vector<SizeT> paragraph_indices_2;
+    SizeT size1 = array1.size();
+    SizeT size2 = array2.size();
 
-    for (SizeT i = 0; i < array1.size(); ++i) {
-        if (array1[i]->empty()) {
-            paragraph_indices_1.push_back(i);
-        }
-    }
-    for (SizeT i = 0; i < array2.size(); ++i) {
-        if (array2[i]->empty()) {
-            paragraph_indices_2.push_back(i);
-        }
-    }
-
-    SizeT min_paragraphs = Min(paragraph_indices_1.size(), paragraph_indices_2.size());
-
-    for (SizeT i = 0; i < min_paragraphs; ++i) {
-        SizeT start_1 = (i == 0) ? 0 : paragraph_indices_1[i - 1] + 1;
-        SizeT start_2 = (i == 0) ? 0 : paragraph_indices_2[i - 1] + 1;
-
-        SizeT end1 = paragraph_indices_1[i];
-        SizeT end2 = paragraph_indices_2[i];
-
-        Vector<SharedPtr<String>> paragraphs1(array1.begin() + start_1, array1.begin() + end1);
-        Vector<SharedPtr<String>> paragraphs2(array2.begin() + start_2, array2.begin() + end2);
-
-        SizeT length_diff = paragraphs1.size() - paragraphs2.size();
-
-        if (length_diff > 0) {
-            array2.insert(array2.begin() + end2, length_diff, MakeShared<String>());
-        } else if (length_diff < 0) {
-            array1.insert(array1.begin() + end1, -length_diff, MakeShared<String>());
-        }
+    if (size1 < size2) {
+        array1.resize(size2, MakeShared<String>(""));
+    } else if (size2 < size1) {
+        array2.resize(size1, MakeShared<String>(""));
     }
 }
 
@@ -114,7 +88,7 @@ void PhysicalExplain::Init() {
     }
 }
 
-void PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
+bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -181,6 +155,7 @@ void PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     ExplainOperatorState *explain_operator_state = static_cast<ExplainOperatorState *>(operator_state);
     explain_operator_state->data_block_array_.emplace_back(Move(output_data_block));
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

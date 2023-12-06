@@ -143,30 +143,35 @@ void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     FragmentTask *fragment_task{nullptr};
-    Vector<FragmentTask*> task_list;
+    Vector<FragmentTask *> task_list;
     task_list.reserve(DEFAULT_BLOCKING_QUEUE_SIZE);
     bool running{true};
     while (running) {
         task_queue->DequeueBulk(task_list);
         SizeT list_size = task_list.size();
-        for(SizeT idx = 0; idx < list_size; ++ idx) {
+        for (SizeT idx = 0; idx < list_size; ++idx) {
             fragment_task = task_list[idx];
 
-            if (fragment_task->IsTerminator()) {
-                running = false;
-                break;
-            }
+            try {
+                if (fragment_task->IsTerminator()) {
+                    running = false;
+                    break;
+                }
 
-            if (!fragment_task->Ready()) {
-                ready_queue_->Enqueue(fragment_task);
-                continue;
-            }
+                if (!fragment_task->Ready()) {
+                    ready_queue_->Enqueue(fragment_task);
+                    continue;
+                }
 
-            fragment_task->OnExecute(worker_id);
-            fragment_task->SetLastWorkID(worker_id);
-            if (!fragment_task->IsComplete()) {
-                ready_queue_->Enqueue(fragment_task);
-            } else {
+                fragment_task->OnExecute(worker_id);
+                fragment_task->SetLastWorkID(worker_id);
+                if (!fragment_task->IsComplete()) {
+                    ready_queue_->Enqueue(fragment_task);
+                } else {
+                    fragment_task->TryCompleteFragment();
+                }
+            } catch (const Exception &e) {
+                LOG_ERROR(e.what());
                 fragment_task->TryCompleteFragment();
             }
         }

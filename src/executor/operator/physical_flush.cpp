@@ -29,8 +29,7 @@ namespace infinity {
 
 void PhysicalFlush::Init() {}
 
-void PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
-
+bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
     switch (flush_type_) {
         case FlushType::kData: {
             FlushData(query_context);
@@ -45,8 +44,8 @@ void PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
             break;
         }
     }
-
     operator_state->SetComplete();
+    return true;
 }
 
 void PhysicalFlush::FlushData(QueryContext *) {

@@ -42,8 +42,9 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
 
 void PhysicalCreateCollection::Init() {}
 
-void PhysicalCreateCollection::Execute(QueryContext *query_context, OperatorState *output_state) {
+bool PhysicalCreateCollection::Execute(QueryContext *query_context, OperatorState *output_state) {
     output_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

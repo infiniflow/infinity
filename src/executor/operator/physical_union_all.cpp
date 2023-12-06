@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalUnionAll::Init() {}
 
-void PhysicalUnionAll::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+bool PhysicalUnionAll::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 
 } // namespace infinity

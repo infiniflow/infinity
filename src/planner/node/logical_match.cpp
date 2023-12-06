@@ -43,15 +43,23 @@ Vector<ColumnBinding> LogicalMatch::GetColumnBindings() const {
 
 SharedPtr<Vector<String>> LogicalMatch::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    result_names->emplace_back(COLUMN_NAME_ROW_ID);
+    SizeT column_count = base_table_ref_->column_names_->size();
+    result_names->reserve(column_count + 2);
+    for (auto &name : *base_table_ref_->column_names_)
+        result_names->emplace_back(name);
     result_names->emplace_back(COLUMN_NAME_SCORE);
+    result_names->emplace_back(COLUMN_NAME_ROW_ID);
     return result_names;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatch::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    SizeT column_count = base_table_ref_->column_names_->size();
+    result_types->reserve(column_count + 2);
+    for (auto &type : *base_table_ref_->column_types_)
+        result_types->emplace_back(type);
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kFloat));
+    result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 

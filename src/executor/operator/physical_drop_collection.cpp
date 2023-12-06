@@ -29,6 +29,9 @@ namespace infinity {
 
 void PhysicalDropCollection::Init() {}
 
-void PhysicalDropCollection::Execute(QueryContext *, OperatorState *operator_state) { operator_state->SetComplete(); }
+bool PhysicalDropCollection::Execute(QueryContext *, OperatorState *operator_state) {
+    operator_state->SetComplete();
+    return true;
+}
 
 } // namespace infinity

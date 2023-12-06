@@ -194,7 +194,7 @@ private:
 
 void PhysicalSort::Init() {}
 
-void PhysicalSort::Execute(QueryContext *, OperatorState *) {
+bool PhysicalSort::Execute(QueryContext *, OperatorState *) {
 #if 0
     executor_.Init(this->expressions_);
 
@@ -228,6 +228,7 @@ void PhysicalSort::Execute(QueryContext *, OperatorState *) {
 
     Sort(order_by_table, order_by_types_);
 #endif
+    return true;
 }
 
 SharedPtr<DataTable> PhysicalSort::GetOrderTable() const {

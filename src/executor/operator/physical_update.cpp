@@ -38,7 +38,7 @@ namespace infinity {
 
 void PhysicalUpdate::Init() {}
 
-void PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     SizeT input_data_block_count = prev_op_state->data_block_array_.size();
     for(SizeT block_idx = 0; block_idx < input_data_block_count; ++ block_idx) {
@@ -87,6 +87,7 @@ void PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
     if (prev_op_state->Complete()) {
         operator_state->SetComplete();
     }
+    return true;
 }
 
 } // namespace infinity

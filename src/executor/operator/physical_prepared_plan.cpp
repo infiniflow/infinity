@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalPreparedPlan::Init() {}
 
-void PhysicalPreparedPlan::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalPreparedPlan::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

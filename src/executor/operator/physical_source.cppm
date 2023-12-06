@@ -48,9 +48,9 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    void Execute(QueryContext *query_context, SourceState *source_state);
+    bool Execute(QueryContext *query_context, SourceState *source_state);
 
     bool ReadyToExec(SourceState *source_state);
 

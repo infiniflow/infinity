@@ -46,8 +46,7 @@ void PhysicalProject::Init() {
     //    outputs_[output_table_index_] = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
-
+bool PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
 
@@ -92,6 +91,7 @@ void PhysicalProject::Execute(QueryContext *query_context, OperatorState *operat
     if (prev_op_state->Complete()) {
         project_operator_state->SetComplete();
     }
+    return true;
 }
 
 SharedPtr<Vector<String>> PhysicalProject::GetOutputNames() const {

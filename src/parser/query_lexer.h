@@ -2,9 +2,9 @@
 #define yyHEADER_H 1
 #define yyIN_HEADER 1
 
-#line 6 "query_lexer.h"
+#line 5 "query_lexer.h"
 
-#line 8 "query_lexer.h"
+#line 7 "query_lexer.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -531,6 +531,6 @@ static int yy_flex_strlen ( const char * );
 #line 125 "query_lexer.l"
 
 
-#line 535 "query_lexer.h"
+#line 534 "query_lexer.h"
 #undef yyIN_HEADER
 #endif /* yyHEADER_H */

@@ -18,15 +18,15 @@ import data_block;
 import stl;
 import physical_operator_type;
 import fragment_data;
+import infinity_exception;
 
 module operator_state;
 
 namespace infinity {
 
-bool QueueSourceState::GetData(UniquePtr<DataBlock> &output) {
+bool QueueSourceState::GetData() {
     SharedPtr<FragmentData> fragment_data = nullptr;
     source_queue_.Dequeue(fragment_data);
-//    DataBlock* input_data_block = fragment_data->data_block_.get();
     if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
         auto it = num_tasks_.find(fragment_data->fragment_id_);
         if (it != num_tasks_.end()) {
@@ -37,9 +37,27 @@ bool QueueSourceState::GetData(UniquePtr<DataBlock> &output) {
             }
         }
     }
-    output = Move(fragment_data->data_block_);
-    return num_tasks_.empty();
+    bool completed = num_tasks_.empty();
+    OperatorState *next_op_state = this->next_op_state_;
+    switch (next_op_state->operator_type_) {
+        case PhysicalOperatorType::kMergeKnn: {
+            MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
+            merge_knn_op_state->input_data_block_ = Move(fragment_data->data_block_);
+            merge_knn_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kFusion: {
+            FusionOperatorState *fusion_op_state = (FusionOperatorState *)next_op_state;
+            fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(Move(fragment_data->data_block_));
+            fusion_op_state->input_complete_ = completed;
+            break;
+        }
+        default: {
+            Error<ExecutorException>("Not support operator type");
+            break;
+        }
+    }
+    return completed;
 }
-
 
 } // namespace infinity
