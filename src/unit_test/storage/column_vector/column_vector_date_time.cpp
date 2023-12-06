@@ -37,7 +37,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -110,7 +109,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -143,7 +141,8 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         column_constant.Reset();
@@ -159,7 +158,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -207,7 +205,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -316,7 +313,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -389,7 +385,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -422,7 +417,8 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
         column_constant.Reset();
@@ -438,7 +434,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -486,7 +481,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -595,7 +589,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -670,7 +663,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -704,7 +696,9 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
         EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
@@ -721,7 +715,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -771,7 +764,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -885,7 +877,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -961,7 +952,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -995,7 +985,9 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));
         EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
@@ -1012,7 +1004,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1062,7 +1053,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1176,7 +1166,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1250,7 +1239,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1285,7 +1273,9 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
         column_constant.Reset();
@@ -1301,7 +1291,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1350,7 +1339,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);

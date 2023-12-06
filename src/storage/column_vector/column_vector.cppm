@@ -14,6 +14,8 @@
 
 module;
 
+#include <sstream>
+
 import stl;
 import parser;
 import global_resource_usage;
@@ -23,7 +25,7 @@ import selection;
 import default_values;
 import value;
 import column_buffer;
-
+import third_party;
 import infinity_exception;
 
 export module column_vector;
@@ -83,17 +85,46 @@ public:
         GlobalResourceUsage::DecrObjectCount();
     }
 
-    void Initialize(const ColumnVector &other, const Selection &input_select);
+    void Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx) { Initialize(other.vector_type_, other, start_idx, end_idx); }
 
-    void Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx);
+    String ToString() const {
+        std::stringstream ss;
+        for (SizeT idx = 0; idx < tail_index_; ++idx) {
+            ss << ToString(idx) << " ";
+        }
+        return ss.str();
+    }
+
+    void AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
+
+    void AppendValue(const Value &value) {
+        Assert<StorageException>(initialized, "Column vector isn't initialized.");
+        if (vector_type_ == ColumnVectorType::kConstant) {
+            Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+        }
+
+        if (tail_index_ >= capacity_) {
+            Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+        }
+        SetValue(tail_index_++, value);
+    }
+
+    void SetVectorType(ColumnVectorType vector_type) {
+        Assert<TypeException>(!initialized, "Column Vector is initialized");
+        Assert<TypeException>(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.");
+        if (vector_type_ == vector_type) {
+            return;
+        }
+        this->Reset();
+        this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
+    }
+
+public:
+    void Initialize(const ColumnVector &other, const Selection &input_select);
 
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
     void Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx);
-
-    void CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx);
-
-    String ToString() const;
 
     String ToString(SizeT row_index) const;
 
@@ -107,21 +138,11 @@ public:
 
     void Finalize(SizeT index);
 
-private:
-    // Used by Append by Ptr
-    void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
-
-    // Use by Append value
-    void SetByPtr(SizeT index, const_ptr_t value_ptr);
-
-public:
-    void AppendValue(const Value &value);
-
     void AppendByPtr(const_ptr_t value_ptr);
 
-    void AppendWith(const ColumnVector &other);
-
     void AppendWith(const ColumnVector &other, SizeT from, SizeT count);
+
+    // What is this two ??????
 
     // input parameter:
     // column_buffer - input column
@@ -141,21 +162,6 @@ public:
     // Enlarge the column vector capacity.
     void Reserve(SizeT new_capacity);
 
-    void SetVectorType(ColumnVectorType vector_type) {
-        Assert<TypeException>(!initialized, "Column Vector is initialized");
-        Assert<TypeException>(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.");
-        if (vector_type_ == vector_type) {
-            return;
-        }
-        this->Reset();
-        this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
-    }
-
-    inline void SetDataType(const SharedPtr<DataType> &data_type) {
-        Assert<TypeException>(!initialized, "Column Vector is initialized");
-        data_type_ = data_type;
-    }
-
     void Reset();
 
     bool operator==(const ColumnVector &other) const;
@@ -163,11 +169,14 @@ public:
 
     // Estimated serialized size in bytes
     i32 GetSizeInBytes() const;
+
     // Write to a char buffer
     void WriteAdv(char *&ptr) const;
+
     // Read from a serialized version
     static SharedPtr<ColumnVector> ReadAdv(char *&ptr, i32 maxbytes);
 
+private:
     template <typename T>
     static void CopyValue(const ColumnVector &src, const ColumnVector &dst, SizeT count) {
         auto *src_ptr = (T *)(dst.data_ptr_);
@@ -177,7 +186,14 @@ public:
         }
     }
 
-private:
+    // Used by Append by Ptr
+    void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
+
+    // Use by Append value
+    void SetByPtr(SizeT index, const_ptr_t value_ptr);
+
+    void CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx);
+
     template <typename DataT>
     inline void CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select);
 

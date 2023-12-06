@@ -38,7 +38,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -110,7 +109,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -144,7 +142,9 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
         column_constant.Reset();
@@ -161,7 +161,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -209,7 +208,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);

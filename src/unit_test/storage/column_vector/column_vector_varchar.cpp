@@ -37,7 +37,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -135,7 +135,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -180,7 +180,9 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         String s = "hello" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_TRUE(vx.value_.varchar.IsInlined());
@@ -204,7 +206,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -271,7 +273,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -433,7 +435,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -537,7 +539,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -583,7 +585,9 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         String s = "hellohellohello" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         EXPECT_FALSE(vx.value_.varchar.IsInlined());
@@ -607,7 +611,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -674,7 +678,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -721,7 +725,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -832,7 +836,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -879,7 +883,9 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
         String s = "Professional" + ToStr(i);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
         if (s.length() <= VARCHAR_INLINE_LEN) {

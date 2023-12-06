@@ -37,7 +37,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -121,7 +121,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -155,7 +155,9 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         auto *integer_mixed_ptr = (IntegerMixedType *)(&vx.value_.mixed_value);
         EXPECT_EQ(integer_mixed_ptr->value, i);
@@ -253,7 +255,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -336,7 +338,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -371,7 +373,9 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         auto *float_mixed_ptr = (FloatMixedType *)(&vx.value_.mixed_value);
         EXPECT_FLOAT_EQ(float_mixed_ptr->value, static_cast<f64>(i));
@@ -469,7 +473,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -558,7 +562,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -596,7 +600,9 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = ToStr(i);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         auto *short_str_mixed_ptr = (ShortStrMixedType *)(&vx.value_.mixed_value);
         EXPECT_EQ(short_str_mixed_ptr->length, str.size());
@@ -705,7 +711,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -814,7 +820,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -860,7 +866,9 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
         String header(5, 'a' + i % 26);
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         auto *long_str_mixed_ptr = (LongStrMixedType *)(&vx.value_.mixed_value);
         EXPECT_EQ(long_str_mixed_ptr->length, str.size());
@@ -1000,7 +1008,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1078,7 +1086,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1111,7 +1119,9 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
         column_constant.Reset();
@@ -1200,7 +1210,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1278,7 +1288,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1311,7 +1321,9 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
         column_constant.Reset();
@@ -1400,7 +1412,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -1938,7 +1950,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -2183,7 +2195,9 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kTuple);
@@ -2982,7 +2996,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -3597,7 +3611,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetDataType(data_type), TypeException);
+    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
@@ -3874,7 +3888,9 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         }
 
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-        column_constant.CopyRow(column_vector, 0, i);
+        column_constant.SetValue(0, column_vector.GetValue(i));
+        column_constant.Finalize(1);
+
         Value vx = column_constant.GetValue(0);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kArray);
