@@ -31,7 +31,7 @@ public:
 
     UniquePtr<IRSAnalyzer> Get(const StringView &name);
 
-    void Set(const StringView &name, const String &args = "");
+    void Set(const StringView &name);
 
 private:
     CacheType cache_;
