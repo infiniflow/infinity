@@ -36,11 +36,9 @@ void PhysicalSink::Init() {}
 void PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) {}
 
 void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
-
     if (sink_state->error_message_.get() != nullptr) {
         return;
     }
-
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
             Error<ExecutorException>("Invalid sinker type");

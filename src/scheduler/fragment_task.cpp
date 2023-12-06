@@ -72,8 +72,9 @@ void FragmentTask::OnExecute(i64) {
             operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
             operator_refs[op_idx]->FillingTableRefs(table_refs);
             profiler.StopOperator(operator_states_[op_idx].get());
-            if (operator_states_[op_idx]->data_block_array_.empty())
+            if (operator_states_[op_idx]->data_block_array_.empty()) {
                 break;
+            }
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
