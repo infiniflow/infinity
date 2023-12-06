@@ -103,7 +103,7 @@ def get_embedding_info(column_big_info, column_defs, column_name, index):
     column_defs.append(proto_column_def)
 
 
-class RemoteThriftDatabase(Database, ABC):
+class RemoteDatabase(Database, ABC):
 
     def __init__(self, conn, name: str):
         self._conn = conn
@@ -123,21 +123,21 @@ class RemoteThriftDatabase(Database, ABC):
             else:  # numeric or varchar
                 get_ordinary_info(column_big_info, column_defs, column_name, index)
         # print(column_defs)
-        return self._conn.client.create_table(db_name=self._conn.db_name, table_name=table_name,
+        return self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                               column_defs=column_defs,
                                               option=options)
 
     def drop_table(self, table_name):
-        return self._conn.client.drop_table(db_name=self._conn.db_name, table_name=table_name)
+        return self._conn.drop_table(db_name=self._db_name, table_name=table_name)
 
     def list_tables(self):
-        return self._conn.client.list_tables(self._db_name)
+        return self._conn.list_tables(self._db_name)
 
     def describe_table(self, table_name):
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
-        res = self._conn.client.get_table(db_name=self._conn.db_name, table_name=table_name)
+        res = self._conn.get_table(db_name=self._db_name, table_name=table_name)
         if res.success is True:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:

@@ -25,12 +25,9 @@ namespace infinity {
 
 export class Table {
 public:
-    Table(String table_name, SharedPtr<BaseSession> session)
-        : table_name_(Move(table_name)), session_(Move(session)) {}
+    Table(String table_name, SharedPtr<BaseSession> session) : table_name_(Move(table_name)), session_(Move(session)) {}
 
-    QueryResult CreateIndex(const String &index_name,
-                            Vector<IndexInfo *> *index_info_list,
-                            CreateIndexOptions create_index_options);
+    QueryResult CreateIndex(const String &index_name, Vector<IndexInfo *> *index_info_list, CreateIndexOptions create_index_options);
 
     QueryResult DropIndex(const String &index_name);
 
@@ -42,7 +39,7 @@ public:
 
     QueryResult Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
 
-    QueryResult Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &vector_expr,
+    QueryResult Search(Vector<ParsedExpr *> &knn_exprs,
                        Vector<Pair<ParsedExpr *, ParsedExpr *>> &fts_expr,
                        ParsedExpr *filter,
                        Vector<ParsedExpr *> *output_columns,

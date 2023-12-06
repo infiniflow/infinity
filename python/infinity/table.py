@@ -16,6 +16,7 @@ import typing as tp
 from abc import ABC, abstractmethod
 from typing import Optional, Union
 
+from infinity.common import VEC
 from infinity.index import IndexInfo
 
 
@@ -45,43 +46,19 @@ class Table(ABC):
     def update(self, cond: Optional[str], data: Optional[list[dict[str, tp.Union[str, int, float]]]]):
         pass
 
-    from infinity.query import Query, InfinityQueryBuilder
     @abstractmethod
     def search(
             self,
-            query: Optional[Union[str]] = None,
-    ) -> InfinityQueryBuilder:
+            query: Optional[Union[VEC, str]] = None,
+            vector_column_name: str = "vector",
+            distance: str = "L2",
+            threshold: Optional[float] = None,
+    ):
         raise NotImplementedError
 
     @abstractmethod
-    def _execute_query(self, query: Query):
+    def _execute_query(self, query):
         pass
 
 
-def binary_exp_to_paser_exp(binary_expr_key) -> str:
-    if binary_expr_key == "eq":
-        return "="
-    elif binary_expr_key == "gt":
-        return ">"
-    elif binary_expr_key == "lt":
-        return "<"
-    elif binary_expr_key == "gte":
-        return ">="
-    elif binary_expr_key == "lte":
-        return "<="
-    elif binary_expr_key == "neq":
-        return "!="
-    elif binary_expr_key == "and":
-        return "and"
-    elif binary_expr_key == "or":
-        return "or"
-    elif binary_expr_key == "add":
-        return "+"
-    elif binary_expr_key == "sub":
-        return "-"
-    elif binary_expr_key == "mul":
-        return "*"
-    elif binary_expr_key == "div":
-        return "/"
-    else:
-        raise Exception(f"unknown binary expression: {binary_expr_key}")
+

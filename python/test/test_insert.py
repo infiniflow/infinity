@@ -15,7 +15,7 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import REMOTE_HOST
 
 
 class TestInsert:
@@ -43,7 +43,7 @@ class TestInsert:
             - 'table_2'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -79,7 +79,7 @@ class TestInsert:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("test_insert_varchar", {"c1": "varchar"}, None)
         assert res.success
@@ -103,7 +103,7 @@ class TestInsert:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("test_insert_big_varchar", {"c1": "varchar"}, None)
         assert res.success
@@ -124,7 +124,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_embedding")
         res = db_obj.create_table("test_insert_embedding", {"c1": "vector,3,int"}, None)
@@ -172,7 +172,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_embedding")
         res = db_obj.create_table("test_insert_big_embedding", {"c1": "vector,65535,int"}, None)
@@ -196,7 +196,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("test_insert_big_embedding", {"c1": "vector,65535,float"}, None)
         assert res.success

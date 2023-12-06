@@ -22,12 +22,11 @@ import query_result;
 import infinity_context;
 import query_context;
 import parser;
+import infinity_exception;
 
 namespace infinity {
 
-QueryResult Table::CreateIndex(const String &index_name,
-                               Vector<IndexInfo *> *index_info_list,
-                               CreateIndexOptions ) {
+QueryResult Table::CreateIndex(const String &index_name, Vector<IndexInfo *> *index_info_list, CreateIndexOptions) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -89,7 +88,7 @@ QueryResult Table::Insert(Vector<String> *columns, Vector<Vector<ParsedExpr *> *
     return result;
 }
 
-QueryResult Table::Import(const String &path, ImportOptions ) {
+QueryResult Table::Import(const String &path, ImportOptions import_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -104,7 +103,7 @@ QueryResult Table::Import(const String &path, ImportOptions ) {
     import_statement->table_name_ = table_name_;
 
     import_statement->header_ = false;
-    import_statement->copy_file_type_ = CopyFileType::kCSV;
+    import_statement->copy_file_type_ = import_options.copy_file_type_;
     import_statement->delimiter_ = ',';
 
     QueryResult result = query_context_ptr->QueryStatement(import_statement.get());
@@ -142,7 +141,7 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     return result;
 }
 
-QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
+QueryResult Table::Search(Vector<ParsedExpr *> &knn_exprs,
                           Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
                           ParsedExpr *filter,
                           Vector<ParsedExpr *> *output_columns,
@@ -164,6 +163,41 @@ QueryResult Table::Search(Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
     select_statement->where_expr_ = filter;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
+
+    select_statement->order_by_list = new Vector<OrderByExpr *>;
+    SizeT knn_expr_size = knn_exprs.size();
+    for(SizeT idx = 0; idx < knn_expr_size; ++ idx) {
+        OrderByExpr* order_by_expr = new OrderByExpr();
+        order_by_expr->expr_ = knn_exprs[idx];
+        if(knn_exprs[idx]->type_ != ParsedExprType::kKnn) {
+            Error<PlannerException>("Unmatched expression type");
+        }
+
+        KnnExpr* knn_expr = (KnnExpr*)(knn_exprs[idx]);
+        switch(knn_expr->distance_type_) {
+            case KnnDistanceType::kL2: {
+                order_by_expr->type_ = OrderType::kAsc;
+                break;
+            }
+            case KnnDistanceType::kInnerProduct: {
+                order_by_expr->type_ = OrderType::kDesc;
+                break;
+            }
+            case KnnDistanceType::kCosine: {
+                order_by_expr->type_ = OrderType::kDesc;
+                break;
+            }
+            case KnnDistanceType::kHamming: {
+                order_by_expr->type_ = OrderType::kAsc;
+                break;
+            }
+            case KnnDistanceType::kInvalid: {
+                Error<PlannerException>("Invalid knn distance type");
+                break;
+            }
+        }
+        select_statement->order_by_list->emplace_back(order_by_expr);
+    }
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

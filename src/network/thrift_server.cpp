@@ -15,7 +15,6 @@
 #include "thrift_server.h"
 
 #include <memory>
-#include <stdexcept>
 #include <thrift/TToString.h>
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/concurrency/ThreadManager.h>
@@ -31,6 +30,8 @@
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
 
+#include <expr/knn_expr.h>
+
 import infinity;
 import stl;
 import infinity_exception;
@@ -42,11 +43,13 @@ import value;
 import third_party;
 import parser;
 import file_writer;
-import local_file_system;
 import table_def;
-
-#include "parser/statement/extra/create_index_info.h"
-#include <type/complex/embedding_type.h>
+import file_system_type;
+import file_system;
+import local_file_system;
+import infinity_context;
+import config;
+import data_block;
 
 namespace infinity {
 
@@ -55,7 +58,7 @@ public:
     InfinityServiceHandler() = default;
 
     void Connect(infinity_thrift_rpc::CommonResponse &response) override {
-        auto infinity = infinity::Infinity::RemoteConnect();
+        auto infinity = Infinity::RemoteConnect();
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Connect failed";
@@ -69,11 +72,11 @@ public:
         }
     }
 
-    void Disconnect(infinity_thrift_rpc::CommonResponse &_return, const infinity_thrift_rpc::CommonRequest &request) override {
+    void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         if (infinity == nullptr) {
-            _return.success = false;
-            _return.error_msg = "Disconnect failed";
+            response.success = false;
+            response.error_msg = "Disconnect failed";
             LOG_ERROR(Format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
@@ -82,7 +85,7 @@ public:
             infinity_session_map_.erase(session_id);
             infinity_session_map_mutex_.unlock();
             LOG_TRACE(Format("THRIFT : Disconnect success"));
-            _return.success = true;
+            response.success = true;
         }
     }
 
@@ -134,7 +137,7 @@ public:
             columns->emplace_back(column);
         }
 
-        Vector<vector<ParsedExpr *> *> * values = new Vector<Vector<ParsedExpr *> *>();
+        Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
 
         for (auto &value : request.fields) {
@@ -152,20 +155,62 @@ public:
         ProcessCommonResult(response, result);
     }
 
+    CopyFileType GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
+        switch (copy_file_type) {
+            case infinity_thrift_rpc::CopyFileType::CSV:
+                return CopyFileType::kCSV;
+            case infinity_thrift_rpc::CopyFileType::JSON:
+                return CopyFileType::kJSON;
+            case infinity_thrift_rpc::CopyFileType::FVECS:
+                return CopyFileType::kFVECS;
+            default:
+                Error<NetworkException>("Not implemented copy file type", __FILE_NAME__, __LINE__);
+        }
+    }
+
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
-        LocalFileSystem fs;
-        Path path(Format("/tmp/{}_{}_{}", request.db_name, request.table_name, request.file_name));
-        FileWriter file_writer(fs, path.c_str(), 1024 * 1024);
-        file_writer.Write(request.file_content.data(), request.file_content.size());
-        file_writer.Flush();
+        Path path(
+            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
 
-        auto result = table->Import(path.c_str(), (const ImportOptions &)request.import_option);
+        ImportOptions import_options;
+        import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
 
+        const QueryResult result = table->Import(path.c_str(), import_options);
         ProcessCommonResult(response, result);
+    }
+
+    void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
+        LocalFileSystem fs;
+        Path path(
+            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+        if (request.index != 0) {
+            FileWriter file_writer(fs, path.c_str(), request.data.size(), FileFlags::WRITE_FLAG | FileFlags::APPEND_FLAG);
+            file_writer.Write(request.data.data(), request.data.size());
+            file_writer.Flush();
+        } else {
+            // Check file exist
+            if (fs.Exists(path.c_str())) {
+                auto exist_file_size = LocalFileSystem::GetFileSizeByPath(path.c_str());
+                if (exist_file_size != request.total_size) {
+                    LOG_TRACE(Format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
+                    fs.DeleteFile(path.c_str());
+                } else {
+                    response.__set_success(true);
+                    response.__set_can_skip(true);
+                    return;
+                }
+            }
+            FileWriter file_writer(fs, path.c_str(), request.data.size());
+            file_writer.Write(request.data.data(), request.data.size());
+            file_writer.Flush();
+        }
+        LOG_TRACE(Format("Upload file name: {} , index: {}", path.c_str(), request.index));
+        response.__set_success(true);
+        response.__set_can_skip(false);
     }
 
     void handeleColumnDefs(infinity_thrift_rpc::SelectResponse &response,
@@ -185,10 +230,10 @@ public:
         }
     }
 
-    void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                           SizeT row_count,
-                           SizeT col_index,
-                           const std::shared_ptr<ColumnVector> &column_vector) {
+    static void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
+                                  SizeT row_count,
+                                  SizeT col_index,
+                                  const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
@@ -259,7 +304,14 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<Pair<ParsedExpr *, ParsedExpr *>> vector_expr{};
+        Vector<ParsedExpr *> *knn_expr_list = new Vector<ParsedExpr *>();
+        knn_expr_list->reserve(request.knn_expr_list.size());
+        if (request.__isset.knn_expr_list == true) {
+            for (auto &knn_expr : request.knn_expr_list) {
+                auto parsed_expr = GetKnnExprFromProto(knn_expr);
+                knn_expr_list->emplace_back(parsed_expr);
+            }
+        }
 
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
 
@@ -270,10 +322,24 @@ public:
 
         // TODO:
         //    ParsedExpr *offset;
-        //    offset = new ParsedExpr();
-        //    ParsedExpr *limit;
-        //    limit = new ConstantExpr (0);
-        const QueryResult result = table->Search(vector_expr, fts_expr, filter, output_columns, nullptr, nullptr);
+        // offset = new ParsedExpr();
+
+        ParsedExpr *limit = nullptr;
+        if (request.__isset.limit_expr == true) {
+            limit = GetParsedExprFromProto(request.limit_expr);
+        }
+
+        Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
+        if (request.__isset.order_by_list == true) {
+            order_by_list = new Vector<OrderByExpr *>();
+            order_by_list->reserve(request.order_by_list.size());
+            for (auto &order_by_expr : request.order_by_list) {
+                // auto parsed_expr = GetOrderByExprFromProto(order_by_expr);
+                // order_by_list->emplace_back(parsed_expr);
+            }
+        }
+
+        const QueryResult result = table->Search(*knn_expr_list, fts_expr, filter, output_columns, nullptr, limit);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
@@ -288,6 +354,7 @@ public:
 
                 for (SizeT col_index = 0; col_index < column_count; ++col_index) {
                     auto column_vector = data_block->column_vectors[col_index];
+                    all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
                     switch (column_vector->data_type_->type()) {
                         case LogicalType::kBoolean:
                         case LogicalType::kTinyInt:
@@ -691,6 +758,16 @@ private:
         return parsed_expr;
     }
 
+    static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
+        auto knn_expr = new KnnExpr();
+        knn_expr->column_expr_ = GetColumnExprFromProto(*expr.column_expr.type.column_expr);
+        knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
+        knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
+        knn_expr->dimension_ = expr.dimension;
+        knn_expr->embedding_data_ptr_ = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        return knn_expr;
+    }
+
     static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
         if (expr.type.__isset.column_expr == true) {
             auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
@@ -701,8 +778,40 @@ private:
         } else if (expr.type.__isset.function_expr == true) {
             auto parsed_expr = GetFunctionExprFromProto(*expr.type.function_expr);
             return parsed_expr;
+        } else if (expr.type.__isset.knn_expr == true) {
+            auto parsed_expr = GetKnnExprFromProto(*expr.type.knn_expr);
+            return parsed_expr;
         } else {
             Error<TypeException>("Invalid parsed expression type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    static KnnDistanceType GetDistanceTypeFormProto(const infinity_thrift_rpc::KnnDistanceType::type &type) {
+        switch (type) {
+            case infinity_thrift_rpc::KnnDistanceType::L2:
+                return KnnDistanceType::kL2;
+            case infinity_thrift_rpc::KnnDistanceType::Cosine:
+                return KnnDistanceType::kCosine;
+            case infinity_thrift_rpc::KnnDistanceType::InnerProduct:
+                return KnnDistanceType::kInnerProduct;
+            case infinity_thrift_rpc::KnnDistanceType::Hamming:
+                return KnnDistanceType::kHamming;
+            default:
+                Error<TypeException>("Invalid distance type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    static void *GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+        if (embedding_data.__isset.f32_array_value) {
+            return (void *)embedding_data.f32_array_value.data();
+        } else if (embedding_data.__isset.f64_array_value) {
+            return (void *)embedding_data.f64_array_value.data();
+        } else if (embedding_data.__isset.i32_array_value) {
+            return (void *)embedding_data.i32_array_value.data();
+        } else if (embedding_data.__isset.i64_array_value) {
+            return (void *)embedding_data.i64_array_value.data();
+        } else {
+            Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
         }
     }
 
@@ -824,15 +933,19 @@ private:
 class InfinityServiceCloneFactory : virtual public infinity_thrift_rpc::InfinityServiceIfFactory {
 public:
     ~InfinityServiceCloneFactory() override = default;
+
     infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
+
         LOG_TRACE(Format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
                          sock->getSocketInfo(),
                          sock->getPeerHost(),
                          sock->getPeerAddress(),
                          sock->getPeerPort()));
+
         return new InfinityServiceHandler;
     }
+
     void releaseHandler(infinity_thrift_rpc::InfinityServiceIf *handler) override { delete handler; }
 };
 

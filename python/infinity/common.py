@@ -11,39 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from pathlib import Path
 from typing import Union
-from abc import ABC, abstractmethod
 
-from infinity import URI
+import numpy as np
 
 
-# abstract class
-class InfinityConnection(ABC):
-    def __init__(self, uri: URI):
-        self.uri = uri
+class NetworkAddress:
+    def __init__(self, ip, port):
+        self.ip = ip
+        self.port = port
 
-    @abstractmethod
-    def create_database(self, db_name, options=None):
-        pass
+    def __str__(self):
+        return f'IP: {self.ip}, Port: {self.port}'
 
-    @abstractmethod
-    def list_databases(self):
-        pass
 
-    @abstractmethod
-    def describe_database(self, db_name):
-        pass
+URI = Union[NetworkAddress, Path]
+VEC = Union[list, np.ndarray]
 
-    @abstractmethod
-    def drop_database(self, db_name, options=None):
-        pass
-
-    @abstractmethod
-    def get_database(self, db_name):
-        pass
-
-    @abstractmethod
-    def disconnect(self):
-        pass
+REMOTE_HOST = NetworkAddress("192.168.200.151", 9080)
+LOCAL_HOST = NetworkAddress("0.0.0.0", 9080)

@@ -64,6 +64,7 @@ struct ColumnDef {
 4:  list<Constraint> constraints = [],
 }
 
+
 enum LiteralType {
 Boolean,
 Double,
@@ -99,12 +100,22 @@ InnerProduct,
 Hamming,
 }
 
+union EmbeddingData {
+1: list<bool> bool_array_value,
+2: list<binary> i8_array_value,
+3: list<i16> i16_array_value,
+4: list<i32> i32_array_value,
+5: list<i64> i64_array_value,
+6: list<double> f32_array_value,
+7: list<double> f64_array_value,
+}
+
 struct KnnExpr {
 1: ParsedExpr  column_expr,
-2: list<string> embedding_data,
+2: EmbeddingData embedding_data,
 3: i64 dimension,
 4: KnnDistanceType distance_type,
-5: EmbeddingType embedding_type,
+5: ElementType embedding_data_type,
 }
 
 struct ConstantExpr {
@@ -134,6 +145,11 @@ struct UpdateExpr {
 2: ParsedExpr value,
 }
 
+struct OrderByExpr {
+1: ParsedExpr expr,
+2: bool asc,
+}
+
 
 struct Field {
 1: list<ParsedExpr> parse_exprs = [],
@@ -161,16 +177,20 @@ ColumnInvalid,
 struct ColumnField {
 1: ColumnType column_type,
 2: list<binary> column_vectors = [],
+3: string column_name,
 }
 
 struct ImportOption {
 1:  string delimiter,
-2:  string file_type,
-3:  string table_name,
-4:  string schema_name,
-5:  bool copy_from,
-6:  bool has_header,
-7:  CopyFileType copy_file_type,
+2:  bool copy_from,
+3:  bool has_header,
+4:  CopyFileType copy_file_type,
+}
+
+struct UploadResponse {
+1:  bool success,
+2:  string error_msg,
+3:  bool can_skip,
 }
 
 struct CommonResponse {
@@ -320,16 +340,29 @@ struct ImportRequest{
 6:  i64 session_id,
 }
 
-struct SelectRequest {
+struct FileChunk {
 1:  string db_name,
 2:  string table_name,
-3:  list<ParsedExpr> select_list = [],
-4:  ParsedExpr where_expr,
-5:  list<ParsedExpr> group_by_list = [],
-6:  ParsedExpr having_expr,
-7:  ParsedExpr limit_expr,
-8:  ParsedExpr offset_expr,
-9:  i64 session_id,
+3:  string file_name,
+4:  binary data,
+5:  i32 index,
+6:  bool is_last
+7:  i64 session_id,
+8:  i64 total_size,
+}
+
+struct SelectRequest {
+1: i64 session_id,
+2:  string db_name,
+3:  string table_name,
+4:  list<ParsedExpr> select_list = [],
+5:  ParsedExpr where_expr,
+6:  list<ParsedExpr> group_by_list = [],
+7:  ParsedExpr having_expr,
+8:  ParsedExpr limit_expr,
+9:  ParsedExpr offset_expr,
+10:  list<OrderByExpr> order_by_list = [],
+11:  list<KnnExpr> knn_expr_list = [],
 }
 
 struct SelectResponse {
@@ -368,6 +401,7 @@ CommonResponse Import(1:ImportRequest request),
 SelectResponse Select(1:SelectRequest request),
 CommonResponse Delete(1:DeleteRequest request),
 CommonResponse Update(1:UpdateRequest request),
+UploadResponse UploadFileChunk(1:FileChunk request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),

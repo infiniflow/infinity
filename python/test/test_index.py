@@ -14,7 +14,7 @@
 
 import infinity
 import infinity.index as index
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 
 
 class TestIndex:

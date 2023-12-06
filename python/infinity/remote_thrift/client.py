@@ -100,16 +100,18 @@ class ThriftInfinityClient:
                                                 column_names=column_names,
                                                 fields=fields))
 
-    def import_data(self, db_name: str, table_name: str, file_name: str, file_content, import_options):
+    def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.client.Import(ImportRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
                                                 file_name=file_name,
-                                                file_content=file_content,
                                                 import_option=import_options))
 
-    def select(self, db_name: str, table_name: str, select_list, where_expr, group_by_list, limit_expr, offset_expr,
-               search_expr):
+    def select(self, db_name: str, table_name: str, select_list,
+               where_expr, group_by_list, limit_expr, offset_expr,
+               search_expr,
+               knn_expr_list,
+               ):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
@@ -118,6 +120,7 @@ class ThriftInfinityClient:
                                                 group_by_list=group_by_list,
                                                 limit_expr=limit_expr,
                                                 offset_expr=offset_expr,
+                                                knn_expr_list=knn_expr_list
                                                 ))
 
     def delete(self, db_name: str, table_name: str, where_expr):
@@ -137,3 +140,13 @@ class ThriftInfinityClient:
         res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
         self.transport.close()
         return res
+
+    def upload(self, db_name: str, table_name: str, file_name: str, data, index: int, is_last: bool, total_size: int):
+        return self.client.UploadFileChunk(FileChunk(session_id=self.session_id,
+                                                     db_name=db_name,
+                                                     table_name=table_name,
+                                                     file_name=file_name,
+                                                     index=index,
+                                                     data=data,
+                                                     is_last=is_last,
+                                                     total_size=total_size))

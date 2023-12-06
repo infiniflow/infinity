@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import time
 from abc import ABC
 from typing import Optional, Union, List
 
 import pandas as pd
-from sqlglot import condition, expressions as exp
+from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from infinity.common import VEC
 from infinity.index import IndexInfo
 from infinity.query import Query, InfinityVectorQueryBuilder
 from infinity.remote_thrift.types import build_result
-from infinity.table import Table, binary_exp_to_paser_exp
+from infinity.remote_thrift.utils import traverse_conditions
+from infinity.table import Table
 
 
 class RemoteTable(Table, ABC):
@@ -47,15 +48,15 @@ class RemoteTable(Table, ABC):
 
             index_info_list_to_use.append(index_info_to_use)
 
-        return self._conn.client.create_index(db_name=self._db_name,
-                                              table_name=self._table_name,
-                                              index_name=index_name,
-                                              index_info_list=index_info_list_to_use,
-                                              option=options)
+        return self._conn.create_index(db_name=self._db_name,
+                                       table_name=self._table_name,
+                                       index_name=index_name,
+                                       index_info_list=index_info_list_to_use,
+                                       option=options)
 
     def drop_index(self, index_name: str):
-        return self._conn.client.drop_index(db_name=self._db_name, table_name=self._table_name,
-                                            index_name=index_name)
+        return self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
+                                     index_name=index_name)
 
     def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -96,22 +97,55 @@ class RemoteTable(Table, ABC):
             f.parse_exprs = parse_exprs
             fields.append(f)
 
-        return self._conn.client.insert(db_name=db_name, table_name=table_name, column_names=column_names,
-                                        fields=fields)
+        return self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
+                                 fields=fields)
 
     def import_data(self, file_path: str, options=None):
-        st = time.process_time()
-        with open(file_path, "rb", buffering=1024 * 1024) as file:
-            file_content = file.read()
 
-        # print(f"read file time: {time.process_time() - st}")
+        options = ttypes.ImportOption()
+
+        total_size = os.path.getsize(file_path)
+        chunk_size = 1024 * 1024 * 10  # 10MB
         file_name = os.path.basename(file_path)
+        if file_name.endswith('.csv'):
+            options.copy_file_type = ttypes.CopyFileType.CSV
+            options.delimiter = ","
+        elif file_name.endswith('.json'):
+            options.copy_file_type = ttypes.CopyFileType.JSON
+        elif file_name.endswith('.fvecs'):
+            options.copy_file_type = ttypes.CopyFileType.FVECS
 
-        return self._conn.client.import_data(db_name=self._db_name,
-                                             table_name=self._table_name,
-                                             file_name=file_name,
-                                             file_content=file_content,
-                                             import_options=options)
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+            num_chunks = len(file_data) // chunk_size + 1
+
+            for index in range(num_chunks):
+                start = index * chunk_size
+                end = min((index + 1) * chunk_size, len(file_data))
+                chunk_data = file_data[start:end]
+                is_last = (index == num_chunks - 1)
+                res = self._conn.upload(db_name=self._db_name,
+                                        table_name=self._table_name,
+                                        file_name=file_name,
+                                        data=chunk_data,
+                                        index=index,
+                                        is_last=is_last,
+                                        total_size=total_size)
+                match res:
+                    case None:
+                        raise Exception("upload failed")
+                    case _:
+                        if not res.success:
+                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.error_msg:
+                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.can_skip:
+                            break
+
+        return self._conn.import_data(db_name=self._db_name,
+                                      table_name=self._table_name,
+                                      file_name=file_name,
+                                      import_options=options)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -119,7 +153,7 @@ class RemoteTable(Table, ABC):
                 where_expr = None
             case _:
                 where_expr = traverse_conditions(condition(cond))
-        return self._conn.client.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
+        return self._conn.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
 
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         # {"c1": 1, "c2": 1.1}
@@ -162,25 +196,29 @@ class RemoteTable(Table, ABC):
                         update_expr.value = paser_expr
                         update_expr_array.append(update_expr)
 
-        return self._conn.client.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
-                                        update_expr_array=update_expr_array)
+        return self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
+                                 update_expr_array=update_expr_array)
 
         pass
 
     def search(
             self,
-            query: Optional[Union[str]] = None,
+            embedding: Optional[Union[VEC, str]] = None,
+            vector_column_name: str = "vector",
+            distance: str = "L2",
+            threshold: Optional[float] = None,
     ) -> InfinityVectorQueryBuilder:
         return InfinityVectorQueryBuilder.create(
             table=self,
-            query=query,
-            vector_column_name="",
+            embedding=embedding,
+            vector_column_name=vector_column_name,
+            distance=distance,
+            threshold=threshold
         )
 
     def _execute_query(self, query: Query) -> pd.DataFrame:
         # process select_list
         select_list: List[ttypes.ParsedExpr] = []
-
         for column in query.columns:
             match column:
                 case "*":
@@ -208,11 +246,11 @@ class RemoteTable(Table, ABC):
             case _:
                 constant_exp = ttypes.ConstantExpr()
                 constant_exp.literal_type = ttypes.LiteralType.Int64
+                constant_exp.i64_value = query.limit
                 paser_expr_type = ttypes.ParsedExprType()
                 paser_expr_type.constant_expr = constant_exp
                 limit_expr = ttypes.ParsedExpr()
                 limit_expr.type = paser_expr_type
-                limit_expr.i64_value = query.limit
 
         # process offset_expr
         match query.offset:
@@ -227,100 +265,58 @@ class RemoteTable(Table, ABC):
                 offset_expr.type = paser_expr_type
                 offset_expr.i64_value = query.offset
 
+        # process knn_exprs
+        match query.embedding:
+            case None:
+                knn_exprs_list = None
+
+            case _:
+                knn_exprs_list = []
+                embedding = query.embedding
+                vector_column_name = query.vector_column_name
+                distance = query.distance
+                threshold = query.threshold
+
+                knn_expr = ttypes.KnnExpr()
+
+                knn_expr.column_expr = traverse_conditions(condition(vector_column_name))
+
+                if isinstance(embedding[0], int):
+                    data = ttypes.EmbeddingData()
+                    data.i64_array_value = embedding
+                    knn_expr.embedding_data = data
+                    knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
+                elif isinstance(embedding[0], float):
+                    data = ttypes.EmbeddingData()
+                    data.f32_array_value = embedding
+                    knn_expr.embedding_data = data
+                    knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat32
+                else:
+                    raise Exception(f"Invalid embedding {embedding[0]} type")
+
+                match query.distance:
+                    case "L2":
+                        knn_expr.distance = ttypes.KnnDistanceType.L2
+                    case "IP":
+                        knn_expr.distance = ttypes.KnnDistanceType.InnerProduct
+                    case _:
+                        raise Exception("Invalid distance type")
+
+                knn_expr.dimension = len(embedding)
+                knn_exprs_list.append(knn_expr)
+
         # execute the query
-        res = self._conn.client.select(db_name=self._db_name,
-                                       table_name=self._table_name,
-                                       select_list=select_list,
-                                       where_expr=where_expr,
-                                       group_by_list=None,
-                                       limit_expr=limit_expr,
-                                       offset_expr=offset_expr,
-                                       search_expr=None)
+        res = self._conn.select(db_name=self._db_name,
+                                table_name=self._table_name,
+                                select_list=select_list,
+                                where_expr=where_expr,
+                                group_by_list=None,
+                                limit_expr=limit_expr,
+                                offset_expr=offset_expr,
+                                search_expr=None,
+                                knn_expr_list=knn_exprs_list)
 
         # process the results
         if res.success:
             return build_result(res)
         # todo: how to convert bytes to string?
-
-
-def traverse_conditions(cons) -> ttypes.ParsedExpr:
-    if isinstance(cons, exp.Binary):
-        parsed_expr = ttypes.ParsedExpr()
-        function_expr = ttypes.FunctionExpr()
-        function_expr.function_name = binary_exp_to_paser_exp(
-            cons.key)  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
-
-        arguments = []
-        for value in cons.hashable_args:
-            expr = traverse_conditions(value)
-            arguments.append(expr)
-        function_expr.arguments = arguments
-
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.function_expr = function_expr
-
-        parsed_expr.type = paser_expr_type
-
-        return parsed_expr
-
-    elif isinstance(cons, exp.Column):
-        parsed_expr = ttypes.ParsedExpr()
-        column_expr = ttypes.ColumnExpr()
-        column_name = [cons.alias_or_name]
-        if cons.alias_or_name == "*":
-            column_expr.star = True
-        else:
-            column_expr.star = False
-        column_expr.column_name = column_name
-
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.column_expr = column_expr
-
-        parsed_expr.type = paser_expr_type
-        return parsed_expr
-
-    elif isinstance(cons, exp.Literal):
-        parsed_expr = ttypes.ParsedExpr()
-        constant_expr = ttypes.ConstantExpr()
-
-        if cons.is_int:
-            constant_expr.literal_type = ttypes.LiteralType.Int64
-            constant_expr.i64_value = int(cons.output_name)
-        elif cons.is_number:
-            constant_expr.literal_type = ttypes.LiteralType.Double
-            constant_expr.f64_value = float(cons.output_name)
-        elif cons.is_string:
-            constant_expr.literal_type = ttypes.LiteralType.String
-            constant_expr.str_value = cons.output_name
-        else:
-            raise Exception(f"unknown literal type: {cons}")
-
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.constant_expr = constant_expr
-
-        parsed_expr.type = paser_expr_type
-        return parsed_expr
-
-    elif isinstance(cons, exp.Paren):
-        for value in cons.hashable_args:
-            return traverse_conditions(value)
-    elif isinstance(cons, exp.Neg):
-        parsed_expr = ttypes.ParsedExpr()
-        if isinstance(cons.hashable_args[0], exp.Literal):
-            constant_expr = ttypes.ConstantExpr()
-            if cons.hashable_args[0].is_int:
-                constant_expr.literal_type = ttypes.LiteralType.Int64
-                constant_expr.i64_value = -int(cons.hashable_args[0].output_name)
-            elif cons.hashable_args[0].is_number:
-                constant_expr.literal_type = ttypes.LiteralType.Double
-                constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
-            else:
-                raise Exception(f"unknown literal type: {cons}")
-
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_expr
-            parsed_expr.type = paser_expr_type
-
-            return parsed_expr
-    else:
-        raise Exception(f"unknown condition type: {cons}")

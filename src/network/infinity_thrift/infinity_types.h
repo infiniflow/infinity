@@ -180,6 +180,8 @@ class ParsedExpr;
 
 class ColumnExpr;
 
+class EmbeddingData;
+
 class KnnExpr;
 
 class ConstantExpr;
@@ -190,11 +192,15 @@ class BetweenExpr;
 
 class UpdateExpr;
 
+class OrderByExpr;
+
 class Field;
 
 class ColumnField;
 
 class ImportOption;
+
+class UploadResponse;
 
 class CommonResponse;
 
@@ -239,6 +245,8 @@ class DropTableRequest;
 class InsertRequest;
 
 class ImportRequest;
+
+class FileChunk;
 
 class SelectRequest;
 
@@ -751,13 +759,105 @@ void swap(ColumnExpr &a, ColumnExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const ColumnExpr& obj);
 
+typedef struct _EmbeddingData__isset {
+  _EmbeddingData__isset() : bool_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false) {}
+  bool bool_array_value :1;
+  bool i8_array_value :1;
+  bool i16_array_value :1;
+  bool i32_array_value :1;
+  bool i64_array_value :1;
+  bool f32_array_value :1;
+  bool f64_array_value :1;
+} _EmbeddingData__isset;
+
+class EmbeddingData : public virtual ::apache::thrift::TBase {
+ public:
+
+  EmbeddingData(const EmbeddingData&);
+  EmbeddingData& operator=(const EmbeddingData&);
+  EmbeddingData() noexcept {
+  }
+
+  virtual ~EmbeddingData() noexcept;
+  std::vector<bool>  bool_array_value;
+  std::vector<std::string>  i8_array_value;
+  std::vector<int16_t>  i16_array_value;
+  std::vector<int32_t>  i32_array_value;
+  std::vector<int64_t>  i64_array_value;
+  std::vector<double>  f32_array_value;
+  std::vector<double>  f64_array_value;
+
+  _EmbeddingData__isset __isset;
+
+  void __set_bool_array_value(const std::vector<bool> & val);
+
+  void __set_i8_array_value(const std::vector<std::string> & val);
+
+  void __set_i16_array_value(const std::vector<int16_t> & val);
+
+  void __set_i32_array_value(const std::vector<int32_t> & val);
+
+  void __set_i64_array_value(const std::vector<int64_t> & val);
+
+  void __set_f32_array_value(const std::vector<double> & val);
+
+  void __set_f64_array_value(const std::vector<double> & val);
+
+  bool operator == (const EmbeddingData & rhs) const
+  {
+    if (__isset.bool_array_value != rhs.__isset.bool_array_value)
+      return false;
+    else if (__isset.bool_array_value && !(bool_array_value == rhs.bool_array_value))
+      return false;
+    if (__isset.i8_array_value != rhs.__isset.i8_array_value)
+      return false;
+    else if (__isset.i8_array_value && !(i8_array_value == rhs.i8_array_value))
+      return false;
+    if (__isset.i16_array_value != rhs.__isset.i16_array_value)
+      return false;
+    else if (__isset.i16_array_value && !(i16_array_value == rhs.i16_array_value))
+      return false;
+    if (__isset.i32_array_value != rhs.__isset.i32_array_value)
+      return false;
+    else if (__isset.i32_array_value && !(i32_array_value == rhs.i32_array_value))
+      return false;
+    if (__isset.i64_array_value != rhs.__isset.i64_array_value)
+      return false;
+    else if (__isset.i64_array_value && !(i64_array_value == rhs.i64_array_value))
+      return false;
+    if (__isset.f32_array_value != rhs.__isset.f32_array_value)
+      return false;
+    else if (__isset.f32_array_value && !(f32_array_value == rhs.f32_array_value))
+      return false;
+    if (__isset.f64_array_value != rhs.__isset.f64_array_value)
+      return false;
+    else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    return true;
+  }
+  bool operator != (const EmbeddingData &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const EmbeddingData & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(EmbeddingData &a, EmbeddingData &b);
+
+std::ostream& operator<<(std::ostream& out, const EmbeddingData& obj);
+
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), dimension(false), distance_type(false), embedding_type(false) {}
+  _KnnExpr__isset() : column_expr(false), embedding_data(false), dimension(false), distance_type(false), embedding_data_type(false) {}
   bool column_expr :1;
   bool embedding_data :1;
   bool dimension :1;
   bool distance_type :1;
-  bool embedding_type :1;
+  bool embedding_data_type :1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
@@ -767,31 +867,36 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
   KnnExpr& operator=(const KnnExpr&);
   KnnExpr() noexcept
           : dimension(0),
-            distance_type(static_cast<KnnDistanceType::type>(0)) {
+            distance_type(static_cast<KnnDistanceType::type>(0)),
+            embedding_data_type(static_cast<ElementType::type>(0)) {
   }
 
   virtual ~KnnExpr() noexcept;
   ParsedExpr column_expr;
-  std::vector<std::string>  embedding_data;
+  EmbeddingData embedding_data;
   int64_t dimension;
   /**
    * 
    * @see KnnDistanceType
    */
   KnnDistanceType::type distance_type;
-  EmbeddingType embedding_type;
+  /**
+   * 
+   * @see ElementType
+   */
+  ElementType::type embedding_data_type;
 
   _KnnExpr__isset __isset;
 
   void __set_column_expr(const ParsedExpr& val);
 
-  void __set_embedding_data(const std::vector<std::string> & val);
+  void __set_embedding_data(const EmbeddingData& val);
 
   void __set_dimension(const int64_t val);
 
   void __set_distance_type(const KnnDistanceType::type val);
 
-  void __set_embedding_type(const EmbeddingType& val);
+  void __set_embedding_data_type(const ElementType::type val);
 
   bool operator == (const KnnExpr & rhs) const
   {
@@ -803,7 +908,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
       return false;
     if (!(distance_type == rhs.distance_type))
       return false;
-    if (!(embedding_type == rhs.embedding_type))
+    if (!(embedding_data_type == rhs.embedding_data_type))
       return false;
     return true;
   }
@@ -1062,6 +1167,55 @@ void swap(UpdateExpr &a, UpdateExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const UpdateExpr& obj);
 
+typedef struct _OrderByExpr__isset {
+  _OrderByExpr__isset() : expr(false), asc(false) {}
+  bool expr :1;
+  bool asc :1;
+} _OrderByExpr__isset;
+
+class OrderByExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  OrderByExpr(const OrderByExpr&);
+  OrderByExpr& operator=(const OrderByExpr&);
+  OrderByExpr() noexcept
+              : asc(0) {
+  }
+
+  virtual ~OrderByExpr() noexcept;
+  ParsedExpr expr;
+  bool asc;
+
+  _OrderByExpr__isset __isset;
+
+  void __set_expr(const ParsedExpr& val);
+
+  void __set_asc(const bool val);
+
+  bool operator == (const OrderByExpr & rhs) const
+  {
+    if (!(expr == rhs.expr))
+      return false;
+    if (!(asc == rhs.asc))
+      return false;
+    return true;
+  }
+  bool operator != (const OrderByExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const OrderByExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(OrderByExpr &a, OrderByExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const OrderByExpr& obj);
+
 typedef struct _Field__isset {
   _Field__isset() : parse_exprs(true) {}
   bool parse_exprs :1;
@@ -1106,9 +1260,10 @@ void swap(Field &a, Field &b);
 std::ostream& operator<<(std::ostream& out, const Field& obj);
 
 typedef struct _ColumnField__isset {
-  _ColumnField__isset() : column_type(false), column_vectors(true) {}
+  _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false) {}
   bool column_type :1;
   bool column_vectors :1;
+  bool column_name :1;
 } _ColumnField__isset;
 
 class ColumnField : public virtual ::apache::thrift::TBase {
@@ -1117,7 +1272,8 @@ class ColumnField : public virtual ::apache::thrift::TBase {
   ColumnField(const ColumnField&);
   ColumnField& operator=(const ColumnField&);
   ColumnField() noexcept
-              : column_type(static_cast<ColumnType::type>(0)) {
+              : column_type(static_cast<ColumnType::type>(0)),
+                column_name() {
 
   }
 
@@ -1128,6 +1284,7 @@ class ColumnField : public virtual ::apache::thrift::TBase {
    */
   ColumnType::type column_type;
   std::vector<std::string>  column_vectors;
+  std::string column_name;
 
   _ColumnField__isset __isset;
 
@@ -1135,11 +1292,15 @@ class ColumnField : public virtual ::apache::thrift::TBase {
 
   void __set_column_vectors(const std::vector<std::string> & val);
 
+  void __set_column_name(const std::string& val);
+
   bool operator == (const ColumnField & rhs) const
   {
     if (!(column_type == rhs.column_type))
       return false;
     if (!(column_vectors == rhs.column_vectors))
+      return false;
+    if (!(column_name == rhs.column_name))
       return false;
     return true;
   }
@@ -1160,11 +1321,8 @@ void swap(ColumnField &a, ColumnField &b);
 std::ostream& operator<<(std::ostream& out, const ColumnField& obj);
 
 typedef struct _ImportOption__isset {
-  _ImportOption__isset() : delimiter(false), file_type(false), table_name(false), schema_name(false), copy_from(false), has_header(false), copy_file_type(false) {}
+  _ImportOption__isset() : delimiter(false), copy_from(false), has_header(false), copy_file_type(false) {}
   bool delimiter :1;
-  bool file_type :1;
-  bool table_name :1;
-  bool schema_name :1;
   bool copy_from :1;
   bool has_header :1;
   bool copy_file_type :1;
@@ -1177,9 +1335,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   ImportOption& operator=(const ImportOption&);
   ImportOption() noexcept
                : delimiter(),
-                 file_type(),
-                 table_name(),
-                 schema_name(),
                  copy_from(0),
                  has_header(0),
                  copy_file_type(static_cast<CopyFileType::type>(0)) {
@@ -1187,9 +1342,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   virtual ~ImportOption() noexcept;
   std::string delimiter;
-  std::string file_type;
-  std::string table_name;
-  std::string schema_name;
   bool copy_from;
   bool has_header;
   /**
@@ -1202,12 +1354,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   void __set_delimiter(const std::string& val);
 
-  void __set_file_type(const std::string& val);
-
-  void __set_table_name(const std::string& val);
-
-  void __set_schema_name(const std::string& val);
-
   void __set_copy_from(const bool val);
 
   void __set_has_header(const bool val);
@@ -1217,12 +1363,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   bool operator == (const ImportOption & rhs) const
   {
     if (!(delimiter == rhs.delimiter))
-      return false;
-    if (!(file_type == rhs.file_type))
-      return false;
-    if (!(table_name == rhs.table_name))
-      return false;
-    if (!(schema_name == rhs.schema_name))
       return false;
     if (!(copy_from == rhs.copy_from))
       return false;
@@ -1247,6 +1387,63 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+
+typedef struct _UploadResponse__isset {
+  _UploadResponse__isset() : success(false), error_msg(false), can_skip(false) {}
+  bool success :1;
+  bool error_msg :1;
+  bool can_skip :1;
+} _UploadResponse__isset;
+
+class UploadResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  UploadResponse(const UploadResponse&);
+  UploadResponse& operator=(const UploadResponse&);
+  UploadResponse() noexcept
+                 : success(0),
+                   error_msg(),
+                   can_skip(0) {
+  }
+
+  virtual ~UploadResponse() noexcept;
+  bool success;
+  std::string error_msg;
+  bool can_skip;
+
+  _UploadResponse__isset __isset;
+
+  void __set_success(const bool val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_can_skip(const bool val);
+
+  bool operator == (const UploadResponse & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(can_skip == rhs.can_skip))
+      return false;
+    return true;
+  }
+  bool operator != (const UploadResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const UploadResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(UploadResponse &a, UploadResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const UploadResponse& obj);
 
 typedef struct _CommonResponse__isset {
   _CommonResponse__isset() : success(false), error_msg(false), session_id(false) {}
@@ -2558,8 +2755,101 @@ void swap(ImportRequest &a, ImportRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
 
+typedef struct _FileChunk__isset {
+  _FileChunk__isset() : db_name(false), table_name(false), file_name(false), data(false), index(false), is_last(false), session_id(false), total_size(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool file_name :1;
+  bool data :1;
+  bool index :1;
+  bool is_last :1;
+  bool session_id :1;
+  bool total_size :1;
+} _FileChunk__isset;
+
+class FileChunk : public virtual ::apache::thrift::TBase {
+ public:
+
+  FileChunk(const FileChunk&);
+  FileChunk& operator=(const FileChunk&);
+  FileChunk() noexcept
+            : db_name(),
+              table_name(),
+              file_name(),
+              data(),
+              index(0),
+              is_last(0),
+              session_id(0),
+              total_size(0) {
+  }
+
+  virtual ~FileChunk() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string file_name;
+  std::string data;
+  int32_t index;
+  bool is_last;
+  int64_t session_id;
+  int64_t total_size;
+
+  _FileChunk__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_file_name(const std::string& val);
+
+  void __set_data(const std::string& val);
+
+  void __set_index(const int32_t val);
+
+  void __set_is_last(const bool val);
+
+  void __set_session_id(const int64_t val);
+
+  void __set_total_size(const int64_t val);
+
+  bool operator == (const FileChunk & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(file_name == rhs.file_name))
+      return false;
+    if (!(data == rhs.data))
+      return false;
+    if (!(index == rhs.index))
+      return false;
+    if (!(is_last == rhs.is_last))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(total_size == rhs.total_size))
+      return false;
+    return true;
+  }
+  bool operator != (const FileChunk &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FileChunk & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FileChunk &a, FileChunk &b);
+
+std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
+
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), session_id(false) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), knn_expr_list(true) {}
+  bool session_id :1;
   bool db_name :1;
   bool table_name :1;
   bool select_list :1;
@@ -2568,7 +2858,8 @@ typedef struct _SelectRequest__isset {
   bool having_expr :1;
   bool limit_expr :1;
   bool offset_expr :1;
-  bool session_id :1;
+  bool order_by_list :1;
+  bool knn_expr_list :1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
@@ -2577,14 +2868,17 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   SelectRequest(const SelectRequest&);
   SelectRequest& operator=(const SelectRequest&);
   SelectRequest() noexcept
-                : db_name(),
-                  table_name(),
-                  session_id(0) {
+                : session_id(0),
+                  db_name(),
+                  table_name() {
+
+
 
 
   }
 
   virtual ~SelectRequest() noexcept;
+  int64_t session_id;
   std::string db_name;
   std::string table_name;
   std::vector<ParsedExpr>  select_list;
@@ -2593,9 +2887,12 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   ParsedExpr having_expr;
   ParsedExpr limit_expr;
   ParsedExpr offset_expr;
-  int64_t session_id;
+  std::vector<OrderByExpr>  order_by_list;
+  std::vector<KnnExpr>  knn_expr_list;
 
   _SelectRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
 
   void __set_db_name(const std::string& val);
 
@@ -2613,10 +2910,14 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
 
   void __set_offset_expr(const ParsedExpr& val);
 
-  void __set_session_id(const int64_t val);
+  void __set_order_by_list(const std::vector<OrderByExpr> & val);
+
+  void __set_knn_expr_list(const std::vector<KnnExpr> & val);
 
   bool operator == (const SelectRequest & rhs) const
   {
+    if (!(session_id == rhs.session_id))
+      return false;
     if (!(db_name == rhs.db_name))
       return false;
     if (!(table_name == rhs.table_name))
@@ -2633,7 +2934,9 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(offset_expr == rhs.offset_expr))
       return false;
-    if (!(session_id == rhs.session_id))
+    if (!(order_by_list == rhs.order_by_list))
+      return false;
+    if (!(knn_expr_list == rhs.knn_expr_list))
       return false;
     return true;
   }

@@ -17,11 +17,18 @@ from __future__ import annotations
 from abc import ABC
 from typing import List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import pydantic
 
+from infinity.common import VEC
+
 
 class Query(pydantic.BaseModel):
+    embedding: Optional[list]
+    vector_column_name: Optional[str] = "vector"
+    distance: Optional[str] = "L2"
+    threshold: Optional[float] = None
     columns: Optional[List[str]] = None
     filter: Optional[str] = None
     limit: Optional[int] = None
@@ -34,10 +41,16 @@ class InfinityQueryBuilder(ABC):
     def create(
             cls,
             table,
-            query: Optional[Union[str]],
+            embedding: Optional[VEC],
             vector_column_name: str,
+            distance: str = "L2",
+            threshold: Optional[float] = None,
     ) -> InfinityQueryBuilder:
-        return InfinityVectorQueryBuilder(table, query, vector_column_name)
+        if isinstance(embedding, list):
+            embedding = embedding
+        if isinstance(embedding, np.ndarray):
+            embedding = embedding.tolist()
+        return InfinityVectorQueryBuilder(table, embedding, vector_column_name, distance, threshold)
 
     def __init__(self, table):
         self._table = table
@@ -54,7 +67,7 @@ class InfinityQueryBuilder(ABC):
         self._offset = offset
         return self
 
-    def output(self, columns: list) -> InfinityQueryBuilder:
+    def output(self, columns: Optional[list]) -> InfinityQueryBuilder:
         self._columns = columns
         return self
 
@@ -62,21 +75,22 @@ class InfinityQueryBuilder(ABC):
         self._filter = where
         return self
 
-    @property
-    def columns(self):
-        return self._columns
-
 
 class InfinityVectorQueryBuilder(InfinityQueryBuilder):
     def __init__(
             self,
             table,
-            query: Optional[Union[str]],
-            vector_column: str,
+            embedding: Optional[VEC],
+            vector_column_name: str,
+            distance: str = "L2",
+            threshold: Optional[float] = None,
+
     ):
         super().__init__(table)
-        self._query = query
-        self._vector_column = vector_column
+        self._embedding = embedding
+        self._vector_column = vector_column_name
+        self._distance = distance
+        self._threshold = threshold
 
     def filter(self, where: Optional[str]) -> InfinityVectorQueryBuilder:
         self._filter = where
@@ -90,8 +104,17 @@ class InfinityVectorQueryBuilder(InfinityQueryBuilder):
         self._offset = offset
         return self
 
+    def output(self, columns: Optional[list]) -> InfinityVectorQueryBuilder:
+        self._columns = columns
+        return self
+
     def to_df(self) -> pd.DataFrame:
         query = Query(
+            embedding=self._embedding,
+            vector_column_name=self._vector_column,
+            distance=self._distance,
+            threshold=self._threshold,
+
             filter=self._filter,
             columns=self._columns,
             limit=self._limit,

@@ -12,36 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export module query_options;
 
+export module query_options;
+import parser;
 namespace infinity {
 
-export class CreateDatabaseOptions {
+export class CreateDatabaseOptions {};
 
-};
+export class DropDatabaseOptions {};
 
-export class DropDatabaseOptions {
+export class CreateTableOptions {};
 
-};
+export class DropTableOptions {};
 
-export class CreateTableOptions {
+export class CreateIndexOptions {};
 
-};
-
-export class DropTableOptions {
-
-};
-
-export class CreateIndexOptions {
-
-};
-
-export class DropIndexOptions {
-
-};
+export class DropIndexOptions {};
 
 export class ImportOptions {
-
+public:
+    char delimiter_{','};
+    bool header_{false};
+    CopyFileType copy_file_type_{CopyFileType::kCSV};
 };
 
-}
+} // namespace infinity
