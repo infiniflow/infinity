@@ -40,7 +40,7 @@ namespace infinity {
 
 void PhysicalMergeKnn::Init() {}
 
-void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);
     if (merge_knn_op_state->input_complete_) {
         LOG_TRACE("PhysicalMergeKnn::Input is complete");
@@ -76,6 +76,7 @@ void PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             Error<NotImplementException>("Not implemented");
         }
     }
+    return true;
 }
 
 template <typename DataType, template <typename, typename> typename C>

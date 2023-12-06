@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalDummyScan::Init() {}
 
-void PhysicalDummyScan::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalDummyScan::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

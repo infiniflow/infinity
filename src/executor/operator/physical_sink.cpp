@@ -33,11 +33,11 @@ namespace infinity {
 
 void PhysicalSink::Init() {}
 
-void PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) {}
+bool PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 
-void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
+bool PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
     if (sink_state->error_message_.get() != nullptr) {
-        return;
+        return true;
     }
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
@@ -74,6 +74,7 @@ void PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
             break;
         }
     }
+    return true;
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {

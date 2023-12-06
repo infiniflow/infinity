@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalIntersect::Init() {}
 
-void PhysicalIntersect::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalIntersect::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

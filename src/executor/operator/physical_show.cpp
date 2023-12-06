@@ -211,7 +211,7 @@ void PhysicalShow::Init() {
     }
 }
 
-void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ShowOperatorState *show_operator_state = (ShowOperatorState *)(operator_state);
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
@@ -260,6 +260,7 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             Error<ExecutorException>("Invalid chunk scan type");
         }
     }
+    return true;
 }
 
 /**

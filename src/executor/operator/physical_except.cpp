@@ -23,6 +23,6 @@ namespace infinity {
 
 void PhysicalExcept::Init() {}
 
-void PhysicalExcept::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalExcept::Execute(QueryContext *, OperatorState *) { return true; }
 
 } // namespace infinity

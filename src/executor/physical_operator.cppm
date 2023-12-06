@@ -45,8 +45,8 @@ public:
 
     u64 node_id() const { return operator_id_; }
 
-    /// for push based execution
-    virtual void Execute(QueryContext *query_context, OperatorState *output_state) = 0;
+    /// for push based execution. returns if done some real work. It determins whether FragmentTask schedule remaining operators.
+    virtual bool Execute(QueryContext *query_context, OperatorState *output_state) = 0;
 
     const SharedPtr<DataTable> &output() const { return output_; }
 

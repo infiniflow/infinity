@@ -50,7 +50,7 @@ public:
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     void GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
 

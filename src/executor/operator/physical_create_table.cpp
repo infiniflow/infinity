@@ -55,7 +55,7 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
 
 void PhysicalCreateTable::Init() {}
 
-void PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
     auto txn = query_context->GetTxn();
 
@@ -66,6 +66,7 @@ void PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *op
         create_table_operator_state->error_message_ = Move(status.msg_);
     }
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

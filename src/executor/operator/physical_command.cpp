@@ -39,7 +39,7 @@ namespace infinity {
 
 void PhysicalCommand::Init() {}
 
-void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
     DeferFn defer_fn([&]() { operator_state->SetComplete(); });
     switch (command_info_->type()) {
         case CommandType::kUse: {
@@ -54,7 +54,7 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
-                return ;
+                return true;
             }
 
             if(set_command->var_name() == profile_history_capacity_name) {
@@ -62,7 +62,7 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
-                return ;
+                return true;
             }
 
             if(set_command->var_name() == log_level) {
@@ -76,32 +76,32 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                 if(set_command->value_str() == "trace") {
                     SetLogLevel(LogLevel::kTrace);
-                    return ;
+                    return true;
                 }
 
                 if(set_command->value_str() == "info") {
                     SetLogLevel(LogLevel::kInfo);
-                    return ;
+                    return true;
                 }
 
                 if(set_command->value_str() == "warning") {
                     SetLogLevel(LogLevel::kWarning);
-                    return ;
+                    return true;
                 }
 
                 if(set_command->value_str() == "error") {
                     SetLogLevel(LogLevel::kError);
-                    return ;
+                    return true;
                 }
 
                 if(set_command->value_str() == "fatal") {
                     SetLogLevel(LogLevel::kFatal);
-                    return ;
+                    return true;
                 }
 
                 Error<ExecutorException>(Format("Unknown log level: {}.", set_command->value_str()));
                 //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
-                return ;
+                return true;
             }
 
             if(set_command->var_name() == worker_cpu_limit) {
@@ -115,7 +115,7 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
                 Error<ExecutorException>(Format("You need to change the CPU limit before start the system.", set_command->var_name()));
 //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
-                return ;
+                return true;
             }
 
             {
@@ -145,6 +145,6 @@ void PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             Error<ExecutorException>("Invalid command type.");
         }
     }
-
+    return true;
 }
 } // namespace infinity

@@ -55,18 +55,19 @@ PhysicalFusion::PhysicalFusion(u64 id,
                                UniquePtr<PhysicalOperator> right,
                                SharedPtr<FusionExpression> fusion_expr,
                                SharedPtr<Vector<String>> output_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> output_types)
-    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id), fusion_expr_(fusion_expr), output_names_(Move(output_names)),
-      output_types_(Move(output_types)) {}
+                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                               SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id, load_metas), fusion_expr_(fusion_expr),
+      output_names_(Move(output_names)), output_types_(Move(output_types)) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 
 void PhysicalFusion::Init() {}
 
-void PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operator_state) {
     FusionOperatorState *fusion_operator_state = static_cast<FusionOperatorState *>(operator_state);
     if (!fusion_operator_state->input_complete_) {
-        return;
+        return false;
     }
     Assert<ExecutorException>(0 == fusion_expr_->method_.compare("rrf"), Format("Fusion method {} is not implemented.", fusion_expr_->method_));
     SizeT rank_constant = 60;
@@ -168,6 +169,7 @@ void PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
     operator_state->data_block_array_.push_back(Move(output_data_block));
     fusion_operator_state->input_data_blocks_.clear();
     operator_state->SetComplete();
+    return true;
 }
 
 String PhysicalFusion::ToString(i64 &space) const {

@@ -67,14 +67,7 @@ namespace infinity {
 
 void PhysicalKnnScan::Init() {}
 
-void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
-//    if (operator_state->data_block_.get() == nullptr) {
-//        operator_state->data_block_ = DataBlock::Make();
-//
-//        // Performance issue here.
-//        operator_state->data_block_->Init(*GetOutputTypes());
-//    }
-
+bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
     auto elem_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->elem_type_;
     auto dist_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->knn_distance_type_;
@@ -101,6 +94,7 @@ void PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
             Error<ExecutorException>("Not implemented");
         }
     }
+    return true;
 }
 
 TableCollectionEntry *PhysicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }

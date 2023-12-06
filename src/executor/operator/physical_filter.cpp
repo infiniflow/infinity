@@ -54,7 +54,7 @@ void PhysicalFilter::Init() {
     //    output_ = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-void PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
+bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     auto* prev_op_state = operator_state->prev_op_state_;
     auto* filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
 
@@ -92,6 +92,7 @@ void PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     if(prev_op_state->Complete()) {
         filter_operator_state->SetComplete();
     }
+    return true;
 }
 
 } // namespace infinity

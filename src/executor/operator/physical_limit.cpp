@@ -36,7 +36,7 @@ namespace infinity {
 
 void PhysicalLimit::Init() {}
 
-void PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
 #if 0
     // output table definition is same as input
@@ -57,6 +57,7 @@ void PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator
 
     output_ = GetLimitOutput(input_table_, limit, offset);
 #endif
+    return true;
 }
 
 SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &input_table, i64 limit, i64 offset) {

@@ -41,10 +41,10 @@ namespace infinity {
 
 void PhysicalTableScan::Init() {}
 
-void PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *table_scan_operator_state = static_cast<TableScanOperatorState *>(operator_state);
-
     ExecuteInternal(query_context, table_scan_operator_state);
+    return true;
 }
 
 SharedPtr<Vector<String>> PhysicalTableScan::GetOutputNames() const {

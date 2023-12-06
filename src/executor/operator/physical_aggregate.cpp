@@ -34,7 +34,7 @@ namespace infinity {
 
 void PhysicalAggregate::Init() {}
 
-void PhysicalAggregate::Execute(QueryContext *, OperatorState *) {
+bool PhysicalAggregate::Execute(QueryContext *, OperatorState *) {
 #if 0
     input_table_ = left_->output();
     ExecutorAssert(input_table_ != nullptr, "No left input.");
@@ -184,6 +184,7 @@ void PhysicalAggregate::Execute(QueryContext *, OperatorState *) {
     // 4. generate the result to output
     this->output_ = output_groupby_table;
 #endif
+    return true;
 }
 
 void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &grouped_input_table) {

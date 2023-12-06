@@ -26,7 +26,7 @@ namespace infinity {
 
 void PhysicalHashJoin::Init() {}
 
-void PhysicalHashJoin::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalHashJoin::Execute(QueryContext *, OperatorState *) { return true; }
 
 SharedPtr<Vector<String>> PhysicalHashJoin::GetOutputNames() const {
     SharedPtr<Vector<String>> result = MakeShared<Vector<String>>();
