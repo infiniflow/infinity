@@ -1314,7 +1314,12 @@ void field_writer::write(const basic_term_reader& reader,
   uint64_t term_count = 0;
   uint64_t sum_dfreq = 0;
   uint64_t sum_tfreq = 0;
+  const char *ptr = reader.meta().name.c_str();
   std::cout << "field writer " << reader.meta().name << std::endl;
+  for (size_t i = 0; i < reader.meta().name.size(); ++i) {
+      std::cout << (uint32_t)ptr[i] << std::endl;
+  }
+  std::cout << std::endl;
   const bool freq_exists =
     IndexFeatures::NONE != (index_features & IndexFeatures::FREQ);
 

@@ -34,7 +34,7 @@
 #include "utils/noncopyable.hpp"
 #include "utils/timer_utils.hpp"
 #include "utils/type_limits.hpp"
-
+#include <iostream>
 #include <parallel_hashmap/phmap.h>
 
 namespace irs {
@@ -319,7 +319,7 @@ class segment_writer : public ColumnProvider, util::noncopyable {
 
     const hashed_string_view field_name{
       static_cast<std::string_view>(field.name())};
-
+    std::cout << "field.name()" << field.name() << " hashed_string_view " << field_name << std::endl;
     auto& tokens = static_cast<token_stream&>(field.get_tokens());
     const auto& features = static_cast<const features_t&>(field.features());
     const IndexFeatures index_features = field.index_features();

@@ -417,6 +417,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                                                            text_features,
                                                            analyzers[col].get());
                         auto [src_ptr, data_size] = column_buffer.GetVarcharAt(i);
+                        std::cout << "index field " << index_base->column_name() << std::endl;
                         field->f_ = String(src_ptr, data_size);
                         doc.Insert<irs::Action::INDEX>(*field);
                     } break;

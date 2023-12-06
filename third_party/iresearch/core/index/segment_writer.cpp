@@ -180,7 +180,7 @@ bool segment_writer::index(const hashed_string_view& name, const doc_id_t doc,
                            const features_t& features, token_stream& tokens) {
   REGISTER_TIMER_DETAILED();
   IRS_ASSERT(col_writer_);
-
+  std::cout << "segment_writer::index " << name << std::endl;
   auto* slot = fields_.emplace(name, index_features, features, *col_writer_);
 
   // invert only if new field index features are a subset of slot index features
