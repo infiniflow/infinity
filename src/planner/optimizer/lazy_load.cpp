@@ -134,6 +134,12 @@ void CleanScan::VisitNode(LogicalNode &op) {
             match.base_table_ref_->RetainColumnByIndices(Move(project_indices));
             break;
         }
+        case LogicalNodeType::kFusion: {
+            // Skip
+            VisitNodeChildren(op);
+            VisitNodeExpression(op);
+            break;
+        }
         default: {
             last_op_load_metas_= op.load_metas();
             VisitNodeChildren(op);
