@@ -111,9 +111,6 @@ public:
     u64 result_index_{0};
 
     u64 knn_table_index_{};
-    Vector<SharedPtr<BaseExpression>> knn_exprs_;
-    Vector<OrderType> knn_orders_;
-    HashMap<String, i64> knn_index_by_name_;
 
     // Bound CTE
     HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;
@@ -189,8 +186,6 @@ public:
     inline bool HasCorrelatedColumn() const { return !correlated_column_exprs_.empty(); }
 
     const Binding *GetBindingFromCurrentOrParentByName(const String &binding_name) const;
-
-    void AddKnnExpr(const SharedPtr<BaseExpression> &knn_expr);
 
 private:
     void AddBinding(const SharedPtr<Binding> &binding);

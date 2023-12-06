@@ -34,6 +34,8 @@ void SQLParser::Parse(const std::string &sql_text, ParserResult* result) {
 
     state_ = sql_scan_string(sql_text.c_str(), scanner_);
 
+    // WARNNING: shall reset result to avoid polluting later Parse!
+    result->Reset();
     if (sqlparse(scanner_, result)) {
         std::cerr << "Parse error: " << sql_text << std::endl;
     }

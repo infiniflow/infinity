@@ -15,7 +15,7 @@ COPY test_knn_ip FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # mertic ip will order descendingly. The query will return row 4, 3, 2
 query I
-SELECT c1 FROM test_knn_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 3;
+SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 6
@@ -28,7 +28,7 @@ COPY test_knn_ip FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
-SELECT c1 FROM test_knn_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 3;
+SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8
@@ -40,7 +40,7 @@ COPY test_knn_ip FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WITH (D
 
 # the query will return row 4 from block 1, 2 and 3
 query I
-SELECT c1 FROM test_knn_ip ORDER BY KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 3;
+SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8
 8

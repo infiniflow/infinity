@@ -797,37 +797,34 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     table_index += ToStr(knn_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
-    SizeT knn_expr_count = knn_scan_node->knn_expressions_.size();
-    for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-        const auto &knn_expression = knn_scan_node->knn_expressions_[idx];
-        KnnExpression *knn_expr_raw = static_cast<KnnExpression *>(knn_expression.get());
-        // Embedding info
-        String embedding_info = String(intent_size, ' ');
-        embedding_info += " - embedding info: ";
-        embedding_info += knn_expr_raw->arguments().at(0)->Name();
-        result->emplace_back(MakeShared<String>(embedding_info));
+    const auto &knn_expression = knn_scan_node->knn_expression_;
+    KnnExpression *knn_expr_raw = static_cast<KnnExpression *>(knn_expression.get());
+    // Embedding info
+    String embedding_info = String(intent_size, ' ');
+    embedding_info += " - embedding info: ";
+    embedding_info += knn_expr_raw->arguments().at(0)->Name();
+    result->emplace_back(MakeShared<String>(embedding_info));
 
-        String embedding_type_str = String(intent_size + 2, ' ');
-        embedding_type_str += " - element type: ";
-        embedding_type_str += EmbeddingT::EmbeddingDataType2String(knn_expr_raw->embedding_data_type_);
-        result->emplace_back(MakeShared<String>(embedding_type_str));
+    String embedding_type_str = String(intent_size + 2, ' ');
+    embedding_type_str += " - element type: ";
+    embedding_type_str += EmbeddingT::EmbeddingDataType2String(knn_expr_raw->embedding_data_type_);
+    result->emplace_back(MakeShared<String>(embedding_type_str));
 
-        String embedding_dimension_str = String(intent_size + 2, ' ');
-        embedding_dimension_str += " - dimension: ";
-        embedding_type_str += ToStr(knn_expr_raw->dimension_);
-        result->emplace_back(MakeShared<String>(embedding_dimension_str));
+    String embedding_dimension_str = String(intent_size + 2, ' ');
+    embedding_dimension_str += " - dimension: ";
+    embedding_type_str += ToStr(knn_expr_raw->dimension_);
+    result->emplace_back(MakeShared<String>(embedding_dimension_str));
 
-        String distance_type_str = String(intent_size + 2, ' ');
-        distance_type_str += " - distance type: ";
-        distance_type_str += KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
-        result->emplace_back(MakeShared<String>(distance_type_str));
+    String distance_type_str = String(intent_size + 2, ' ');
+    distance_type_str += " - distance type: ";
+    distance_type_str += KnnExpr::KnnDistanceType2Str(knn_expr_raw->distance_type_);
+    result->emplace_back(MakeShared<String>(distance_type_str));
 
-        // Query embedding
-        String query_embedding = String(intent_size + 2, ' ');
-        query_embedding += " - query embedding: ";
-        query_embedding += EmbeddingT::Embedding2String(knn_expr_raw->query_embedding_, knn_expr_raw->embedding_data_type_, knn_expr_raw->dimension_);
-        result->emplace_back(MakeShared<String>(query_embedding));
-    }
+    // Query embedding
+    String query_embedding = String(intent_size + 2, ' ');
+    query_embedding += " - query embedding: ";
+    query_embedding += EmbeddingT::Embedding2String(knn_expr_raw->query_embedding_, knn_expr_raw->embedding_data_type_, knn_expr_raw->dimension_);
+    result->emplace_back(MakeShared<String>(query_embedding));
 
     // filter expression
     if (knn_scan_node->filter_expression_.get() != nullptr) {

@@ -38,45 +38,27 @@ Vector<ColumnBinding> LogicalKnnScan::GetColumnBindings() const {
     for (SizeT i = 0; i < column_count; ++i) {
         result.emplace_back(base_table_ref_->table_index_, i);
     }
-
-    column_count = knn_expressions_.size();
-    for (SizeT i = 0; i < column_count; ++i) {
-        result.emplace_back(knn_table_index_, i);
-    }
+    result.emplace_back(knn_table_index_, 0);
     return result;
 }
 
 SharedPtr<Vector<String>> LogicalKnnScan::GetOutputNames() const {
-
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-
     SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count);
     for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
         const auto &column_name = base_table_ref_->column_names_->at(col_idx);
         result_names->emplace_back(column_name);
     }
-
-    SizeT expr_count = knn_expressions_.size();
-    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
-        const auto &knn_expr = knn_expressions_[expr_idx];
-        result_names->emplace_back(knn_expr->Name());
-    }
-
+    result_names->emplace_back(knn_expression_->Name());
     result_names->emplace_back(COLUMN_NAME_ROW_ID);
     return result_names;
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
     Vector<SharedPtr<DataType>> result_types = *base_table_ref_->column_types_;
-    SizeT expr_count = knn_expressions_.size();
-    result_types.reserve(result_types.size() + expr_count);
-
-    for (SizeT expr_idx = 0; expr_idx < expr_count; ++expr_idx) {
-        const auto &knn_expr = knn_expressions_[expr_idx];
-        result_types.emplace_back(MakeShared<DataType>(knn_expr->Type()));
-    }
-
+    result_types.reserve(result_types.size() + 2);
+    result_types.emplace_back(MakeShared<DataType>(knn_expression_->Type()));
     result_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
 }

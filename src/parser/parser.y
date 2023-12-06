@@ -1336,20 +1336,16 @@ table_reference_name : table_name table_alias {
 
 /* 'table_name' or 'schema_name.table_name' */
 table_name : IDENTIFIER {
-    if(!result->IsError()) {
-        $$ = new infinity::TableName();
-        ParserHelper::ToLower($1);
-        $$->table_name_ptr_ = $1;
-    }
+    $$ = new infinity::TableName();
+    ParserHelper::ToLower($1);
+    $$->table_name_ptr_ = $1;
 }
 | IDENTIFIER '.' IDENTIFIER {
-    if(!result->IsError()) {
-        $$ = new infinity::TableName();
-        ParserHelper::ToLower($1);
-        ParserHelper::ToLower($3);
-        $$->schema_name_ptr_ = $1;
-        $$->table_name_ptr_ = $3;
-    }
+    $$ = new infinity::TableName();
+    ParserHelper::ToLower($1);
+    ParserHelper::ToLower($3);
+    $$->schema_name_ptr_ = $1;
+    $$->table_name_ptr_ = $3;
 };
 
 /* AS 'table_alias' or AS 'table_alias(col1_alias, col2_alias ... )' */
@@ -1711,7 +1707,7 @@ operand: '(' expr ')' {
 | query_expr
 | fusion_expr
 
-knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
+knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
     $$ = knn_expr;
 
@@ -1850,6 +1846,7 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ')' {
         yyerror(&yyloc, scanner, result, "Invalid knn data type");
         YYERROR;
     }
+    knn_expr->topn_ = $11;
 }
 
 match_expr : MATCH '(' STRING ',' STRING ')' {

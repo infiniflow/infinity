@@ -34,6 +34,7 @@ import third_party;
 import block_entry;
 import default_values;
 import data_block;
+import knn_expression;
 
 module physical_merge_knn;
 

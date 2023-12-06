@@ -107,7 +107,10 @@ u64 BindContext::GetNewLogicalNodeId() { return parent_ ? parent_->GetNewLogical
 
 u64 BindContext::GenerateBindingContextIndex() { return parent_ ? parent_->GenerateBindingContextIndex() : next_bind_context_index_++; }
 
-u64 BindContext::GenerateTableIndex() { return parent_ ? parent_->GenerateTableIndex() : next_table_index_++; }
+u64 BindContext::GenerateTableIndex() {
+    knn_table_index_ = parent_ ? parent_->GenerateTableIndex() : next_table_index_++;
+    return knn_table_index_;
+}
 
 void BindContext::AddBinding(const SharedPtr<Binding> &binding) {
     binding_by_name_.emplace(binding->table_name_, binding);
@@ -341,15 +344,6 @@ const Binding *BindContext::GetBindingFromCurrentOrParentByName(const String &bi
         return nullptr;
     }
     return binding_iter->second.get();
-}
-
-void BindContext::AddKnnExpr(const SharedPtr<BaseExpression> &knn_expr) {
-    if (knn_exprs_.empty()) {
-        knn_table_index_ = GenerateTableIndex();
-    }
-
-    knn_exprs_.emplace_back(knn_expr);
-    knn_index_by_name_.emplace(knn_expr->Name(), knn_exprs_.size() - 1);
 }
 
 // void

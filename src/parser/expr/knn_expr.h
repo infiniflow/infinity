@@ -44,6 +44,7 @@ public:
     int64_t dimension_{};
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
+    int64_t topn_{100};
 };
 
 } // namespace infinity
