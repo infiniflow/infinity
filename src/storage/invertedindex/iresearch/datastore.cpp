@@ -308,6 +308,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
             analyzers.push_back(Move(stream));
         } else {
             // use segmentation as default
+            LOG_INFO("Analyzer required does not exist, use segmentation analyzer instead");
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(Move(stream));
         }
