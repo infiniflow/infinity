@@ -362,6 +362,7 @@ struct SelectRequest {
 8:  ParsedExpr limit_expr,
 9:  ParsedExpr offset_expr,
 10:  list<OrderByExpr> order_by_list = [],
+11:  list<KnnExpr> knn_expr_list = [],
 }
 
 struct SelectResponse {

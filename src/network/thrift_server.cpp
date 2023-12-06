@@ -30,6 +30,8 @@
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
 
+#include <expr/knn_expr.h>
+
 import infinity;
 import stl;
 import infinity_exception;
@@ -302,7 +304,14 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<ParsedExpr *> vector_expr{};
+        Vector<ParsedExpr *> knn_expr_list{};
+        knn_expr_list.reserve(request.knn_expr_list.size());
+        if (request.__isset.knn_expr_list == true) {
+            for (auto &knn_expr : request.knn_expr_list) {
+                auto parsed_expr = GetKnnExprFromProto(knn_expr);
+                knn_expr_list.emplace_back(parsed_expr);
+            }
+        }
 
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
 
@@ -326,7 +335,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(vector_expr, fts_expr, filter, output_columns, nullptr, nullptr);
+        const QueryResult result = table->Search(knn_expr_list, fts_expr, filter, output_columns, nullptr, nullptr);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
@@ -745,6 +754,16 @@ private:
         return parsed_expr;
     }
 
+    static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
+        auto knn_expr = new KnnExpr();
+        knn_expr->column_expr_ = GetColumnExprFromProto(*expr.column_expr.type.column_expr);
+        knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
+        knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
+        knn_expr->dimension_ = expr.dimension;
+        knn_expr->embedding_data_ptr_ = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        return knn_expr;
+    }
+
     static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
         if (expr.type.__isset.column_expr == true) {
             auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
@@ -755,8 +774,40 @@ private:
         } else if (expr.type.__isset.function_expr == true) {
             auto parsed_expr = GetFunctionExprFromProto(*expr.type.function_expr);
             return parsed_expr;
+        } else if (expr.type.__isset.knn_expr == true) {
+            auto parsed_expr = GetKnnExprFromProto(*expr.type.knn_expr);
+            return parsed_expr;
         } else {
             Error<TypeException>("Invalid parsed expression type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    static KnnDistanceType GetDistanceTypeFormProto(const infinity_thrift_rpc::KnnDistanceType::type &type) {
+        switch (type) {
+            case infinity_thrift_rpc::KnnDistanceType::L2:
+                return KnnDistanceType::kL2;
+            case infinity_thrift_rpc::KnnDistanceType::Cosine:
+                return KnnDistanceType::kCosine;
+            case infinity_thrift_rpc::KnnDistanceType::InnerProduct:
+                return KnnDistanceType::kInnerProduct;
+            case infinity_thrift_rpc::KnnDistanceType::Hamming:
+                return KnnDistanceType::kHamming;
+            default:
+                Error<TypeException>("Invalid distance type", __FILE_NAME__, __LINE__);
+        }
+    }
+
+    static void *GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+        if (embedding_data.__isset.f32_array_value) {
+            return (void *)embedding_data.f32_array_value.data();
+        } else if (embedding_data.__isset.f64_array_value) {
+            return (void *)embedding_data.f64_array_value.data();
+        } else if (embedding_data.__isset.i32_array_value) {
+            return (void *)embedding_data.i32_array_value.data();
+        } else if (embedding_data.__isset.i64_array_value) {
+            return (void *)embedding_data.i64_array_value.data();
+        } else {
+            Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
         }
     }
 

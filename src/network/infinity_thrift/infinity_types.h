@@ -2848,7 +2848,7 @@ void swap(FileChunk &a, FileChunk &b);
 std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), knn_expr_list(true) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
@@ -2859,6 +2859,7 @@ typedef struct _SelectRequest__isset {
   bool limit_expr :1;
   bool offset_expr :1;
   bool order_by_list :1;
+  bool knn_expr_list :1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
@@ -2870,6 +2871,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
                 : session_id(0),
                   db_name(),
                   table_name() {
+
 
 
 
@@ -2886,6 +2888,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   ParsedExpr limit_expr;
   ParsedExpr offset_expr;
   std::vector<OrderByExpr>  order_by_list;
+  std::vector<KnnExpr>  knn_expr_list;
 
   _SelectRequest__isset __isset;
 
@@ -2909,6 +2912,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
 
   void __set_order_by_list(const std::vector<OrderByExpr> & val);
 
+  void __set_knn_expr_list(const std::vector<KnnExpr> & val);
+
   bool operator == (const SelectRequest & rhs) const
   {
     if (!(session_id == rhs.session_id))
@@ -2930,6 +2935,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
     if (!(offset_expr == rhs.offset_expr))
       return false;
     if (!(order_by_list == rhs.order_by_list))
+      return false;
+    if (!(knn_expr_list == rhs.knn_expr_list))
       return false;
     return true;
   }
