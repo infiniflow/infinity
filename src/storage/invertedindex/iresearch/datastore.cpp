@@ -18,7 +18,6 @@ module;
 #include <chrono>
 #include <ctpl_stl.h>
 #include <filesystem>
-#include <iostream>
 
 #include "formats/formats.hpp"
 #include "index/index_reader.hpp"
