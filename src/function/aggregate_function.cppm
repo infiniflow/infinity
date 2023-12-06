@@ -42,7 +42,7 @@ public:
     static inline void StateUpdate(const ptr_t state, const SharedPtr<ColumnVector> &input_column_vector) {
         // Loop execute state update according to the input column vector
 
-        switch (input_column_vector->vector_type_) {
+        switch (input_column_vector->vector_type()) {
             case ColumnVectorType::kFlat: {
                 SizeT row_count = input_column_vector->Size();
                 auto *input_ptr = (InputType *)(input_column_vector->data());

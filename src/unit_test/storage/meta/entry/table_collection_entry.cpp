@@ -297,9 +297,9 @@ TEST_F(TableCollectionEntryTest, test2) {
                 EXPECT_EQ(local_block_state.column_vector_map_.size(), 3);
 
                 ColumnVector *column0 = local_block_state.column_vector_map_.at(0).column_vector_;
-                i8 *col0_ptr = (i8 *)(column0->data_ptr_);
+                i8 *col0_ptr = (i8 *)(column0->data());
                 ColumnVector *column2 = local_block_state.column_vector_map_.at(2).column_vector_;
-                f64 *col2_ptr = (f64 *)(column2->data_ptr_);
+                f64 *col2_ptr = (f64 *)(column2->data());
                 for (SizeT row = 0; row < row_count; ++row) {
                     EXPECT_EQ(col0_ptr[row], (i8)row);
                     EXPECT_FLOAT_EQ(col2_ptr[row], row % 8192);

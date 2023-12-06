@@ -23,8 +23,7 @@ namespace infinity {
 
 export class DataFileWorker : public FileWorker {
 public:
-    explicit DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-        : FileWorker(Move(file_dir), Move(file_name), buffer_size) {}
+    explicit DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size);
 
     virtual ~DataFileWorker() override;
 
@@ -33,9 +32,14 @@ public:
 
     void FreeInMemory() override;
 
+    SizeT GetMemoryCost() const override { return buffer_size_; }
+
 protected:
     void WriteToFileImpl(bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
+
+private:
+    const SizeT buffer_size_;
 };
 } // namespace infinity

@@ -48,9 +48,9 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
         Vector<RowID> row_ids;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
             SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
-            if (column_vector->data_type_->type() == LogicalType::kRowID) {
+            if (column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
-                Memcpy(row_ids.data(), column_vector->data_ptr_, column_vector->Size() * sizeof(RowID));
+                Memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
                 break;
             }
         }

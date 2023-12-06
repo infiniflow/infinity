@@ -51,9 +51,9 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
             SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
-            if (column_vector->data_type_->type() == LogicalType::kRowID) {
+            if (column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
-                Memcpy(row_ids.data(), column_vector->data_ptr_, column_vector->Size() * sizeof(RowID));
+                Memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
                 break;
             } else {
                 column_vectors.push_back(column_vector);
@@ -65,7 +65,7 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             for (SizeT expr_idx = 0; expr_idx < update_columns_.size(); ++expr_idx) {
                 SizeT column_idx = update_columns_[expr_idx].first;
                 const SharedPtr<BaseExpression> &expr = update_columns_[expr_idx].second;
-                SharedPtr<ColumnVector> output_column = ColumnVector::Make(column_vectors[column_idx]->data_type_);
+                SharedPtr<ColumnVector> output_column = ColumnVector::Make(column_vectors[column_idx]->data_type());
                 output_column->Initialize(ColumnVectorType::kFlat);
                 SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
                 evaluator.Execute(expr, expr_state, output_column);

@@ -37,7 +37,9 @@ protected:
 
 public:
     explicit IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, const IndexBase *index_base, const ColumnDef *column_def)
-        : FileWorker(file_dir, file_name, 0), column_def_(column_def), index_base_(index_base) {}
+        : FileWorker(file_dir, file_name), column_def_(column_def), index_base_(index_base) {}
+
+    SizeT GetMemoryCost() const override { return 0; }
 
     ~IndexFileWorker() override = default;
 };

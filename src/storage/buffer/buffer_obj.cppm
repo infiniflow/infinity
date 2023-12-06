@@ -27,9 +27,6 @@ class BufferManager;
 export enum class BufferStatus {
     kLoaded,
     kUnloaded,
-    // kLoadedUnsaved,
-    // kLoadedMutable,
-    // kUnloadedModified,
     kFreed,
     kNew,
 };
@@ -65,7 +62,7 @@ public:
 
     void CloseFile();
 
-    SizeT GetBufferSize() const { return file_worker_->buffer_size_; }
+    SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
 

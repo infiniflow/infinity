@@ -132,9 +132,9 @@ private:
                                        void *state_ptr,
                                        bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data_ptr_);
-        const auto *right_ptr = (const RightType *)(right->data_ptr_);
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        const auto *left_ptr = (const LeftType *)(left->data());
+        const auto *right_ptr = (const RightType *)(right->data());
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         if (nullable) {
@@ -162,7 +162,7 @@ private:
                                                                             state_ptr);
             }
         }
-        result->tail_index_ = count;
+        result->Finalize(count);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -245,9 +245,9 @@ private:
                                            void *state_ptr,
                                            bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data_ptr_);
-        const auto *right_ptr = (const RightType *)(right->data_ptr_);
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        const auto *left_ptr = (const LeftType *)(left->data());
+        const auto *right_ptr = (const RightType *)(right->data());
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         if (nullable) {
@@ -275,7 +275,7 @@ private:
                                                                             state_ptr);
             }
         }
-        result->tail_index_ = count;
+        result->Finalize(count);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -369,9 +369,9 @@ private:
                                            void *state_ptr,
                                            bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data_ptr_);
-        const auto *right_ptr = (const RightType *)(right->data_ptr_);
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        const auto *left_ptr = (const LeftType *)(left->data());
+        const auto *right_ptr = (const RightType *)(right->data());
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         if (nullable) {
@@ -399,7 +399,7 @@ private:
                                                                             state_ptr);
             }
         }
-        result->tail_index_ = count;
+        result->Finalize(count);
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -483,9 +483,9 @@ private:
                                                void *state_ptr,
                                                bool nullable) {
 
-        const auto *left_ptr = (const LeftType *)(left->data_ptr_);
-        const auto *right_ptr = (const RightType *)(right->data_ptr_);
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        const auto *left_ptr = (const LeftType *)(left->data());
+        const auto *right_ptr = (const RightType *)(right->data());
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         if (nullable) {
@@ -506,7 +506,7 @@ private:
             result_null->SetAllTrue();
             Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
         }
-        result->tail_index_ = 1;
+        result->Finalize(1) ;
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
