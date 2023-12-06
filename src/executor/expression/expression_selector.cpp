@@ -78,7 +78,7 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
     expr_evaluator.Init(input_data_);
     expr_evaluator.Execute(expr, state, bool_column);
 
-    const auto *bool_column_ptr = (const u8 *)(bool_column->data_ptr_);
+    const auto *bool_column_ptr = (const u8 *)(bool_column->data());
     SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
 
     Select(bool_column_ptr, null_mask, count, output_true_select, true);

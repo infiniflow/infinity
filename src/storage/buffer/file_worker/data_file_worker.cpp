@@ -24,6 +24,9 @@ module data_file_worker;
 
 namespace infinity {
 
+DataFileWorker::DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
+    : FileWorker(Move(file_dir), Move(file_name)), buffer_size_(buffer_size) {}
+
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {
         FreeInMemory();
@@ -36,14 +39,14 @@ void DataFileWorker::AllocateInMemory() {
         Error<StorageException>("Data is already allocated.");
     }
     Assert<StorageException>(buffer_size_ > 0, "Bug.");
-    data_ = reinterpret_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
         Error<StorageException>("Data is already freed.");
     }
-    delete[] reinterpret_cast<char *>(data_);
+    delete[] static_cast<char *>(data_);
     data_ = nullptr;
 }
 
@@ -96,6 +99,7 @@ void DataFileWorker::ReadFromFileImpl() {
     if (magic_number != 0x00dd3344) {
         Error<StorageException>(Format("Incorrect file header magic number: {}.", magic_number));
     }
+
     u64 buffer_size_{};
     nbytes = fs.Read(*file_handler_, &buffer_size_, sizeof(buffer_size_));
     if (nbytes != sizeof(buffer_size_)) {
@@ -106,7 +110,7 @@ void DataFileWorker::ReadFromFileImpl() {
     }
 
     // file body
-    data_ = reinterpret_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]{});
     nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != buffer_size_) {
         Error<StorageException>(Format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));

@@ -29,10 +29,10 @@ export class EmbeddingUnaryOperator {
 public:
     template <typename InputElemType, typename OutputElemType, typename Operator>
     static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
-        const auto *input_ptr = (const InputElemType *)(input->data_ptr_);
+        const auto *input_ptr = (const InputElemType *)(input->data());
         const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
 
-        auto *result_ptr = (OutputElemType *)(result->data_ptr_);
+        auto *result_ptr = (OutputElemType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         auto embedding_info = static_cast<EmbeddingInfo *>(input->data_type()->type_info().get());
@@ -56,7 +56,7 @@ public:
                     ExecuteFlat<InputElemType, OutputElemType, Operator>(input_ptr, result_ptr, dim, result_null.get(), count, state_ptr);
                 }
                 // Result tail_index need to update.
-                result->tail_index_ = count;
+                result->Finalize(count);
                 return;
             }
             case ColumnVectorType::kConstant: {
@@ -67,7 +67,7 @@ public:
                 } else {
                     result_null->SetFalse(0);
                 }
-                result->tail_index_ = 1;
+                result->Finalize(1);
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {

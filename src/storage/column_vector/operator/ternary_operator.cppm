@@ -36,16 +36,16 @@ public:
                                void *state_ptr,
                                bool nullable) {
 
-        const auto *first_ptr = (const FirstType *)(first->data_ptr_);
+        const auto *first_ptr = (const FirstType *)(first->data());
         const SharedPtr<Bitmask> &first_null = first->nulls_ptr_;
 
-        const auto *second_ptr = (const SecondType *)(second->data_ptr_);
+        const auto *second_ptr = (const SecondType *)(second->data());
         const SharedPtr<Bitmask> &second_null = second->nulls_ptr_;
 
-        const auto *third_ptr = (const ThirdType *)(third->data_ptr_);
+        const auto *third_ptr = (const ThirdType *)(third->data());
         const SharedPtr<Bitmask> &third_null = second->nulls_ptr_;
 
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         // 8 cases for first/second/third
@@ -81,7 +81,7 @@ public:
                                                                                    count,
                                                                                    state_ptr);
             }
-            result->tail_index_ = count;
+            result->Finalize(count);
         }
 
         // 2. Flat Flat Constant
@@ -119,7 +119,7 @@ public:
                                                                                    count,
                                                                                    state_ptr);
             }
-            result->tail_index_ = count;
+            result->Finalize(count);
         }
 
         // 5. Constant Flat Flat
@@ -169,7 +169,7 @@ public:
                                                                                          0,
                                                                                          state_ptr);
             }
-            result->tail_index_ = 1;
+            result->Finalize(1);
             return;
         }
     }

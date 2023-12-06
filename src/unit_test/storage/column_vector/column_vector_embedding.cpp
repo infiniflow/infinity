@@ -45,9 +45,8 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -56,9 +55,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
@@ -83,15 +82,15 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
@@ -111,7 +110,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
         v.value_.embedding.Reset();
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
 
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
@@ -135,10 +134,10 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -150,9 +149,8 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16 * 4);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -161,9 +159,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
         for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
@@ -218,9 +216,8 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -229,9 +226,9 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
@@ -272,11 +269,11 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -288,9 +285,8 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 4 * 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -299,8 +295,8 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data_ptr_;
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    tmp_ptr = column_vector.data();
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
         for (i64 j = 0; j < embedding_info->Dimension(); ++j) {

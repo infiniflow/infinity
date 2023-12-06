@@ -50,26 +50,27 @@ public:
     static inline SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type) { return MakeShared<ColumnVector>(Move(data_type)); }
 
 public:
-    ColumnVectorType vector_type_{ColumnVectorType::kInvalid};
-
-    SharedPtr<DataType> data_type_;
-
     SizeT data_type_size_{0};
 
     // this buffer is holding the data
     SharedPtr<VectorBuffer> buffer_{nullptr};
 
-    // Only a pointer to the real data in vector buffer
-    ptr_t data_ptr_{nullptr};
-
     // A bitmap to indicate the null information
     SharedPtr<Bitmask> nulls_ptr_{nullptr};
+
+    bool initialized{false};
+
+private:
+    ColumnVectorType vector_type_{ColumnVectorType::kInvalid};
+
+    SharedPtr<DataType> data_type_;
+
+    // Only a pointer to the real data in vector buffer
+    ptr_t data_ptr_{nullptr};
 
     SizeT capacity_{0};
 
     SizeT tail_index_{0};
-
-    bool initialized{false};
 
 public:
     // Construct a column vector without initialization;
@@ -106,12 +107,14 @@ public:
 
     void Finalize(SizeT index);
 
+private:
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
     // Use by Append value
     void SetByPtr(SizeT index, const_ptr_t value_ptr);
 
+public:
     void AppendValue(const Value &value);
 
     void AppendByPtr(const_ptr_t value_ptr);
@@ -188,7 +191,7 @@ private:
 public:
     [[nodiscard]] const inline ColumnVectorType &vector_type() const { return vector_type_; }
 
-    [[nodiscard]] const inline SharedPtr<DataType> &data_type() const { return data_type_; }
+    [[nodiscard]] const inline SharedPtr<DataType> data_type() const { return data_type_; }
 
     [[nodiscard]] inline ptr_t data() const { return data_ptr_; }
 

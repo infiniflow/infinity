@@ -1369,7 +1369,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
 
 void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
     // We assume the value_ptr point to the same type data.
-    if (data_type()->type() == LogicalType::kEmbedding) {
+    if (data_type_->type() == LogicalType::kEmbedding) {
         auto *embedding_ptr = (EmbeddingT *)(value_ptr);
         SetByRawPtr(index, embedding_ptr->ptr);
     } else {
@@ -1413,7 +1413,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
 
     Assert<StorageException>(
         *this->data_type_ == *other.data_type_,
-        Format("Attempt to append column vector{} to column vector{}", other.data_type()->ToString(), this->data_type()->ToString()));
+        Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
 
     Assert<StorageException>(
         this->tail_index_ + count <= this->capacity_,

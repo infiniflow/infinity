@@ -28,6 +28,7 @@ import faiss;
 import merge_knn;
 import block_index;
 import column_buffer;
+import buffer_manager;
 import block_column_entry;
 import third_party;
 import block_entry;
@@ -100,6 +101,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     if(merge_knn_state->input_complete_) {
         merge_knn->End(); // reorder the heap
+        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
 
@@ -134,7 +136,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = table_ref_->column_ids_[i];
                     ColumnBuffer column_buffer =
-                        BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
+                        BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), buffer_mgr);
 
                     const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
                     output_data_block->AppendValueByPtr(column_id, ptr);

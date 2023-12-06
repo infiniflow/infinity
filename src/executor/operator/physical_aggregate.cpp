@@ -316,7 +316,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                                   "Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx));
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            output_datablock->column_vectors[column_id]->tail_index_ = datablock_size;
+            output_datablock->column_vectors[column_id]->Finalize(datablock_size);
         }
 
         output_datablock->Finalize();
@@ -435,7 +435,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                 }
             }
 
-            output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx + 1;
+            output_datablock->column_vectors[column_id]->Finalize(block_row_idx + 1);
         }
 
         output_datablock->Finalize();

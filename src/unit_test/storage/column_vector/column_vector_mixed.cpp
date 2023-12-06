@@ -44,9 +44,8 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -55,9 +54,9 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
@@ -77,15 +76,15 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
@@ -95,7 +94,7 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
         EXPECT_EQ(integer_mixed_ptr->value, i);
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
 
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
@@ -114,10 +113,10 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -129,9 +128,8 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -140,9 +138,9 @@ TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_integer1 = MixedType::MakeInteger(i);
         column_vector.AppendByPtr((ptr_t)(&mixed_integer1));
@@ -262,9 +260,8 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -273,9 +270,9 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
@@ -295,15 +292,15 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
@@ -313,7 +310,7 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
         EXPECT_FLOAT_EQ(float_mixed_ptr->value, static_cast<f64>(i));
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
@@ -331,10 +328,10 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -346,9 +343,8 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -357,9 +353,9 @@ TEST_F(ColumnVectorMixedTest, mixed_float_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_float1 = MixedType::MakeFloat(static_cast<f64>(i));
         column_vector.AppendByPtr((ptr_t)(&mixed_float1));
@@ -480,9 +476,8 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -491,9 +486,9 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = ToStr(i);
@@ -515,15 +510,15 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = ToStr(i);
@@ -535,7 +530,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
         EXPECT_STREQ(short_str_mixed_ptr->ptr, str.c_str());
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         String str = ToStr(i);
@@ -555,10 +550,10 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -570,9 +565,8 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -581,9 +575,9 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str = ToStr(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
@@ -718,9 +712,8 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -729,9 +722,9 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
@@ -759,15 +752,15 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
@@ -785,7 +778,7 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
         EXPECT_STREQ(value_header.c_str(), header.c_str());
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
@@ -812,11 +805,11 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     column_vector.Reset();
 
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -828,9 +821,8 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -839,9 +831,9 @@ TEST_F(ColumnVectorMixedTest, mixed_long_str_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String str(20, 'a' + i % 26);
         String header(5, 'a' + i % 26);
@@ -1015,9 +1007,8 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1026,9 +1017,9 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
@@ -1046,15 +1037,15 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
@@ -1062,7 +1053,7 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kNull);
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
@@ -1079,10 +1070,10 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     column_vector.Reset();
 
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -1094,9 +1085,8 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1105,9 +1095,9 @@ TEST_F(ColumnVectorMixedTest, mixed_null_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_null = MixedType::MakeNull();
         column_vector.AppendByPtr((ptr_t)(&mixed_null));
@@ -1217,9 +1207,8 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1228,9 +1217,9 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
@@ -1248,15 +1237,15 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value vx = column_vector.GetValue(i);
@@ -1264,7 +1253,7 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kMissing);
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
@@ -1281,10 +1270,10 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     column_vector.Reset();
 
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -1296,9 +1285,8 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1307,9 +1295,9 @@ TEST_F(ColumnVectorMixedTest, mixed_missing_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         MixedT mixed_missing = MixedType::MakeMissing();
         column_vector.AppendByPtr((ptr_t)(&mixed_missing));
@@ -1419,9 +1407,8 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1430,9 +1417,9 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
 
@@ -1617,15 +1604,15 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -1758,7 +1745,7 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
         }
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
 
@@ -1942,11 +1929,11 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     column_vector.Reset();
 
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -1958,9 +1945,8 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -1969,9 +1955,9 @@ TEST_F(ColumnVectorMixedTest, mixed_tuple_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
 
         MixedType mixed_tuple1 = MixedType::MakeTuple(7);
@@ -3003,9 +2989,8 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -3014,9 +2999,9 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data_ptr_;
+    auto tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -3228,15 +3213,15 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
-    EXPECT_EQ(column_vector.tail_index_, clone_column_vector.tail_index_);
-    EXPECT_EQ(column_vector.capacity_, clone_column_vector.capacity_);
-    EXPECT_EQ(column_vector.data_type_, clone_column_vector.data_type_);
-    EXPECT_EQ(column_vector.data_ptr_, clone_column_vector.data_ptr_);
+    EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
+    EXPECT_EQ(column_vector.capacity(), clone_column_vector.capacity());
+    EXPECT_EQ(column_vector.data_type(), clone_column_vector.data_type());
+    EXPECT_EQ(column_vector.data(), clone_column_vector.data());
     EXPECT_EQ(column_vector.data_type_size_, clone_column_vector.data_type_size_);
     EXPECT_EQ(column_vector.nulls_ptr_, clone_column_vector.nulls_ptr_);
     EXPECT_EQ(column_vector.buffer_, clone_column_vector.buffer_);
     EXPECT_EQ(column_vector.initialized, clone_column_vector.initialized);
-    EXPECT_EQ(column_vector.vector_type_, clone_column_vector.vector_type_);
+    EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -3392,7 +3377,7 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
         }
     }
 
-    EXPECT_EQ(column_vector.tail_index_, DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
     for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
@@ -3603,11 +3588,11 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     column_vector.Reset();
 
     EXPECT_EQ(column_vector.capacity(), 0);
-    EXPECT_EQ(column_vector.tail_index_, 0);
+    EXPECT_EQ(column_vector.Size(), 0);
     //    EXPECT_EQ(column_vector.data_type_size_, 0);
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_EQ(column_vector.buffer_->fix_heap_mgr_, nullptr);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.initialized, false);
 
     // ====
@@ -3619,9 +3604,8 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_EQ(column_vector.Size(), 0);
 
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
-    EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
-    EXPECT_NE(column_vector.data_ptr_, nullptr);
+    EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
     EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
@@ -3630,9 +3614,9 @@ TEST_F(ColumnVectorMixedTest, mixed_array_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data_ptr_;
+    tmp_ptr = column_vector.data();
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
+    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         f64 fvalue = static_cast<f64>(i) + static_cast<f64>(i) / 10.0f;
         String short_str(10, 'a' + i % 26);

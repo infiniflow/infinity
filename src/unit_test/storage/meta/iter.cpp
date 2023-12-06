@@ -37,11 +37,12 @@ public:
     class MockFileWorker : public FileWorker {
         void AllocateInMemory() override {}
         void FreeInMemory() override {}
+        size_t GetMemoryCost() const override { return 0; }
         void WriteToFileImpl(bool &) override {}
         void ReadFromFileImpl() override {}
 
     public:
-        MockFileWorker(void *data) : FileWorker(nullptr, nullptr, 0) { data_ = data; }
+        MockFileWorker(void *data) : FileWorker(nullptr, nullptr) { data_ = data; }
     };
 
     class MockBufferObj : public BufferObj {

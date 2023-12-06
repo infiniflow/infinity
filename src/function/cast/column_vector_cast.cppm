@@ -151,7 +151,7 @@ export struct ColumnVectorCast {
     template <class SourceType, class TargetType, class Operator>
     static bool
     GenericTryCastColumnVector(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &result, SizeT count, CastParameters &parameters) {
-        ColumnVectorCastData input(parameters.strict, result, *source->data_type_, *result->data_type_);
+        ColumnVectorCastData input(parameters.strict, result, *source->data_type(), *result->data_type());
         UnaryOperator::Execute<SourceType, TargetType, Operator>(source, result, count, &input, true);
         return input.all_converted_;
     }
@@ -189,7 +189,7 @@ export struct ColumnVectorCast {
     template <class SourceElemType, class TargetElemType, class Operator>
     inline static bool
     TryCastColumnVectorEmbedding(const SharedPtr<ColumnVector> &source, SharedPtr<ColumnVector> &target, SizeT count, CastParameters &parameters) {
-        ColumnVectorCastData input(parameters.strict, target, *source->data_type_, *target->data_type_);
+        ColumnVectorCastData input(parameters.strict, target, *source->data_type(), *target->data_type());
         EmbeddingUnaryOperator::Execute<SourceElemType, TargetElemType, TryCastValueEmbedding<Operator>>(source, target, count, &input, true);
         return input.all_converted_;
     }

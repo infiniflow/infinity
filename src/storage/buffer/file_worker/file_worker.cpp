@@ -39,11 +39,6 @@ void FileWorker::CloseFile() {
 }
 
 void FileWorker::WriteToFile(bool to_spill) {
-    // if (buffer_size == 0) {
-    //     buffer_size = buffer_size_;
-    // } else if (buffer_size > buffer_size_) {
-    //     Error<StorageException>("Invalid buffer size.");
-    // }
     if (data_ == nullptr) {
         Error<StorageException>("No data will be written.");
     }

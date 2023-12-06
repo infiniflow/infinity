@@ -249,7 +249,7 @@ public:
         String dst;
         SizeT total_varchar_data_size = 0;
         for (SizeT index = 0; index < row_count; ++index) {
-            VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
+            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
             total_varchar_data_size += varchar.length_;
         }
 
@@ -258,7 +258,7 @@ public:
 
         i32 current_offset = 0;
         for (SizeT index = 0; index < row_count; ++index) {
-            VarcharT &varchar = ((VarcharT *)column_vector->data_ptr_)[index];
+            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
             i32 length = varchar.length_;
             if (varchar.IsInlined()) {
                 Memcpy(dst.data() + current_offset, &length, sizeof(i32));
@@ -355,7 +355,7 @@ public:
                 for (SizeT col_index = 0; col_index < column_count; ++col_index) {
                     auto column_vector = data_block->column_vectors[col_index];
                     all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-                    switch (column_vector->data_type_->type()) {
+                    switch (column_vector->data_type()->type()) {
                         case LogicalType::kBoolean:
                         case LogicalType::kTinyInt:
                         case LogicalType::kSmallInt:

@@ -132,29 +132,18 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, 
         src_chunk_remain_size -= copy_size;
         nbytes -= copy_size;
 
-        if(current_chunk_remain_size == 0 && src_chunk_remain_size == 0) {
-            ++ src_chunk_id;
-            src_chunk_offset = 0;
-
-            ++ chunk_id;
+        if (current_chunk_remain_size == 0) {
+            ++chunk_id;
             chunk_offset = 0;
-        }
-
-        if(current_chunk_remain_size > 0 && src_chunk_remain_size == 0) {
-            ++ src_chunk_id;
-            src_chunk_offset = 0;
+        } else {
             chunk_offset += copy_size;
         }
 
-        if(src_chunk_remain_size > 0 && current_chunk_remain_size == 0) {
-            ++ chunk_id;
-            chunk_offset = 0;
+        if (src_chunk_remain_size == 0) {
+            ++src_chunk_id;
+            src_chunk_offset = 0;
+        } else {
             src_chunk_offset += copy_size;
-        }
-
-        if(src_chunk_remain_size > 0 && current_chunk_remain_size > 0) {
-            src_chunk_offset += copy_size;
-            chunk_offset += copy_size;
         }
     }
 

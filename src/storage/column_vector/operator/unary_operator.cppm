@@ -29,10 +29,10 @@ export class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
-        const auto *input_ptr = (const InputType *)(input->data_ptr_);
+        const auto *input_ptr = (const InputType *)(input->data());
         const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
 
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         switch (input->vector_type()) {
@@ -48,7 +48,7 @@ public:
                     ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
                 }
                 // Result tail_index need to update.
-                result->tail_index_ = count;
+                result->Finalize(count);
                 return;
             }
             case ColumnVectorType::kConstant: {
@@ -63,7 +63,7 @@ public:
                 } else {
                     Operator::template Execute<InputType, ResultType>(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                 }
-                result->tail_index_ = 1;
+                result->Finalize(1);
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
