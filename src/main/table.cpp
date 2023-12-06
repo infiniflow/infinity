@@ -164,7 +164,6 @@ QueryResult Table::Search(Vector<ParsedExpr *> &knn_exprs,
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
 
-    // fix me: order by
     select_statement->order_by_list = new Vector<OrderByExpr *>;
     SizeT knn_expr_size = knn_exprs.size();
     for(SizeT idx = 0; idx < knn_expr_size; ++ idx) {
