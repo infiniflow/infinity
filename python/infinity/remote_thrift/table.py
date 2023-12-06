@@ -283,12 +283,12 @@ class RemoteTable(Table, ABC):
 
                 if isinstance(embedding[0], int):
                     data = ttypes.EmbeddingData()
-                    data.int64_data = embedding
+                    data.i64_array_value = embedding
                     knn_expr.embedding_data = data
                     knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
                 elif isinstance(embedding[0], float):
                     data = ttypes.EmbeddingData()
-                    data.double_data = embedding
+                    data.f64_array_value = embedding
                     knn_expr.embedding_data = data
                     knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat64
                 else:

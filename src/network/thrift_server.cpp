@@ -304,12 +304,12 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<ParsedExpr *> knn_expr_list{};
-        knn_expr_list.reserve(request.knn_expr_list.size());
+        Vector<ParsedExpr *> *knn_expr_list = new Vector<ParsedExpr *>();
+        knn_expr_list->reserve(request.knn_expr_list.size());
         if (request.__isset.knn_expr_list == true) {
             for (auto &knn_expr : request.knn_expr_list) {
                 auto parsed_expr = GetKnnExprFromProto(knn_expr);
-                knn_expr_list.emplace_back(parsed_expr);
+                knn_expr_list->emplace_back(parsed_expr);
             }
         }
 
@@ -335,7 +335,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(knn_expr_list, fts_expr, filter, output_columns, nullptr, nullptr);
+        const QueryResult result = table->Search(*knn_expr_list, fts_expr, filter, output_columns, nullptr, nullptr);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
