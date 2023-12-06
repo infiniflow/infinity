@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "analysis/analyzers.hpp"
 #include "analysis/segmentation_token_stream.hpp"
 #include "index/norm.hpp"
@@ -252,10 +266,10 @@ TEST_F(IRSDatastoreTest, test1) {
     UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
     {
         auto ctx = datastore.index_writer_->GetBatch();
-#if 1
+#if 0
     std::fstream fin;
     std::istream *in;
-    fin.open("/home/infominer/codebase/workspace/infinity-debug/test/data/csv/enwiki_9999.csv", std::fstream::in);
+    fin.open("../test/data/csv/enwiki_9999.csv", std::fstream::in);
     if (!fin) {
         return;
     }
@@ -268,19 +282,19 @@ TEST_F(IRSDatastoreTest, test1) {
         std::stringstream line_stream(line);
         auto doc = ctx.Insert(i);
         {
-            auto field = MakeShared<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            auto field = MakeUnique<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
             std::getline(line_stream, field->f_, '\t');
-            doc.Insert<irs::Action::INDEX>(*field);
+            doc.Insert<irs::Action::INDEX>(field.get());
         }
         {
-            auto field = MakeShared<TextField>("date", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            auto field = MakeUnique<TextField>("date", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
             std::getline(line_stream, field->f_, '\t');
-            doc.Insert<irs::Action::INDEX>(*field);
+            doc.Insert<irs::Action::INDEX>(field.get());
         }
         {
-            auto field = MakeShared<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+            auto field = MakeUnique<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
             std::getline(line_stream, field->f_, '\t');
-            doc.Insert<irs::Action::INDEX>(*field);
+            doc.Insert<irs::Action::INDEX>(field.get());
         }
     }
 
@@ -289,15 +303,15 @@ TEST_F(IRSDatastoreTest, test1) {
         for (int i = 1; i < 10000; ++i) {
             auto doc = ctx.Insert(i);
             {
-                auto field = MakeShared<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+                auto field = MakeUnique<TextField>("body", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
                 field->f_ = "hello, world, a, b, c ";
-                doc.Insert<irs::Action::INDEX>(*field);
+                doc.Insert<irs::Action::INDEX>(field.get());
             }
 
             {
-                auto field = MakeShared<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
+                auto field = MakeUnique<TextField>("title", irs::IndexFeatures::FREQ | irs::IndexFeatures::POS, text_features, stream.get());
                 field->f_ = "Anarchism";
-                doc.Insert<irs::Action::INDEX>(*field);
+                doc.Insert<irs::Action::INDEX>(field.get());
             }
         }
 #endif
@@ -313,8 +327,5 @@ TEST_F(IRSDatastoreTest, test1) {
     SearchOptions search_ops("");
     ScoredIds result;
     auto rc = datastore.Search(flt.get(), search_ops.options_, result);
-    if (rc != 0) {
-        std::cout << "IRSDataStore::Search failed" << std::endl;
-    }
-    std::cout << "Result size:" << result.size() << std::endl;
+    ASSERT_TRUE(result.size() == 100);
 }
