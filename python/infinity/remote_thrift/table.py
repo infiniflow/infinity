@@ -246,11 +246,11 @@ class RemoteTable(Table, ABC):
             case _:
                 constant_exp = ttypes.ConstantExpr()
                 constant_exp.literal_type = ttypes.LiteralType.Int64
+                constant_exp.i64_value = query.limit
                 paser_expr_type = ttypes.ParsedExprType()
                 paser_expr_type.constant_expr = constant_exp
                 limit_expr = ttypes.ParsedExpr()
                 limit_expr.type = paser_expr_type
-                limit_expr.i64_value = query.limit
 
         # process offset_expr
         match query.offset:

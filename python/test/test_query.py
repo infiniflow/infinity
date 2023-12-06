@@ -10,15 +10,18 @@ class TestQuery:
     def test_query(self):
         conn = ThriftInfinityClient(REMOTE_HOST)
         db = RemoteDatabase(conn, "default")
-        db.create_table("my_table", {"c1": "int, primary key", "c2": "float32"}, None)
+        db.create_table("my_table", {"c1": "vector,5,float"}, None)
 
         table = RemoteTable(conn, "default", "my_table")
-        # res = table.insert([{"c1": 0, "c2": 0}])
-        # res = table.insert([{"c1": 1, "c2": 2}])
-        table.search().output(["*"]).to_df()
-        print()
-        print(table.search().output(["*"]).to_df())
+        res = table.insert([{"c1": [1.0] * 5}])
+        assert res.success
+        res = table.insert([{"c1": [4.0] * 5}])
+        assert res.success
+        res = table.insert([{"c1": [7.0] * 5}])
+        assert res.success
 
+        select_res = table.search().output(["*"]).to_df()
+        print(select_res)
         # Create a query builder
         query_builder = InfinityVectorQueryBuilder.create(
             table=table,
