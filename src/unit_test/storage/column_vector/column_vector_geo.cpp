@@ -53,10 +53,6 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -68,7 +64,6 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -87,18 +82,6 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
         EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
         EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
-        Value v = Value::MakePoint(point);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kPoint);
-        EXPECT_FLOAT_EQ(vx.value_.point.x, static_cast<f64>(i) + 0.5f);
-        EXPECT_FLOAT_EQ(vx.value_.point.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -127,10 +110,6 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -180,10 +159,6 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -230,9 +205,6 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         PointT point(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         Value v = Value::MakePoint(point);
@@ -344,10 +316,6 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         LineT line(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f, static_cast<f64>(i) - 5.3f);
@@ -359,7 +327,6 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -379,19 +346,6 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
         EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        LineT line(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f, static_cast<f64>(i) - 5.3f);
-        Value v = Value::MakeLine(line);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kLine);
-        EXPECT_FLOAT_EQ(vx.value_.line.a, static_cast<f64>(i) + 0.5f);
-        EXPECT_FLOAT_EQ(vx.value_.line.b, static_cast<f64>(i) - 0.8f);
-        EXPECT_FLOAT_EQ(vx.value_.line.c, static_cast<f64>(i) - 5.3f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -420,10 +374,6 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         LineT line(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f, static_cast<f64>(i) - 5.3f);
@@ -476,10 +426,6 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         LineT line(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f, static_cast<f64>(i) - 5.3f);
@@ -528,9 +474,6 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         LineT line(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f, static_cast<f64>(i) - 5.3f);
         Value v = Value::MakeLine(line);
@@ -647,10 +590,6 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -665,7 +604,6 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -686,22 +624,6 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
-        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
-        LineSegT line_seg(p1, p2);
-        Value v = Value::MakeLineSegment(line_seg);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kLineSeg);
-        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.x, static_cast<f64>(i) + 0.5f);
-        EXPECT_FLOAT_EQ(vx.value_.line_segment.point1.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.x, static_cast<f64>(i) - 5.3f);
-        EXPECT_FLOAT_EQ(vx.value_.line_segment.point2.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -730,10 +652,6 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -790,10 +708,6 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -846,9 +760,6 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
@@ -977,10 +888,6 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -996,7 +903,6 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -1017,22 +923,6 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
         EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
         EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
-        PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
-        BoxT box(p1, p2);
-        Value v = Value::MakeBox(box);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kBox);
-        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.x, static_cast<f64>(i) + 0.5f);
-        EXPECT_FLOAT_EQ(vx.value_.box.upper_left.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.x, static_cast<f64>(i) - 5.3f);
-        EXPECT_FLOAT_EQ(vx.value_.box.lower_right.y, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -1061,10 +951,6 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -1120,10 +1006,6 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -1176,9 +1058,6 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         PointT p2(static_cast<f64>(i) - 5.3f, static_cast<f64>(i) + 7.9f);
@@ -2267,10 +2146,6 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -2285,7 +2160,6 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -2305,21 +2179,6 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
         EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
         EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
         EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
-        f64 r = static_cast<f64>(i) + 7.9f;
-        CircleT circle(p1, r);
-        Value v = Value::MakeCircle(circle);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kCircle);
-        EXPECT_FLOAT_EQ(vx.value_.circle.center.x, static_cast<f64>(i) + 0.5f);
-        EXPECT_FLOAT_EQ(vx.value_.circle.center.y, static_cast<f64>(i) - 0.8f);
-        EXPECT_FLOAT_EQ(vx.value_.circle.radius, static_cast<f64>(i) + 7.9f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -2348,10 +2207,6 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -2405,10 +2260,6 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
@@ -2459,9 +2310,6 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         PointT p1(static_cast<f64>(i) + 0.5f, static_cast<f64>(i) - 0.8f);
         f64 r = static_cast<f64>(i) + 7.9f;

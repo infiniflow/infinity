@@ -53,10 +53,6 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
@@ -66,8 +62,6 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -85,17 +79,6 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
         EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    //    return ;
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kFloat);
-        EXPECT_FLOAT_EQ(vx.value_.float32, static_cast<FloatT>(i) + 0.5f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -129,10 +112,6 @@ TEST_F(ColumnVectorFloatTest, flat_float) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         FloatT f = static_cast<FloatT>(i) + 0.5f;
@@ -180,10 +159,6 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
@@ -227,9 +202,6 @@ TEST_F(ColumnVectorFloatTest, contant_float) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
         column_vector.AppendValue(v);
@@ -333,10 +305,6 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
@@ -346,8 +314,6 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
         EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -365,16 +331,6 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
         EXPECT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kDouble);
-        EXPECT_FLOAT_EQ(vx.value_.float64, static_cast<DoubleT>(i) + 0.8f);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -402,10 +358,6 @@ TEST_F(ColumnVectorFloatTest, flat_double) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DoubleT f = static_cast<DoubleT>(i) + 0.8f;
@@ -453,10 +405,6 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
@@ -500,9 +448,6 @@ TEST_F(ColumnVectorFloatTest, contant_double) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeDouble(static_cast<DoubleT>(i) + 0.8f);
         column_vector.AppendValue(v);

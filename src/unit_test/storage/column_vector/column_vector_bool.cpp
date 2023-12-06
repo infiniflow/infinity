@@ -52,10 +52,6 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     {
         Value v = Value::MakeBool(true);
@@ -71,7 +67,6 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -91,16 +86,6 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
         EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
     }
     EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kBoolean);
-        EXPECT_EQ(vx.value_.boolean, static_cast<BooleanT>(i % 2 == 0));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
@@ -132,10 +117,6 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         BooleanT boolean = static_cast<BooleanT>(i % 2 == 0);
@@ -181,10 +162,6 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
@@ -227,9 +204,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
+    
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
         column_vector.AppendValue(v);

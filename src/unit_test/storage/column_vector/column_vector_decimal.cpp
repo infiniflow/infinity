@@ -53,10 +53,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DecimalT decimal(0, static_cast<i64>(i));
@@ -67,8 +63,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -88,17 +82,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
 
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        DecimalT decimal(0, static_cast<i64>(i));
-        Value v = Value::MakeDecimal(decimal, decimal_info);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kDecimal);
-        EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
@@ -124,10 +107,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DecimalT decimal(0, static_cast<i64>(i));
@@ -176,10 +155,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         DecimalT decimal(0, static_cast<i64>(i));
@@ -223,9 +198,6 @@ TEST_F(ColumnVectorDecimalTest, contant_decimal) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         DecimalT decimal(0, static_cast<i64>(i));
         Value v = Value::MakeDecimal(decimal, decimal_info);

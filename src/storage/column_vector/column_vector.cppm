@@ -140,9 +140,8 @@ public:
 
     void AppendByPtr(const_ptr_t value_ptr);
 
+    // This two should merge into one function because `ColumnBuffer` will be removed.
     void AppendWith(const ColumnVector &other, SizeT from, SizeT count);
-
-    // What is this two ??????
 
     // input parameter:
     // column_buffer - input column
@@ -158,9 +157,6 @@ public:
     SizeT AppendWith(RowID from, SizeT count);
 
     void ShallowCopy(const ColumnVector &other);
-
-    // Enlarge the column vector capacity.
-    void Reserve(SizeT new_capacity);
 
     void Reset();
 

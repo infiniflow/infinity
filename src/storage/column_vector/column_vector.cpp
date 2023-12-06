@@ -1460,22 +1460,6 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     this->tail_index_ = other.tail_index_;
 }
 
-void ColumnVector::Reserve(SizeT new_capacity) {
-    Assert<StorageException>(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value");
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-
-    if (new_capacity <= capacity_)
-        return;
-
-    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity, buffer_->buffer_type_);
-    new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
-    new_buffer->fix_heap_mgr_ = Move(buffer_->fix_heap_mgr_);
-    buffer_ = new_buffer;
-
-    capacity_ = new_capacity;
-    data_ptr_ = buffer_->GetData();
-}
-
 void ColumnVector::Reset() {
     // 1. Vector type is reset to invalid.
     vector_type_ = ColumnVectorType::kInvalid;

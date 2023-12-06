@@ -52,10 +52,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
@@ -66,8 +62,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -87,17 +81,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
         EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
     }
     EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        DateT date(static_cast<i32>(i));
-        Value v = Value::MakeDate(date);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kDate);
-        EXPECT_EQ(vx.value_.date.value, static_cast<i32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
@@ -124,10 +107,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_date) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateT date(static_cast<i32>(i));
@@ -173,10 +152,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
@@ -220,9 +195,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_date) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         DateT date(static_cast<i32>(i));
         Value v = Value::MakeDate(date);
@@ -328,10 +300,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -342,8 +310,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -361,18 +327,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kTime);
         EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        TimeT time(static_cast<i32>(i));
-        Value v = Value::MakeTime(time);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kTime);
-        EXPECT_EQ(vx.value_.time.value, static_cast<i32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -400,10 +354,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_time) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -449,10 +399,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         TimeT time(static_cast<i32>(i));
@@ -496,9 +442,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_time) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         TimeT time(static_cast<i32>(i));
         Value v = Value::MakeTime(time);
@@ -604,10 +547,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -619,8 +558,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
         EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -639,19 +576,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
         EXPECT_EQ(vx.type().type(), LogicalType::kDateTime);
         EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
         EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
-        Value v = Value::MakeDateTime(datetime);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kDateTime);
-        EXPECT_EQ(vx.value_.datetime.date, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.datetime.time, static_cast<i32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -678,10 +602,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_datetime) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -730,10 +650,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
@@ -779,9 +695,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_datetime) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         DateTimeT datetime(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeDateTime(datetime);
@@ -893,10 +806,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -908,8 +817,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
         EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -928,19 +835,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
         EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
         EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));
         EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
-    }
-    EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
-        Value v = Value::MakeTimestamp(timestamp);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kTimestamp);
-        EXPECT_EQ(vx.value_.timestamp.date, static_cast<i32>(i));
-        EXPECT_EQ(vx.value_.timestamp.time, static_cast<i32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     column_vector.Reset();
@@ -967,10 +861,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_timestamp) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -1019,10 +909,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
@@ -1068,9 +954,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_timestamp) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         TimestampT timestamp(static_cast<i32>(i), static_cast<i32>(i));
         Value v = Value::MakeTimestamp(timestamp);
@@ -1181,10 +1064,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         IntervalT interval;
@@ -1196,8 +1075,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
         EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
-
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
 
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
@@ -1217,18 +1094,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
         EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
     }
     EXPECT_EQ(column_vector.Size(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.capacity(), 2 * DEFAULT_VECTOR_SIZE);
-
-    for (i64 i = DEFAULT_VECTOR_SIZE; i < 2 * DEFAULT_VECTOR_SIZE; ++i) {
-        IntervalT interval;
-        interval.value = static_cast<i32>(i);
-        Value v = Value::MakeInterval(interval);
-        column_vector.AppendValue(v);
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kInterval);
-        EXPECT_EQ(vx.value_.interval.value, static_cast<i32>(i));
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
-    }
 
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0);
@@ -1254,10 +1119,6 @@ TEST_F(ColumnVectorDateTimeTest, flat_interval) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         IntervalT interval;
@@ -1306,10 +1167,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    auto tmp_ptr = column_vector.data();
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(tmp_ptr, column_vector.data());
 
     for (i64 i = 0; i < 1; ++i) {
         IntervalT interval;
@@ -1354,9 +1211,6 @@ TEST_F(ColumnVectorDateTimeTest, contant_flat) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
-    tmp_ptr = column_vector.data();
-    EXPECT_EQ(tmp_ptr, column_vector.data());
     for (i64 i = 0; i < 1; ++i) {
         IntervalT interval;
         interval.value = static_cast<i32>(i);
