@@ -23,9 +23,9 @@ export module load_meta;
 namespace infinity {
 
 export struct LoadMeta {
-    ColumnBinding binding_;
-    SizeT index_;
-    SharedPtr<DataType> type_;
+    ColumnBinding binding_{};
+    SizeT index_{};
+    SharedPtr<DataType> type_{};
 };
 
 } // namespace infinity

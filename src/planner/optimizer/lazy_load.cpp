@@ -30,7 +30,7 @@ module lazy_load;
 
 namespace infinity {
 
-BaseTableRef * GetScanTableRef(LogicalNode &op) {
+Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto table_scan = dynamic_cast<LogicalTableScan &>(op);
@@ -48,16 +48,16 @@ BaseTableRef * GetScanTableRef(LogicalNode &op) {
             return match.base_table_ref_.get();
         }
         default: {
-            return nullptr;
+            return None;
         }
     }
 }
 
 void RefencecColumnCollection::VisitNode(LogicalNode &op) {
     auto base_table_ref = GetScanTableRef(op);
-    if (base_table_ref != nullptr) {
-        auto table_idx = base_table_ref->table_index_;
-        auto column_types = base_table_ref->column_types_;
+    if (base_table_ref.has_value()) {
+        auto table_idx = base_table_ref.value()->table_index_;
+        auto column_types = base_table_ref.value()->column_types_;
         auto scan_bindings = op.GetColumnBindings();
 
         column_types_.insert({table_idx, column_types});
@@ -114,7 +114,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             auto table_scan = dynamic_cast<LogicalTableScan &>(op);
             Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
-            scan_table_ids_.push_back(table_scan.base_table_ref_->table_index_);
+            scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
             table_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
             break;
         }
@@ -122,7 +122,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
             Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
 
-            scan_table_ids_.push_back(knn_scan.base_table_ref_->table_index_);
+            scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
             knn_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
             break;
         }
@@ -132,18 +132,18 @@ void CleanScan::VisitNode(LogicalNode &op) {
             VisitNodeExpression(op);
 
             auto load_metas = op.load_metas();
-            if (!scan_table_ids_.empty()) {
+            if (!scan_table_indexes_.empty()) {
                 Vector<LoadMeta> filtered_metas;
 
-                for (SizeT i = 0; i < scan_table_ids_.size(); i++) {
+                for (SizeT i = 0; i < scan_table_indexes_.size(); i++) {
                     for (SizeT j = 0; j < load_metas->size(); j++) {
-                        if ((*load_metas)[j].binding_.table_idx != scan_table_ids_[i]) {
+                        if ((*load_metas)[j].binding_.table_idx != scan_table_indexes_[i]) {
                             filtered_metas.push_back((*load_metas)[j]);
                         }
                     }
                 }
                 op.set_load_metas(MakeShared<Vector<LoadMeta>>(filtered_metas));
-                scan_table_ids_.clear();
+                scan_table_indexes_.clear();
             }
             break;
         }

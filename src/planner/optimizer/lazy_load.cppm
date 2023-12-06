@@ -52,7 +52,7 @@ private:
     SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
     SharedPtr<Vector<LoadMeta>> last_op_load_metas_{};
-    Vector<SizeT> scan_table_ids_{};
+    Vector<SizeT> scan_table_indexes_{};
 };
 
 export class LazyLoad : public OptimizerRule {
@@ -62,14 +62,14 @@ public:
             return;
         }
 
-        meta_loader_.VisitNode(*logical_plan);
+        collector.VisitNode(*logical_plan);
         cleaner_.VisitNode(*logical_plan);
     }
 
     [[nodiscard]] inline String name() const final { return "Lazy Load"; }
 
 private:
-    RefencecColumnCollection meta_loader_{};
+    RefencecColumnCollection collector{};
     CleanScan cleaner_{};
 };
 
