@@ -31,7 +31,7 @@ namespace infinity {
 class BoundDeleteStatement;
 class BoundUpdateStatement;
 
-export class QueryBinder : public EnableSharedFromThis<QueryBinder> {
+export class QueryBinder {
 public:
     explicit QueryBinder(QueryContext *query_context, SharedPtr<BindContext> bind_context_ptr)
         : query_context_ptr_(Move(query_context)), bind_context_ptr_(Move(bind_context_ptr)) {}

@@ -121,7 +121,7 @@ SharedPtr<BaseExpression> BoundUpdateStatement::UnnestSubquery(SharedPtr<Logical
                                                                QueryContext *query_context,
                                                                const SharedPtr<BindContext> &) {
     building_subquery_ = true;
-    //    SharedPtr<QueryBinder> query_binder_ptr = MakeShared<QueryBinder>(query_context,
+    //    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(query_context,
     //                                                                      bind_context);
     SubqueryExpression *subquery_expr_ptr = (SubqueryExpression *)condition.get();
     SharedPtr<LogicalNode> subquery_plan = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);
