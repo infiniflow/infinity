@@ -36,11 +36,11 @@ public:
     explicit QueryBinder(QueryContext *query_context, SharedPtr<BindContext> bind_context_ptr)
         : query_context_ptr_(Move(query_context)), bind_context_ptr_(Move(bind_context_ptr)) {}
 
-    SharedPtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
+    UniquePtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
 
-    SharedPtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
+    UniquePtr<BoundDeleteStatement> BindDelete(const DeleteStatement &statement);
 
-    SharedPtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
+    UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
     QueryContext *query_context_ptr_;
 
@@ -72,22 +72,24 @@ private:
     void BuildGroupBy(QueryContext *query_context,
                       const SelectStatement &select,
                       const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                      SharedPtr<BoundSelectStatement> &select_statement);
+                      UniquePtr<BoundSelectStatement> &select_statement);
 
     void BuildHaving(QueryContext *query_context,
                      const SelectStatement &select,
                      const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                     SharedPtr<BoundSelectStatement> &select_statement);
+                     UniquePtr<BoundSelectStatement> &select_statement);
 
     void PushOrderByToProject(QueryContext *query_context, const SelectStatement &statement);
 
-    void BuildSelectList(QueryContext *query_context, SharedPtr<BoundSelectStatement> &select_statement);
+    void BuildSelectList(QueryContext *query_context, UniquePtr<BoundSelectStatement> &select_statement);
 
-    void BuildOrderBy(QueryContext *query_context, const SelectStatement &statement, SharedPtr<BoundSelectStatement> &bound_statement) const;
+    void BuildOrderBy(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const;
 
-    void BuildLimit(QueryContext *query_context, const SelectStatement &statement, SharedPtr<BoundSelectStatement> &bound_statement) const;
+    void BuildLimit(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const;
 
-    void PruneOutput(QueryContext *query_context, i64 select_column_count, SharedPtr<BoundSelectStatement> &bound_statement);
+    void PruneOutput(QueryContext *query_context, i64 select_column_count, UniquePtr<BoundSelectStatement> &bound_statement);
+
+    static void CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type);
 };
 
 } // namespace infinity

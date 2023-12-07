@@ -129,7 +129,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
 
 Status LogicalPlanner::BuildSelect(const SelectStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
     return Status();
 }
@@ -276,7 +276,7 @@ Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<Bind
 
 Status LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    SharedPtr<BoundUpdateStatement> bound_statement_ptr = query_binder_ptr->BindUpdate(*statement);
+    UniquePtr<BoundUpdateStatement> bound_statement_ptr = query_binder_ptr->BindUpdate(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
     return Status();
 }
@@ -284,7 +284,7 @@ Status LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<B
 Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // FIXME: After supporting Truncate, switch to the Truncate instruction when there is no where_expr_.
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    SharedPtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
+    UniquePtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
     return Status();
 }
@@ -348,7 +348,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     if (create_table_info->select_ != nullptr) {
         SharedPtr<BindContext> select_bind_context_ptr = BindContext::Make(nullptr);
         QueryBinder select_query_binder(this->query_context_ptr_, select_bind_context_ptr);
-        SharedPtr<BoundSelectStatement> bound_statement_ptr = select_query_binder.BindSelect(*create_table_info->select_);
+        UniquePtr<BoundSelectStatement> bound_statement_ptr = select_query_binder.BindSelect(*create_table_info->select_);
         logical_create_table_operator->set_left_node(bound_statement_ptr->BuildPlan(this->query_context_ptr_));
     }
 
@@ -403,7 +403,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
 
     // Build create view statement
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*create_view_info->select_);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*create_view_info->select_);
 
     if (column_count == 0) {
         // Not specify the view column

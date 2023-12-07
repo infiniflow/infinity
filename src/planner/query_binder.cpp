@@ -60,9 +60,9 @@ import status;
 module query_binder;
 namespace infinity {
 
-SharedPtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {
+UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {
 
-    SharedPtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
+    UniquePtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
 
     Assert<PlannerException>(statement.select_list_ != nullptr, "SELECT list is needed");
     Assert<PlannerException>(!statement.select_list_->empty(), "SELECT list can't be empty");
@@ -297,7 +297,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*subquery_ref->select_statement_);
 
     // Get the subquery result table index as the new from table index
     u64 subquery_table_index = bound_statement_ptr->result_index_;
@@ -320,7 +320,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
     this->bind_context_ptr_->AddSubqueryBinding(binding_name, subquery_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, subquery_table_index, binding_name);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), subquery_table_index, binding_name);
 
     // TODO: Not care about the correlated expression
 
@@ -348,14 +348,14 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, subquery_bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*cte->select_statement_);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*cte->select_statement_);
 
     u64 cte_table_index = bound_statement_ptr->result_index_;
     // Add binding into bind context
     this->bind_context_ptr_->AddCTEBinding(name, cte_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
-    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, cte_table_index, name);
+    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), cte_table_index, name);
 
     // TODO: Not care about the correlated expression
 
@@ -433,7 +433,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
 
     // Create bound select node and subquery table reference
     QueryBinder subquery_binder(this->query_context_ptr_, view_bind_context_ptr);
-    SharedPtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
+    UniquePtr<BoundSelectStatement> bound_statement_ptr = subquery_binder.BindSelect(*select_stmt_ptr);
 
     // View table index is the output index of view.
     u64 view_index = bound_statement_ptr->result_index_;
@@ -442,7 +442,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
 
     // Use view name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(bound_statement_ptr, bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
 
     // TODO: Not care about the correlated expression
 
@@ -727,7 +727,7 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
 void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                const SelectStatement &select,
                                const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                               SharedPtr<BoundSelectStatement> &select_statement) {
+                               UniquePtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
     bind_context_ptr_->group_by_table_name_ = "groupby" + ToStr(table_index);
@@ -756,7 +756,7 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
 void QueryBinder::BuildHaving(QueryContext *query_context,
                               const SelectStatement &select,
                               const SharedPtr<BindAliasProxy> &bind_alias_proxy,
-                              SharedPtr<BoundSelectStatement> &select_statement) {
+                              UniquePtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
     bind_context_ptr_->aggregate_table_name_ = "aggregate" + ToStr(table_index);
@@ -781,7 +781,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &st
     }
 }
 
-void QueryBinder::BuildSelectList(QueryContext *, SharedPtr<BoundSelectStatement> &bound_select_statement) {
+void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
     bind_context_ptr_->project_table_name_ = "project" + ToStr(table_index);
@@ -823,7 +823,7 @@ void QueryBinder::BuildSelectList(QueryContext *, SharedPtr<BoundSelectStatement
 
 void QueryBinder::BuildOrderBy(QueryContext *query_context,
                                const SelectStatement &statement,
-                               SharedPtr<BoundSelectStatement> &bound_statement) const {
+                               UniquePtr<BoundSelectStatement> &bound_statement) const {
     auto order_binder = MakeShared<OrderBinder>(query_context);
     SizeT order_by_count = statement.order_by_list->size();
     bound_statement->order_by_expressions_.reserve(order_by_count);
@@ -835,7 +835,7 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
     }
 }
 
-void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement &statement, SharedPtr<BoundSelectStatement> &bound_statement) const {
+void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement &statement, UniquePtr<BoundSelectStatement> &bound_statement) const {
     auto limit_binder = MakeShared<LimitBinder>(query_context);
     bound_statement->limit_expression_ = limit_binder->Bind(*statement.limit_expr_, this->bind_context_ptr_.get(), 0, true);
 
@@ -844,7 +844,7 @@ void QueryBinder::BuildLimit(QueryContext *query_context, const SelectStatement 
     }
 }
 
-void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, SharedPtr<BoundSelectStatement> &bound_statement) {
+void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, UniquePtr<BoundSelectStatement> &bound_statement) {
     Vector<SharedPtr<BaseExpression>> &pruned_expressions = bound_statement->pruned_expression_;
     Vector<SharedPtr<BaseExpression>> &projection_expressions = bound_statement->projection_expressions_;
     Vector<String> &output_names = *bound_statement->names_ptr_;
@@ -864,9 +864,27 @@ void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, SharedPtr
     }
 }
 
-SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
+void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type) {
+    switch (distance_type) {
+        case KnnDistanceType::kL2:
+        case KnnDistanceType::kHamming: {
+            Assert<PlannerException>(order_type == OrderType::kAsc, "L2 need ascending order");
+            break;
+        }
+        case KnnDistanceType::kInnerProduct:
+        case KnnDistanceType::kCosine: {
+            Assert<PlannerException>(order_type == OrderType::kDesc, "IP need descending order");
+            break;
+        }
+        default: {
+            Error<PlannerException>("Invalid KNN distance type");
+        }
+    }
+}
+
+UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
     // refers to QueryBinder::BindSelect
-    SharedPtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
+    UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
     TableReference from_table;
     from_table.db_name_ = statement.schema_name_;
     from_table.table_name_ = statement.table_name_;
@@ -883,9 +901,9 @@ SharedPtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     return bound_delete_statement;
 }
 
-SharedPtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
+UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
     // refers to QueryBinder::BindSelect
-    SharedPtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
+    UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
     TableReference from_table;
     from_table.db_name_ = statement.schema_name_;
     from_table.table_name_ = statement.table_name_;
