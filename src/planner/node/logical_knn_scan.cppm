@@ -51,11 +51,9 @@ public:
 
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    Vector<SharedPtr<BaseExpression>> knn_expressions_{};
+    SharedPtr<KnnExpression> knn_expression_{};
 
-    SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> filter_expression_{};
-    OrderType order_by_type_{OrderType::kAsc};
 
     u64 knn_table_index_{};
 };

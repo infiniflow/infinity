@@ -60,6 +60,7 @@ import plain_store;
 import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
+import knn_expression;
 
 module physical_knn_scan;
 
@@ -110,10 +111,7 @@ PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return ba
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    if (knn_expressions_.size() != 1) {
-        Error<SchedulerException>("Currently, we only support one knn column scenario");
-    }
-    KnnExpression *knn_expr = static_cast<KnnExpression *>(knn_expressions_[0].get());
+    KnnExpression *knn_expr = knn_expression_.get();
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
     SizeT knn_column_id = column_expr->binding().column_idx;
 

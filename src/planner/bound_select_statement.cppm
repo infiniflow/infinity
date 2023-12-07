@@ -24,6 +24,7 @@ import table_ref;
 import parser;
 import query_context;
 import search_expression;
+import knn_expression;
 
 export module bound_select_statement;
 
@@ -40,8 +41,10 @@ public:
 
     SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
-    SharedPtr<LogicalKnnScan>
-    BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
+    SharedPtr<LogicalKnnScan> BuildInitialKnnScan(SharedPtr<TableRef> &table_ref,
+                                                  SharedPtr<KnnExpression> knn_expr,
+                                                  QueryContext *query_context,
+                                                  const SharedPtr<BindContext> &bind_context);
 
     SharedPtr<LogicalNode> BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context);
 

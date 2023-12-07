@@ -26,6 +26,7 @@ import base_table_ref;
 import table_collection_entry;
 import block_index;
 import load_meta;
+import knn_expression;
 
 export module physical_knn_scan;
 
@@ -38,17 +39,15 @@ export class PhysicalKnnScan final : public PhysicalOperator {
 public:
     explicit PhysicalKnnScan(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
-                             Vector<SharedPtr<BaseExpression>> knn_expressions,
-                             SharedPtr<BaseExpression> limit_expression,
+                             SharedPtr<KnnExpression> knn_expression,
                              SharedPtr<BaseExpression> filter_expression,
-                             OrderType order_by_type,
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)),
-          knn_expressions_(Move(knn_expressions)), limit_expression_(Move(limit_expression)), filter_expression_(Move(filter_expression)),
-          order_by_type_(order_by_type), output_names_(Move(output_names)), output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
+          knn_expression_(Move(knn_expression)), filter_expression_(Move(filter_expression)), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 
@@ -79,11 +78,9 @@ public:
 public:
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    Vector<SharedPtr<BaseExpression>> knn_expressions_{};
+    SharedPtr<KnnExpression> knn_expression_{};
 
-    SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> filter_expression_{};
-    OrderType order_by_type_{OrderType::kAsc};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

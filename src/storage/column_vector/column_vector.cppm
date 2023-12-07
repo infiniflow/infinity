@@ -141,7 +141,7 @@ public:
     void AppendByPtr(const_ptr_t value_ptr);
 
     // This two should merge into one function because `ColumnBuffer` will be removed.
-    void AppendWith(const ColumnVector &other, SizeT from, SizeT count);
+    void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
 
     // input parameter:
     // column_buffer - input column
@@ -174,11 +174,11 @@ public:
 
 private:
     template <typename T>
-    static void CopyValue(const ColumnVector &src, const ColumnVector &dst, SizeT count) {
+    static void CopyValue(const ColumnVector &src, const ColumnVector &dst, SizeT from, SizeT count) {
         auto *src_ptr = (T *)(dst.data_ptr_);
         T *dst_ptr = &((T *)(src.data_ptr_))[src.tail_index_];
         for (SizeT idx = 0; idx < count; ++idx) {
-            dst_ptr[idx] = src_ptr[idx];
+            dst_ptr[idx] = src_ptr[from + idx];
         }
     }
 

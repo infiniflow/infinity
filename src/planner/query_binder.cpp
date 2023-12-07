@@ -14,9 +14,9 @@
 
 module;
 
-#include <string>
 #include <algorithm>
 #include <memory>
+#include <string>
 
 import stl;
 
@@ -370,7 +370,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
         schema_name = from_table->db_name_;
     }
 
-    BaseEntry* base_table_entry{nullptr};
+    BaseEntry *base_table_entry{nullptr};
     Status status = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_, base_table_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
@@ -413,7 +413,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
 }
 
 SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const TableReference *from_table) {
-    BaseEntry* base_view_entry{nullptr};
+    BaseEntry *base_view_entry{nullptr};
     Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
@@ -645,9 +645,7 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
     return result;
 }
 
-void QueryBinder::UnfoldStarExpression(QueryContext *,
-                                       const Vector<ParsedExpr *> &input_select_list,
-                                       Vector<ParsedExpr *> &output_select_list) {
+void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *> &input_select_list, Vector<ParsedExpr *> &output_select_list) {
     output_select_list.reserve(input_select_list.size());
     for (auto *select_expr : input_select_list) {
         if (select_expr->type_ == ParsedExprType::kColumn) {
@@ -831,26 +829,9 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
     for (const OrderByExpr *order_expr : *statement.order_by_list) {
-
-        if (!bind_context_ptr_->knn_exprs_.empty()) {
-            // TODO: In future, we may allow to order by more than one knn exprs or mix knn and other exprs.
-            Error<PlannerException>("Only one KNN expression is allowed in order by clause");
-        }
-
-        // If order by has KNN expression, the expr need to be stored in bind_context without push to select list.
-        // TODO: now we only check the expr is KNN, but doesn't contain KNN.
-        if (order_expr->expr_->type_ == ParsedExprType::kKnn) {
-            KnnExpr *knn_expr = static_cast<KnnExpr *>(order_expr->expr_);
-            QueryBinder::CheckKnnAndOrderBy(knn_expr->distance_type_, order_expr->type_);
-            auto bound_order_expr = order_binder->Bind(*order_expr->expr_, this->bind_context_ptr_.get(), 0, true);
-
-            bind_context_ptr_->AddKnnExpr(bound_order_expr);
-            bind_context_ptr_->knn_orders_.emplace_back(order_expr->type_);
-        } else {
-            auto bound_order_expr = order_binder->Bind(*order_expr->expr_, this->bind_context_ptr_.get(), 0, true);
-            bound_statement->order_by_types_.emplace_back(order_expr->type_);
-            bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
-        }
+        auto bound_order_expr = order_binder->Bind(*order_expr->expr_, this->bind_context_ptr_.get(), 0, true);
+        bound_statement->order_by_types_.emplace_back(order_expr->type_);
+        bound_statement->order_by_expressions_.emplace_back(bound_order_expr);
     }
 }
 
@@ -880,24 +861,6 @@ void QueryBinder::PruneOutput(QueryContext *, i64 select_column_count, SharedPtr
                                                                     0);
         result->source_position_ = SourcePosition(bind_context_ptr_->binding_context_id_, ExprSourceType::kProjection);
         pruned_expressions.emplace_back(result);
-    }
-}
-
-void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType order_type) {
-    switch (distance_type) {
-        case KnnDistanceType::kL2:
-        case KnnDistanceType::kHamming: {
-            Assert<PlannerException>(order_type == OrderType::kAsc, "L2 need ascending order");
-            break;
-        }
-        case KnnDistanceType::kInnerProduct:
-        case KnnDistanceType::kCosine: {
-            Assert<PlannerException>(order_type == OrderType::kDesc, "IP need descending order");
-            break;
-        }
-        default: {
-            Error<PlannerException>("Invalid KNN distance type");
-        }
     }
 }
 

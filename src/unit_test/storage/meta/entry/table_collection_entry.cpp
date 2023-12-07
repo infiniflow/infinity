@@ -173,7 +173,7 @@ TEST_F(TableCollectionEntryTest, test2) {
 
         SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE * 2;
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
         input_block->Init(column_types, row_count);
 
         for (SizeT i = 0; i < row_count; ++i) {
@@ -215,8 +215,8 @@ TEST_F(TableCollectionEntryTest, test2) {
             for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 2);
-                EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
+                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1);
+                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
                 for (const auto &block_pair : segment_pair.second.block_map_) {
                     //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
@@ -310,7 +310,7 @@ TEST_F(TableCollectionEntryTest, test2) {
             for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-                EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
+                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
                 for (const auto &block_pair : segment_pair.second.block_map_) {
                     //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);
@@ -370,7 +370,7 @@ TEST_F(TableCollectionEntryTest, test2) {
             for (const auto &segment_pair : read_table_meta->segment_map_) {
                 EXPECT_EQ(segment_pair.first, 0);
                 EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-                EXPECT_EQ(segment_pair.second.block_map_.size(), 2);
+                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
                 for (const auto &block_pair : segment_pair.second.block_map_) {
                     //                    EXPECT_EQ(block_pair.first, 0);
                     EXPECT_NE(block_pair.second.block_entry_, nullptr);

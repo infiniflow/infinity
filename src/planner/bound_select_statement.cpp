@@ -65,6 +65,7 @@ import base_table_ref;
 import subquery_table_ref;
 import cross_product_table_ref;
 import join_table_ref;
+import knn_expression;
 
 module bound_select_statement;
 
@@ -72,8 +73,7 @@ namespace infinity {
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    if (search_expr_ == nullptr && bind_context->knn_exprs_.empty()) {
-        // Non-knn case
+    if (search_expr_ == nullptr) {
         SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_, query_context, bind_context);
         if (!where_conditions_.empty()) {
             SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
@@ -110,12 +110,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = sort;
         }
 
-        if (limit_expression_.get() != nullptr) {
-            SharedPtr<LogicalLimit> limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_);
-            limit->set_left_node(root);
-            root = limit;
-        }
-
         if (!pruned_expression_.empty()) {
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
             pruned_project->set_left_node(root);
@@ -123,37 +117,13 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         return root;
-    } else if (!bind_context->knn_exprs_.empty()) {
-        SharedPtr<LogicalNode> root = nullptr;
-
-        // Knn case
-        SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, query_context, bind_context);
-        if (bind_context_->knn_orders_.size() != 1) {
-            Error<PlannerException>("Knn Scan need order by clause which should have only one expression");
-        }
-
-        knn_scan->order_by_type_ = bind_context_->knn_orders_[0];
-        knn_scan->limit_expression_ = limit_expression_;
-
-        // FIXME: need check if there is subquery inside the where conditions
-        auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
-
-        knn_scan->filter_expression_ = filter_expr;
-        root = knn_scan;
-
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
-        project->set_left_node(root);
-        root = project;
-
-        return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        // FIXME: add KNN support here!
-        if (search_expr_->match_exprs_.empty()) {
-            Error<PlannerException>("SEARCH shall have at least one MATCH expression");
-        }
-        if (search_expr_->match_exprs_.size() >= 3) {
-            Error<PlannerException>("SEARCH shall have at max two MATCH expression");
+        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size();
+        if (num_children <= 0) {
+            Error<PlannerException>("SEARCH shall have at least one MATCH or KNN expression");
+        } else if (num_children >= 3) {
+            Error<PlannerException>("SEARCH shall have at max two MATCH or KNN expression");
         }
 
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
@@ -163,7 +133,17 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             SharedPtr<LogicalNode> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
             match_knn_nodes.push_back(matchNode);
-            root = matchNode;
+        }
+
+        bind_context->GenerateTableIndex();
+        for (auto &knn_expr : search_expr_->knn_exprs_) {
+            Assert<PlannerException>(table_ref_ptr_->type() == TableRefType::kTable, "Not base table reference");
+            SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
+            // FIXME: need check if there is subquery inside the where conditions
+            auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
+            knn_scan->filter_expression_ = filter_expr;
+            SharedPtr<LogicalNode> logicKnnScan = std::dynamic_pointer_cast<LogicalNode>(knn_scan);
+            match_knn_nodes.push_back(logicKnnScan);
         }
 
         if (search_expr_->fusion_expr_ != nullptr) {
@@ -176,6 +156,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             if (match_knn_nodes.size() > 1)
                 fusionNode->set_right_node(match_knn_nodes[1]);
             root = fusionNode;
+        } else {
+            root = match_knn_nodes[0];
         }
 
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
@@ -186,41 +168,17 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
     }
 }
 
-SharedPtr<LogicalKnnScan>
-BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-    if (table_ref.get() == nullptr) {
-        Error<PlannerException>("Attempt to do KNN scan without table");
-    }
-    switch (table_ref->type_) {
-        case TableRefType::kCrossProduct: {
-            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.");
-            break;
-        }
-        case TableRefType::kJoin: {
-            Error<PlannerException>("KNN is not supported on JOIN relation, now.");
-        }
-        case TableRefType::kTable: {
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
-
-            // Change function table to knn table scan function
-            base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(), "knn_scan");
-
-            SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
-
-            knn_scan_node->knn_expressions_ = bind_context->knn_exprs_;
-            knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
-            return knn_scan_node;
-        }
-        case TableRefType::kSubquery: {
-            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.");
-            break;
-        }
-        default: {
-            Error<PlannerException>("Unexpected table type");
-        }
-    }
-
-    return nullptr;
+SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<TableRef> &table_ref,
+                                                                    SharedPtr<KnnExpression> knn_expr,
+                                                                    QueryContext *query_context,
+                                                                    const SharedPtr<BindContext> &bind_context) {
+    auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
+    // Change function table to knn table scan function
+    base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(), "knn_scan");
+    SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
+    knn_scan_node->knn_expression_ = knn_expr;
+    knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
+    return knn_scan_node;
 }
 
 SharedPtr<LogicalNode>
@@ -302,8 +260,7 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContex
     return logical_join_node;
 }
 
-SharedPtr<LogicalNode>
-BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &, QueryContext *, const SharedPtr<BindContext> &bind_context) {
+SharedPtr<LogicalNode> BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &, QueryContext *, const SharedPtr<BindContext> &bind_context) {
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
     String alias("DummyTable" + ToStr(logical_node_id));
     SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());

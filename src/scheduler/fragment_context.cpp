@@ -87,23 +87,15 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 }
 
 UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
-    // if (physical_merge_knn->knn_expressions_.size() != 1) {
-    //     Error<SchedulerException>("Currently, we only support one knn column scenario");
-    // }
-    KnnExpression *knn_expr = static_cast<KnnExpression *>(physical_merge_knn->knn_expressions_[0].get());
-
-    ValueExpression *limit_expr = static_cast<ValueExpression *>(physical_merge_knn->limit_expression_.get());
-    if (limit_expr == nullptr) {
-        Error<SchedulerException>("No limit in KNN select is not supported now");
-    }
-    i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
-
+    KnnExpression *knn_expr = physical_merge_knn->knn_expression_.get();
     UniquePtr<OperatorState> operator_state = MakeUnique<MergeKnnOperatorState>();
     MergeKnnOperatorState *merge_knn_op_state_ptr = (MergeKnnOperatorState *)(operator_state.get());
-
     // Set fake parallel number here. It will be set in SetMergeKnnState
-    merge_knn_op_state_ptr->merge_knn_function_data_ =
-        MakeShared<MergeKnnFunctionData>(1, topk, knn_expr->embedding_data_type_, knn_expr->distance_type_, physical_merge_knn->table_ref_);
+    merge_knn_op_state_ptr->merge_knn_function_data_ = MakeShared<MergeKnnFunctionData>(1,
+                                                                                        knn_expr->topn_,
+                                                                                        knn_expr->embedding_data_type_,
+                                                                                        knn_expr->distance_type_,
+                                                                                        physical_merge_knn->table_ref_);
 
     return operator_state;
 }
@@ -454,22 +446,11 @@ PhysicalSource *FragmentContext::GetSourceOperator() const { return fragment_ptr
 SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMaterializedFragmentCtx *fragment_context, QueryContext *query_context) {
     auto [block_column_entries, index_entries] = knn_scan_operator->PlanWithIndex(query_context);
     SizeT task_n = block_column_entries.size() + index_entries.size();
-
-    if (knn_scan_operator->knn_expressions_.size() != 1) {
-        Error<SchedulerException>("Currently, we only support one knn column scenario");
-    }
-    KnnExpression *knn_expr = static_cast<KnnExpression *>(knn_scan_operator->knn_expressions_[0].get());
-
-    ValueExpression *limit_expr = static_cast<ValueExpression *>(knn_scan_operator->limit_expression_.get());
-    if (limit_expr == nullptr) {
-        Error<SchedulerException>("No limit in KNN select is not supported now");
-    }
-    i64 topk = limit_expr->GetValue().GetValue<BigIntT>();
-
+    KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
     auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                               Move(block_column_entries),
                                                               Move(index_entries),
-                                                              topk,
+                                                              knn_expr->topn_,
                                                               knn_expr->dimension_,
                                                               1,
                                                               knn_expr->query_embedding_.ptr,
