@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <string>
 import stl;
 import query_context;
@@ -352,7 +353,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     ann_ivfflat_query.End();
                     auto dists = ann_ivfflat_query.GetDistances();
                     auto row_ids = ann_ivfflat_query.GetIDs();
-                    merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                    constexpr auto vacant_value = AnnIVFFlatType::vacant_value();
+                    //TODO: now only work for one query
+                    //FIXME: cant work for multiple queries
+                    auto result_count = std::lower_bound(dists, dists + knn_scan_shared_data->topk_, vacant_value,
+                                                         AnnIVFFlatType::compare_dist) - dists;
+                    merge_heap->Search(dists, row_ids, result_count);
                 };
                 switch (knn_scan_shared_data->knn_distance_type_) {
                     case KnnDistanceType::kL2: {

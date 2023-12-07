@@ -38,7 +38,7 @@ public:
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, top_k), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, std::numeric_limits<DistType>::max());
+        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, vacant_value());
         heap_twin_max_multiple_ =
             MakeUnique<heap_twin_multiple<std::greater<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
     }
@@ -59,7 +59,7 @@ public:
         if (begin_ || this->query_count_ == 0) {
             return;
         }
-        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, std::numeric_limits<DistType>::max());
+        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, vacant_value());
 
         begin_ = true;
     }
@@ -117,7 +117,7 @@ public:
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::max(); ++k) {
+                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != vacant_value(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -183,7 +183,7 @@ public:
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
                 for (u32 k = 0;
-                     k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::max(); ++k) {
+                     k < n_probes && centroid_dists[k + i * n_probes] != vacant_value(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -227,6 +227,17 @@ public:
         return id_array_->data() + idx * this->top_k_;
     }
 
+    [[nodiscard]] static constexpr DistType vacant_value() {
+        return std::numeric_limits<DistType>::max();
+    }
+
+    [[nodiscard]] inline static bool good_dist(const DistType &a) {
+        return a != vacant_value();
+    }
+
+    [[nodiscard]] inline static bool compare_dist(const DistType &a, const DistType &b) {
+        return a < b;
+    }
 private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
@@ -244,7 +255,7 @@ public:
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, top_k), queries_(queries) {
 
         id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, std::numeric_limits<DistType>::lowest());
+        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, vacant_value());
         heap_twin_min_multiple_ =
             MakeUnique<heap_twin_multiple<std::less<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
     }
@@ -270,7 +281,7 @@ public:
         if (begin_ || this->query_count_ == 0) {
             return;
         }
-        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, std::numeric_limits<DistType>::lowest());
+        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, vacant_value());
 
         begin_ = true;
     }
@@ -328,7 +339,7 @@ public:
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::lowest(); ++k) {
+                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != vacant_value(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -394,7 +405,7 @@ public:
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
                 for (u32 k = 0;
-                     k < n_probes && centroid_dists[k + i * n_probes] != std::numeric_limits<DistType>::lowest(); ++k) {
+                     k < n_probes && centroid_dists[k + i * n_probes] != vacant_value(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -437,6 +448,17 @@ public:
         return id_array_->data() + idx * this->top_k_;
     }
 
+    [[nodiscard]] static constexpr DistType vacant_value() {
+        return std::numeric_limits<DistType>::lowest();
+    }
+
+    [[nodiscard]] inline static bool good_dist(const DistType &a) {
+        return a != vacant_value();
+    }
+
+    [[nodiscard]] inline static bool compare_dist(const DistType &a, const DistType &b) {
+        return a > b;
+    }
 private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
