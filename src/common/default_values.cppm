@@ -27,11 +27,11 @@ export {
     constexpr SizeT COLUMN_IDENTIFIER_DELETE = (SizeT)(-3);
     constexpr SizeT COLUMN_IDENTIFIER_SCORE = (SizeT)(-4);
     constexpr SizeT COLUMN_IDENTIFIER_DISTANCE = (SizeT)(-5);
-    constexpr String COLUMN_NAME_ROW_ID = "__rowid";
-    constexpr String COLUMN_NAME_CREATE = "__create";
-    constexpr String COLUMN_NAME_DELETE = "__delete";
-    constexpr String COLUMN_NAME_SCORE = "__score";
-    constexpr String COLUMN_NAME_DISTANCE = "__distance";
+    constexpr StringView COLUMN_NAME_ROW_ID = "__rowid";
+    constexpr StringView COLUMN_NAME_CREATE = "__create";
+    constexpr StringView COLUMN_NAME_DELETE = "__delete";
+    constexpr StringView COLUMN_NAME_SCORE = "__score";
+    constexpr StringView COLUMN_NAME_DISTANCE = "__distance";
 
     // type related constants
     constexpr i64 MAX_VARCHAR_SIZE = 65536;
@@ -85,12 +85,13 @@ export {
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
-    constexpr String WAL_FILE_TEMP_FILE = "wal.log";
-    constexpr String WAL_FILE_PREFIX = "wal.log.";
-    constexpr String CATALOG_FILE_DIR = "catalog";
+    constexpr StringView WAL_FILE_TEMP_FILE = "wal.log";
+    constexpr StringView WAL_FILE_PREFIX = "wal.log.";
+    constexpr StringView CATALOG_FILE_DIR = "catalog";
 
-    constexpr String SYSTEM_DB_NAME = "system";
-    constexpr String SYSTEM_CONFIG_TABLE_NAME = "config";
+    constexpr StringView SYSTEM_DB_NAME = "system";
+    constexpr StringView SYSTEM_CONFIG_TABLE_NAME = "config";
+    constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;

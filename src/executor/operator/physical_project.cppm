@@ -34,8 +34,8 @@ public:
                              UniquePtr<PhysicalOperator> left,
                              Vector<SharedPtr<BaseExpression>> expressions,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id, load_metas), projection_table_index_(table_index),
-          expressions_(Move(expressions)) {}
+        : PhysicalOperator(PhysicalOperatorType::kProjection, Move(left), nullptr, id, load_metas), expressions_(Move(expressions)),
+          projection_table_index_(table_index) {}
 
     ~PhysicalProject() override = default;
 

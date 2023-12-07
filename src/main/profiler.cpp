@@ -150,6 +150,12 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
         case QueryPhase::kExecution: {
             return "Execution";
         }
+        case QueryPhase::kCommit: {
+            return "Commit";
+        }
+        case QueryPhase::kRollback: {
+            return "Rollback";
+        }
         default: {
             Error<ExecutorException>("Invalid query phase in query profiler");
         }
@@ -194,6 +200,7 @@ void QueryProfiler::Stop() {
         return;
     }
     profilers_[EnumInteger(current_phase_)].End();
+    current_phase_ = QueryPhase::kInvalid;
 }
 
 void QueryProfiler::Flush(TaskProfiler &&profiler) {
