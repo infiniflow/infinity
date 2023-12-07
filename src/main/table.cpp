@@ -23,6 +23,7 @@ import infinity_context;
 import query_context;
 import parser;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -141,12 +142,7 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     return result;
 }
 
-QueryResult Table::Search(Vector<ParsedExpr *> &knn_exprs,
-                          Vector<Pair<ParsedExpr *, ParsedExpr *>> &,
-                          ParsedExpr *filter,
-                          Vector<ParsedExpr *> *output_columns,
-                          ParsedExpr *offset,
-                          ParsedExpr *limit) {
+QueryResult Table::Search(Vector<ParsedExpr *> *search_exprs, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -161,43 +157,14 @@ QueryResult Table::Search(Vector<ParsedExpr *> &knn_exprs,
     select_statement->table_ref_ = table_ref;
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
-    select_statement->limit_expr_ = limit;
-    select_statement->offset_expr_ = offset;
-
-    select_statement->order_by_list = new Vector<OrderByExpr *>;
-    SizeT knn_expr_size = knn_exprs.size();
-    for(SizeT idx = 0; idx < knn_expr_size; ++ idx) {
-        OrderByExpr* order_by_expr = new OrderByExpr();
-        order_by_expr->expr_ = knn_exprs[idx];
-        if(knn_exprs[idx]->type_ != ParsedExprType::kKnn) {
-            Error<PlannerException>("Unmatched expression type");
-        }
-
-        KnnExpr* knn_expr = (KnnExpr*)(knn_exprs[idx]);
-        switch(knn_expr->distance_type_) {
-            case KnnDistanceType::kL2: {
-                order_by_expr->type_ = OrderType::kAsc;
-                break;
-            }
-            case KnnDistanceType::kInnerProduct: {
-                order_by_expr->type_ = OrderType::kDesc;
-                break;
-            }
-            case KnnDistanceType::kCosine: {
-                order_by_expr->type_ = OrderType::kDesc;
-                break;
-            }
-            case KnnDistanceType::kHamming: {
-                order_by_expr->type_ = OrderType::kAsc;
-                break;
-            }
-            case KnnDistanceType::kInvalid: {
-                Error<PlannerException>("Invalid knn distance type");
-                break;
-            }
-        }
-        select_statement->order_by_list->emplace_back(order_by_expr);
+    if(search_exprs != nullptr) {
+        infinity::SearchExpr *search_expr = new infinity::SearchExpr();
+        search_expr->SetExprs(search_exprs);
+        select_statement->search_expr_ = search_expr;
+    } else {
+        LOG_ERROR("Not search expression why use search?");
     }
+
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

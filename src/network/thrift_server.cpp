@@ -339,7 +339,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(*knn_expr_list, fts_expr, filter, output_columns, nullptr, limit);
+        const QueryResult result = table->Search(knn_expr_list, filter, output_columns);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
