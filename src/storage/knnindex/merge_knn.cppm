@@ -20,6 +20,7 @@ import knn_result_handler;
 
 import infinity_exception;
 import faiss;
+import bitmask;
 
 export module merge_knn;
 
@@ -42,6 +43,8 @@ public:
 
 public:
     void Search(const DataType *dist, const RowID *row_ids, u16 count);
+
+    void Search(const DataType *dist, const RowID *row_ids, u16 count, Bitmask &bitmask);
 
     void Begin();
 
@@ -78,6 +81,22 @@ void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u
         const RowID *r = row_ids + i * topk_;
         for (u16 j = 0; j < count; j++) {
             single_result_handler_->add_result(d[j], r[j], i);
+        }
+    }
+}
+
+template<typename DataType, template<typename, typename> typename C>
+void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u16 count, Bitmask &bitmask) {
+    for (u64 i = 0; i < this->query_count_; ++i) {
+        const DataType *d = dist + i * topk_;
+        const RowID *r = row_ids + i * topk_;
+        for (u16 j = 0; j < count; j++) {
+            if (bitmask.IsTrue(j)) {
+                if(i == 0){
+                    ++this->total_count_;
+                }
+                single_result_handler_->add_result(d[j], r[j], i);
+            }
         }
     }
 }

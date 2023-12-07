@@ -38,7 +38,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         }
     };
 
-    if (op.operator_type() == LogicalNodeType::kJoin) {
+    if (op.operator_type() == LogicalNodeType::kJoin or op.operator_type() == LogicalNodeType::kKnnScan) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
         load_func();

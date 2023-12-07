@@ -89,17 +89,11 @@ void ExpressionSelector::Select(const u8 *__restrict bool_column,
                                 SizeT count,
                                 SharedPtr<Selection> &output_true_select,
                                 bool nullable) {
-    if (nullable) {
-        if (null_mask->IsAllTrue()) {
-            for (SizeT idx = 0; idx < count; ++idx) {
-                if (bool_column[idx] > 0) {
-                    output_true_select->Append(idx);
-                }
-            }
-        } else {
+    if (nullable && !(null_mask->IsAllTrue())) {
             const u64 *result_null_data = null_mask->GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
             for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
+                end_index = Min(end_index, count);
                 if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while (start_index < end_index) {
@@ -110,7 +104,7 @@ void ExpressionSelector::Select(const u8 *__restrict bool_column,
                     }
                 } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
-                    ;
+                    start_index = end_index;
                 } else {
                     SizeT original_start = start_index;
                     while (start_index < end_index) {
@@ -123,7 +117,6 @@ void ExpressionSelector::Select(const u8 *__restrict bool_column,
                     }
                 }
             }
-        }
     } else {
         for (SizeT idx = 0; idx < count; ++idx) {
             if (bool_column[idx] > 0) {

@@ -23,6 +23,7 @@ import block_index;
 import block_column_entry;
 import merge_knn;
 import segment_column_index_entry;
+import bitmask;
 
 import base_table_ref;
 
@@ -75,6 +76,17 @@ public:
         Vector<DataType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
+        }
+        return res;
+    }
+
+    Vector <DataType>
+    Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
+        Vector <DataType> res(data_count);
+        for (SizeT i = 0; i < data_count; ++i) {
+            if (bitmask.IsTrue(i)) {
+                res[i] = dist_func_(query, datas + i * dim, dim);
+            }
         }
         return res;
     }
