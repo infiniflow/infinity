@@ -21,6 +21,7 @@ import global_block_id;
 import knn_distance; // delete this
 import block_index;
 import block_column_entry;
+import segment_entry;
 import merge_knn;
 import segment_column_index_entry;
 import bitmask;

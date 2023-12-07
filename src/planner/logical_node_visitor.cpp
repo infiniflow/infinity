@@ -128,7 +128,9 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kKnnScan: {
             auto &node = (LogicalKnnScan &)op;
-            VisitExpression(node.filter_expression_);
+            if(node.filter_expression_) {
+                VisitExpression(node.filter_expression_);
+            }
             break;
         }
         default: {

@@ -90,37 +90,45 @@ namespace infinity {
     }
 
     void merge_into_bitmask(const u8 *__restrict input_bool_column, const SharedPtr <Bitmask> &input_null_mask,
-                            const SizeT count, Bitmask &bitmask, bool nullable) {
+                            const SizeT count, Bitmask &bitmask, bool nullable, SizeT bitmask_offset = 0) {
         if ((!nullable) || (input_null_mask->IsAllTrue())) {
             for (SizeT idx = 0; idx < count; ++idx) {
                 if (input_bool_column[idx] == 0) {
-                    bitmask.SetFalse(idx);
+                    bitmask.SetFalse(idx + bitmask_offset);
                 }
             }
         } else {
             const u64 *result_null_data = input_null_mask->GetData();
             u64 *bitmask_data = bitmask.GetData();
             SizeT unit_count = BitmaskBuffer::UnitCount(count);
+            bool bitmask_use_unit = (bitmask_offset % BitmaskBuffer::UNIT_BITS) == 0;
+            SizeT bitmask_unit_offset = bitmask_offset / BitmaskBuffer::UNIT_BITS;
             for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS;
                  i < unit_count; ++i, end_index = Min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
                 if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     for (; start_index < end_index; ++start_index) {
                         if (input_bool_column[start_index] == 0) {
-                            bitmask.SetFalse(start_index);
+                            bitmask.SetFalse(start_index + bitmask_offset);
                         }
                     }
                 } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
-                    if (bitmask.GetData() == nullptr) {
-                        bitmask.SetFalse(start_index);
+                    if (bitmask_use_unit) {
+                        if (bitmask.GetData() == nullptr) {
+                            bitmask.SetFalse(start_index + bitmask_offset);
+                        }
+                        bitmask_data[i + bitmask_unit_offset] = BitmaskBuffer::UNIT_MIN;
+                        start_index = end_index;
+                    } else {
+                        for (; start_index < end_index; ++start_index) {
+                            bitmask.SetFalse(start_index + bitmask_offset);
+                        }
                     }
-                    bitmask_data[i] = BitmaskBuffer::UNIT_MIN;
-                    start_index = end_index;
                 } else {
                     for (; start_index < end_index; ++start_index) {
-                        if ((input_null_mask->IsTrue(start_index)) && (input_bool_column[start_index] == 0)) {
-                            bitmask.SetFalse(start_index);
+                        if (!(input_null_mask->IsTrue(start_index)) || (input_bool_column[start_index] == 0)) {
+                            bitmask.SetFalse(start_index + bitmask_offset);
                         }
                     }
                 }
@@ -256,7 +264,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             ExpressionEvaluator expr_evaluator;
             expr_evaluator.Init(&db_for_filter);
             expr_evaluator.Execute(filter_expression_, filter_state, bool_column);
-            const auto *bool_column_ptr = (const u8 *) (bool_column->data_ptr_);
+            const auto *bool_column_ptr = (const u8 *) (bool_column->data());
             SharedPtr <Bitmask> &null_mask = bool_column->nulls_ptr_;
             merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
         }
@@ -288,41 +296,73 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_[index_idx];
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-        //TODO: support bitmask filter
+        auto segment_id = segment_column_index_entry->segment_id_;
+        SegmentEntry *segment_entry = nullptr;
+        auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
+        if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
+            Error<ExecutorException>(Format("Cannot find SegmentEntry for segment id: {}", segment_id));
+        } else {
+            segment_entry = iter->second;
+        }
+        auto segment_row_count = segment_entry->row_count_;
+        Bitmask bitmask;
+        bitmask.Initialize(std::bit_ceil(segment_row_count));
+        if (filter_expression_) {
+            SizeT segment_row_count_real = 0;
+            //filter and build bitmask, if filter_expression_ != nullptr
+            auto filter_state = ExpressionState::CreateState(filter_expression_);
+            DataBlock db_for_filter;
+            auto bool_column = MakeShared<ColumnVector>(MakeShared<infinity::DataType>(LogicalType::kBoolean));
+            bool_column->Initialize();
+            ExpressionEvaluator expr_evaluator;
+            for (auto &block_entry: segment_entry->block_entries_) {
+                auto row_count = block_entry->row_count_;
+                db_for_filter.Init(*(base_table_ref_->column_types_), row_count);
+                block_scan_for_filter(db_for_filter, buffer_mgr, row_count, block_entry.get(),
+                                      base_table_ref_->column_ids_);
+                expr_evaluator.Init(&db_for_filter);
+                expr_evaluator.Execute(filter_expression_, filter_state, bool_column);
+                const auto *bool_column_ptr = (const u8 *) (bool_column->data());
+                SharedPtr <Bitmask> &null_mask = bool_column->nulls_ptr_;
+                merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true, segment_row_count_real);
+                segment_row_count_real += row_count;
+                db_for_filter.UnInit();
+                bool_column->Reset();
+            }
+            if (segment_row_count_real != segment_row_count) {
+                Error<ExecutorException>(Format("Bug: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                                                segment_id, segment_row_count_real, segment_row_count));
+            }
+        }
+        //bool use_bitmask = !bitmask.IsAllTrue();
 
         switch (segment_column_index_entry->column_index_entry_->index_base_->index_type_) {
             case IndexType::kIVFFlat: {
                 BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
-                auto segment_id = segment_column_index_entry->segment_id_;
+                auto IVFFlatScan = [&]<typename AnnIVFFlatType>() {
+                    AnnIVFFlatType ann_ivfflat_query{query,
+                                                     knn_scan_shared_data->query_count_,
+                                                     knn_scan_shared_data->topk_,
+                                                     knn_scan_shared_data->dimension_,
+                                                     knn_scan_shared_data->elem_type_};
+                    ann_ivfflat_query.Begin();
+                    ann_ivfflat_query.Search(index, segment_id, n_probes, bitmask);
+                    ann_ivfflat_query.End();
+                    auto dists = ann_ivfflat_query.GetDistances();
+                    auto row_ids = ann_ivfflat_query.GetIDs();
+                    merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                };
                 switch (knn_scan_shared_data->knn_distance_type_) {
                     case KnnDistanceType::kL2: {
-                        AnnIVFFlatL2 ann_ivfflat_query{query,
-                                                       knn_scan_shared_data->query_count_,
-                                                       knn_scan_shared_data->topk_,
-                                                       knn_scan_shared_data->dimension_,
-                                                       knn_scan_shared_data->elem_type_};
-                        ann_ivfflat_query.Begin();
-                        ann_ivfflat_query.Search(index, segment_id, n_probes);
-                        ann_ivfflat_query.End();
-                        auto dists = ann_ivfflat_query.GetDistances();
-                        auto row_ids = ann_ivfflat_query.GetIDs();
-                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        IVFFlatScan.template operator()<AnnIVFFlatL2 < DataType>>
+                        ();
                         break;
                     }
                     case KnnDistanceType::kInnerProduct: {
-                        AnnIVFFlatIP ann_ivfflat_query{query,
-                                                       knn_scan_shared_data->query_count_,
-                                                       knn_scan_shared_data->topk_,
-                                                       knn_scan_shared_data->dimension_,
-                                                       knn_scan_shared_data->elem_type_};
-                        ann_ivfflat_query.Begin();
-                        ann_ivfflat_query.Search(index, segment_id, n_probes);
-                        ann_ivfflat_query.End();
-                        auto dists = ann_ivfflat_query.GetDistances();
-                        auto row_ids = ann_ivfflat_query.GetIDs();
-                        merge_heap->Search(dists, row_ids, knn_scan_shared_data->topk_);
+                        IVFFlatScan.template operator()<AnnIVFFlatIP < DataType>>
+                        ();
                         break;
                     }
                     default: {
@@ -342,7 +382,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
                             static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_);
+                        MaxHeap <Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_,
+                                                                              bitmask);
                         if (result_n < 0) {
                             result_n = heap.size();
                         } else if (result_n != heap.size()) {

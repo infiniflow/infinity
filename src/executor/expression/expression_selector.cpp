@@ -106,12 +106,9 @@ void ExpressionSelector::Select(const u8 *__restrict bool_column,
                     // all data of 64 rows are null
                     start_index = end_index;
                 } else {
-                    SizeT original_start = start_index;
                     while (start_index < end_index) {
-                        if (null_mask->IsTrue(start_index - original_start)) {
-                            if (bool_column[start_index] > 0) {
-                                output_true_select->Append(start_index);
-                            }
+                        if ((null_mask->IsTrue(start_index)) && (bool_column[start_index] > 0)) {
+                            output_true_select->Append(start_index);
                         }
                         ++start_index;
                     }
