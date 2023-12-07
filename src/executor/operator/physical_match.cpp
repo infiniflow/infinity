@@ -53,10 +53,15 @@ module physical_match;
 
 namespace infinity {
 
-PhysicalMatch::PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)), match_expr_(match_expr) {}
+PhysicalMatch::PhysicalMatch(u64 id,
+                             SharedPtr<BaseTableRef> base_table_ref,
+                             SharedPtr<MatchExpression> match_expr,
+                             u64 match_table_index,
+                             SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
+      base_table_ref_(Move(base_table_ref)), match_expr_(Move(match_expr)) {}
 
-PhysicalMatch::~PhysicalMatch() {}
+PhysicalMatch::~PhysicalMatch() = default;
 
 void PhysicalMatch::Init() {}
 
