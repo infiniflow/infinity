@@ -90,6 +90,7 @@ export {
     constexpr StringView CATALOG_FILE_DIR = "catalog";
 
     constexpr StringView SYSTEM_DB_NAME = "system";
+    constexpr StringView DEFAULT_DB_NAME = "default";
     constexpr StringView SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 

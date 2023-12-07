@@ -172,13 +172,37 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     SharedPtr<KnnExpression> knn_expr,
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
-    auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
-    // Change function table to knn table scan function
-    base_table_ref->table_func_ = KnnScanFunction::Make(query_context->storage()->catalog(), "knn_scan");
-    SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
-    knn_scan_node->knn_expression_ = knn_expr;
-    knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
-    return knn_scan_node;
+    if (table_ref.get() == nullptr) {
+        Error<PlannerException>("Attempt to do KNN scan without table");
+    }
+    switch (table_ref->type_) {
+        case TableRefType::kCrossProduct: {
+            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.");
+            break;
+        }
+        case TableRefType::kJoin: {
+            Error<PlannerException>("KNN is not supported on JOIN relation, now.");
+        }
+        case TableRefType::kTable: {
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
+
+            // Change function table to knn table scan function
+            SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
+
+            knn_scan_node->knn_expression_ = knn_expr;
+            knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
+            return knn_scan_node;
+        }
+        case TableRefType::kSubquery: {
+            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.");
+            break;
+        }
+        default: {
+            Error<PlannerException>("Unexpected table type");
+        }
+    }
+
+    return nullptr;
 }
 
 SharedPtr<LogicalNode>

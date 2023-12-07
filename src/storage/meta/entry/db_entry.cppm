@@ -57,8 +57,8 @@ public:
                                       TxnManager *txn_mgr,
                                       BaseEntry *&base_entry);
 
-    static Status
-    GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
+    static Tuple<BaseEntry*, Status>
+    GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts);
 
     static void RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
 

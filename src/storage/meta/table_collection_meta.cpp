@@ -289,19 +289,19 @@ void TableCollectionMeta::DeleteNewEntry(TableCollectionMeta *table_meta, u64 tx
  * @param begin_ts
  * @return Status
  */
-Status TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_table_entry) {
+Tuple<BaseEntry*, Status> TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts) {
     SharedLock<RWMutex> r_locker(table_meta->rw_locker_);
     if (table_meta->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
     for (const auto &table_entry : table_meta->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kNotFound, Move(err_msg));
+            return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
         }
 
         u64 table_entry_commit_ts = table_entry->commit_ts_;
@@ -311,24 +311,22 @@ Status TableCollectionMeta::GetEntry(TableCollectionMeta *table_meta, u64 txn_id
                 if (table_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped.");
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kNotFound, Move(err_msg));
+                    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
                 } else {
-                    new_table_entry = table_entry.get();
-                    return Status::OK();
+                    return {table_entry.get(), Status::OK()};
                 }
             }
         } else {
             // not committed
             if (txn_id == table_entry->txn_id_) {
                 // same txn
-                new_table_entry = table_entry.get();
-                return Status::OK();
+                return {table_entry.get(), Status::OK()};
             }
         }
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
     LOG_ERROR(*err_msg);
-    return Status(ErrorCode::kNotFound, Move(err_msg));
+    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
 }
 
 SharedPtr<String> TableCollectionMeta::ToString(TableCollectionMeta *table_meta) {

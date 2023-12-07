@@ -56,6 +56,7 @@ import block_index;
 import cast_expression;
 import search_expression;
 import status;
+import default_values;
 
 module query_binder;
 namespace infinity {
@@ -365,13 +366,12 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
 SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
     String schema_name;
     if (from_table->db_name_.empty()) {
-        schema_name = "default";
+        schema_name = DEFAULT_DB_NAME;
     } else {
         schema_name = from_table->db_name_;
     }
 
-    BaseEntry *base_table_entry{nullptr};
-    Status status = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_, base_table_entry);
+    auto [base_table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
     }
@@ -399,12 +399,10 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    SharedPtr<TableScanFunction> table_scan_function = TableScanFunction::Make(query_context->storage()->catalog(), "table_scan");
     SharedPtr<BlockIndex> block_index = TableCollectionEntry::GetBlockIndex(table_collection_entry, txn_id, begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref =
-        MakeShared<BaseTableRef>(table_scan_function, table_collection_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
+    auto table_ref = MakeShared<BaseTableRef>(table_collection_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
     this->bind_context_ptr_->AddTableBinding(alias, table_index, table_collection_entry, types_ptr, names_ptr, block_index);
@@ -442,7 +440,8 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     this->bind_context_ptr_->AddViewBinding(from_table->table_name_, view_index, view_entry->column_types(), view_entry->column_names());
 
     // Use view name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+    auto subquery_table_ref_ptr =
+        MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
 
     // TODO: Not care about the correlated expression
 

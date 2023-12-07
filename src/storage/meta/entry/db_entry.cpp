@@ -114,8 +114,8 @@ Status DBEntry::DropTableCollection(DBEntry *db_entry,
     return TableCollectionMeta::DropNewEntry(table_meta, txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type, base_entry);
 }
 
-Status
-DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry) {
+Tuple<BaseEntry*, Status>
+DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts) {
     db_entry->rw_locker_.lock_shared();
 
     TableCollectionMeta *table_meta{nullptr};
@@ -128,9 +128,9 @@ DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_na
     if (table_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid db meta.");
         LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
-    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts, new_db_entry);
+    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
 }
 
 void DBEntry::RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -154,8 +154,7 @@ Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 
     results.reserve(db_entry->tables_.size());
     for (auto &table_collection_meta_pair : db_entry->tables_) {
         TableCollectionMeta *table_collection_meta = table_collection_meta_pair.second.get();
-        BaseEntry *table_collection_entry{nullptr};
-        Status status = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts, table_collection_entry);
+        auto [table_collection_entry, status] = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
         if (!status.ok()) {
             LOG_TRACE(Format("error when get table/collection entry: {}", status.message()));
         } else {
