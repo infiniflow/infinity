@@ -104,6 +104,16 @@ inline ApproxPos PGM<double>::Search(u64 val) const {
     return GetPos(this->search(Codec::U64ToDouble(val)));
 }
 
+template <>
+inline ApproxPos PGM<i32>::Search(u64 val) const {
+    return GetPos(this->search((i32)val));
+}
+
+template <>
+inline ApproxPos PGM<i64>::Search(u64 val) const {
+    return GetPos(this->search((i64)val));
+}
+
 NumericIndex::NumericIndex() {}
 
 void NumericIndex::CreatePGM(LogicalType logical_type) {
@@ -127,12 +137,16 @@ void NumericIndex::CreatePGM(LogicalType logical_type) {
             column_index_.reset(new PGM<double>());
         } break;
         case kDate: {
+            column_index_.reset(new PGM<i32>());
         } break;
         case kTime: {
+            column_index_.reset(new PGM<i32>());
         } break;
         case kDateTime: {
+            column_index_.reset(new PGM<i64>());
         } break;
         case kTimestamp: {
+            column_index_.reset(new PGM<i64>());
         } break;
         default:
             break;
@@ -176,15 +190,16 @@ void NumericIndex::Insert(SegmentEntry *segment_entry, SharedPtr<ColumnDef> colu
                 } break;
                 case kDate: {
                     auto block_data_ptr = reinterpret_cast<const DateType *>(buffer_handle.GetData());
-                    DateType v = block_data_ptr[i];
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
                 } break;
                 case kTime: {
                     auto block_data_ptr = reinterpret_cast<const TimeType *>(buffer_handle.GetData());
-                    TimeType v = block_data_ptr[i];
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
                 } break;
                 case kDateTime: {
                     auto block_data_ptr = reinterpret_cast<const DateTimeType *>(buffer_handle.GetData());
                     DateTimeType v = block_data_ptr[i];
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
                 } break;
                 case kTimestamp: {
                     auto block_data_ptr = reinterpret_cast<const TimestampType *>(buffer_handle.GetData());
