@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import load_meta;
 
 export module physical_union_all;
 
@@ -29,13 +30,14 @@ namespace infinity {
 
 export class PhysicalUnionAll : public PhysicalOperator {
 public:
-    explicit PhysicalUnionAll(u64 id) : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id) {}
+    explicit PhysicalUnionAll(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kUnionAll, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalUnionAll() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

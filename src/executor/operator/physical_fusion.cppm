@@ -23,6 +23,7 @@ import physical_operator_type;
 import table_collection_entry;
 import base_expression;
 import fusion_expression;
+import load_meta;
 
 export module physical_fusion;
 
@@ -30,20 +31,30 @@ namespace infinity {
 
 export class PhysicalFusion final: public PhysicalOperator {
 public:
-    explicit PhysicalFusion(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<FusionExpression> fusion_expr);
+    explicit PhysicalFusion(u64 id,
+                            UniquePtr<PhysicalOperator> left,
+                            UniquePtr<PhysicalOperator> right,
+                            SharedPtr<FusionExpression> fusion_expr,
+                            SharedPtr<Vector<String>> output_names,
+                            SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                            SharedPtr<Vector<LoadMeta>> load_metas);
     ~PhysicalFusion() override;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; };
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; };
 
     String ToString(i64 &space) const;
 
     SharedPtr<FusionExpression> fusion_expr_;
+
+private:
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

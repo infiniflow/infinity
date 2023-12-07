@@ -15,10 +15,10 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 
 
-class TestDelete:
+class TestUpdate:
 
     def test_version(self):
         print(infinity.__version__)

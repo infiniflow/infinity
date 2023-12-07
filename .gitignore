@@ -49,7 +49,10 @@
 *.tar
 *.tgz
 *.xz
-
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
 
 # build directory of Gradle, CMake etc
 tmp
@@ -98,4 +101,7 @@ python/build
 python/dist
 python/infinity.egg-info
 python/.idea
+
+
+sift
 

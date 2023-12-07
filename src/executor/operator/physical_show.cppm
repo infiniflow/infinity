@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import logical_show;
+import load_meta;
 
 export module physical_show;
 
@@ -35,15 +36,16 @@ public:
                           String object_name,
                           u64 table_index,
                           Optional<u32> segment_id,
-                          Optional<u16> block_id)
-        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id), scan_type_(type), db_name_(Move(db_name)),
+                          Optional<u16> block_id,
+                          SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(Move(db_name)),
           object_name_(Move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
 
     ~PhysicalShow() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *output_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

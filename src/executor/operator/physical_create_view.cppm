@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import index_def;
+import load_meta;
 
 export module physical_create_view;
 
@@ -31,15 +32,16 @@ public:
     explicit inline PhysicalCreateView(u64 id,
                                        SharedPtr<Vector<String>> names_ptr,
                                        SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
-                                       SharedPtr<CreateViewInfo> create_view_info)
-        : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id), create_view_info_(Move(create_view_info)), output_names_(Move(names_ptr)),
-          output_types_(Move(types_ptr)) {}
+                                       SharedPtr<CreateViewInfo> create_view_info,
+                                       SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id, load_metas), output_names_(Move(names_ptr)),
+          output_types_(Move(types_ptr)), create_view_info_(Move(create_view_info)) {}
 
     ~PhysicalCreateView() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline const SharedPtr<CreateViewInfo> &bound_select_statement() const { return create_view_info_; };
 

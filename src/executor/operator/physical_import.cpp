@@ -68,7 +68,7 @@ void PhysicalImport::Init() {}
  * @param input_state
  * @param output_state
  */
-void PhysicalImport::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
     switch (file_type_) {
         case CopyFileType::kCSV: {
@@ -85,6 +85,7 @@ void PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
     import_op_state->SetComplete();
+    return true;
 }
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {

@@ -14,7 +14,6 @@
 
 module;
 
-#include <iostream>
 #include <sstream>
 import stl;
 import selection;
@@ -187,28 +186,20 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
                 //            case kPath: {
-                //                CopyFrom<PathT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-                //                break;
                 //            }
                 //            case kPolygon: {
-                //                CopyFrom<PolygonT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-                //                break;
                 //            }
             case kCircle: {
                 CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
                 //            case kBitmap: {
-                //                CopyFrom<BitmapT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-                //                break;
                 //            }
             case kUuid: {
                 CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
                 //            case kBlob: {
-                //                CopyFrom<BlobT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
-                //                break;
                 //            }
             case kEmbedding: {
                 CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
@@ -233,10 +224,6 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             }
         }
     }
-}
-
-void ColumnVector::Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
-    Initialize(other.vector_type_, other, start_idx, end_idx);
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
@@ -434,28 +421,20 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 break;
             }
                 //            case kPath: {
-                //                CopyFrom<PathT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
-                //                break;
                 //            }
                 //            case kPolygon: {
-                //                CopyFrom<PolygonT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
-                //                break;
                 //            }
             case kCircle: {
                 CopyFrom<CircleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
                 //            case kBitmap: {
-                //                CopyFrom<BitmapT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
-                //                break;
                 //            }
             case kUuid: {
                 CopyFrom<UuidT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
                 //            case kBlob: {
-                //                CopyFrom<BlobT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
-                //                break;
                 //            }
             case kEmbedding: {
                 CopyFrom<EmbeddingT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
@@ -584,28 +563,20 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
             //        case kPath: {
-            //            CopyRowFrom<PathT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
-            //            break;
             //        }
             //        case kPolygon: {
-            //            CopyRowFrom<PolygonT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
-            //            break;
             //        }
         case kCircle: {
             CopyRowFrom<CircleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
             //        case kBitmap: {
-            //            CopyRowFrom<BitmapT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
-            //            break;
             //        }
         case kUuid: {
             CopyRowFrom<UuidT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
             //        case kBlob: {
-            //            CopyRowFrom<BlobT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
-            //            break;
             //        }
         case kEmbedding: {
             CopyRowFrom<EmbeddingT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
@@ -629,215 +600,6 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             Error<ExecutorException>("Not implemented");
         }
     }
-}
-
-String ColumnVector::ToString() const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    std::stringstream ss;
-    switch (data_type_->type()) {
-        case kBoolean: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((BooleanT *)data_ptr_)[row_index] ? "true" : "false") << std::endl;
-                ;
-            }
-            break;
-        }
-        case kTinyInt: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((TinyIntT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kSmallInt: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((SmallIntT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kInteger: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((IntegerT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kBigInt: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((BigIntT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kHugeInt: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((HugeIntT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kFloat: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((FloatT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kDouble: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << (((DoubleT *)data_ptr_)[row_index]) << std::endl;
-                ;
-            }
-            break;
-        }
-        case kDecimal: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DecimalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kVarchar: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((VarcharT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kDate: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kTime: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((TimeT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kDateTime: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((DateT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kTimestamp: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((TimestampT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kInterval: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((IntervalT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kArray: {
-            Error<NotImplementException>("Not implemented.");
-        }
-        case kTuple: {
-            Error<NotImplementException>("Not implemented.");
-        }
-        case kPoint: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((PointT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kLine: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((LineT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kLineSeg: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((LineSegT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kBox: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((BoxT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-            //        case kPath: {
-            //            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-            //                ss << ((PathT *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
-            //            }
-            //            break;
-            //        }
-            //        case kPolygon: {
-            //            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-            //                ss << ((PolygonT *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
-            //            }
-            //            break;
-            //        }
-        case kCircle: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((CircleT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-            //        case kBitmap: {
-            //            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-            //                ss << ((BitmapT *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
-            //            }
-            //            break;
-            //        }
-        case kUuid: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((UuidT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-            //        case kBlob: {
-            //            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-            //                ss << ((BlobT *)data_ptr_)[row_index].ToString().c_str() <<std::endl;;
-            //            }
-            //            break;
-            //        }
-        case kEmbedding: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((EmbeddingT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kRowID: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((RowID *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        case kMixed: {
-            for (SizeT row_index = 0; row_index < tail_index_; ++row_index) {
-                ss << ((MixedT *)data_ptr_)[row_index].ToString().c_str() << std::endl;
-                ;
-            }
-            break;
-        }
-        default: {
-            Error<TypeException>("Unexpected type");
-        }
-    }
-    return ss.str();
 }
 
 String ColumnVector::ToString(SizeT row_index) const {
@@ -925,22 +687,18 @@ String ColumnVector::ToString(SizeT row_index) const {
             Error<TypeException>("Not implemented");
         }
 //        case kPath: {
-//            Error<TypeException>("Not implemented");
 //        }
 //        case kPolygon: {
-//            Error<TypeException>("Not implemented");
 //        }
         case kCircle: {
             Error<TypeException>("Not implemented");
         }
 //        case kBitmap: {
-//            Error<TypeException>("Not implemented");
 //        }
         case kUuid: {
             Error<TypeException>("Not implemented");
         }
 //        case kBlob: {
-//            Error<TypeException>("Not implemented");
 //        }
         case kEmbedding: {
             //            Error<TypeException>("Not implemented");
@@ -1052,22 +810,18 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeBox(((BoxT *)data_ptr_)[index]);
         }
             //        case kPath: {
-            //            return Value::MakePath(((PathT *)data_ptr_)[index]);
             //        }
             //        case kPolygon: {
-            //            return Value::MakePolygon(((PolygonT *)data_ptr_)[index]);
             //        }
         case kCircle: {
             return Value::MakeCircle(((CircleT *)data_ptr_)[index]);
         }
             //        case kBitmap: {
-            //            return Value::MakeBitmap(((BitmapT *)data_ptr_)[index]);
             //        }
         case kUuid: {
             return Value::MakeUuid(((UuidT *)data_ptr_)[index]);
         }
             //        case kBlob: {
-            //            return Value::MakeBlob(((BlobT *)data_ptr_)[index]);
             //        }
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
@@ -1204,64 +958,20 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
             //        case kPath: {
-            //            u32 point_count = value.value_.path.point_count;
-            //
-            //            SizeT point_area_size = point_count * sizeof(PointT);
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //            Memcpy(ptr, value.value_.path.ptr, point_area_size);
-            //
-            //            // Why not use value.GetValue<PathT>(); ?
-            //            // It will call PathT operator= to allocate new memory for point area.
-            //            // In this case, we need the point area in memory vector buffer.
-            //            ((PathT *)data_ptr_)[index].ptr = ptr;
-            //            ((PathT *)data_ptr_)[index].point_count = point_count;
-            //            ((PathT *)data_ptr_)[index].closed = value.value_.path.closed;
-            //            break;
             //        }
             //        case kPolygon: {
-            //
-            //            u64 point_count = value.value_.polygon.point_count;
-            //
-            //            SizeT point_area_size = point_count * sizeof(PointT);
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //            Memcpy(ptr, value.value_.polygon.ptr, point_area_size);
-            //
-            //            // Why not use value.GetValue<PolygonT>(); ?
-            //            // It will call PolygonT operator= to allocate new memory for point area.
-            //            // In this case, we need the point area in memory vector buffer.
-            //            ((PolygonT *)data_ptr_)[index].ptr = ptr;
-            //            ((PolygonT *)data_ptr_)[index].point_count = point_count;
-            //            ((PolygonT *)data_ptr_)[index].bounding_box = value.value_.polygon.bounding_box;
-            //            break;
             //        }
         case kCircle: {
             ((CircleT *)data_ptr_)[index] = value.GetValue<CircleT>();
             break;
         }
             //        case kBitmap: {
-            //            u64 bit_count = value.value_.bitmap.count;
-            //            u64 unit_count = BitmapT::UnitCount(bit_count);
-            //
-            //            SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
-            //            Memcpy(ptr, (void *)(value.value_.bitmap.ptr), bit_area_size);
-            //
-            //            ((BitmapT *)data_ptr_)[index].ptr = (u64 *)ptr;
-            //            ((BitmapT *)data_ptr_)[index].count = bit_count;
-            //            break;
             //        }
         case kUuid: {
             ((UuidT *)data_ptr_)[index] = value.GetValue<UuidT>();
             break;
         }
             //        case kBlob: {
-            //            u64 blob_size = value.value_.blob.size;
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(blob_size);
-            //            Memcpy(ptr, (void *)(value.value_.blob.ptr), blob_size);
-            //
-            //            ((BlobT *)data_ptr_)[index].ptr = ptr;
-            //            ((BlobT *)data_ptr_)[index].size = blob_size;
-            //            break;
             //        }
         case kEmbedding: {
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
@@ -1404,67 +1114,20 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             break;
         }
             //        case kPath: {
-            //            auto *point_ptr = (PathT *)(raw_ptr);
-            //            u32 point_count = point_ptr->point_count;
-            //
-            //            SizeT point_area_size = point_count * sizeof(PointT);
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //            Memcpy(ptr, point_ptr->ptr, point_area_size);
-            //
-            //            // Why not use value.GetValue<PathT>(); ?
-            //            // It will call PathT operator= to allocate new memory for point area.
-            //            // In this case, we need the point area in memory vector buffer.
-            //            ((PathT *)data_ptr_)[index].ptr = ptr;
-            //            ((PathT *)data_ptr_)[index].point_count = point_count;
-            //            ((PathT *)data_ptr_)[index].closed = point_ptr->closed;
-            //            break;
             //        }
             //        case kPolygon: {
-            //            auto *polygon_ptr = (PolygonT *)(raw_ptr);
-            //            u64 point_count = polygon_ptr->point_count;
-            //
-            //            SizeT point_area_size = point_count * sizeof(PointT);
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //            Memcpy(ptr, polygon_ptr->ptr, point_area_size);
-            //
-            //            // Why not use value.GetValue<PolygonT>(); ?
-            //            // It will call PolygonT operator= to allocate new memory for point area.
-            //            // In this case, we need the point area in memory vector buffer.
-            //            ((PolygonT *)data_ptr_)[index].ptr = ptr;
-            //            ((PolygonT *)data_ptr_)[index].point_count = point_count;
-            //            ((PolygonT *)data_ptr_)[index].bounding_box = polygon_ptr->bounding_box;
-            //            break;
             //        }
         case kCircle: {
             ((CircleT *)data_ptr_)[index] = *(CircleT *)(raw_ptr);
             break;
         }
             //        case kBitmap: {
-            //            auto *bitmap_ptr = (BitmapT *)(raw_ptr);
-            //            u64 bit_count = bitmap_ptr->count;
-            //            u64 unit_count = BitmapT::UnitCount(bit_count);
-            //
-            //            SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
-            //            Memcpy(ptr, (void *)(bitmap_ptr->ptr), bit_area_size);
-            //
-            //            ((BitmapT *)data_ptr_)[index].ptr = (u64 *)ptr;
-            //            ((BitmapT *)data_ptr_)[index].count = bit_count;
-            //            break;
             //        }
         case kUuid: {
             ((UuidT *)data_ptr_)[index] = *(UuidT *)(raw_ptr);
             break;
         }
             //        case kBlob: {
-            //            auto *blob_ptr = (BlobT *)(raw_ptr);
-            //            u64 blob_size = blob_ptr->size;
-            //            ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(blob_size);
-            //            Memcpy(ptr, (void *)(blob_ptr->ptr), blob_size);
-            //
-            //            ((BlobT *)data_ptr_)[index].ptr = ptr;
-            //            ((BlobT *)data_ptr_)[index].size = blob_size;
-            //            break;
             //        }
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
@@ -1489,7 +1152,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
 
 void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
     // We assume the value_ptr point to the same type data.
-    if (data_type()->type() == LogicalType::kEmbedding) {
+    if (data_type_->type() == LogicalType::kEmbedding) {
         auto *embedding_ptr = (EmbeddingT *)(value_ptr);
         SetByRawPtr(index, embedding_ptr->ptr);
     } else {
@@ -1497,47 +1160,20 @@ void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
     }
 }
 
-void ColumnVector::AppendValue(const Value &value) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
-    }
-
-    if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
-    }
-    SetValue(tail_index_++, value);
-}
-
-void ColumnVector::AppendByRawPtr(const_ptr_t raw_ptr) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
-    }
-    if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
-    }
-    SetByRawPtr(tail_index_++, raw_ptr);
-}
-
 void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
-
+    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+    }
+    if (tail_index_ >= capacity_) {
+        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+    }
     if (data_type_->type() == LogicalType::kEmbedding) {
-        AppendByRawPtr(value_ptr);
+        SetByRawPtr(tail_index_++, value_ptr);
     } else {
-        Assert<StorageException>(initialized, "Column vector isn't initialized.");
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
-        }
-        if (tail_index_ >= capacity_) {
-            Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
-        }
-
         SetByPtr(tail_index_++, value_ptr);
     }
 }
-
-void ColumnVector::AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
 
 void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
     if (count == 0) {
@@ -1546,7 +1182,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
 
     Assert<StorageException>(
         *this->data_type_ == *other.data_type_,
-        Format("Attempt to append column vector{} to column vector{}", other.data_type()->ToString(), this->data_type()->ToString()));
+        Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
 
     Assert<StorageException>(
         this->tail_index_ + count <= this->capacity_,
@@ -1554,75 +1190,39 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
 
     switch (data_type_->type()) {
         case kBoolean: {
-            auto *src_ptr = (BooleanT *)(other.data_ptr_);
-            BooleanT *dst_ptr = &((BooleanT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<BooleanT>(*this, other, count);
             break;
         }
         case kTinyInt: {
-            auto *src_ptr = (TinyIntT *)(other.data_ptr_);
-            TinyIntT *dst_ptr = &((TinyIntT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<TinyIntT>(*this, other, count);
             break;
         }
         case kSmallInt: {
-            auto *src_ptr = (SmallIntT *)(other.data_ptr_);
-            SmallIntT *dst_ptr = &((SmallIntT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<SmallIntT>(*this, other, count);
             break;
         }
         case kInteger: {
-            auto *src_ptr = (IntegerT *)(other.data_ptr_);
-            IntegerT *dst_ptr = &((IntegerT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<IntegerT>(*this, other, count);
             break;
         }
         case kBigInt: {
-            auto *src_ptr = (BigIntT *)(other.data_ptr_);
-            BigIntT *dst_ptr = &((BigIntT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<BigIntT>(*this, other, count);
             break;
         }
         case kHugeInt: {
-            auto *src_ptr = (HugeIntT *)(other.data_ptr_);
-            HugeIntT *dst_ptr = &((HugeIntT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<HugeIntT>(*this, other, count);
             break;
         }
         case kFloat: {
-            auto *src_ptr = (FloatT *)(other.data_ptr_);
-            FloatT *dst_ptr = &((FloatT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<FloatT>(*this, other, count);
             break;
         }
         case kDouble: {
-            auto *src_ptr = (DoubleT *)(other.data_ptr_);
-            DoubleT *dst_ptr = &((DoubleT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<DoubleT>(*this, other, count);
             break;
         }
         case kDecimal: {
-            auto *src_ptr = (DecimalT *)(other.data_ptr_);
-            DecimalT *dst_ptr = &((DecimalT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<DecimalT>(*this, other, count);
             break;
         }
         case kVarchar: {
@@ -1649,43 +1249,23 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             break;
         }
         case kDate: {
-            auto *src_ptr = (DateT *)(other.data_ptr_);
-            DateT *dst_ptr = &((DateT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<DateT>(*this, other, count);
             break;
         }
         case kTime: {
-            auto *src_ptr = (TimeT *)(other.data_ptr_);
-            TimeT *dst_ptr = &((TimeT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<TimeT>(*this, other, count);
             break;
         }
         case kDateTime: {
-            auto *src_ptr = (DateTimeT *)(other.data_ptr_);
-            DateTimeT *dst_ptr = &((DateTimeT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<DateTimeT>(*this, other, count);
             break;
         }
         case kTimestamp: {
-            auto *src_ptr = (TimestampT *)(other.data_ptr_);
-            TimestampT *dst_ptr = &((TimestampT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<TimestampT>(*this, other, count);
             break;
         }
         case kInterval: {
-            auto *src_ptr = (IntervalT *)(other.data_ptr_);
-            IntervalT *dst_ptr = &((IntervalT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<IntervalT>(*this, other, count);
             break;
         }
         case kArray: {
@@ -1696,130 +1276,34 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
-            auto *src_ptr = (PointT *)(other.data_ptr_);
-            PointT *dst_ptr = &((PointT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<PointT>(*this, other, count);
             break;
         }
         case kLine: {
-            auto *src_ptr = (LineT *)(other.data_ptr_);
-            LineT *dst_ptr = &((LineT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<LineT>(*this, other, count);
             break;
         }
         case kLineSeg: {
-            auto *src_ptr = (LineSegT *)(other.data_ptr_);
-            LineSegT *dst_ptr = &((LineSegT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<LineSegT>(*this, other, count);
             break;
         }
         case kBox: {
-            auto *src_ptr = (BoxT *)(other.data_ptr_);
-            BoxT *dst_ptr = &((BoxT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<BoxT>(*this, other, count);
             break;
         }
             //        case kPath: {
-            //            auto *base_src_ptr = (PathT *)(other.data_ptr_);
-            //            PathT *base_dst_ptr = &((PathT *)(data_ptr_))[this->tail_index_];
-            //            for (SizeT idx = 0; idx < count; ++idx) {
-            //                PathT &src_ref = base_src_ptr[idx];
-            //                u32 point_count = src_ref.point_count;
-            //                PathT &dst_ref = base_dst_ptr[idx];
-            //
-            //                // Allocate the mem
-            //                SizeT point_area_size = point_count * sizeof(PointT);
-            //                ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //
-            //                // Copy the point data
-            //                Memcpy(ptr, src_ref.ptr, point_area_size);
-            //
-            //                dst_ref.ptr = ptr;
-            //                dst_ref.point_count = point_count;
-            //                dst_ref.closed = src_ref.closed;
-            //            }
-            //            break;
-            //        }
-            //        case kPolygon: {
-            //            auto *base_src_ptr = (PolygonT *)(other.data_ptr_);
-            //            PolygonT *base_dst_ptr = &((PolygonT *)(data_ptr_))[this->tail_index_];
-            //            for (SizeT idx = 0; idx < count; ++idx) {
-            //                PolygonT &src_ref = base_src_ptr[idx];
-            //                u32 point_count = src_ref.point_count;
-            //                PolygonT &dst_ref = base_dst_ptr[idx];
-            //
-            //                // Allocate the mem
-            //                SizeT point_area_size = point_count * sizeof(PointT);
-            //                ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(point_area_size);
-            //
-            //                // Copy the point data
-            //                Memcpy(ptr, src_ref.ptr, point_area_size);
-            //
-            //                dst_ref.ptr = ptr;
-            //                dst_ref.point_count = point_count;
-            //                dst_ref.bounding_box = src_ref.bounding_box;
-            //            }
-            //            break;
             //        }
         case kCircle: {
-            auto *src_ptr = (CircleT *)(other.data_ptr_);
-            CircleT *dst_ptr = &((CircleT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<CircleT>(*this, other, count);
             break;
         }
             //        case kBitmap: {
-            //            auto *base_src_ptr = (BitmapT *)(other.data_ptr_);
-            //            BitmapT *base_dst_ptr = &((BitmapT *)(data_ptr_))[this->tail_index_];
-            //            for (SizeT idx = 0; idx < count; ++idx) {
-            //                BitmapT &src_ref = base_src_ptr[idx];
-            //                u64 bit_count = src_ref.count;
-            //                u64 unit_count = BitmapT::UnitCount(bit_count);
-            //
-            //                BitmapT &dst_ref = base_dst_ptr[idx];
-            //
-            //                // Allocate the mem
-            //                SizeT bit_area_size = unit_count * BitmapT::UNIT_BYTES;
-            //                ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(bit_area_size);
-            //                Memcpy(ptr, (void *)(src_ref.ptr), bit_area_size);
-            //
-            //                dst_ref.count = bit_count;
-            //                dst_ref.ptr = (u64 *)ptr;
-            //            }
-            //            break;
             //        }
         case kUuid: {
-            auto *src_ptr = (UuidT *)(other.data_ptr_);
-            UuidT *dst_ptr = &((UuidT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<UuidT>(*this, other, count);
             break;
         }
             //        case kBlob: {
-            //            auto *base_src_ptr = (BlobT *)(other.data_ptr_);
-            //            BlobT *base_dst_ptr = &((BlobT *)(data_ptr_))[this->tail_index_];
-            //            for (SizeT idx = 0; idx < count; ++idx) {
-            //                BlobT &src_ref = base_src_ptr[idx];
-            //                BlobT &dst_ref = base_dst_ptr[idx];
-            //
-            //                // Allocate the mem
-            //                ptr_t ptr = this->buffer_->fix_heap_mgr_->Allocate(src_ref.size);
-            //                Memcpy(ptr, (void *)(src_ref.ptr), src_ref.size);
-            //
-            //                dst_ref.size = src_ref.size;
-            //                dst_ref.ptr = ptr;
-            //            }
-            //            break;
             //        }
         case kEmbedding: {
             //            auto *base_src_ptr = (EmbeddingT *)(other.data_ptr_);
@@ -1833,19 +1317,11 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             break;
         }
         case kRowID: {
-            auto *src_ptr = (RowID *)(other.data_ptr_);
-            RowID *dst_ptr = &((RowID *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<RowID>(*this, other, count);
             break;
         }
         case kMixed: {
-            auto *src_ptr = (MixedT *)(other.data_ptr_);
-            MixedT *dst_ptr = &((MixedT *)(data_ptr_))[this->tail_index_];
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[idx];
-            }
+            CopyValue<MixedT>(*this, other, count);
             break;
         }
         default: {
@@ -1982,22 +1458,6 @@ void ColumnVector::ShallowCopy(const ColumnVector &other) {
     this->initialized = other.initialized;
     this->capacity_ = other.capacity_;
     this->tail_index_ = other.tail_index_;
-}
-
-void ColumnVector::Reserve(SizeT new_capacity) {
-    Assert<StorageException>(vector_type_ != ColumnVectorType::kConstant, "Constant column vector can only have one value");
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-
-    if (new_capacity <= capacity_)
-        return;
-
-    SharedPtr<VectorBuffer> new_buffer = VectorBuffer::Make(data_type_size_, new_capacity, buffer_->buffer_type_);
-    new_buffer->Copy(data_ptr_, data_type_size_ * tail_index_);
-    new_buffer->fix_heap_mgr_ = Move(buffer_->fix_heap_mgr_);
-    buffer_ = new_buffer;
-
-    capacity_ = new_capacity;
-    data_ptr_ = buffer_->GetData();
 }
 
 void ColumnVector::Reset() {

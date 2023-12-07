@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import index_def;
 import table_def;
+import load_meta;
 
 export module physical_create_table;
 
@@ -35,7 +36,8 @@ public:
                                  SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                  ConflictType conflict_type,
                                  u64 table_index,
-                                 u64 id);
+                                 u64 id,
+                                 SharedPtr<Vector<LoadMeta>> load_metas);
 
     explicit PhysicalCreateTable(SharedPtr<String> schema_name,
                                  UniquePtr<PhysicalOperator> input,
@@ -43,13 +45,14 @@ public:
                                  SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                  ConflictType conflict_type,
                                  u64 table_index,
-                                 u64 id);
+                                 u64 id,
+                                 SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalCreateTable() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

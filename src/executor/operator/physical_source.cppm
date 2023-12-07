@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_source;
 
@@ -35,17 +36,21 @@ export enum class SourceType {
 
 export class PhysicalSource final : public PhysicalOperator {
 public:
-    explicit PhysicalSource(u64 id, SourceType source_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types)
-        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id), output_names_(Move(names)), output_types_(Move(types)),
-          type_(source_type) {}
+    explicit PhysicalSource(u64 id,
+                            SourceType source_type,
+                            SharedPtr<Vector<String>> names,
+                            SharedPtr<Vector<SharedPtr<DataType>>> types,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id, load_metas), type_(source_type), output_names_(Move(names)),
+          output_types_(Move(types)) {}
 
     ~PhysicalSource() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    void Execute(QueryContext *query_context, SourceState *source_state);
+    bool Execute(QueryContext *query_context, SourceState *source_state);
 
     bool ReadyToExec(SourceState *source_state);
 

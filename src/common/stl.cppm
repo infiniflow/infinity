@@ -405,6 +405,11 @@ export {
     void Fill(FI first, FI last, const T &value) {
         std::fill(first, last, value);
     }
+
+    template <typename T1, typename T2>
+    constexpr bool IsSame() {
+        return std::is_same<T1, T2>();
+    }
 }
 
 export template <typename T1, typename T2>

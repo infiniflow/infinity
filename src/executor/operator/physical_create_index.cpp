@@ -31,13 +31,14 @@ namespace infinity {
 
 void PhysicalCreateIndex::Init() {}
 
-void PhysicalCreateIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalCreateIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
     Status status = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_, conflict_type_);
     if (!status.ok()) {
         operator_state->error_message_ = Move(status.msg_);
     }
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

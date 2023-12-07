@@ -29,6 +29,7 @@ import infinity_exception;
 import operator_state;
 import physical_operator_type;
 import query_context;
+import base_table_ref;
 
 module fragment_task;
 
@@ -61,29 +62,34 @@ void FragmentTask::OnExecute(i64) {
 
     bool enable_profiler = query_context->is_enable_profiling();
     TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+    HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
     profiler.Begin();
     UniquePtr<String> err_msg = nullptr;
+    bool done_real_work = false;
     try {
         for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
             profiler.StartOperator(operator_refs[op_idx]);
-            operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+            operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
+            done_real_work = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+            operator_refs[op_idx]->FillingTableRefs(table_refs);
             profiler.StopOperator(operator_states_[op_idx].get());
+            if (!done_real_work) {
+                break;
+            }
         }
     } catch (const Exception &e) {
         err_msg = MakeUnique<String>(e.what());
     }
     profiler.End();
+    fragment_context->FlushProfiler(profiler);
 
     if (err_msg.get() != nullptr) {
         sink_state_->error_message_ = Move(err_msg);
     }
-
-    PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-
-    fragment_context->FlushProfiler(profiler);
-    sink_op->Execute(query_context, sink_state_.get());
-
-    //    prof.End();
+    if (done_real_work) {
+        PhysicalSink *sink_op = fragment_context->GetSinkOperator();
+        sink_op->Execute(query_context, sink_state_.get());
+    }
 }
 
 u64 FragmentTask::ProposedCPUID(u64 max_cpu_count) const {

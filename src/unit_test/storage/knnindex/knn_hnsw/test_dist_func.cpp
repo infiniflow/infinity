@@ -91,7 +91,7 @@ TEST_F(DistFuncTest, test2) {
         }
     }
 
-    auto lvq_store = LVQ8Store::Make(vec_n, dim, {0, true});
+    auto lvq_store = LVQ8Store::Make(vec_n, dim, 0);
     Distance distance(lvq_store.dim());
     DenseVectorIter iter(vecs1.get(), dim, vec_n);
     lvq_store.AddVec(std::move(iter), vec_n);

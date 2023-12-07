@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_export;
 
@@ -27,15 +28,22 @@ namespace infinity {
 
 export class PhysicalExport : public PhysicalOperator {
 public:
-    explicit PhysicalExport(u64 id, String schema_name, String table_name, String file_path, bool header, char delimiter, CopyFileType type)
-        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id), file_type_(type),
-          file_path_(Move(file_path)), table_name_(Move(table_name)), schema_name_(Move(schema_name)), header_(header), delimiter_(delimiter) {}
+    explicit PhysicalExport(u64 id,
+                            String schema_name,
+                            String table_name,
+                            String file_path,
+                            bool header,
+                            char delimiter,
+                            CopyFileType type,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
+          table_name_(Move(table_name)), file_path_(Move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 
     ~PhysicalExport() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

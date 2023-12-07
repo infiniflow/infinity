@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_explain;
 
@@ -27,14 +28,18 @@ namespace infinity {
 
 export class PhysicalExplain final : public PhysicalOperator {
 public:
-    explicit PhysicalExplain(u64 id, ExplainType type, SharedPtr<Vector<SharedPtr<String>>> text_array, UniquePtr<PhysicalOperator> left)
-        : PhysicalOperator(PhysicalOperatorType::kExplain, Move(left), nullptr, id), explain_type_(type), texts_(Move(text_array)) {}
+    explicit PhysicalExplain(u64 id,
+                             ExplainType type,
+                             SharedPtr<Vector<SharedPtr<String>>> text_array,
+                             UniquePtr<PhysicalOperator> left,
+                             SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kExplain, Move(left), nullptr, id, load_metas), explain_type_(type), texts_(Move(text_array)) {}
 
     ~PhysicalExplain() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = Move(text); }
 
@@ -46,7 +51,7 @@ public:
 
     inline ExplainType explain_type() const { return explain_type_; }
 
-    static void AlignParagraphs(Vector<SharedPtr<String>>& array1, Vector<SharedPtr<String>>& array2);
+    static void AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2);
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};

@@ -293,7 +293,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
                                            logical_create_table->GetOutputTypes(),
                                            logical_create_table->conflict_type(),
                                            logical_create_table->table_index(),
-                                           logical_operator->node_id());
+                                           logical_operator->node_id(),
+                                           logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -304,7 +305,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
                                      logical_create_index->conflict_type(),
                                      logical_create_index->GetOutputNames(),
                                      logical_create_index->GetOutputTypes(),
-                                     logical_create_index->node_id());
+                                     logical_create_index->node_id(),
+                                     logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -315,7 +317,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedP
                                                 logical_create_collection->GetOutputNames(),
                                                 logical_create_collection->GetOutputTypes(),
                                                 logical_create_collection->table_index(),
-                                                logical_operator->node_id());
+                                                logical_operator->node_id(),
+                                                logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -324,11 +327,12 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateSchema(const SharedPtr<L
                                             logical_create_schema->conflict_type(),
                                             logical_create_schema->GetOutputNames(),
                                             logical_create_schema->GetOutputTypes(),
-                                            logical_create_schema->node_id());
+                                            logical_create_schema->node_id(),
+                                            logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalPreparedPlan>(logical_operator->node_id());
+    return MakeUnique<PhysicalPreparedPlan>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateView(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -336,7 +340,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateView(const SharedPtr<Log
     return MakeUnique<PhysicalCreateView>(logical_operator->node_id(),
                                           logical_create_view->names_ptr(),
                                           logical_create_view->types_ptr(),
-                                          logical_create_view->create_view_info());
+                                          logical_create_view->create_view_info(),
+                                          logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -347,7 +352,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropTable(const SharedPtr<Logi
                                          logical_drop_table->conflict_type(),
                                          logical_drop_table->GetOutputNames(),
                                          logical_drop_table->GetOutputTypes(),
-                                         logical_drop_table->node_id());
+                                         logical_drop_table->node_id(),
+                                         logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -358,7 +364,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropIndex(const SharedPtr<Logi
                                          logical_drop_index->conflict_type(),
                                          logical_drop_index->GetOutputNames(),
                                          logical_drop_index->GetOutputTypes(),
-                                         logical_drop_index->node_id());
+                                         logical_drop_index->node_id(),
+                                         logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -366,7 +373,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropCollection(const SharedPtr
     return MakeUnique<PhysicalDropCollection>(logical_drop_collection->schema_name(),
                                               logical_drop_collection->collection_name(),
                                               logical_drop_collection->conflict_type(),
-                                              logical_drop_collection->node_id());
+                                              logical_drop_collection->node_id(),
+                                              logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropSchema(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -375,7 +383,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropSchema(const SharedPtr<Log
                                           logical_drop_schema->conflict_type(),
                                           logical_drop_schema->GetOutputNames(),
                                           logical_drop_schema->GetOutputTypes(),
-                                          logical_drop_schema->node_id());
+                                          logical_drop_schema->node_id(),
+                                          logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropView(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -385,7 +394,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDropView(const SharedPtr<Logic
                                         logical_drop_view->conflict_type(),
                                         logical_drop_view->GetOutputNames(),
                                         logical_drop_view->GetOutputTypes(),
-                                        logical_drop_view->node_id());
+                                        logical_drop_view->node_id(),
+                                        logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -394,7 +404,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
     return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
                                       logical_insert_ptr->table_collection_entry(),
                                       logical_insert_ptr->table_index(),
-                                      logical_insert_ptr->value_list());
+                                      logical_insert_ptr->value_list(),
+                                      logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -403,7 +414,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
     SharedPtr<LogicalDelete> logical_delete = dynamic_pointer_cast<LogicalDelete>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    auto physical_delete = MakeUnique<PhysicalDelete>(logical_operator->node_id(), Move(input_physical_operator), logical_delete->table_entry_ptr_);
+    auto physical_delete = MakeUnique<PhysicalDelete>(logical_operator->node_id(),
+                                                      Move(input_physical_operator),
+                                                      logical_delete->table_entry_ptr_,
+                                                      logical_operator->load_metas());
     return physical_delete;
 }
 
@@ -416,7 +430,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
     auto physical_update = MakeUnique<PhysicalUpdate>(logical_operator->node_id(),
                                                       Move(input_physical_operator),
                                                       logical_update->table_entry_ptr_,
-                                                      logical_update->update_columns_);
+                                                      logical_update->update_columns_,
+                                                      logical_operator->load_metas());
     return physical_update;
 }
 
@@ -427,7 +442,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<Logical
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),
-                                      logical_import->FileType());
+                                      logical_import->FileType(),
+                                      logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -438,11 +454,15 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<Logical
                                       logical_export->file_path(),
                                       logical_export->header(),
                                       logical_export->delimiter(),
-                                      logical_export->FileType());
+                                      logical_export->FileType(),
+                                      logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalAlter>(logical_operator->GetOutputNames(), logical_operator->GetOutputTypes(), logical_operator->node_id());
+    return MakeUnique<PhysicalAlter>(logical_operator->GetOutputNames(),
+                                     logical_operator->GetOutputTypes(),
+                                     logical_operator->node_id(),
+                                     logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -459,7 +479,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                          logical_aggregate->groups_,
                                          logical_aggregate->groupby_index_,
                                          logical_aggregate->aggregates_,
-                                         logical_aggregate->aggregate_index_);
+                                         logical_aggregate->aggregate_index_,
+                                         logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -482,7 +503,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNo
                                               logical_join->join_type_,
                                               logical_join->conditions_,
                                               Move(left_physical_operator),
-                                              Move(right_physical_operator));
+                                              Move(right_physical_operator),
+                                              logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -501,7 +523,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<L
     left_physical_operator = BuildPhysicalOperator(left_node);
     right_physical_operator = BuildPhysicalOperator(right_node);
 
-    return MakeUnique<PhysicalCrossProduct>(logical_operator->node_id(), Move(left_physical_operator), Move(right_physical_operator));
+    return MakeUnique<PhysicalCrossProduct>(logical_operator->node_id(),
+                                            Move(left_physical_operator),
+                                            Move(right_physical_operator),
+                                            logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -517,7 +542,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNo
     return MakeUnique<PhysicalSort>(logical_operator->node_id(),
                                     Move(input_physical_operator),
                                     logical_sort->expressions_,
-                                    logical_sort->order_by_types_);
+                                    logical_sort->order_by_types_,
+                                    logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -531,7 +557,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
     return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
                                      Move(input_physical_operator),
                                      logical_limit->limit_expression_,
-                                     logical_limit->offset_expression_);
+                                     logical_limit->offset_expression_,
+                                     logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -545,7 +572,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<Log
     return MakeUnique<PhysicalProject>(logical_operator->node_id(),
                                        logical_project->table_index_,
                                        Move(input_physical_operator),
-                                       logical_project->expressions_);
+                                       logical_project->expressions_,
+                                       logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -557,19 +585,22 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<Logical
 
     SharedPtr<LogicalFilter> logical_filter = static_pointer_cast<LogicalFilter>(logical_operator);
 
-    return MakeUnique<PhysicalFilter>(logical_operator->node_id(), Move(input_physical_operator), logical_filter->expression());
+    return MakeUnique<PhysicalFilter>(logical_operator->node_id(),
+                                      Move(input_physical_operator),
+                                      logical_filter->expression(),
+                                      logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIntersect(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id());
+    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnion(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalUnionAll>(logical_operator->node_id());
+    return MakeUnique<PhysicalUnionAll>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExcept(const SharedPtr<LogicalNode> &logical_operator) const {
-    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id());
+    return MakeUnique<PhysicalHashJoin>(logical_operator->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -580,12 +611,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_show->object_name(),
                                     logical_show->table_index(),
                                     logical_show->segment_id(),
-                                    logical_show->block_id());
+                                    logical_show->block_id(),
+                                    logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalTableScan> logical_table_scan = static_pointer_cast<LogicalTableScan>(logical_operator);
-    return MakeUnique<PhysicalTableScan>(logical_operator->node_id(), logical_table_scan->base_table_ref_, logical_table_scan->add_row_id_);
+    return MakeUnique<PhysicalTableScan>(logical_operator->node_id(),
+                                         logical_table_scan->base_table_ref_,
+                                         logical_operator->load_metas(),
+                                         logical_table_scan->add_row_id_);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -595,17 +630,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<Logic
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalDummyScan> logical_show = static_pointer_cast<LogicalDummyScan>(logical_operator);
-    return MakeUnique<PhysicalDummyScan>(logical_show->node_id());
+    return MakeUnique<PhysicalDummyScan>(logical_show->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalFlush *logical_flush = (LogicalFlush *)(logical_operator.get());
-    return MakeUnique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id());
+    return MakeUnique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id(), logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalMatch> logical_match = static_pointer_cast<LogicalMatch>(logical_operator);
-    return MakeUnique<PhysicalMatch>(logical_match->node_id(), logical_match->base_table_ref_, logical_match->match_expr_);
+    return MakeUnique<PhysicalMatch>(logical_match->node_id(),
+                                     logical_match->base_table_ref_,
+                                     logical_match->match_expr_,
+                                     logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -619,7 +657,13 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
     if (right_logical_node != nullptr) {
         right_phy = BuildPhysicalOperator(right_logical_node);
     }
-    return MakeUnique<PhysicalFusion>(logical_fusion->node_id(), Move(left_phy), Move(right_phy), logical_fusion->fusion_expr_);
+    return MakeUnique<PhysicalFusion>(logical_fusion->node_id(),
+                                      Move(left_phy),
+                                      Move(right_phy),
+                                      logical_fusion->fusion_expr_,
+                                      logical_fusion->GetOutputNames(),
+                                      logical_fusion->GetOutputTypes(),
+                                      logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -632,7 +676,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                                                           logical_knn_scan->order_by_type_,
                                                                           logical_knn_scan->GetOutputNames(),
                                                                           logical_knn_scan->GetOutputTypes(),
-                                                                          logical_knn_scan->knn_table_index_);
+                                                                          logical_knn_scan->knn_table_index_,
+                                                                          logical_operator->load_metas());
 
     return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),
                                         logical_knn_scan->base_table_ref_,
@@ -642,7 +687,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                         logical_knn_scan->knn_expressions_,
                                         logical_knn_scan->limit_expression_,
                                         logical_knn_scan->order_by_type_,
-                                        logical_knn_scan->knn_table_index_);
+                                        logical_knn_scan->knn_table_index_,
+                                        logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -650,7 +696,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<Logica
     return MakeUnique<PhysicalCommand>(logical_command->node_id(),
                                        logical_command->command_info(),
                                        logical_command->GetOutputNames(),
-                                       logical_command->GetOutputTypes());
+                                       logical_command->GetOutputTypes(),
+                                       logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -672,20 +719,30 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
         case ExplainType::kOpt: {
-            explain_node =
-                MakeUnique<PhysicalExplain>(logical_explain->node_id(), logical_explain->explain_type(), logical_explain->TextArray(), nullptr);
+            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       logical_explain->TextArray(),
+                                                       nullptr,
+                                                       logical_operator->load_metas());
             break;
         }
         case ExplainType::kPhysical: {
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
             ExplainPhysicalPlan::Explain(input_physical_operator.get(), texts_ptr);
-            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(), logical_explain->explain_type(), texts_ptr, nullptr);
+            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       texts_ptr,
+                                                       nullptr,
+                                                       logical_operator->load_metas());
             break;
         }
         case ExplainType::kFragment:
         case ExplainType::kPipeline: {
-            explain_node =
-                MakeUnique<PhysicalExplain>(logical_explain->node_id(), logical_explain->explain_type(), nullptr, Move(input_physical_operator));
+            explain_node = MakeUnique<PhysicalExplain>(logical_explain->node_id(),
+                                                       logical_explain->explain_type(),
+                                                       nullptr,
+                                                       Move(input_physical_operator),
+                                                       logical_operator->load_metas());
             break;
         }
     }

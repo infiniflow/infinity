@@ -40,7 +40,7 @@ public:
 
 public:
     ParsedExpr *column_expr_{};
-    void *embedding_data_ptr_{};
+    void *embedding_data_ptr_{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
     int64_t dimension_{};
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};

@@ -211,7 +211,7 @@ void PhysicalShow::Init() {
     }
 }
 
-void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ShowOperatorState *show_operator_state = (ShowOperatorState *)(operator_state);
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
@@ -260,6 +260,7 @@ void PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             Error<ExecutorException>("Invalid chunk scan type");
         }
     }
+    return true;
 }
 
 /**
@@ -278,7 +279,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     Vector<DatabaseDetail> databases_detail = txn->ListDatabases();
 
     // Prepare the output data block
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type};
 
     output_block_ptr->Init(column_types);
@@ -296,7 +297,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(output_block_ptr);
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 /**
@@ -320,7 +321,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     // Prepare the output data block
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
 
@@ -456,7 +457,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(output_block_ptr);
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -474,7 +475,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     }
 
     // Prepare the output data block
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type, bigint_type, bigint_type, bigint_type};
 
@@ -510,7 +511,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(output_block_ptr);
+    show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -533,7 +534,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("profiles"), column_defs);
 
     // create data block for output state
-    auto output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
         column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
@@ -596,7 +597,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
     // create data block for output state
-    auto output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
         varchar_type,
@@ -668,7 +669,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
     };
 
-    auto output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     auto chuck_filling = [&](const StdFunction<u64(const String &)>& file_size_func, const String &path) {
         SizeT column_id = 0;
         {
@@ -745,7 +746,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("configs"), column_defs);
 
     // create data block for output state
-    auto output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
         varchar_type,
@@ -1285,7 +1286,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
-    auto output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types(4, varchar_type);
     output_block_ptr->Init(column_types);
 
@@ -1471,7 +1472,7 @@ void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOpe
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("session status"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> output_column_types{
         varchar_type,
         varchar_type,
@@ -1509,7 +1510,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("global status"), output_column_defs);
     output_ = MakeShared<DataTable>(table_def, TableType::kResult);
 
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> output_column_types{
         varchar_type,
         varchar_type,

@@ -36,3 +36,6 @@ default_row_size        = 4096
 [buffer]
 buffer_pool_size        = "3GB"
 temp_dir                = "/tmp"
+
+[resource]
+dict_dir                = "/tmp/infinity/resource"

@@ -358,7 +358,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mag
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/concurrentqueue")
-target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/hnswlib")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/iresearch/core")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -367,8 +366,14 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
-add_executable(unit_test_hnswalg "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
+add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
 
-target_link_libraries(unit_test_hnswalg
+target_link_libraries(test_hnsw
     infinity_core
+)
+
+add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
+
+target_link_libraries(test_hnsw_bitmask
+        infinity_core
 )

@@ -98,6 +98,9 @@ public:
 
     [[nodiscard]] inline u64 wal_size_threshold() const { return system_option_.wal_size_threshold_; }
 
+    // Resource
+    [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 

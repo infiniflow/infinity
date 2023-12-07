@@ -117,6 +117,9 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
 
+    // Default resource config
+    String default_resource_dict_path = String("/tmp/infinity/resource");
+
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         Printf("No config file is given, use default configs.");
@@ -181,6 +184,9 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.delta_checkpoint_interval_sec_ = delta_checkpoint_interval_sec;
             system_option_.delta_checkpoint_interval_wal_bytes_ = delta_checkpoint_interval_wal_bytes;
         }
+
+        // Resource
+        { system_option_.resource_dict_path_ = default_resource_dict_path; }
     } else {
         Printf("Read config from: {}", *config_path);
         TomlTable config = TomlParseFile(*config_path);
@@ -328,6 +334,12 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
                 return result;
             }
         }
+
+        // Resource
+        {
+            auto resource_config = config["resource"];
+            system_option_.resource_dict_path_ = resource_config["dict_dir"].value_or(default_resource_dict_path);
+        }
     }
 
     return result;
@@ -378,6 +390,9 @@ void Config::PrintAll() const {
     Printf(" - delta_checkpoint_interval_sec: {}\n", system_option_.delta_checkpoint_interval_sec_);
     Printf(" - delta_checkpoint_interval_wal_bytes: {}\n", system_option_.delta_checkpoint_interval_wal_bytes_);
     Printf(" - wal_size_threshold: {}\n", system_option_.wal_size_threshold_);
+
+    // Resource
+    Printf(" - dict_dir: {}\n", system_option_.resource_dict_path_.c_str());
 }
 
 } // namespace infinity

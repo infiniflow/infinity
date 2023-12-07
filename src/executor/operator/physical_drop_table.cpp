@@ -32,8 +32,7 @@ namespace infinity {
 
 void PhysicalDropTable::Init() {}
 
-void PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
-
+bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
 
     BaseEntry* new_table_entry{nullptr};
@@ -51,6 +50,7 @@ void PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
     auto result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
     output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
     operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

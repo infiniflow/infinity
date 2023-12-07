@@ -22,11 +22,12 @@ export module fragment_data;
 namespace infinity {
 
 export struct FragmentData {
-    SharedPtr<DataBlock> data_block_{};
+    UniquePtr<DataBlock> data_block_{};
 
+    u64 fragment_id_{u64_max};
     i64 task_id_{-1};
-    i64 data_idx_{-1};
-    i64 data_count_{-1};
+    SizeT data_idx_{u64_max};
+    SizeT data_count_{u64_max};
 };
 
 } // namespace infinity

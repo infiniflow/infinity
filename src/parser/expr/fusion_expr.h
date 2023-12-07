@@ -31,8 +31,8 @@ public:
     void SetOptions(const std::string &options);
 
 public:
-    std::string method_;
-    std::shared_ptr<SearchOptions> options_;
+    std::string method_{};
+    std::shared_ptr<SearchOptions> options_{};
 };
 
 } // namespace infinity

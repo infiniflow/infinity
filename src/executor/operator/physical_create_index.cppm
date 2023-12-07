@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import index_def;
+import load_meta;
 
 export module physical_create_index;
 
@@ -29,7 +30,7 @@ export class PhysicalCreateIndex : public PhysicalOperator {
 public:
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) override;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
     SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
@@ -42,8 +43,9 @@ public:
                                                       ConflictType conflict_type,
                                                       SharedPtr<Vector<String>> output_names,
                                                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                                      u64 id) {
-        return MakeUnique<PhysicalCreateIndex>(schema_name, table_name, index_definition, conflict_type, output_names, output_types, id);
+                                                      u64 id,
+                                                      SharedPtr<Vector<LoadMeta>> load_metas) {
+        return MakeUnique<PhysicalCreateIndex>(schema_name, table_name, index_definition, conflict_type, output_names, output_types, id, load_metas);
     }
 
     PhysicalCreateIndex(SharedPtr<String> schema_name,
@@ -52,8 +54,9 @@ public:
                         ConflictType conflict_type,
                         SharedPtr<Vector<String>> output_names,
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                        u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id), schema_name_(schema_name), table_name_(table_name),
+                        u64 id,
+                        SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id, load_metas), schema_name_(schema_name), table_name_(table_name),
           index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types) {}
 
 public:

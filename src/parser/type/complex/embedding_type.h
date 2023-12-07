@@ -16,6 +16,7 @@
 
 #include "parser_assert.h"
 #include <bitset>
+#include <cstring>
 #include <sstream>
 
 namespace infinity {
@@ -24,7 +25,8 @@ enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, k
 
 struct EmbeddingType {
 public:
-    char *ptr = nullptr;
+    char *ptr{};
+    const bool new_allocated_{};
 
     static size_t embedding_type_width[];
 
@@ -113,9 +115,9 @@ private:
     }
 
 public:
-    inline explicit EmbeddingType(char *&&from_ptr) : ptr(from_ptr) { from_ptr = nullptr; }
+    inline explicit EmbeddingType(char *&&from_ptr) : ptr(from_ptr), new_allocated_(false) { from_ptr = nullptr; }
 
-    inline EmbeddingType(EmbeddingDataType type, size_t dimension) {
+    inline EmbeddingType(EmbeddingDataType type, size_t dimension) : new_allocated_(true) {
         size_t mem_size = EmbeddingSize(type, dimension);
         ptr = new char[mem_size]{0};
     }
@@ -128,29 +130,21 @@ public:
 
     inline EmbeddingType(const EmbeddingType &other) = default;
 
-    inline EmbeddingType(EmbeddingType &&other) noexcept {
+    inline EmbeddingType(EmbeddingType &&other) noexcept : new_allocated_(other.new_allocated_) {
         this->ptr = other.ptr;
         other.ptr = nullptr;
     }
 
-    EmbeddingType &operator=(const EmbeddingType &other) {
-        if (this == &other)
-            return *this;
-        if (ptr != nullptr) {
-            //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-            //            Reset();
-        }
-        ptr = other.ptr;
-        return *this;
-    }
+    EmbeddingType &operator=(const EmbeddingType &other) = delete;
 
     EmbeddingType &operator=(EmbeddingType &&other) noexcept {
         if (this == &other)
             return *this;
         if (ptr != nullptr) {
             //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-            //            Reset();
+            Reset();
         }
+        const_cast<bool &>(new_allocated_) = other.new_allocated_;
         ptr = other.ptr;
         other.ptr = nullptr;
         return *this;
@@ -163,7 +157,7 @@ public:
     inline bool operator!=(const EmbeddingType &other) const = delete;
 
     inline void Reset() {
-        if (ptr != nullptr) {
+        if (ptr && new_allocated_) {
             delete[] ptr;
             ptr = nullptr;
         }
@@ -171,7 +165,10 @@ public:
 
     inline void SetNull() { ptr = nullptr; }
 
-    [[nodiscard]] inline std::string ToString() const { ParserError("ToString() isn't implemented"); return std::string(); }
+    [[nodiscard]] inline std::string ToString() const {
+        ParserError("ToString() isn't implemented");
+        return std::string();
+    }
 };
 
 } // namespace infinity

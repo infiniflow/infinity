@@ -31,14 +31,14 @@ void PlanFragment::SetSourceNode(QueryContext *query_context,
                                  SourceType source_type,
                                  const SharedPtr<Vector<String>> &names,
                                  const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
-    source_ = MakeUnique<PhysicalSource>(query_context->GetNextNodeID(), source_type, names, types);
+    source_ = MakeUnique<PhysicalSource>(query_context->GetNextNodeID(), source_type, names, types, nullptr);
 }
 
 void PlanFragment::SetSinkNode(QueryContext *query_context,
                                SinkType sink_type,
                                const SharedPtr<Vector<String>> &names,
                                const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
-    sink_ = MakeUnique<PhysicalSink>(query_context->GetNextNodeID(), sink_type, names, types);
+    sink_ = MakeUnique<PhysicalSink>(query_context->GetNextNodeID(), sink_type, names, types, nullptr);
 }
 
 SharedPtr<Vector<String>> PlanFragment::ToString() {

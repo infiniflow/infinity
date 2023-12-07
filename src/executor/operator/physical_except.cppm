@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_except;
 
@@ -27,15 +28,18 @@ namespace infinity {
 
 export class PhysicalExcept final : public PhysicalOperator {
 public:
-    explicit PhysicalExcept(SharedPtr<Vector<String>> output_names, SharedPtr<Vector<SharedPtr<DataType>>> output_types, u64 id)
-        : PhysicalOperator(PhysicalOperatorType::kExcept, nullptr, nullptr, id), output_names_(Move(output_names)),
+    explicit PhysicalExcept(SharedPtr<Vector<String>> output_names,
+                            SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                            u64 id,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kExcept, nullptr, nullptr, id, load_metas), output_names_(Move(output_names)),
           output_types_(Move(output_types)) {}
 
     ~PhysicalExcept() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

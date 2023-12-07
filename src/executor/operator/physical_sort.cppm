@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import load_meta;
 
 export module physical_sort;
 
@@ -29,15 +30,19 @@ namespace infinity {
 
 export class PhysicalSort : public PhysicalOperator {
 public:
-    explicit PhysicalSort(u64 id, UniquePtr<PhysicalOperator> left, Vector<SharedPtr<BaseExpression>> expressions, Vector<OrderType> order_by_types)
-        : PhysicalOperator(PhysicalOperatorType::kSort, Move(left), nullptr, id), expressions_(Move(expressions)),
+    explicit PhysicalSort(u64 id,
+                          UniquePtr<PhysicalOperator> left,
+                          Vector<SharedPtr<BaseExpression>> expressions,
+                          Vector<OrderType> order_by_types,
+                          SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kSort, Move(left), nullptr, id, load_metas), expressions_(Move(expressions)),
           order_by_types_(Move(order_by_types)) {}
 
     ~PhysicalSort() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 

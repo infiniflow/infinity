@@ -151,6 +151,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
 void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
                                   SharedPtr<ExpressionState> &,
                                   SharedPtr<ColumnVector> &output_column_vector) {
+    // memory copy here.
     output_column_vector->SetValue(0, expr->GetValue());
     output_column_vector->Finalize(1);
 }

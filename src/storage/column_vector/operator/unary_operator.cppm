@@ -29,10 +29,10 @@ export class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
     static void inline Execute(const SharedPtr<ColumnVector> &input, SharedPtr<ColumnVector> &result, SizeT count, void *state_ptr, bool nullable) {
-        const auto *input_ptr = (const InputType *)(input->data_ptr_);
+        const auto *input_ptr = (const InputType *)(input->data());
         const SharedPtr<Bitmask> &input_null = input->nulls_ptr_;
 
-        auto *result_ptr = (ResultType *)(result->data_ptr_);
+        auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
 
         switch (input->vector_type()) {
@@ -48,7 +48,7 @@ public:
                     ExecuteFlat<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
                 }
                 // Result tail_index need to update.
-                result->tail_index_ = count;
+                result->Finalize(count);
                 return;
             }
             case ColumnVectorType::kConstant: {
@@ -60,11 +60,10 @@ public:
                     } else {
                         result_null->SetFalse(0);
                     }
-                }
-                else {
+                } else {
                     Operator::template Execute<InputType, ResultType>(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                 }
-                result->tail_index_ = 1;
+                result->Finalize(1);
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
@@ -99,7 +98,6 @@ private:
             result_null->SetAllTrue();
 
             for (SizeT i = 0; i < count; i++) {
-                // Not valid for embedding type, since the embedding type width isn't sizeof(EmbeddingT)
                 Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), i, state_ptr);
             }
         } else {
@@ -111,7 +109,12 @@ private:
                 if (input_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                     // all data of 64 rows are not null
                     while (start_index < end_index) {
-                        Operator::template Execute<InputType, ResultType>(input_ptr[i], result_ptr[i], result_null.get(), start_index++, state_ptr);
+                        Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
+                                                                          result_ptr[start_index],
+                                                                          result_null.get(),
+                                                                          start_index,
+                                                                          state_ptr);
+                        ++start_index;
                     }
                 } else if (input_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                     // all data of 64 rows are null
@@ -121,11 +124,12 @@ private:
                     while (start_index < end_index) {
                         if (input_null->IsTrue(start_index - original_start)) {
                             // This row isn't null
-                            Operator::template Execute<InputType, ResultType>(input_ptr[i],
-                                                                              result_ptr[i],
+                            Operator::template Execute<InputType, ResultType>(input_ptr[start_index],
+                                                                              result_ptr[start_index],
                                                                               result_null.get(),
-                                                                              start_index++,
+                                                                              start_index,
                                                                               state_ptr);
+                            ++start_index;
                         }
                     }
                 }

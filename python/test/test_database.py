@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 
 
 class TestDatabase:
@@ -40,7 +40,7 @@ class TestDatabase:
             - 'default'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9090))
+        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
 
         # infinity
         res = infinity_obj.create_database("my_database")

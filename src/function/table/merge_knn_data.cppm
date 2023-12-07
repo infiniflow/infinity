@@ -33,8 +33,7 @@ export enum class MergeKnnHeapType {
 export class MergeKnnFunctionData : public TableFunctionData {
 
 public:
-    explicit MergeKnnFunctionData(i64 total_parallel_n,
-                                  i64 query_count,
+    explicit MergeKnnFunctionData(i64 query_count,
                                   i64 topk,
                                   EmbeddingDataType elem_type,
                                   KnnDistanceType knn_distance_type,
@@ -45,8 +44,6 @@ private:
     void InitMergeKnn(KnnDistanceType knn_distance_type);
 
 public:
-    i64 total_parallel_n_{};
-    i64 current_parallel_idx_{};
     i64 query_count_{};
     i64 topk_{};
     EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};

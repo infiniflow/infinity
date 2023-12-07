@@ -25,6 +25,7 @@ import table_function;
 import base_table_ref;
 import table_collection_entry;
 import block_index;
+import load_meta;
 
 export module physical_table_scan;
 
@@ -37,14 +38,15 @@ namespace infinity {
 
 export class PhysicalTableScan : public PhysicalOperator {
 public:
-    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id = false)
-        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id), base_table_ref_(Move(base_table_ref)), add_row_id_(add_row_id) {}
+    explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<Vector<LoadMeta>> load_metas, bool add_row_id = false)
+        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)),
+          add_row_id_(add_row_id) {}
 
     ~PhysicalTableScan() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
@@ -67,6 +69,10 @@ public:
     bool ParallelExchange() const override { return true; }
 
     bool IsExchange() const override { return true; }
+
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
+    }
 
 private:
     void ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state);

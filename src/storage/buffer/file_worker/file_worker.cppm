@@ -24,9 +24,8 @@ namespace infinity {
 
 export class FileWorker {
 public:
-    // spill_dir_ is not init here.
-    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-        : file_dir_(Move(file_dir)), file_name_(Move(file_name)), buffer_size_(buffer_size) {}
+    // spill_dir_ is not init here
+    explicit FileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name) : file_dir_(Move(file_dir)), file_name_(Move(file_name)) {}
 
     // No destruct here
     virtual ~FileWorker();
@@ -41,6 +40,8 @@ public:
     virtual void AllocateInMemory() = 0;
 
     virtual void FreeInMemory() = 0;
+
+    virtual SizeT GetMemoryCost() const = 0;
 
     void *GetData() { return data_; }
 
@@ -67,7 +68,6 @@ private:
 public:
     const SharedPtr<String> file_dir_{};
     const SharedPtr<String> file_name_{};
-    const SizeT buffer_size_{};
 
 protected:
     void *data_{nullptr};

@@ -16,11 +16,12 @@ from abc import ABC
 
 from infinity import InfinityConnection
 from infinity.remote_thrift.client import ThriftInfinityClient
-from infinity.remote_thrift.db import RemoteThriftDatabase
+from infinity.remote_thrift.db import RemoteDatabase
 
 
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri):
+        super().__init__(uri)
         self.db_name = "default"
         self._client = ThriftInfinityClient(uri)
         self._is_connected = True
@@ -44,7 +45,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def get_database(self, db_name: str):
         res = self._client.get_database(db_name)
         if res.success is True:
-            return RemoteThriftDatabase(self, db_name)
+            return RemoteDatabase(self._client, db_name)
         else:
             raise Exception("Get db error")
 

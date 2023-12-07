@@ -19,6 +19,7 @@ import bound_cast_func;
 import bool_cast;
 import integer_cast;
 import float_cast;
+import embedding_cast;
 import varchar_cast;
 import parser;
 import third_party;
@@ -143,7 +144,7 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
 //            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kEmbedding: {
-            Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            return BindEmbeddingCast(source, target);
         }
         case kRowID: {
             Error<NotImplementException>(Format("Can't cast from {} to {}", source.ToString(), target.ToString()));

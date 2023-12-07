@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 
 
 class TestCreateTable:

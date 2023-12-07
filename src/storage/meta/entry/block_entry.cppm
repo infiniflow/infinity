@@ -31,6 +31,19 @@ class Txn;
 class SegmentEntry;
 class DataBlock;
 
+#pragma pack(4)
+struct CreateField {
+//    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
+
+    TxnTimeStamp create_ts_{};
+    i32 row_count_{};
+
+    bool operator==(const CreateField &rhs) const { return create_ts_ == rhs.create_ts_ && row_count_ == rhs.row_count_; }
+
+    bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
+};
+#pragma pack()
+
 export struct BlockVersion {
     constexpr static String PATH = "version";
 
@@ -41,13 +54,16 @@ export struct BlockVersion {
     void LoadFromFile(const String &version_path);
     void SaveToFile(const String &version_path);
 
-    Vector<Pair<TxnTimeStamp, i32>> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                                // risk to write uninitialized buffer. (ts, rows)
+    Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+                                    // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
 };
 
 export struct BlockEntry : public BaseEntry {
 public:
+    // for iterator unit test
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
+
     /// Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
     /// Construct a new block entry For Replay
@@ -107,7 +123,7 @@ public:
 
     static void FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version);
 
-    inline static BlockColumnEntry *GetColumnDataByID(BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
+    inline static BlockColumnEntry *GetColumnDataByID(const BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
 
     static Json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
 
@@ -119,9 +135,7 @@ public:
 
     const String &DirPath() { return *base_dir_; }
 
-    String VersionFilePath() {
-        return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH);
-    }
+    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH); }
 
 private:
     static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);

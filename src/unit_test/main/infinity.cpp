@@ -236,7 +236,7 @@ TEST_F(InfinityTest, test1) {
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
-        Vector<Pair<ParsedExpr *, ParsedExpr *>> vec_search_exprs;
+        Vector<ParsedExpr *> vec_search_exprs;
         Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
 
         result = table1->Search(vec_search_exprs, fts_search_exprs, nullptr, output_columns, nullptr, nullptr);

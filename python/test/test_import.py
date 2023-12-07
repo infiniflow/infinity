@@ -15,7 +15,7 @@
 import os
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity.common import NetworkAddress
 
 
 class TestImport:

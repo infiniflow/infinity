@@ -13,9 +13,11 @@
 // limitations under the License.
 
 module;
-#include <iostream>
+
 import stl;
 import third_party;
+import config;
+import infinity_context;
 
 module iresearch_analyzer;
 
@@ -26,15 +28,16 @@ constexpr u64 prime = 0x100000001B3ull;
 
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
-void AnalyzerPool::Set(const StringView &name, const String &args) {
-    IRSAnalyzer *analyzer = cache_[name].get();
-    if (!analyzer) {
+void AnalyzerPool::Set(const StringView &name) {
+    IRSAnalyzer *try_analyzer = cache_[name].get();
+    if (!try_analyzer) {
         switch (Str2Int(name.data())) {
             case Str2Int(JIEBA.data()): {
                 IRSJiebaAnalyzer::options_t opt;
-                opt.path_ = args;
-                UniquePtr<IRSAnalyzer> analyzer = MakeUnique<IRSJiebaAnalyzer>(Move(opt));
-                cache_[JIEBA] = Move(analyzer);
+                opt.path_ = InfinityContext::instance().config()->resource_dict_path();
+                UniquePtr<IRSJiebaAnalyzer> analyzer = MakeUnique<IRSJiebaAnalyzer>(Move(opt));
+                if (analyzer->load())
+                    cache_[JIEBA] = Move(analyzer);
             } break;
             case Str2Int(SEGMENT.data()): {
                 IRSSegmentationAnalyzer::options_t opt;
@@ -49,6 +52,8 @@ void AnalyzerPool::Set(const StringView &name, const String &args) {
 
 UniquePtr<IRSAnalyzer> AnalyzerPool::Get(const StringView &name) {
     IRSAnalyzer *analyzer = cache_[name].get();
+    if (!analyzer)
+        return nullptr;
     switch (Str2Int(name.data())) {
         case Str2Int(JIEBA.data()): {
             return MakeUnique<IRSJiebaAnalyzer>(*reinterpret_cast<IRSJiebaAnalyzer *>(analyzer));

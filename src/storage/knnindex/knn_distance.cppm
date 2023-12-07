@@ -16,6 +16,7 @@ module;
 
 import stl;
 import parser;
+import bitmask;
 
 export module knn_distance;
 
@@ -70,6 +71,8 @@ public:
     virtual void Begin() = 0;
 
     virtual void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) = 0;
+
+    virtual void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id, Bitmask &bitmask) = 0;
 
     virtual void End() = 0;
 

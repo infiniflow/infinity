@@ -93,131 +93,131 @@ namespace infinity {
 void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
     switch (op->operator_type()) {
         case PhysicalOperatorType::kAggregate: {
-            Explain((PhysicalAggregate *)op, result, is_recursive, intent_size);
+            Explain((PhysicalAggregate *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kUnionAll: {
-            Explain((PhysicalUnionAll *)op, result, is_recursive, intent_size);
+            Explain((PhysicalUnionAll *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kShow: {
-            Explain((PhysicalShow *)op, result, is_recursive, intent_size);
+            Explain((PhysicalShow *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kTableScan: {
-            Explain((PhysicalTableScan *)op, result, is_recursive, intent_size);
+            Explain((PhysicalTableScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
-            Explain((PhysicalKnnScan *)op, result, is_recursive, intent_size);
+            Explain((PhysicalKnnScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFilter: {
-            Explain((PhysicalFilter *)op, result, is_recursive, intent_size);
+            Explain((PhysicalFilter *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kIndexScan: {
-            Explain((PhysicalIndexScan *)op, result, is_recursive, intent_size);
+            Explain((PhysicalIndexScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDummyScan: {
-            Explain((PhysicalDummyScan *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDummyScan *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kJoinHash: {
-            Explain((PhysicalHashJoin *)op, result, is_recursive, intent_size);
+            Explain((PhysicalHashJoin *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kJoinNestedLoop: {
-            Explain((PhysicalNestedLoopJoin *)op, result, is_recursive, intent_size);
+            Explain((PhysicalNestedLoopJoin *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kJoinMerge: {
-            Explain((PhysicalSortMergeJoin *)op, result, is_recursive, intent_size);
+            Explain((PhysicalSortMergeJoin *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kJoinIndex: {
-            Explain((PhysicalIndexJoin *)op, result, is_recursive, intent_size);
+            Explain((PhysicalIndexJoin *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCrossProduct: {
-            Explain((PhysicalCrossProduct *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCrossProduct *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kLimit: {
-            Explain((PhysicalLimit *)op, result, is_recursive, intent_size);
+            Explain((PhysicalLimit *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kTop: {
-            Explain((PhysicalTop *)op, result, is_recursive, intent_size);
+            Explain((PhysicalTop *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kProjection: {
-            Explain((PhysicalProject *)op, result, is_recursive, intent_size);
+            Explain((PhysicalProject *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kSort: {
-            Explain((PhysicalSort *)op, result, is_recursive, intent_size);
+            Explain((PhysicalSort *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDelete: {
-            Explain((PhysicalDelete *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDelete *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kUpdate: {
-            Explain((PhysicalUpdate *)op, result, is_recursive, intent_size);
+            Explain((PhysicalUpdate *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kInsert: {
-            Explain((PhysicalInsert *)op, result, is_recursive, intent_size);
+            Explain((PhysicalInsert *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kImport: {
-            Explain((PhysicalImport *)op, result, is_recursive, intent_size);
+            Explain((PhysicalImport *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kExport: {
-            Explain((PhysicalExport *)op, result, is_recursive, intent_size);
+            Explain((PhysicalExport *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kAlter: {
-            Explain((PhysicalAlter *)op, result, is_recursive, intent_size);
+            Explain((PhysicalAlter *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateTable: {
-            Explain((PhysicalCreateTable *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCreateTable *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateIndex: {
-            Explain((PhysicalCreateIndex *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCreateIndex *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateCollection: {
-            Explain((PhysicalCreateCollection *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCreateCollection *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateDatabase: {
-            Explain((PhysicalCreateSchema *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCreateSchema *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateView: {
-            Explain((PhysicalCreateView *)op, result, is_recursive, intent_size);
+            Explain((PhysicalCreateView *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDropTable: {
-            Explain((PhysicalDropTable *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDropTable *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDropCollection: {
-            Explain((PhysicalDropCollection *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDropCollection *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDropDatabase: {
-            Explain((PhysicalDropSchema *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDropSchema *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kDropView: {
-            Explain((PhysicalDropView *)op, result, is_recursive, intent_size);
+            Explain((PhysicalDropView *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kExplain: {
@@ -227,7 +227,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kFlush: {
-            Explain((PhysicalFlush *)op, result, is_recursive, intent_size);
+            Explain((PhysicalFlush *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kSource: {
@@ -267,27 +267,31 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kMergeKnn: {
-            Explain((PhysicalMergeKnn *)op, result, is_recursive, intent_size);
+            Explain((PhysicalMergeKnn *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMatch: {
-            Explain((PhysicalMatch *)op, result, is_recursive, intent_size);
+            Explain((PhysicalMatch *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFusion: {
-            Explain((PhysicalFusion *)op, result, is_recursive, intent_size);
+            Explain((PhysicalFusion *)op, result, intent_size);
             break;
         }
         default: {
             Error<PlannerException>("Unexpected logical node type");
         }
     }
+
+    if (is_recursive) {
+        if (op->left() != nullptr)
+            ExplainPhysicalPlan::Explain(op->left(), result, is_recursive, intent_size + 2);
+        if (op->right() != nullptr)
+            ExplainPhysicalPlan::Explain(op->right(), result, is_recursive, intent_size + 2);
+    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -319,10 +323,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -376,10 +377,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -419,10 +417,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -460,10 +455,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -495,10 +487,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -536,10 +525,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -577,10 +563,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String insert_header_str;
         if (intent_size != 0) {
@@ -633,17 +616,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node,
 
         result->emplace_back(MakeShared<String>(insert_str));
     }
-
-    if (insert_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(insert_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String project_header;
         if (intent_size != 0) {
@@ -677,17 +652,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalProject *project_node,
         expression_str += "]";
         result->emplace_back(MakeShared<String>(expression_str));
     }
-
-    if (project_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(project_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String filter_node_header;
     if (intent_size != 0) {
         filter_node_header = String(intent_size - 2, ' ') + "-> FILTER ";
@@ -714,17 +681,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalFilter *filter_node,
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
-
-    if (filter_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(filter_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String table_scan_header;
     if (intent_size != 0) {
         table_scan_header = String(intent_size - 2, ' ') + "-> TABLE SCAN ";
@@ -759,17 +718,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node,
     output_columns += table_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
-
-    if (table_scan_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(table_scan_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String knn_scan_header;
     if (intent_size != 0) {
         knn_scan_header = String(intent_size - 2, ' ') + "-> KNN SCAN ";
@@ -839,10 +790,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregates_count == 0) {
@@ -896,14 +844,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
         group_by_expression_str += "]";
         result->emplace_back(MakeShared<String>(group_by_expression_str));
     }
-
-    if (aggregate_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(aggregate_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String sort_header;
         if (intent_size != 0) {
@@ -943,14 +886,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vecto
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
-
-    if (sort_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(sort_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String limit_header;
         if (intent_size != 0) {
@@ -986,17 +924,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vec
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
-
-    if (limit_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(limit_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String cross_product_header;
         if (intent_size != 0) {
@@ -1019,21 +949,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalCrossProduct *cross_product_node
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
-
-    intent_size += 2;
-    if (cross_product_node->left() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(cross_product_node->left(), result, is_recursive, intent_size);
-    }
-
-    if (cross_product_node->right() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(cross_product_node->right(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String join_header;
     if (intent_size != 0) {
         join_header = String(intent_size - 2, ' ') + "-> NESTED LOOP JOIN";
@@ -1072,18 +990,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node,
         output_columns_str += output_columns->back() + "]";
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
-
-    intent_size += 2;
-    if (join_node->left() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(join_node->left(), result, is_recursive, intent_size);
-    }
-
-    if (join_node->right() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(join_node->right(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->scan_type()) {
         case ShowType::kShowTables: {
             String show_str;
@@ -1271,63 +1180,37 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             Error<ExecutorException>("Invalid show type");
         }
     }
-
-    if (show_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(show_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalTop *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalTop *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String header;
     if (intent_size != 0) {
         header = String(intent_size - 2, ' ') + "-> DELETE FROM ";
@@ -1339,15 +1222,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node,
     DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
     header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
     result->emplace_back(MakeShared<String>(header));
-    if (delete_node->left() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(delete_node->left(), result, is_recursive, intent_size + 2);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String header;
     if (intent_size != 0) {
         header = String(intent_size - 2, ' ') + "-> UPDATE ";
@@ -1359,15 +1236,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node,
     DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
     header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
     result->emplace_back(MakeShared<String>(header));
-    if (update_node->left() != nullptr && is_recursive) {
-        ExplainPhysicalPlan::Explain(update_node->left(), result, is_recursive, intent_size + 2);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String import_header_str;
         if (intent_size != 0) {
@@ -1427,10 +1298,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String export_header_str;
         if (intent_size != 0) {
@@ -1487,17 +1355,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalAlter *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalAlter *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     Error<PlannerException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {
@@ -1550,10 +1412,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String drop_header_str;
         if (intent_size != 0) {
@@ -1585,7 +1444,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node,
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String flush_header_str;
     if (intent_size != 0) {
         flush_header_str = String(intent_size - 2, ' ') + "-> FLUSH ";
@@ -1610,7 +1469,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalFlush *flush_node, SharedPtr<Vec
 
 void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1622,7 +1481,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
         explain_header_str = String(intent_size - 2, ' ') + "-> SINK ";
@@ -1635,7 +1494,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vecto
 
 void ExplainPhysicalPlan::Explain(const PhysicalParallelAggregate *parallel_aggregate_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1649,7 +1508,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalParallelAggregate *parallel_aggr
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeParallelAggregate *merge_parallel_aggregate_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1663,7 +1522,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeParallelAggregate *merge_pa
 
 void ExplainPhysicalPlan::Explain(const PhysicalIntersect *intersect_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1677,7 +1536,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalIntersect *intersect_node,
 
 void ExplainPhysicalPlan::Explain(const PhysicalExcept *except_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1689,7 +1548,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalExcept *except_node,
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
         explain_header_str = String(intent_size - 2, ' ') + "-> HASH ";
@@ -1702,7 +1561,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalHash *hash_node, SharedPtr<Vecto
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeHash *merge_hash_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1716,7 +1575,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeHash *merge_hash_node,
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1730,7 +1589,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1744,7 +1603,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeSort *merge_sort_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1758,7 +1617,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeSort *merge_sort_node,
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
@@ -1785,29 +1644,17 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
     output_columns += merge_knn_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
-
-    if (merge_knn_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(merge_knn_node->left(), result, is_recursive, intent_size);
-    }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, bool is_recursive, i64 intent_size) {
-//    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  bool is_recursive,
+
                                   i64 intent_size) {
     result->emplace_back(MakeShared<String>(fusion_node->ToString(intent_size)));
-    if (fusion_node->left() != nullptr && is_recursive) {
-        intent_size += 2;
-        ExplainPhysicalPlan::Explain(fusion_node->left(), result, is_recursive, intent_size);
-        if (fusion_node->right() != nullptr) {
-            ExplainPhysicalPlan::Explain(fusion_node->right(), result, is_recursive, intent_size);
-        }
-    }
 }
 
 } // namespace infinity

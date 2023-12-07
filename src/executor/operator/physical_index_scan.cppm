@@ -20,6 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
+import load_meta;
 
 export module physical_index_scan;
 
@@ -27,13 +28,14 @@ namespace infinity {
 
 export class PhysicalIndexScan : public PhysicalOperator {
 public:
-    explicit PhysicalIndexScan(u64 id) : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id) {}
+    explicit PhysicalIndexScan(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalIndexScan() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

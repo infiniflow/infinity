@@ -31,6 +31,7 @@ export struct DataBlock {
 
 public:
     static inline SharedPtr<DataBlock> Make() { return MakeShared<DataBlock>(); }
+    static inline UniquePtr<DataBlock> MakeUniquePtr() { return MakeUnique<DataBlock>(); }
 
 public:
     DataBlock() = default;
@@ -77,6 +78,8 @@ public:
     void AppendWith(const DataBlock *other);
 
     void AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count);
+
+    void InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index);
 
 public:
     [[nodiscard]] inline SizeT column_count() const { return column_count_; }

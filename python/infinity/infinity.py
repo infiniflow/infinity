@@ -16,17 +16,7 @@ from pathlib import Path
 from typing import Union
 from abc import ABC, abstractmethod
 
-
-class NetworkAddress:
-    def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
-
-    def __str__(self):
-        return f'IP: {self.ip}, Port: {self.port}'
-
-
-URI = Union[NetworkAddress, Path]
+from infinity import URI
 
 
 # abstract class

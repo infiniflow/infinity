@@ -22,6 +22,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
+import fragment_data;
 
 import infinity_exception;
 
@@ -31,9 +32,9 @@ namespace infinity {
 
 void PhysicalSource::Init() {}
 
-void PhysicalSource::Execute(QueryContext *, OperatorState *) {}
+bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 
-void PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
+bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
             Error<ExecutorException>("Unsupported source state type.");
@@ -46,19 +47,17 @@ void PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         }
         case SourceStateType::kQueue: {
             QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);
-            queue_source_state->source_queue_.Dequeue(queue_source_state->current_fragment_data_);
-            queue_source_state->SetTotalDataCount(queue_source_state->current_fragment_data_->data_count_);
-            queue_source_state->PushData(queue_source_state->current_fragment_data_->data_block_.get());
+            queue_source_state->GetData();
             break;
         }
         default: {
             Error<NotImplementException>("Not support source state type");
         }
     }
+    return true;
 }
 
 bool PhysicalSource::ReadyToExec(SourceState *source_state) {
-
     bool result = true;
     if (source_state->state_type_ == SourceStateType::kQueue) {
         QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);

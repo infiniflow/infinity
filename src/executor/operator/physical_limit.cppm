@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import load_meta;
 
 export module physical_limit;
 
@@ -29,15 +30,19 @@ namespace infinity {
 
 export class PhysicalLimit : public PhysicalOperator {
 public:
-    explicit PhysicalLimit(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<BaseExpression> limit_expr, SharedPtr<BaseExpression> offset_expr)
-        : PhysicalOperator(PhysicalOperatorType::kLimit, Move(left), nullptr, id), limit_expr_(Move(limit_expr)),
+    explicit PhysicalLimit(u64 id,
+                           UniquePtr<PhysicalOperator> left,
+                           SharedPtr<BaseExpression> limit_expr,
+                           SharedPtr<BaseExpression> offset_expr,
+                           SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kLimit, Move(left), nullptr, id, load_metas), limit_expr_(Move(limit_expr)),
           offset_expr_(Move(offset_expr)) {}
 
     ~PhysicalLimit() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 

@@ -17,12 +17,12 @@ module;
 import stl;
 import logical_node_type;
 import column_binding;
+import load_meta;
+import parser;
 
 export module logical_node;
 
 namespace infinity {
-
-class DataType;
 
 export class LogicalNode {
 public:
@@ -52,6 +52,10 @@ public:
 
     void set_node_id(u64 node_id) { node_id_ = node_id; }
 
+    [[nodiscard]] SharedPtr<Vector<LoadMeta>> load_metas() const { return load_metas_; }
+
+    void set_load_metas(SharedPtr<Vector<LoadMeta>> load_metas) { load_metas_ = load_metas; }
+
     virtual String ToString(i64 &space) const = 0;
 
     virtual String name() = 0;
@@ -64,6 +68,9 @@ protected:
 
     SharedPtr<LogicalNode> left_node_{};
     SharedPtr<LogicalNode> right_node_{};
+
+    SharedPtr<Vector<LoadMeta>> load_metas_{};
+
 public:
     template <class TARGET>
     TARGET &Cast() {

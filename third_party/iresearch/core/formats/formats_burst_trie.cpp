@@ -1259,8 +1259,7 @@ void field_writer::prepare(const flush_state& state) {
 
   std::string filename;
   bstring enc_header;
-  auto* enc = state.dir->attributes().encryption();
-
+  auto *enc = state.dir->attributes().encryption();
   // prepare term dictionary
   prepare_output(filename, terms_out_, state, TERMS_EXT, FORMAT_TERMS,
                  static_cast<int32_t>(version_));
@@ -1315,7 +1314,6 @@ void field_writer::write(const basic_term_reader& reader,
   uint64_t term_count = 0;
   uint64_t sum_dfreq = 0;
   uint64_t sum_tfreq = 0;
-
   const bool freq_exists =
     IndexFeatures::NONE != (index_features & IndexFeatures::FREQ);
 

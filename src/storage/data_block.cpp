@@ -157,6 +157,9 @@ void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
 }
 
 void DataBlock::Finalize() {
+    if(finalized) {
+        return ;
+    }
     bool first_flat_column_vector = false;
     SizeT row_count = 0;
     for (SizeT idx = 0; idx < column_count_; ++idx) {
@@ -243,6 +246,11 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT 
     for (SizeT idx = 0; idx < column_count; ++idx) {
         this->column_vectors[idx]->AppendWith(*other->column_vectors[idx], from, count);
     }
+}
+
+void DataBlock::InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index) {
+    column_vectors.insert(column_vectors.begin() + index, vector);
+    column_count_++;
 }
 
 bool DataBlock::operator==(const DataBlock &other) const {

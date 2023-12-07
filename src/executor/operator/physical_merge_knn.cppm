@@ -23,6 +23,7 @@ import physical_operator_type;
 import base_expression;
 import data_table;
 import base_table_ref;
+import load_meta;
 
 export module physical_merge_knn;
 
@@ -38,16 +39,17 @@ public:
                               Vector<SharedPtr<BaseExpression>> knn_exprs,
                               SharedPtr<BaseExpression> limit_expr,
                               OrderType order_by_type,
-                              u64 knn_table_index)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id), output_names_(Move(output_names)), output_types_(Move(output_types)),
-          knn_table_index_(knn_table_index), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)), table_ref_(table_ref),
-          order_by_type_(order_by_type) {}
+                              u64 knn_table_index,
+                              SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id, load_metas), table_ref_(table_ref), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), knn_expressions_(Move(knn_exprs)), limit_expression_(Move(limit_expr)), order_by_type_(order_by_type),
+          knn_table_index_(knn_table_index) {}
 
     ~PhysicalMergeKnn() override = default;
 
     void Init() override;
 
-    void Execute(QueryContext *query_context, OperatorState *operator_state) final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
