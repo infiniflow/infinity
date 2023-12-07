@@ -73,8 +73,8 @@ module physical_knn_scan;
 
 namespace infinity {
 
-    void block_scan_for_filter(DataBlock &output, BufferManager *buffer_mgr, const auto row_count,
-                               const BlockEntry *current_block_entry, const Vector <SizeT> &column_ids) {
+    void ReadDataBlock(DataBlock &output, BufferManager *buffer_mgr, const auto row_count,
+                       const BlockEntry *current_block_entry, const Vector <SizeT> &column_ids) {
         auto block_id = current_block_entry->block_id_;
         auto segment_id = current_block_entry->segment_entry_->segment_id_;
         for (SizeT output_column_id = 0; auto column_id: column_ids) {
@@ -258,7 +258,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             //filter and build bitmask, if filter_expression_ != nullptr
             DataBlock db_for_filter;
             db_for_filter.Init(*(base_table_ref_->column_types_), row_count);
-            block_scan_for_filter(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
+            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
             auto filter_state = ExpressionState::CreateState(filter_expression_);
             auto bool_column = MakeShared<ColumnVector>(MakeShared<infinity::DataType>(LogicalType::kBoolean));
             bool_column->Initialize();
@@ -277,9 +277,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
         Vector <DataType> dists;
         if (use_bitmask) {
-            dists = dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_, bitmask);
+            dists = Move(dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_, bitmask));
         } else {
-            dists = dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_);
+            dists = Move(dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_));
         }
 
         Vector<RowID> row_ids(row_count);
@@ -319,8 +319,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             for (auto &block_entry: segment_entry->block_entries_) {
                 auto row_count = block_entry->row_count_;
                 db_for_filter.Init(*(base_table_ref_->column_types_), row_count);
-                block_scan_for_filter(db_for_filter, buffer_mgr, row_count, block_entry.get(),
-                                      base_table_ref_->column_ids_);
+                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry.get(), base_table_ref_->column_ids_);
                 expr_evaluator.Init(&db_for_filter);
                 expr_evaluator.Execute(filter_expression_, filter_state, bool_column);
                 const auto *bool_column_ptr = (const u8 *) (bool_column->data());
@@ -331,7 +330,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 bool_column->Reset();
             }
             if (segment_row_count_real != segment_row_count) {
-                Error<ExecutorException>(Format("Bug: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                Error<ExecutorException>(
+                        Format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
                                                 segment_id, segment_row_count_real, segment_row_count));
             }
         }
@@ -353,11 +353,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     ann_ivfflat_query.End();
                     auto dists = ann_ivfflat_query.GetDistances();
                     auto row_ids = ann_ivfflat_query.GetIDs();
-                    constexpr auto vacant_value = AnnIVFFlatType::vacant_value();
                     //TODO: now only work for one query
                     //FIXME: cant work for multiple queries
-                    auto result_count = std::lower_bound(dists, dists + knn_scan_shared_data->topk_, vacant_value,
-                                                         AnnIVFFlatType::compare_dist) - dists;
+                    auto result_count =
+                            std::lower_bound(dists, dists + knn_scan_shared_data->topk_, AnnIVFFlatType::InvalidValue(),
+                                             AnnIVFFlatType::CompareDist) - dists;
                     merge_heap->Search(dists, row_ids, result_count);
                 };
                 switch (knn_scan_shared_data->knn_distance_type_) {
