@@ -44,7 +44,6 @@ namespace infinity {
 
 SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    Assert<PlannerException>(bind_context->knn_exprs_.empty(), "knn_exprs_ shall be empty");
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);

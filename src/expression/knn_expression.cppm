@@ -31,7 +31,8 @@ public:
                   i64 dimension,
                   KnnDistanceType knn_distance_type,
                   EmbeddingT query_embedding,
-                  Vector<SharedPtr<BaseExpression>> arguments);
+                  Vector<SharedPtr<BaseExpression>> arguments,
+                  i64 topn);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
@@ -42,6 +43,7 @@ public:
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
     EmbeddingT query_embedding_;
+    i64 topn_;
 };
 
 } // namespace infinity

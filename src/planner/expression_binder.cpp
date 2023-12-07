@@ -434,19 +434,22 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
                                                                         parsed_knn_expr.dimension_,
                                                                         parsed_knn_expr.distance_type_,
                                                                         Move(query_embedding),
-                                                                        arguments);
+                                                                        arguments,
+                                                                        parsed_knn_expr.topn_);
 
     return bound_knn_expr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *, i64, bool) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     SharedPtr<FusionExpression> fusion_expr = nullptr;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
     }
-    // TODO: build KNN expressions
+    for (KnnExpr *knn_expr : expr.knn_exprs_) {
+        knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
+    }
     if (expr.fusion_expr_ != nullptr)
         fusion_expr = MakeShared<FusionExpression>(expr.fusion_expr_->method_, expr.fusion_expr_->options_);
     SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, fusion_expr);
