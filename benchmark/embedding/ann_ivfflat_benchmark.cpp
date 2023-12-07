@@ -307,47 +307,33 @@ int main() {
         BaseProfiler profiler;
         std::chrono::duration<double> t_val = std::chrono::duration<double>::zero();
         Vector <Vector<u32>> results;
+        auto search_f = [&]<typename AnnIVFFlat>() {
+            AnnIVFFlat test_ivf(queries.get(), number_of_queries, top_k, dimension,
+                                EmbeddingDataType::kElemFloat);
+            test_ivf.Begin();
+            profiler.Begin();
+            auto t0 = std::chrono::high_resolution_clock::now();
+            test_ivf.Search(ann_index_data.get(), 0, n_probes);
+            t_val += std::chrono::duration_cast<std::chrono::duration<double>>(
+                    std::chrono::high_resolution_clock::now() - t0);
+            profiler.End();
+            test_ivf.End();
+            auto ID = test_ivf.GetIDs();
+            results.resize(number_of_queries);
+            for (size_t i = 0; i < number_of_queries; ++i) {
+                results[i].resize(top_k);
+                for (size_t j = 0; j < top_k; ++j) {
+                    results[i][j] = ID[i * top_k + j].segment_offset_;
+                }
+            }
+        };
         switch (metric) {
             case MetricType::kMerticL2: {
-                AnnIVFFlatL2 <f32> test_ivf(queries.get(), number_of_queries, top_k, dimension,
-                                            EmbeddingDataType::kElemFloat);
-                test_ivf.Begin();
-                profiler.Begin();
-                auto t0 = std::chrono::high_resolution_clock::now();
-                test_ivf.Search(ann_index_data.get(), 0, n_probes);
-                t_val += std::chrono::duration_cast<std::chrono::duration<double>>(
-                        std::chrono::high_resolution_clock::now() - t0);
-                profiler.End();
-                test_ivf.End();
-                auto ID = test_ivf.GetIDs();
-                results.resize(number_of_queries);
-                for (size_t i = 0; i < number_of_queries; ++i) {
-                    results[i].resize(top_k);
-                    for (size_t j = 0; j < top_k; ++j) {
-                        results[i][j] = ID[i * top_k + j].segment_offset_;
-                    }
-                }
+                search_f.template operator()<AnnIVFFlatL2<f32>>();
                 break;
             }
             case MetricType::kMerticInnerProduct: {
-                AnnIVFFlatIP <f32> test_ivf(queries.get(), number_of_queries, top_k, dimension,
-                                            EmbeddingDataType::kElemFloat);
-                test_ivf.Begin();
-                profiler.Begin();
-                auto t0 = std::chrono::high_resolution_clock::now();
-                test_ivf.Search(ann_index_data.get(), 0, n_probes);
-                t_val += std::chrono::duration_cast<std::chrono::duration<double>>(
-                        std::chrono::high_resolution_clock::now() - t0);
-                profiler.End();
-                test_ivf.End();
-                auto ID = test_ivf.GetIDs();
-                results.resize(number_of_queries);
-                for (size_t i = 0; i < number_of_queries; ++i) {
-                    results[i].resize(top_k);
-                    for (size_t j = 0; j < top_k; ++j) {
-                        results[i][j] = ID[i * top_k + j].segment_offset_;
-                    }
-                }
+                search_f.template operator()<AnnIVFFlatIP<f32>>();
                 break;
             }
             default:
