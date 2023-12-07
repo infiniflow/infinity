@@ -34,6 +34,8 @@ import local_file_system;
 import segment_entry;
 import parser;
 import codec;
+import file_writer;
+import file_reader;
 
 module pgm_numeric;
 
@@ -50,6 +52,10 @@ class PGM : public PGMIndex<VALUE, 8>, public PGMBase {
 
     ApproxPos Search(u64 val) const final;
 
+    void Load(SharedPtr<FileReader> &file_reader) final;
+
+    void Save(SharedPtr<FileWriter> &file_writer) const final;
+
 private:
     Vector<VALUE> data_buffer_;
 };
@@ -64,6 +70,49 @@ template <typename VALUE>
 void PGM<VALUE>::Build() {
     BASE(data_buffer_.begin(), data_buffer_.end());
     data_buffer_.clear();
+}
+
+template <typename VALUE>
+void PGM<VALUE>::Load(SharedPtr<FileReader> &file_reader) {
+    this->n = file_reader->ReadVInt();
+    this->first_key = file_reader->ReadVLong();
+    auto size = file_reader->ReadVInt();
+    this->segments.resize(size);
+    for (auto &segment : this->segments) {
+        segment.key = file_reader->ReadVLong();
+        auto s = file_reader->ReadVInt();
+        segment.slope = Codec::U32ToFloat(s);
+        segment.intercept = file_reader->ReadVInt();
+    }
+    size = file_reader->ReadVInt();
+    this->levels_sizes.resize(size);
+    for (size_t &level_size : this->levels_sizes)
+        level_size = file_reader->ReadVLong();
+    auto s = file_reader->ReadVInt();
+    this->levels_offsets.resize(s);
+    for (size_t &level_offset : this->levels_offsets)
+        level_offset = file_reader->ReadVLong();
+}
+
+template <typename VALUE>
+void PGM<VALUE>::Save(SharedPtr<FileWriter> &file_writer) const {
+    file_writer->WriteVInt((u32)(this->n));
+    file_writer->WriteVLong((u64)(this->first_key));
+    file_writer->WriteVInt((u32)(this->segments.size()));
+
+    for (const auto &segment : this->segments) {
+        file_writer->WriteVLong((u64)(segment.key));
+        file_writer->WriteVInt(Codec::FloatToU32(segment.slope));
+        file_writer->WriteVInt(segment.intercept);
+    }
+
+    file_writer->WriteVInt((u32)(this->levels_sizes.size()));
+    for (const SizeT &level_size : this->levels_sizes)
+        file_writer->WriteVLong(level_size);
+
+    file_writer->WriteVInt((u32)(this->levels_offsets.size()));
+    for (const SizeT &level_offset : this->levels_offsets)
+        file_writer->WriteVLong(level_offset);
 }
 
 static ApproxPos GetPos(pgm::ApproxPos approx_pos) {
@@ -198,12 +247,11 @@ void NumericIndex::Insert(SegmentEntry *segment_entry, SharedPtr<ColumnDef> colu
                 } break;
                 case kDateTime: {
                     auto block_data_ptr = reinterpret_cast<const DateTimeType *>(buffer_handle.GetData());
-                    DateTimeType v = block_data_ptr[i];
                     column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
                 } break;
                 case kTimestamp: {
                     auto block_data_ptr = reinterpret_cast<const TimestampType *>(buffer_handle.GetData());
-                    TimestampType v = block_data_ptr[i];
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
                 } break;
                 default:
                     break;

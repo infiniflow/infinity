@@ -108,7 +108,7 @@ protected:
             auto x = first[i];
             // Here there is an adjustment for inputs with duplicate keys: at the end of a run of duplicate keys equal
             // to x=first[i] such that x+1!=first[i+1], we map the values x+1,...,first[i+1]-1 to their correct rank i
-            auto flag = i > 0 && i + 1u < n && x == first[i - 1] && x != first[i + 1] && x + 1 != first[i + 1];
+            auto flag = i > 0 && i + 1u < (size_t)n && x == first[i - 1] && x != first[i + 1] && x + 1 != first[i + 1];
             return std::pair<K, size_t>(x + flag, i);
         };
         auto out_fun = [&](auto cs) { segments.emplace_back(cs); };
@@ -149,7 +149,7 @@ protected:
 
             static constexpr size_t linear_search_threshold = 8 * 64 / sizeof(Segment);
             if constexpr (EpsilonRecursive <= linear_search_threshold) {
-                for (; std::distance(level_begin,lo)<level_size && std::next(lo)->key <= key; ++lo)
+                for (; (size_t)std::distance(level_begin, lo) < level_size && std::next(lo)->key <= key; ++lo)
                     continue;
                 it = lo;
             } else {

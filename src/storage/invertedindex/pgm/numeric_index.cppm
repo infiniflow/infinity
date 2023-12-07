@@ -20,6 +20,8 @@ import segment_entry;
 import buffer_manager;
 import file_system;
 import parser;
+import file_writer;
+import file_reader;
 
 export module pgm_numeric;
 
@@ -35,8 +37,8 @@ class PGMBase {
 public:
     virtual ~PGMBase() = default;
 
-    // virtual SizeT Save(Vector<u8> &dData) const = 0;
-    // virtual void Load(FileHandler &file_handler) = 0;
+    virtual void Load(SharedPtr<FileReader> &file_reader) = 0;
+    virtual void Save(SharedPtr<FileWriter> &file_writer) const = 0;
     virtual void AppendBlock(const void *data, SizeT size) = 0;
     virtual void Build() = 0;
     virtual ApproxPos Search(u64 val) const = 0;
