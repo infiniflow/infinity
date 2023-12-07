@@ -1175,7 +1175,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     }
 }
 
-void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
+void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
     if (count == 0) {
         return;
     }
@@ -1190,39 +1190,39 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
 
     switch (data_type_->type()) {
         case kBoolean: {
-            CopyValue<BooleanT>(*this, other, count);
+            CopyValue<BooleanT>(*this, other, from, count);
             break;
         }
         case kTinyInt: {
-            CopyValue<TinyIntT>(*this, other, count);
+            CopyValue<TinyIntT>(*this, other, from, count);
             break;
         }
         case kSmallInt: {
-            CopyValue<SmallIntT>(*this, other, count);
+            CopyValue<SmallIntT>(*this, other, from, count);
             break;
         }
         case kInteger: {
-            CopyValue<IntegerT>(*this, other, count);
+            CopyValue<IntegerT>(*this, other, from, count);
             break;
         }
         case kBigInt: {
-            CopyValue<BigIntT>(*this, other, count);
+            CopyValue<BigIntT>(*this, other, from, count);
             break;
         }
         case kHugeInt: {
-            CopyValue<HugeIntT>(*this, other, count);
+            CopyValue<HugeIntT>(*this, other, from, count);
             break;
         }
         case kFloat: {
-            CopyValue<FloatT>(*this, other, count);
+            CopyValue<FloatT>(*this, other, from, count);
             break;
         }
         case kDouble: {
-            CopyValue<DoubleT>(*this, other, count);
+            CopyValue<DoubleT>(*this, other, from, count);
             break;
         }
         case kDecimal: {
-            CopyValue<DecimalT>(*this, other, count);
+            CopyValue<DecimalT>(*this, other, from, count);
             break;
         }
         case kVarchar: {
@@ -1230,7 +1230,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             auto *base_src_ptr = (VarcharT *)(other.data_ptr_);
             VarcharT *base_dst_ptr = &((VarcharT *)(data_ptr_))[this->tail_index_];
             for (SizeT idx = 0; idx < count; ++idx) {
-                VarcharT &src_ref = base_src_ptr[idx];
+                VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
                 dst_ref.length_ = src_ref.length_;
                 if (src_ref.IsInlined()) {
@@ -1249,23 +1249,23 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             break;
         }
         case kDate: {
-            CopyValue<DateT>(*this, other, count);
+            CopyValue<DateT>(*this, other, from, count);
             break;
         }
         case kTime: {
-            CopyValue<TimeT>(*this, other, count);
+            CopyValue<TimeT>(*this, other, from, count);
             break;
         }
         case kDateTime: {
-            CopyValue<DateTimeT>(*this, other, count);
+            CopyValue<DateTimeT>(*this, other, from, count);
             break;
         }
         case kTimestamp: {
-            CopyValue<TimestampT>(*this, other, count);
+            CopyValue<TimestampT>(*this, other, from, count);
             break;
         }
         case kInterval: {
-            CopyValue<IntervalT>(*this, other, count);
+            CopyValue<IntervalT>(*this, other, from, count);
             break;
         }
         case kArray: {
@@ -1276,31 +1276,31 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             Error<StorageException>("Shouldn't store tuple directly, a tuple is flatten as many columns");
         }
         case kPoint: {
-            CopyValue<PointT>(*this, other, count);
+            CopyValue<PointT>(*this, other, from, count);
             break;
         }
         case kLine: {
-            CopyValue<LineT>(*this, other, count);
+            CopyValue<LineT>(*this, other, from, count);
             break;
         }
         case kLineSeg: {
-            CopyValue<LineSegT>(*this, other, count);
+            CopyValue<LineSegT>(*this, other, from, count);
             break;
         }
         case kBox: {
-            CopyValue<BoxT>(*this, other, count);
+            CopyValue<BoxT>(*this, other, from, count);
             break;
         }
             //        case kPath: {
             //        }
         case kCircle: {
-            CopyValue<CircleT>(*this, other, count);
+            CopyValue<CircleT>(*this, other, from, count);
             break;
         }
             //        case kBitmap: {
             //        }
         case kUuid: {
-            CopyValue<UuidT>(*this, other, count);
+            CopyValue<UuidT>(*this, other, from, count);
             break;
         }
             //        case kBlob: {
@@ -1310,18 +1310,18 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT, SizeT count) {
             auto *base_src_ptr = other.data_ptr_;
             ptr_t base_dst_ptr = data_ptr_ + this->tail_index_ * data_type_->Size();
             for (SizeT idx = 0; idx < count; ++idx) {
-                ptr_t src_ptr = base_src_ptr + idx * data_type_->Size();
+                ptr_t src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
                 ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
                 Memcpy(dst_ptr, src_ptr, data_type_->Size());
             }
             break;
         }
         case kRowID: {
-            CopyValue<RowID>(*this, other, count);
+            CopyValue<RowID>(*this, other, from, count);
             break;
         }
         case kMixed: {
-            CopyValue<MixedT>(*this, other, count);
+            CopyValue<MixedT>(*this, other, from, count);
             break;
         }
         default: {
@@ -1377,7 +1377,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 //
          case kVarchar: {
              for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
-                 auto [data_ptr, data_size] = column_buffer.GetVarcharAt(row_idx);
+                 auto [data_ptr, data_size] = column_buffer.GetVarcharAt(start_row + row_idx);
                  const char* src_ptr = data_ptr;
                  SizeT src_size = data_size;
                  auto varchar_dst = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
