@@ -74,13 +74,13 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
         return static_cast<const_ptr_t>(inline_col_.GetData()) + data_type.Size() * row_idx;
     } else {
         switch (data_type.type()) {
-            case kVarchar:
-            case kArray:
-            case kTuple:
-//            case kPath:
-//            case kPolygon:
-//            case kBlob:
-            case kMixed: {
+            case LogicalType::kVarchar:
+            case LogicalType::kArray:
+            case LogicalType::kTuple:
+//            case LogicalType::kPath:
+//            case LogicalType::kPolygon:
+//            case LogicalType::kBlob:
+            case LogicalType::kMixed: {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
