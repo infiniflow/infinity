@@ -54,11 +54,8 @@ PhysicalFusion::PhysicalFusion(u64 id,
                                UniquePtr<PhysicalOperator> left,
                                UniquePtr<PhysicalOperator> right,
                                SharedPtr<FusionExpression> fusion_expr,
-                               SharedPtr<Vector<String>> output_names,
-                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id, load_metas), fusion_expr_(fusion_expr),
-      output_names_(Move(output_names)), output_types_(Move(output_types)) {}
+    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id, load_metas), fusion_expr_(fusion_expr) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 
@@ -90,8 +87,8 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         SizeT base_rank = 1;
         for (UniquePtr<DataBlock> &input_data_block : input_blocks) {
             Assert<ExecutorException>(
-                input_data_block->column_count() == output_types_->size(),
-                Format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), output_types_->size()));
+                input_data_block->column_count() == GetOutputTypes()->size(),
+                Format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), GetOutputTypes()->size()));
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
             SizeT row_n = input_data_block->row_count();
@@ -126,7 +123,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
 
     // 4 generate output data blocks
     UniquePtr<DataBlock> output_data_block = Move(DataBlock::MakeUniquePtr());
-    output_data_block->Init(*output_types_);
+    output_data_block->Init(*GetOutputTypes());
     SizeT row_count = 0;
     for (RRFRankDoc &doc : rrf_vec) {
         // 4.1 get every doc's columns from input data blocks
@@ -156,7 +153,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         }
 
         SizeT column_id = 0;
-        for (; column_id < output_types_->size() - 2; ++column_id) {
+        for (; column_id < GetOutputTypes()->size() - 2; ++column_id) {
             output_data_block->column_vectors[column_id]->AppendWith(*input_blocks[block_idx]->column_vectors[column_id], row_idx, 1);
         }
         // 4.2 add hidden columns: score, row_id

@@ -284,10 +284,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
     }
 
     if (is_recursive) {
-        if (op->left() != nullptr)
+        if (op->left() != nullptr) {
             ExplainPhysicalPlan::Explain(op->left(), result, is_recursive, intent_size + 2);
-        if (op->right() != nullptr)
+        }
+
+        if (op->right() != nullptr) {
             ExplainPhysicalPlan::Explain(op->right(), result, is_recursive, intent_size + 2);
+        }
     }
 }
 
@@ -766,9 +769,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     result->emplace_back(MakeShared<String>(query_embedding));
 
     // filter expression
-    String filter_str = String(intent_size, ' ') + " - filter: ";
-    ExplainLogicalPlan::Explain(knn_scan_node->filter_expression_.get(), filter_str);
-    result->emplace_back(MakeShared<String>(filter_str));
+    BaseExpression *filter_expr = knn_scan_node->filter_expression_.get();
+    if (filter_expr != nullptr) {
+        String filter_str = String(intent_size, ' ') + " - filter: ";
+        ExplainLogicalPlan::Explain(filter_expr, filter_str);
+        result->emplace_back(MakeShared<String>(filter_str));
+    }
 
     // Output columns
     String output_columns = String(intent_size, ' ') + " - output columns: [";
@@ -1645,14 +1651,78 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeKnn *merge_knn_node,
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    result->emplace_back(MakeShared<String>(match_node->ToString(intent_size)));
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> MATCH ";
+    } else {
+        explain_header_str = "MATCH ";
+    }
+    explain_header_str += "(" + ToStr(match_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ') + " - table name: " + match_node->TableAlias() + "(";
+
+    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(match_node->table_collection_ptr());
+
+    table_name += *db_entry->db_name_ + ".";
+    table_name += *match_node->table_collection_ptr()->table_collection_name_ + ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ') + " - table index: #" + ToStr(match_node->table_index());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    String match_expression = String(intent_size, ' ') + " - match expression: " + match_node->match_expr()->ToString();
+    result->emplace_back(MakeShared<String>(match_expression));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = match_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        Error<PlannerException>("No column in merge knn node.");
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += match_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += match_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    if (match_node->left() != nullptr) {
+        Error<PlannerException>("Match node have children nodes.");
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,
                                   SharedPtr<Vector<SharedPtr<String>>> &result,
-
                                   i64 intent_size) {
-    result->emplace_back(MakeShared<String>(fusion_node->ToString(intent_size)));
+    String explain_header_str;
+    if (intent_size != 0) {
+        explain_header_str = String(intent_size - 2, ' ') + "-> FUSION ";
+    } else {
+        explain_header_str = "FUSION ";
+    }
+    explain_header_str += "(" + ToStr(fusion_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(explain_header_str));
+
+    // Fusion expression
+    String table_index = String(intent_size, ' ') + " - fusion: #" + fusion_node->fusion_expr_->ToString();
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ') + " - output columns: [";
+    SizeT column_count = fusion_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        Error<PlannerException>("No column in fusion node.");
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += fusion_node->GetOutputNames()->at(idx) + ", ";
+    }
+    output_columns += fusion_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
 }
 
 } // namespace infinity

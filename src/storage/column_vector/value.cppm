@@ -53,6 +53,8 @@ public:
 
     static Value MakeVarchar(const char *ptr, bool is_move);
 
+    static Value MakeVarchar(const char* ptr, SizeT len);
+
     static Value MakeDate(DateT input);
 
     static Value MakeTime(TimeT input);

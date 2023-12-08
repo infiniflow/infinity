@@ -67,6 +67,42 @@ public:
 
     static const u8 *GetVLongPtr(const u8 *p, u64 *value);
 
+    static float U32ToFloat(u32 u_val) {
+        union {
+            float f_value;
+            u32 u_value;
+        } union_val;
+        union_val.u_value = u_val;
+        return union_val.f_value;
+    }
+
+    static u32 FloatToU32(float f_val) {
+        union {
+            float f_value;
+            u32 u_value;
+        } union_val;
+        union_val.f_value = f_val;
+        return union_val.f_value;
+    }
+
+    static double U64ToDouble(u64 u_val) {
+        union {
+            double d_value;
+            u64 u_value;
+        } union_val;
+        union_val.u_value = u_val;
+        return union_val.d_value;
+    }
+
+    static u64 DoubleToU64(double d_val) {
+        union {
+            double d_value;
+            u64 u_value;
+        } union_val;
+        union_val.d_value = d_val;
+        return union_val.u_value;
+    }
+
 private:
     void AppendFixed8(String &key, u8 i);
 

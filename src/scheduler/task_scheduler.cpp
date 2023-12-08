@@ -152,26 +152,21 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         for (SizeT idx = 0; idx < list_size; ++idx) {
             fragment_task = task_list[idx];
 
-            try {
-                if (fragment_task->IsTerminator()) {
-                    running = false;
-                    break;
-                }
+            if (fragment_task->IsTerminator()) {
+                running = false;
+                break;
+            }
 
-                if (!fragment_task->Ready()) {
-                    ready_queue_->Enqueue(fragment_task);
-                    continue;
-                }
+            if (!fragment_task->Ready()) {
+                ready_queue_->Enqueue(fragment_task);
+                continue;
+            }
 
-                fragment_task->OnExecute(worker_id);
-                fragment_task->SetLastWorkID(worker_id);
-                if (!fragment_task->IsComplete()) {
-                    ready_queue_->Enqueue(fragment_task);
-                } else {
-                    fragment_task->TryCompleteFragment();
-                }
-            } catch (const Exception &e) {
-                LOG_ERROR(e.what());
+            fragment_task->OnExecute(worker_id);
+            fragment_task->SetLastWorkID(worker_id);
+            if (!fragment_task->IsComplete()) {
+                ready_queue_->Enqueue(fragment_task);
+            } else {
                 fragment_task->TryCompleteFragment();
             }
         }

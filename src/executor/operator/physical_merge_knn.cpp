@@ -35,6 +35,7 @@ import block_entry;
 import default_values;
 import data_block;
 import knn_expression;
+import value;
 
 module physical_merge_knn;
 
@@ -139,8 +140,17 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), buffer_mgr);
 
-                    const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
-                    output_data_block->AppendValueByPtr(column_id, ptr);
+                    if(output_types_->at(column_id)->Plain()) {
+                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
+                        output_data_block->AppendValueByPtr(column_id, ptr);
+                    } else {
+                        if(output_types_->at(column_id)->type() != LogicalType::kVarchar) {
+                            Error<NotImplementException>("Not implement complex type reading from column buffer.");
+                        }
+                        auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
+                        Value value = Value::MakeVarchar(varchar_ptr, data_size);
+                        output_data_block->AppendValue(column_id, value);
+                    }
                 }
                 output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);

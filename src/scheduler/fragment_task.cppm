@@ -40,12 +40,13 @@ enum class FragmentSinkType {
     kStream,
 };
 
-enum class FragmentTaskState {
+enum class FragmentTaskStatus {
     kRunning,
     kCancelled,
     kFinished,
     kReady,
     kPending,
+    kError,
 };
 
 export class FragmentTask {
@@ -91,8 +92,16 @@ public:
 
     String PhysOpsToString();
 
+    inline void set_status(FragmentTaskStatus new_status) {
+        status_ = new_status;
+    }
+
+    [[nodiscard]] inline FragmentTaskStatus status() const {
+        return status_;
+    }
+
 public:
-    Atomic<FragmentTaskState> state_{FragmentTaskState::kReady};
+    FragmentTaskStatus status_{FragmentTaskStatus::kReady};
 
     UniquePtr<SourceState> source_state_{};
 

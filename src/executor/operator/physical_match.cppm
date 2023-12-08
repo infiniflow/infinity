@@ -32,7 +32,11 @@ namespace infinity {
 
 export class PhysicalMatch final : public PhysicalOperator {
 public:
-    explicit PhysicalMatch(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr, SharedPtr<Vector<LoadMeta>> load_metas);
+    explicit PhysicalMatch(u64 id,
+                           SharedPtr<BaseTableRef> base_table_ref,
+                           SharedPtr<MatchExpression> match_expr,
+                           u64 match_table_index,
+                           SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalMatch() override;
 
@@ -50,8 +54,17 @@ public:
 
     String ToString(i64 &space) const;
 
+    [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
+
+    [[nodiscard]] inline TableCollectionEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+
+    [[nodiscard]] inline u64 table_index() const { return table_index_; }
+
+    [[nodiscard]] inline MatchExpression* match_expr() const { return match_expr_.get(); }
+private:
+    u64 table_index_{};
     SharedPtr<BaseTableRef> base_table_ref_{};
-    SharedPtr<MatchExpression> match_expr_;
+    SharedPtr<MatchExpression> match_expr_{};
 };
 
 } // namespace infinity

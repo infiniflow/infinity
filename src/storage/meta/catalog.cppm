@@ -15,6 +15,7 @@
 module;
 
 import stl;
+import parser;
 import base_entry;
 import db_entry;
 import db_meta;
@@ -85,8 +86,13 @@ public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
-    static Status
-    CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
+    static Status CreateDatabase(NewCatalog *catalog,
+                                 const String &db_name,
+                                 u64 txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr,
+                                 BaseEntry *&db_entry,
+                                 ConflictType conflict_type = ConflictType::kError);
 
     static Status
     DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
