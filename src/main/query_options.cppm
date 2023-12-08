@@ -12,16 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 export module query_options;
 import parser;
 namespace infinity {
 
-export class CreateDatabaseOptions {};
+export class CreateDatabaseOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class DropDatabaseOptions {};
 
-export class CreateTableOptions {};
+export class CreateTableOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class DropTableOptions {};
 

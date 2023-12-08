@@ -15,6 +15,7 @@
 module;
 
 import stl;
+import parser;
 import base_entry;
 import txn_manager;
 import buffer_manager;
@@ -31,7 +32,7 @@ public:
 
 public:
     // Reserved
-    static Status CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
+    static Status CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry, ConflictType conflict_type = ConflictType::kError);
 
     static Status DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
 
