@@ -67,6 +67,7 @@ import local_file_system;
 import segment_entry;
 import buffer_manager;
 import index_full_text;
+import infinity_exception;
 
 module iresearch_datastore;
 
@@ -299,18 +300,14 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
         if (index_base->analyzer_ == JIEBA) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
             if (!stream.get()) {
-                LOG_INFO("Dict path of Jieba analyzer is not valid, use segmentation analyzer instead");
-                stream = AnalyzerPool::instance().Get(SEGMENT);
+                throw StorageException("Dict path of Jieba analyzer is not valid");
             }
             analyzers.push_back(Move(stream));
         } else if (index_base->analyzer_ == SEGMENT) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(Move(stream));
         } else {
-            // use segmentation as default
-            LOG_INFO("Analyzer required does not exist, use segmentation analyzer instead");
-            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(Move(stream));
+            throw StorageException("Non existing analyzer");
         }
     }
 
