@@ -24,19 +24,39 @@ module operator_state;
 
 namespace infinity {
 
+void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
+    auto it = num_tasks_.find(fragment_id);
+    if (it != num_tasks_.end()) {
+        u64 &pending_tasks = it->second;
+        pending_tasks--;
+        if (pending_tasks == 0) {
+            num_tasks_.erase(it);
+        }
+    }
+}
+
+// A true return value indicate the source is complete
+// A false return value indicate there are more data need to read from source.
+// True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentData> fragment_data = nullptr;
     source_queue_.Dequeue(fragment_data);
-    if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
-        auto it = num_tasks_.find(fragment_data->fragment_id_);
-        if (it != num_tasks_.end()) {
-            u64 &pending_tasks = it->second;
-            pending_tasks--;
-            if (pending_tasks == 0) {
-                num_tasks_.erase(it);
-            }
+
+    if(fragment_data->error_message_.get() != nullptr) {
+        if(this->error_message_.get() == nullptr) {
+            // Only record the first error of input data.
+            this->error_message_ = Move(fragment_data->error_message_);
         }
+
+        // Get an error message from predecessor fragment
+        MarkCompletedTask(fragment_data->fragment_id_);
+    } else if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
+        // Get an all data from this
+        MarkCompletedTask(fragment_data->fragment_id_);
+    } else {
+        return false;
     }
+
     bool completed = num_tasks_.empty();
     OperatorState *next_op_state = this->next_op_state_;
     switch (next_op_state->operator_type_) {

@@ -36,9 +36,7 @@ void PhysicalSink::Init() {}
 bool PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 
 bool PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
-    if (sink_state->error_message_.get() != nullptr) {
-        return true;
-    }
+
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
             Error<ExecutorException>("Invalid sinker type");
@@ -99,11 +97,14 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kProjection: {
             ProjectionOperatorState *projection_output_state = static_cast<ProjectionOperatorState *>(task_op_state);
             if (projection_output_state->data_block_array_.empty()) {
-                Error<ExecutorException>("Empty projection output");
+                if(materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    Error<ExecutorException>("Empty projection output");
+                }
+            } else {
+                materialize_sink_state->data_block_array_ = Move(projection_output_state->data_block_array_);
             }
-
-            materialize_sink_state->data_block_array_ = Move(projection_output_state->data_block_array_);
-
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
@@ -290,6 +291,17 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
+    if(queue_sink_state->error_message_.get() != nullptr) {
+        LOG_TRACE(Format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
+        SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
+        fragment_data->error_message_ = MakeUnique<String>(*queue_sink_state->error_message_);
+        fragment_data->fragment_id_ = queue_sink_state->fragment_id_;
+        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+            next_fragment_queue->Enqueue(fragment_data);
+        }
+        return ;
+    }
+
     if (!task_operator_state->Complete()) {
         LOG_TRACE("Task not completed");
         return;

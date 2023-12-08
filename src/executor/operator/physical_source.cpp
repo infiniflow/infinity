@@ -34,6 +34,7 @@ void PhysicalSource::Init() {}
 
 bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 
+// A true return value indicates the source op of the task is complete.
 bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
@@ -43,18 +44,16 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
         case SourceStateType::kEmpty: {
-            break;
+            return true;
         }
         case SourceStateType::kQueue: {
             QueueSourceState *queue_source_state = static_cast<QueueSourceState *>(source_state);
-            queue_source_state->GetData();
-            break;
+            return queue_source_state->GetData();
         }
         default: {
             Error<NotImplementException>("Not support source state type");
         }
     }
-    return true;
 }
 
 bool PhysicalSource::ReadyToExec(SourceState *source_state) {

@@ -141,6 +141,12 @@ public:
     explicit ProfilerException(Args... params) : Exception(BuildMessage(String("Profiler Error:"), params...)) {}
 };
 
+export class QueryException : public Exception {
+public:
+    template <typename... Args>
+    explicit QueryException(Args... params) : Exception(BuildMessage(String("Query failed due to: "), params...)) {}
+};
+
 #ifdef INFINITY_DEBUG
 
 export template <typename ExceptionType>

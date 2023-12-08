@@ -23,7 +23,7 @@ namespace infinity {
 
 export struct FragmentData {
     UniquePtr<DataBlock> data_block_{};
-
+    UniquePtr<String> error_message_{};
     u64 fragment_id_{u64_max};
     i64 task_id_{-1};
     SizeT data_idx_{u64_max};
