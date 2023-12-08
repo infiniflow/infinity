@@ -23,6 +23,9 @@ import logical_node_type;
 import match_expression;
 import parser;
 import default_values;
+import table_collection_entry;
+import db_entry;
+import third_party;
 
 module logical_match;
 
@@ -78,8 +81,44 @@ String LogicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "LogicalMatch ";
     }
-    ss << arrow_str << "Table: " << *base_table_ref_->table_entry_ptr_->table_collection_name_;
-    ss << ", " << match_expr_->ToString();
+    arrow_str += Format("({})", this->node_id());
+    ss << arrow_str << std::endl;
+
+    // Table alias and name
+    String table_name = String(space, ' ');
+    table_name += " - table name: ";
+    table_name += this->TableAlias();
+    table_name += "(";
+    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(base_table_ref_->table_entry_ptr_);
+    table_name += *db_entry->db_name_;
+    table_name += ".";
+    table_name += *base_table_ref_->table_entry_ptr_->table_collection_name_;
+    table_name += ")";
+    ss << table_name << std::endl;
+
+    // Table index
+    String table_index = String(space, ' ');
+    table_index += " - table index: #";
+    table_index += ToStr(this->TableIndex());
+    ss << table_index << std::endl;
+
+    String match_info = String(space, ' ');
+    match_info += " - match info: " + match_expr_->ToString();
+    ss << match_info << std::endl;
+
+    // Output columns
+    String output_columns = String(space, ' ');
+    output_columns += " - output columns: [";
+    SharedPtr<Vector<String>> output_names = this->GetOutputNames();
+    SizeT column_count = output_names->size();
+    for (SizeT idx = 0; idx < column_count; ++idx) {
+        if (idx != 0)
+            output_columns += ", ";
+        output_columns += output_names->at(idx);
+    }
+    output_columns += "]";
+    ss << output_columns << std::endl;
+
     return ss.str();
 }
 

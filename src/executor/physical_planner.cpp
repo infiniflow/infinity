@@ -643,6 +643,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
     return MakeUnique<PhysicalMatch>(logical_match->node_id(),
                                      logical_match->base_table_ref_,
                                      logical_match->match_expr_,
+                                     logical_match->TableIndex(),
                                      logical_operator->load_metas());
 }
 
@@ -661,8 +662,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
                                       Move(left_phy),
                                       Move(right_phy),
                                       logical_fusion->fusion_expr_,
-                                      logical_fusion->GetOutputNames(),
-                                      logical_fusion->GetOutputTypes(),
                                       logical_operator->load_metas());
 }
 

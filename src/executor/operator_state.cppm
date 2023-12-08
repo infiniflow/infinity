@@ -317,6 +317,7 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
+    UniquePtr<String> error_message_{};
 };
 
 export struct QueueSourceState : public SourceState {
@@ -329,6 +330,9 @@ export struct QueueSourceState : public SourceState {
     BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
 
     Map<u64, u64> num_tasks_; // fragment_id -> number of pending tasks
+
+private:
+    void MarkCompletedTask(u64 fragment_id);
 };
 
 export struct AggregateSourceState : public SourceState {
@@ -377,6 +381,8 @@ export struct SinkState {
 
     [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
 
+    inline bool Error() const { return error_message_.get() != nullptr; }
+
     u64 fragment_id_{};
     u64 task_id_{};
     OperatorState *prev_op_state_{};
@@ -397,6 +403,8 @@ export struct MaterializeSinkState : public SinkState {
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
+
+    bool empty_result_{false};
 };
 
 export struct ResultSinkState : public SinkState {

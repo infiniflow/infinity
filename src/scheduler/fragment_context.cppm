@@ -64,14 +64,7 @@ public:
         query_context_->FlushProfiler(Move(profiler));
     }
 
-    inline void FinishTask() {
-        u64 unfinished_task = task_n_.fetch_sub(1);
-        auto sink_op = GetSinkOperator();
-
-        if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
-            Complete();
-        }
-    }
+    void FinishTask();
 
     Vector<PhysicalOperator *> &GetOperators();
 

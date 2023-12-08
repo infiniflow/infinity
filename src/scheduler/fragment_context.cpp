@@ -44,6 +44,7 @@ import data_table;
 import data_block;
 import physical_merge_knn;
 import merge_knn_data;
+import logger;
 
 import plan_fragment;
 
@@ -437,6 +438,18 @@ void FragmentContext::BuildTask(QueryContext *query_context,
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
     : fragment_ptr_(fragment_ptr), fragment_type_(fragment_ptr->GetFragmentType()), query_context_(query_context){};
 
+void FragmentContext::FinishTask() {
+    u64 unfinished_task = task_n_.fetch_sub(1);
+    auto sink_op = GetSinkOperator();
+
+    if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
+        LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+        Complete();
+    } else {
+        LOG_TRACE(Format("Not all tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+    }
+}
+
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }
 
 PhysicalSink *FragmentContext::GetSinkOperator() const { return fragment_ptr_->GetSinkNode(); }
@@ -689,7 +702,20 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn:
+        case PhysicalOperatorType::kMergeKnn:  {
+            if (fragment_type_ != FragmentType::kSerialMaterialize) {
+                Error<SchedulerException>(
+                    Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            if (tasks_.size() != 1) {
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            tasks_[0]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), 0);
+            break;
+        }
+
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
@@ -842,10 +868,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
     if (tasks_.size() != 1) {
         Error<SchedulerException>("There should be one sink state in serial materialized fragment");
     }
-    for (const auto &task : tasks_) {
-        if (task->sink_state_->error_message_ != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_);
-        }
+
+    if (tasks_[0]->sink_state_->Error()) {
+        throw QueryException(*tasks_[0]->sink_state_->error_message_);
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {

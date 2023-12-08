@@ -130,6 +130,13 @@ Value Value::MakeVarchar(const char *ptr, bool is_move) {
     return value;
 }
 
+Value Value::MakeVarchar(const char* ptr, SizeT len) {
+    Value value(LogicalType::kVarchar);
+    value.value_.varchar.InitAsValue(ptr, len, false);
+    value.is_null_ = false;
+    return value;
+}
+
 Value Value::MakeDate(DateT input) {
     Value value(LogicalType::kDate);
     value.value_.date = input;

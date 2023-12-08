@@ -61,6 +61,7 @@ import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
 import knn_expression;
+import value;
 
 module physical_knn_scan;
 
@@ -378,9 +379,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 for (SizeT column_id : base_table_ref_->column_ids_) {
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
-
-                    const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
-                    output_block_ptr->AppendValueByPtr(column_id, ptr);
+                    if(output_types_->at(column_id)->Plain()) {
+                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
+                        output_block_ptr->AppendValueByPtr(column_id, ptr);
+                    } else {
+                        if(output_types_->at(column_id)->type() != LogicalType::kVarchar) {
+                            Error<NotImplementException>("Not implement complex type reading from column buffer.");
+                        }
+                        auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
+                        Value value = Value::MakeVarchar(varchar_ptr, data_size);
+                        output_block_ptr->AppendValue(column_id, value);
+                    }
                 }
                 SizeT last = base_table_ref_->column_ids_.size();
                 output_block_ptr->AppendValueByPtr(last++, (ptr_t)&result_dists[id]);

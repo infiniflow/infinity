@@ -30,6 +30,7 @@ import operator_state;
 import physical_operator_type;
 import query_context;
 import base_table_ref;
+import defer_op;
 
 module fragment_task;
 
@@ -56,37 +57,48 @@ void FragmentTask::OnExecute(i64) {
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
 
-    source_op->Execute(fragment_context->query_context(), source_state_.get());
+    bool execute_success{false};
+    bool source_complete = source_op->Execute(fragment_context->query_context(), source_state_.get());
+    if(source_state_->error_message_.get() == nullptr) {
+        // No source error
+        Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
-    Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
+        bool enable_profiler = query_context->is_enable_profiling();
+        TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+        HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
+        profiler.Begin();
+        UniquePtr<String> err_msg = nullptr;
+        try {
+            for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
+                profiler.StartOperator(operator_refs[op_idx]);
+                DeferFn defer_fn([&]() { profiler.StopOperator(operator_states_[op_idx].get()); });
 
-    bool enable_profiler = query_context->is_enable_profiling();
-    TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
-    HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
-    profiler.Begin();
-    UniquePtr<String> err_msg = nullptr;
-    bool done_real_work = false;
-    try {
-        for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
-            profiler.StartOperator(operator_refs[op_idx]);
-            operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
-            done_real_work = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
-            operator_refs[op_idx]->FillingTableRefs(table_refs);
-            profiler.StopOperator(operator_states_[op_idx].get());
-            if (!done_real_work) {
-                break;
+                operator_refs[op_idx]->InputLoad(fragment_context->query_context(), operator_states_[op_idx].get(), table_refs);
+                execute_success = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
+                operator_refs[op_idx]->FillingTableRefs(table_refs);
+
+                if (!execute_success) {
+                    break;
+                }
             }
+        } catch (const Exception &e) {
+            err_msg = MakeUnique<String>(e.what());
         }
-    } catch (const Exception &e) {
-        err_msg = MakeUnique<String>(e.what());
-    }
-    profiler.End();
-    fragment_context->FlushProfiler(profiler);
+        profiler.End();
+        fragment_context->FlushProfiler(profiler);
 
-    if (err_msg.get() != nullptr) {
-        sink_state_->error_message_ = Move(err_msg);
+        if (err_msg.get() != nullptr) {
+            sink_state_->error_message_ = Move(err_msg);
+            this->set_status(FragmentTaskStatus::kError);
+        }
     }
-    if (done_real_work) {
+
+    if(source_complete && source_state_->error_message_.get() != nullptr) {
+        sink_state_->error_message_ = Move(source_state_->error_message_);
+        this->set_status(FragmentTaskStatus::kError);
+    }
+
+    if (execute_success or sink_state_->error_message_.get() != nullptr) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, sink_state_.get());
     }
@@ -103,7 +115,7 @@ bool FragmentTask::Ready() const {
     return source_op->ReadyToExec(source_state_.get());
 }
 
-bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() or sink_state_->error_message_.get() != nullptr; }
+bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() or status() == FragmentTaskStatus::kError; }
 
 TaskBinding FragmentTask::TaskBinding() const {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -117,6 +129,7 @@ TaskBinding FragmentTask::TaskBinding() const {
 void FragmentTask::TryCompleteFragment() {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     fragment_context->FinishTask();
+    LOG_TRACE(Format("Task: {} of Fragment: {} is completed", task_id_, fragment_context->fragment_ptr()->FragmentID()));
 }
 
 String FragmentTask::PhysOpsToString() {
