@@ -184,6 +184,12 @@ class EmbeddingData;
 
 class KnnExpr;
 
+class MatchExpr;
+
+class FusionExpr;
+
+class SearchExpr;
+
 class ConstantExpr;
 
 class FunctionExpr;
@@ -580,12 +586,15 @@ void swap(ColumnDef &a, ColumnDef &b);
 std::ostream& operator<<(std::ostream& out, const ColumnDef& obj);
 
 typedef struct _ParsedExprType__isset {
-  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), knn_expr(false), between_expr(false) {}
+  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_expr(false), fusion_expr(false), search_expr(false) {}
   bool constant_expr :1;
   bool column_expr :1;
   bool function_expr :1;
-  bool knn_expr :1;
   bool between_expr :1;
+  bool knn_expr :1;
+  bool match_expr :1;
+  bool fusion_expr :1;
+  bool search_expr :1;
 } _ParsedExprType__isset;
 
 class ParsedExprType : public virtual ::apache::thrift::TBase {
@@ -597,16 +606,22 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
                  : constant_expr(),
                    column_expr(),
                    function_expr(),
+                   between_expr(),
                    knn_expr(),
-                   between_expr() {
+                   match_expr(),
+                   fusion_expr(),
+                   search_expr() {
   }
 
   virtual ~ParsedExprType() noexcept;
   ::std::shared_ptr<ConstantExpr> constant_expr;
   ::std::shared_ptr<ColumnExpr> column_expr;
   ::std::shared_ptr<FunctionExpr> function_expr;
-  ::std::shared_ptr<KnnExpr> knn_expr;
   ::std::shared_ptr<BetweenExpr> between_expr;
+  ::std::shared_ptr<KnnExpr> knn_expr;
+  ::std::shared_ptr<MatchExpr> match_expr;
+  ::std::shared_ptr<FusionExpr> fusion_expr;
+  ::std::shared_ptr<SearchExpr> search_expr;
 
   _ParsedExprType__isset __isset;
 
@@ -616,9 +631,15 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
 
   void __set_function_expr(::std::shared_ptr<FunctionExpr> val);
 
+  void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
+
   void __set_knn_expr(::std::shared_ptr<KnnExpr> val);
 
-  void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
+  void __set_match_expr(::std::shared_ptr<MatchExpr> val);
+
+  void __set_fusion_expr(::std::shared_ptr<FusionExpr> val);
+
+  void __set_search_expr(::std::shared_ptr<SearchExpr> val);
 
   bool operator == (const ParsedExprType & rhs) const
   {
@@ -634,13 +655,25 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
       return false;
     else if (__isset.function_expr && !(function_expr == rhs.function_expr))
       return false;
+    if (__isset.between_expr != rhs.__isset.between_expr)
+      return false;
+    else if (__isset.between_expr && !(between_expr == rhs.between_expr))
+      return false;
     if (__isset.knn_expr != rhs.__isset.knn_expr)
       return false;
     else if (__isset.knn_expr && !(knn_expr == rhs.knn_expr))
       return false;
-    if (__isset.between_expr != rhs.__isset.between_expr)
+    if (__isset.match_expr != rhs.__isset.match_expr)
       return false;
-    else if (__isset.between_expr && !(between_expr == rhs.between_expr))
+    else if (__isset.match_expr && !(match_expr == rhs.match_expr))
+      return false;
+    if (__isset.fusion_expr != rhs.__isset.fusion_expr)
+      return false;
+    else if (__isset.fusion_expr && !(fusion_expr == rhs.fusion_expr))
+      return false;
+    if (__isset.search_expr != rhs.__isset.search_expr)
+      return false;
+    else if (__isset.search_expr && !(search_expr == rhs.search_expr))
       return false;
     return true;
   }
@@ -852,12 +885,13 @@ void swap(EmbeddingData &a, EmbeddingData &b);
 std::ostream& operator<<(std::ostream& out, const EmbeddingData& obj);
 
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), dimension(false), distance_type(false), embedding_data_type(false) {}
+  _KnnExpr__isset() : column_expr(false), embedding_data(false), dimension(false), distance_type(false), embedding_data_type(false), topn(false) {}
   bool column_expr :1;
   bool embedding_data :1;
   bool dimension :1;
   bool distance_type :1;
   bool embedding_data_type :1;
+  bool topn :1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
@@ -868,7 +902,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
   KnnExpr() noexcept
           : dimension(0),
             distance_type(static_cast<KnnDistanceType::type>(0)),
-            embedding_data_type(static_cast<ElementType::type>(0)) {
+            embedding_data_type(static_cast<ElementType::type>(0)),
+            topn(0) {
   }
 
   virtual ~KnnExpr() noexcept;
@@ -885,6 +920,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
    * @see ElementType
    */
   ElementType::type embedding_data_type;
+  int64_t topn;
 
   _KnnExpr__isset __isset;
 
@@ -898,6 +934,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
 
   void __set_embedding_data_type(const ElementType::type val);
 
+  void __set_topn(const int64_t val);
+
   bool operator == (const KnnExpr & rhs) const
   {
     if (!(column_expr == rhs.column_expr))
@@ -909,6 +947,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
     if (!(distance_type == rhs.distance_type))
       return false;
     if (!(embedding_data_type == rhs.embedding_data_type))
+      return false;
+    if (!(topn == rhs.topn))
       return false;
     return true;
   }
@@ -927,6 +967,167 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
 void swap(KnnExpr &a, KnnExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
+
+typedef struct _MatchExpr__isset {
+  _MatchExpr__isset() : fields(false), matching_text(false), options_text(false) {}
+  bool fields :1;
+  bool matching_text :1;
+  bool options_text :1;
+} _MatchExpr__isset;
+
+class MatchExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  MatchExpr(const MatchExpr&);
+  MatchExpr& operator=(const MatchExpr&);
+  MatchExpr() noexcept
+            : fields(),
+              matching_text(),
+              options_text() {
+  }
+
+  virtual ~MatchExpr() noexcept;
+  std::string fields;
+  std::string matching_text;
+  std::string options_text;
+
+  _MatchExpr__isset __isset;
+
+  void __set_fields(const std::string& val);
+
+  void __set_matching_text(const std::string& val);
+
+  void __set_options_text(const std::string& val);
+
+  bool operator == (const MatchExpr & rhs) const
+  {
+    if (!(fields == rhs.fields))
+      return false;
+    if (!(matching_text == rhs.matching_text))
+      return false;
+    if (!(options_text == rhs.options_text))
+      return false;
+    return true;
+  }
+  bool operator != (const MatchExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const MatchExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(MatchExpr &a, MatchExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const MatchExpr& obj);
+
+typedef struct _FusionExpr__isset {
+  _FusionExpr__isset() : method(false), options_text(false) {}
+  bool method :1;
+  bool options_text :1;
+} _FusionExpr__isset;
+
+class FusionExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  FusionExpr(const FusionExpr&);
+  FusionExpr& operator=(const FusionExpr&);
+  FusionExpr() noexcept
+             : method(),
+               options_text() {
+  }
+
+  virtual ~FusionExpr() noexcept;
+  std::string method;
+  std::string options_text;
+
+  _FusionExpr__isset __isset;
+
+  void __set_method(const std::string& val);
+
+  void __set_options_text(const std::string& val);
+
+  bool operator == (const FusionExpr & rhs) const
+  {
+    if (!(method == rhs.method))
+      return false;
+    if (!(options_text == rhs.options_text))
+      return false;
+    return true;
+  }
+  bool operator != (const FusionExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FusionExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FusionExpr &a, FusionExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
+
+typedef struct _SearchExpr__isset {
+  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), fusion_expr(false) {}
+  bool match_exprs :1;
+  bool knn_exprs :1;
+  bool fusion_expr :1;
+} _SearchExpr__isset;
+
+class SearchExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  SearchExpr(const SearchExpr&);
+  SearchExpr& operator=(const SearchExpr&);
+  SearchExpr() noexcept {
+  }
+
+  virtual ~SearchExpr() noexcept;
+  std::vector<MatchExpr>  match_exprs;
+  std::vector<KnnExpr>  knn_exprs;
+  FusionExpr fusion_expr;
+
+  _SearchExpr__isset __isset;
+
+  void __set_match_exprs(const std::vector<MatchExpr> & val);
+
+  void __set_knn_exprs(const std::vector<KnnExpr> & val);
+
+  void __set_fusion_expr(const FusionExpr& val);
+
+  bool operator == (const SearchExpr & rhs) const
+  {
+    if (!(match_exprs == rhs.match_exprs))
+      return false;
+    if (!(knn_exprs == rhs.knn_exprs))
+      return false;
+    if (!(fusion_expr == rhs.fusion_expr))
+      return false;
+    return true;
+  }
+  bool operator != (const SearchExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const SearchExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(SearchExpr &a, SearchExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const SearchExpr& obj);
 
 typedef struct _ConstantExpr__isset {
   _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false) {}
@@ -2848,18 +3049,18 @@ void swap(FileChunk &a, FileChunk &b);
 std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), knn_expr_list(true) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
   bool select_list :1;
+  bool search_expr :1;
   bool where_expr :1;
   bool group_by_list :1;
   bool having_expr :1;
   bool limit_expr :1;
   bool offset_expr :1;
   bool order_by_list :1;
-  bool knn_expr_list :1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
@@ -2874,7 +3075,6 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
 
 
 
-
   }
 
   virtual ~SelectRequest() noexcept;
@@ -2882,13 +3082,13 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::vector<ParsedExpr>  select_list;
+  SearchExpr search_expr;
   ParsedExpr where_expr;
   std::vector<ParsedExpr>  group_by_list;
   ParsedExpr having_expr;
   ParsedExpr limit_expr;
   ParsedExpr offset_expr;
   std::vector<OrderByExpr>  order_by_list;
-  std::vector<KnnExpr>  knn_expr_list;
 
   _SelectRequest__isset __isset;
 
@@ -2899,6 +3099,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   void __set_table_name(const std::string& val);
 
   void __set_select_list(const std::vector<ParsedExpr> & val);
+
+  void __set_search_expr(const SearchExpr& val);
 
   void __set_where_expr(const ParsedExpr& val);
 
@@ -2912,8 +3114,6 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
 
   void __set_order_by_list(const std::vector<OrderByExpr> & val);
 
-  void __set_knn_expr_list(const std::vector<KnnExpr> & val);
-
   bool operator == (const SelectRequest & rhs) const
   {
     if (!(session_id == rhs.session_id))
@@ -2923,6 +3123,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
     if (!(table_name == rhs.table_name))
       return false;
     if (!(select_list == rhs.select_list))
+      return false;
+    if (!(search_expr == rhs.search_expr))
       return false;
     if (!(where_expr == rhs.where_expr))
       return false;
@@ -2935,8 +3137,6 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
     if (!(offset_expr == rhs.offset_expr))
       return false;
     if (!(order_by_list == rhs.order_by_list))
-      return false;
-    if (!(knn_expr_list == rhs.knn_expr_list))
       return false;
     return true;
   }

@@ -304,16 +304,33 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<ParsedExpr *> *knn_expr_list = new Vector<ParsedExpr *>();
-        knn_expr_list->reserve(request.knn_expr_list.size());
-        if (request.__isset.knn_expr_list == true) {
-            for (auto &knn_expr : request.knn_expr_list) {
-                auto parsed_expr = GetKnnExprFromProto(knn_expr);
-                knn_expr_list->emplace_back(parsed_expr);
-            }
+
+
+        SizeT knn_expr_count = request.search_expr.knn_exprs.size();
+        SizeT match_expr_count = request.search_expr.match_exprs.size();
+        bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
+        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+
+        Vector<ParsedExpr *> *search_expr_list = new Vector<ParsedExpr *>();
+        search_expr_list->reserve(total_expr_count);
+
+        for(SizeT idx = 0; idx < knn_expr_count; ++ idx) {
+            ParsedExpr* knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+            search_expr_list->emplace_back(knn_expr);
         }
 
-        Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
+        for(SizeT idx = 0; idx < match_expr_count; ++ idx) {
+            ParsedExpr* match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
+            search_expr_list->emplace_back(match_expr);
+        }
+
+        if(fusion_expr_exists) {
+            ParsedExpr* fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+            search_expr_list->emplace_back(fusion_expr);
+        }
+
+        infinity::SearchExpr *search_expr = new infinity::SearchExpr();
+        search_expr->SetExprs(search_expr_list);
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
@@ -339,7 +356,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(knn_expr_list, filter, output_columns);
+        const QueryResult result = table->Search(search_expr, filter, output_columns);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
@@ -766,6 +783,21 @@ private:
         knn_expr->dimension_ = expr.dimension;
         knn_expr->embedding_data_ptr_ = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
         return knn_expr;
+    }
+
+    static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr) {
+        auto match_expr = new MatchExpr();
+        match_expr->fields_ = expr.fields;
+        match_expr->matching_text_ = expr.matching_text;
+        match_expr->options_text_ = expr.options_text;
+        return match_expr;
+    }
+
+    static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr) {
+        auto fusion_expr = new FusionExpr();
+        fusion_expr->method_ = expr.method;
+        fusion_expr->SetOptions(expr.options_text);
+        return fusion_expr;
     }
 
     static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
