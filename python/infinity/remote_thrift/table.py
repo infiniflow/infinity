@@ -44,7 +44,8 @@ class RemoteTable(Table, ABC):
             index_info_to_use = ttypes.IndexInfo()
             index_info_to_use.column_name = index_info.column_name.strip()
             index_info_to_use.index_type = index_info.index_type.to_ttype()
-            index_info_to_use.index_param_list = [init_param.to_ttype() for init_param in index_info.params]
+            index_info_to_use.index_param_list = [
+                init_param.to_ttype() for init_param in index_info.params]
 
             index_info_list_to_use.append(index_info_to_use)
 
@@ -279,7 +280,8 @@ class RemoteTable(Table, ABC):
 
                 knn_expr = ttypes.KnnExpr()
 
-                knn_expr.column_expr = traverse_conditions(condition(vector_column_name))
+                knn_expr.column_expr = traverse_conditions(
+                    condition(vector_column_name))
 
                 if isinstance(embedding[0], int):
                     data = ttypes.EmbeddingData()
@@ -309,12 +311,11 @@ class RemoteTable(Table, ABC):
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=select_list,
+                                search_expr=search_expr,
                                 where_expr=where_expr,
                                 group_by_list=None,
                                 limit_expr=limit_expr,
-                                offset_expr=offset_expr,
-                                search_expr=None,
-                                knn_expr_list=knn_exprs_list)
+                                offset_expr=offset_expr)
 
         # process the results
         if res.success:
