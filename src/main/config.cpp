@@ -77,7 +77,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     i32 default_time_zone_bias = 8;
 
     // Default system config
-    u64 default_total_cpu_number = 1;
+    u64 default_total_cpu_number = Thread::hardware_concurrency();
     u64 default_total_memory_size = GetAvailableMem();
     u64 default_query_cpu_limit = default_total_cpu_number;
     u64 default_query_memory_limit = default_total_memory_size;
