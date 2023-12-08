@@ -18,6 +18,7 @@ module;
 
 import base_entry;
 import stl;
+import parser;
 import db_entry;
 import txn_manager;
 import logger;
@@ -32,7 +33,7 @@ module db_meta;
 
 namespace infinity {
 
-Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry) {
+Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&res_entry, ConflictType conflic_type) {
     UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
 
     //    rw_locker_.lock();
@@ -69,10 +70,18 @@ Status DBMeta::CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts
                     db_meta->entry_list_.emplace_front(Move(db_entry));
                     return Status::OK();
                 } else {
-                    // Duplicated database
-                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *db_meta->db_name_));
-                    LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kDuplicate, Move(err_msg));
+                    switch (conflic_type) {
+                        case ConflictType::kIgnore: {
+                            res_entry = header_db_entry;
+                            return Status::OK();
+                        }
+                        default: {
+                            // Duplicated database
+                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *db_meta->db_name_));
+                            LOG_ERROR(*err_msg);
+                            return Status(ErrorCode::kDuplicate, Move(err_msg));
+                        }
+                    }
                 }
             } else {
                 // Write-Write conflict

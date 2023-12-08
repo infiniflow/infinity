@@ -451,6 +451,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 
     Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
     index_def_ptr->index_array_.reserve(index_info_list.size());
+    if (index_info_list.empty()) {
+        Error<PlannerException>("No index info.");
+    }
     for (IndexInfo *index_info : index_info_list) {
         SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {

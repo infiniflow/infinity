@@ -17,6 +17,7 @@ module;
 #include <vector>
 
 import stl;
+import parser;
 import base_entry;
 import txn_manager;
 import db_meta;
@@ -61,8 +62,14 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::CreateDatabase instead
-Status
-NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry) {
+Status NewCatalog::CreateDatabase(NewCatalog *catalog,
+                                  const String &db_name,
+                                  u64 txn_id,
+                                  TxnTimeStamp begin_ts,
+                                  TxnManager *txn_mgr,
+                                  BaseEntry *&db_entry,
+                                  ConflictType conflict_type
+                                  ) {
 
     // Check if there is db_meta with the db_name
     DBMeta *db_meta{nullptr};
@@ -95,7 +102,7 @@ NewCatalog::CreateDatabase(NewCatalog *catalog, const String &db_name, u64 txn_i
     }
 
     LOG_TRACE(Format("Add new database entry: {}", db_name));
-    return DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry);
+    return DBMeta::CreateNewEntry(db_meta, txn_id, begin_ts, txn_mgr, db_entry, conflict_type);
 }
 
 // do not only use this method to drop database
@@ -274,7 +281,7 @@ void NewCatalog::CheckCatalog() {
                     }
                     auto table_entry = static_cast<TableCollectionEntry *>(base_entry.get());
                     if (table_entry->table_collection_meta_->db_entry_ != db_entry) {
-//                        int a = 1;
+                        //                        int a = 1;
                     }
                 }
             }
