@@ -15,7 +15,7 @@
 import os
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity import NetworkAddress
 
 
 class TestImport:
@@ -27,7 +27,8 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(
+            NetworkAddress('127.0.0.1', 9080))
         assert infinity_obj
 
         # infinity
@@ -44,7 +45,6 @@ class TestImport:
         test_fvecs_dir = parent_dir + "/sift/sift/base.fvecs"
         assert os.path.exists(test_fvecs_dir)
 
-
         res = table_obj.import_data(test_fvecs_dir, None)
         assert res.success
 
@@ -55,7 +55,8 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(
+            NetworkAddress('127.0.0.1', 9080))
         assert infinity_obj
 
         # infinity
@@ -66,5 +67,3 @@ class TestImport:
 
         # search ordinary
         table_obj.search().output(["*"]).to_df()
-
-

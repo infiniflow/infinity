@@ -31,7 +31,7 @@ class TestImport:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
             assert infinity_obj
 
             # infinity
@@ -40,7 +40,8 @@ class TestImport:
             assert db_obj
 
             # import
-            res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
+            res = db_obj.create_table(
+                "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
             assert res.success
             table_obj = db_obj.get_table("my_table4")
             assert table_obj

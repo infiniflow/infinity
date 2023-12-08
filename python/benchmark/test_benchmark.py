@@ -21,7 +21,7 @@ from datetime import datetime
 import pandas as pd
 
 import infinity
-from infinity.infinity import NetworkAddress
+from infinity import NetworkAddress
 
 
 def trace_unhandled_exceptions(func):
@@ -65,7 +65,8 @@ def worker_thread(process_id, thread_id, num_iterations, some_function, ip='0.0.
 def worker_internal_connection(process_id, num_threads, num_iterations, some_function, ip=None, port=None):
     threads = []
     for j in range(num_threads):
-        thread = threading.Thread(target=worker_thread, args=(process_id, j, num_iterations, some_function, ip, port))
+        thread = threading.Thread(target=worker_thread, args=(
+            process_id, j, num_iterations, some_function, ip, port))
         threads.append(thread)
         thread.start()
 
@@ -104,7 +105,8 @@ def execute(some_functions: list, protocols: list, num_processes, num_threads, n
 
     for (protocol, ip, port) in protocols:
         for some_function in some_functions:
-            elapsed_time = measure_time_internal(num_processes, num_threads, num_times, some_function, ip, port)
+            elapsed_time = measure_time_internal(
+                num_processes, num_threads, num_times, some_function, ip, port)
             qps = num_times / elapsed_time  # queries per second
             avg_latency = (elapsed_time / num_times) * 1000  # in ms
 
@@ -127,7 +129,8 @@ class TestBenchmark:
     def test_measure_time(self):
         @trace_unhandled_exceptions
         def create_database(infinity_obj, port, process_id, thread_id, num_iteration):
-            res = infinity_obj.create_database(f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
+            res = infinity_obj.create_database(
+                f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
             if not res.success:
                 raise Exception(f"create_database failed: {res.error_msg}")
 
@@ -145,7 +148,8 @@ class TestBenchmark:
 
         @trace_unhandled_exceptions
         def drop_database(infinity_obj, port, process_id, thread_id, num_iteration):
-            res = infinity_obj.drop_database(f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}")
+            res = infinity_obj.drop_database(
+                f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}")
             if not res.success:
                 raise Exception(f"drop_database failed: {res.error_msg}")
 
@@ -221,12 +225,16 @@ class TestBenchmark:
         num_times = 16 * 16 * 10
         protocols = [thread_pool_thrift]
 
-        database_functions = [create_database, get_database, list_databases, drop_database]
+        database_functions = [create_database,
+                              get_database, list_databases, drop_database]
 
-        db_df = execute(database_functions, protocols, num_processes, num_threads, num_times)
+        db_df = execute(database_functions, protocols,
+                        num_processes, num_threads, num_times)
 
-        table_functions = [create_table, insert_table, select_table, list_tables, drop_table]
-        tbl_df = execute(table_functions, protocols, num_processes, num_threads, num_times)
+        table_functions = [create_table, insert_table,
+                           select_table, list_tables, drop_table]
+        tbl_df = execute(table_functions, protocols,
+                         num_processes, num_threads, num_times)
 
         # index_functions = []
         # idx_df = execute(index_functions, protocols, num_processes, num_threads, num_times)

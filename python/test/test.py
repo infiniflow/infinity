@@ -75,7 +75,7 @@ class TestCase:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
             assert infinity_obj
 
             # infinity
@@ -92,7 +92,8 @@ class TestCase:
             assert res.success
 
             db_obj = infinity_obj.get_database("default")
-            res = db_obj.create_table("my_table1", {"c1": "int, primary key"}, None)
+            res = db_obj.create_table(
+                "my_table1", {"c1": "int, primary key"}, None)
             assert res.success
 
             res = db_obj.list_tables()
@@ -102,7 +103,8 @@ class TestCase:
             assert res.success
 
             # index
-            res = db_obj.create_table("my_table2", {"c1": "vector,1024,float"}, None)
+            res = db_obj.create_table(
+                "my_table2", {"c1": "vector,1024,float"}, None)
             assert res.success
 
             table_obj = db_obj.get_table("my_table2")
@@ -122,13 +124,15 @@ class TestCase:
             assert res.success
 
             # insert
-            res = db_obj.create_table("my_table3", {"c1": "int, primary key", "c2": "float"}, None)
+            res = db_obj.create_table(
+                "my_table3", {"c1": "int, primary key", "c2": "float"}, None)
             assert res.success
 
             table_obj = db_obj.get_table("my_table3")
             assert table_obj
 
-            res = table_obj.insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
+            res = table_obj.insert(
+                [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
             assert res.success
             # search
             res = table_obj.search().output(["c1 + 0.1"]).to_df()
@@ -145,7 +149,8 @@ class TestCase:
             assert res.success
 
             # import
-            res = db_obj.create_table("my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
+            res = db_obj.create_table(
+                "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
             assert res.success
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
@@ -174,5 +179,6 @@ class TestCase:
         print(res)
         res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
         print(res)
-        res = traverse_conditions(condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
+        res = traverse_conditions(
+            condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
         print(res)

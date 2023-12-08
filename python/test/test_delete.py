@@ -49,11 +49,12 @@ class TestDelete:
             - 'table_3'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
         db_obj = infinity_obj.get_database("default")
 
         # infinity
-        res = db_obj.create_table("table_3", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
+        res = db_obj.create_table(
+            "table_3", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
         assert res.success
 
         table_obj = db_obj.get_table("table_3")
