@@ -181,7 +181,7 @@ class TestBenchmark:
             res = (infinity_obj
                    .get_database(f"default")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
-                   .search()
+                   .query_builder()
                    .output(["*"])
                    .filter("c1 > 1").to_df())
             if res is None:

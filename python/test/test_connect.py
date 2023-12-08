@@ -16,6 +16,7 @@ import pytest
 import infinity
 from infinity.common import NetworkAddress
 
+
 class TestConnection:
     def test_connect_and_disconnect_ok(self):
         """

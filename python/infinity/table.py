@@ -47,18 +47,9 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def search(
-            self,
-            query: Optional[Union[VEC, str]] = None,
-            vector_column_name: str = "vector",
-            distance: str = "L2",
-            threshold: Optional[float] = None,
-    ):
+    def query_builder(self):
         raise NotImplementedError
 
     @abstractmethod
     def _execute_query(self, query):
         pass
-
-
-

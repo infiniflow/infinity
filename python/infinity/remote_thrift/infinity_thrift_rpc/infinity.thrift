@@ -114,12 +114,11 @@ union EmbeddingData {
 }
 
 struct KnnExpr {
-1: ParsedExpr  column_expr,
+1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
-3: i64 dimension,
+3: ElementType embedding_data_type,
 4: KnnDistanceType distance_type,
-5: ElementType embedding_data_type,
-6: i64 topn,
+5: i64 topn,
 }
 
 struct MatchExpr {
