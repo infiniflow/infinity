@@ -306,6 +306,10 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
         } else if (index_base->analyzer_ == SEGMENT) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(Move(stream));
+        } else if (index_base->analyzer_.empty()) {
+            // TODO use segmentation analyzer if analyzer is not set
+            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
+            analyzers.push_back(Move(stream));
         } else {
             throw StorageException("Non existing analyzer");
         }
