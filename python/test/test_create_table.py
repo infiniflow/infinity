@@ -24,9 +24,10 @@ class TestCreateTable:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.create_table("test_create_varchar_table", {"c1": "varchar, primary key", "c2": "float"}, None)
+        res = db_obj.create_table("test_create_varchar_table", {
+                                  "c1": "varchar, primary key", "c2": "float"}, None)
         assert res.success
         table_obj = db_obj.get_table("test_create_varchar_table")
         assert table_obj
@@ -39,9 +40,10 @@ class TestCreateTable:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.create_table("test_create_embedding_table", {"c1": "vector,128,float"}, None)
+        res = db_obj.create_table("test_create_embedding_table", {
+                                  "c1": "vector,128,float"}, None)
         assert res.success
         table_obj = db_obj.get_table("test_create_embedding_table")
         assert table_obj

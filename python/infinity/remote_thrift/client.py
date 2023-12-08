@@ -24,9 +24,11 @@ class ThriftInfinityClient:
     def __init__(self, uri: URI):
         match uri.port:
             case 9070:
-                self.transport = TTransport.TFramedTransport(TSocket.TSocket(uri.ip, uri.port))  # async
+                self.transport = TTransport.TFramedTransport(
+                    TSocket.TSocket(uri.ip, uri.port))  # async
             case _:
-                self.transport = TTransport.TBufferedTransport(TSocket.TSocket(uri.ip, uri.port))  # sync
+                self.transport = TTransport.TBufferedTransport(
+                    TSocket.TSocket(uri.ip, uri.port))  # sync
         self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
@@ -107,20 +109,17 @@ class ThriftInfinityClient:
                                                 file_name=file_name,
                                                 import_option=import_options))
 
-    def select(self, db_name: str, table_name: str, select_list,
-               where_expr, group_by_list, limit_expr, offset_expr,
-               search_expr,
-               knn_expr_list,
-               ):
+    def select(self, db_name: str, table_name: str, select_list, search_expr,
+               where_expr, group_by_list, limit_expr, offset_expr):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
                                                 select_list=select_list,
+                                                search_expr=search_expr,
                                                 where_expr=where_expr,
                                                 group_by_list=group_by_list,
                                                 limit_expr=limit_expr,
                                                 offset_expr=offset_expr,
-                                                knn_expr_list=knn_expr_list
                                                 ))
 
     def delete(self, db_name: str, table_name: str, where_expr):
