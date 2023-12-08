@@ -1157,6 +1157,21 @@ select_without_paren: with_clause select_clause_with_modifier {
 };
 
 select_clause_with_modifier: select_clause_without_modifier order_by_clause limit_expr offset_expr {
+    if($3 == nullptr and $4 != nullptr) {
+        delete $1;
+        delete $2;
+        delete $4;
+        yyerror(&yyloc, scanner, result, "Offset expression isn't valid without Limit expression");
+        YYERROR;
+    }
+    if($1->search_expr_ != nullptr and ($2 != nullptr or $3 != nullptr or $4 != nullptr)) {
+        delete $1;
+        delete $2;
+        delete $3;
+        delete $4;
+        yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY, LIMIT, OFFSET) is conflict with SEARCH expression.");
+        YYERROR;
+    }
     $1->order_by_list = $2;
     $1->limit_expr_ = $3;
     $1->offset_expr_ = $4;

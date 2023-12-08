@@ -1265,6 +1265,21 @@ TEST_F(SelectStatementParsingTest, good_test4) {
     }
 }
 
+TEST_F(SelectStatementParsingTest, bad_test1) {
+
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        // bad dimension type double not match hamming
+        String input_sql = "SELECT b FROM t1 WHERE a > 0 OFFSET 3;";
+        parser->Parse(input_sql, result.get());
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+}
+
 TEST_F(SelectStatementParsingTest, bad_knn_test) {
 
     using namespace infinity;
@@ -1290,6 +1305,38 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
     {
         // bit only support hamming
         String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
+        parser->Parse(input_sql, result.get());
+        std::cout << result->error_message_ << std::endl;
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+}
+
+TEST_F(SelectStatementParsingTest, bad_search_test) {
+
+    using namespace infinity;
+    SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
+    SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        // bad dimension type double not match hamming
+        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1.0, 2.0], 'double', 'hamming', 3) WHERE a > 0 ORDER BY c2;";
+        parser->Parse(input_sql, result.get());
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+
+    {
+        // bit which length should be aligned with 8
+        String input_sql = "SELECT b FROM t1 SEARCH KNN(c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;";
+        parser->Parse(input_sql, result.get());
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+    }
+
+    {
+        // bit only support hamming
+        String input_sql = "SELECT b FROM t1 SEARCH MATCH('author^2,name^5', 'frank dune') LIMIT 5;";
         parser->Parse(input_sql, result.get());
         std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
