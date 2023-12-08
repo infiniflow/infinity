@@ -66,4 +66,4 @@ class TestImport:
         table_obj = db_obj.get_table("benchmark")
 
         # search ordinary
-        table_obj.search().output(["*"]).to_df()
+        table_obj.query_builder().output(["*"]).to_df()

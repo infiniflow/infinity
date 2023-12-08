@@ -777,11 +777,10 @@ private:
 
     static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
         auto knn_expr = new KnnExpr();
-        knn_expr->column_expr_ = GetColumnExprFromProto(*expr.column_expr.type.column_expr);
+        knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
-        knn_expr->dimension_ = expr.dimension;
-        knn_expr->embedding_data_ptr_ = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
         return knn_expr;
     }
 
@@ -833,15 +832,19 @@ private:
         }
     }
 
-    static void *GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
-        if (embedding_data.__isset.f32_array_value) {
-            return (void *)embedding_data.f32_array_value.data();
-        } else if (embedding_data.__isset.f64_array_value) {
-            return (void *)embedding_data.f64_array_value.data();
+    static std::pair<void *, int64_t> GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+        if (embedding_data.__isset.i8_array_value) {
+            return std::make_pair((void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size());
+        } else if (embedding_data.__isset.i16_array_value) {
+            return std::make_pair((void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size());
         } else if (embedding_data.__isset.i32_array_value) {
-            return (void *)embedding_data.i32_array_value.data();
+            return std::make_pair((void *)embedding_data.i32_array_value.data(), embedding_data.i32_array_value.size());
         } else if (embedding_data.__isset.i64_array_value) {
-            return (void *)embedding_data.i64_array_value.data();
+            return std::make_pair((void *)embedding_data.i64_array_value.data(), embedding_data.i64_array_value.size());
+        } else if (embedding_data.__isset.f32_array_value) {
+            return std::make_pair((void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size());
+        } else if (embedding_data.__isset.f64_array_value) {
+            return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
             Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
         }

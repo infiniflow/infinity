@@ -96,52 +96,53 @@ class TestSelect:
              {"c1": 9, "c2": 9}])
         assert res.success
 
-        res = table_obj.search().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c1", "c2"]).to_df()
+        res = table_obj.query_builder().output(["c1", "c2"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c1 + c2"]).filter("c1 = 3").to_df()
+        res = table_obj.query_builder().output(
+            ["c1 + c2"]).filter("c1 = 3").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)})
                                       .astype({'(c1 + c2)': dtype('int32')}))
 
-        res = table_obj.search().output(
+        res = table_obj.query_builder().output(
             ["c1"]).filter("c1 > 2 and c2 < 4").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
                                       .astype({'c1': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
         # todo: fix this negative test case
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = table_obj.search().output(["c2"]).filter(
+        res = table_obj.query_builder().output(["c2"]).filter(
             "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
@@ -214,20 +215,20 @@ class TestSelect:
              {"c1": 'i', "c2": 'i'}, {"c1": 'j', "c2": 'j'}, {
                  "c1": 'k', "c2": 'k'}, {"c1": 'l', "c2": 'l'},
              {"c1": 'm', "c2": 'm'}])
-        res = table_obj.search().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
                                                                 'l', 'm'),
                                                          'c2': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
                                                                 'l', 'm')})
                                       .astype({'c1': dtype('O'), 'c2': dtype('O')}))
 
-        res = table_obj.search().output(
+        res = table_obj.query_builder().output(
             ["c1", "c2"]).filter("c1 = 'a'").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype(
             {'c1': dtype('O'), 'c2': dtype('O')}))
 
         # TODO NotImplement Error: Not implement: varchar > varchar
-        # res = table_obj.search().output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
+        # res = table_obj.query_builder().output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
         res = db_obj.drop_table("test_select_varchar")
         assert res.success
@@ -246,7 +247,7 @@ class TestSelect:
             table_obj.insert(
                 [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
-        res = table_obj.search().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["*"]).to_df()
         assert res.row_count == 32000
 
     def test_select_embedding_int32(self):
@@ -284,12 +285,12 @@ class TestSelect:
         res = table_obj.import_data(test_csv_dir, None)
         assert res.success
 
-        res = table_obj.search().output(["c2"]).to_df()
+        res = table_obj.query_builder().output(["c2"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])}))
 
-        res = table_obj.search().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
@@ -327,13 +328,13 @@ class TestSelect:
         res = table_obj.import_data(test_csv_dir, None)
         assert res.success
 
-        res = table_obj.search().output(["c2"]).to_df()
+        res = table_obj.query_builder().output(["c2"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c2': ([0.1, 0.2, 0.3, -0.2], [0.2, 0.1, 0.3, 0.4],
                     [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])}))
 
-        res = table_obj.search().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["*"]).to_df()
         print(res)
 
         pd.testing.assert_frame_equal(res,
@@ -380,7 +381,7 @@ class TestSelect:
             res = table_obj.import_data(test_csv_dir, None)
             assert res.success
 
-        res = table_obj.search().output(["c2"]).to_df()
+        res = table_obj.query_builder().output(["c2"]).to_df()
         assert res.row_count == 30000
 
     def test_select_same_output(self):
@@ -392,6 +393,6 @@ class TestSelect:
                             "c1": "int", "c2": "int"}, None)
 
         table_obj = db_obj.get_table("test_select_same_output")
-        res = table_obj.search().output(["c1", "c2"]).to_df()
-        res = table_obj.search().output(["c1", "c1"]).to_df()
+        res = table_obj.query_builder().output(["c1", "c2"]).to_df()
+        res = table_obj.query_builder().output(["c1", "c1"]).to_df()
         print(res)

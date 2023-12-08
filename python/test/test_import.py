@@ -54,7 +54,8 @@ class TestImport:
             assert res.success
 
             # search
-            res = table_obj.search().output(["c1"]).filter("c1 > 1").to_df()
+            res = table_obj.query_builder().output(
+                ["c1"]).filter("c1 > 1").to_df()
             print(res)
             res = db_obj.drop_table("my_table4")
             assert res.success
