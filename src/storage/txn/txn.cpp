@@ -199,7 +199,7 @@ TxnTableStore *Txn::GetTxnTableStore(TableCollectionEntry *table_entry) {
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
 
-Status Txn::CreateDatabase(const String &db_name, ConflictType, BaseEntry *&base_entry) {
+Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&base_entry) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -209,7 +209,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType, BaseEntry *&base
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    Status status = NewCatalog::CreateDatabase(catalog_, db_name, this->txn_id_, begin_ts, txn_mgr_, base_entry);
+    Status status = NewCatalog::CreateDatabase(catalog_, db_name, this->txn_id_, begin_ts, txn_mgr_, base_entry, conflict_type);
     if (!status.ok()) {
         return status;
     }

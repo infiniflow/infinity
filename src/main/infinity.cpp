@@ -83,7 +83,7 @@ void Infinity::LocalDisconnect() {
 //    Printf("To disconnect the database.\n");
 }
 
-QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &) {
+QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {
     QueryResult query_result;
     if(db_name.empty()) {
         query_result.result_table_ = nullptr;
@@ -103,6 +103,8 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
     create_schema_info->schema_name_ = db_name;
     create_statement->create_info_ = create_schema_info;
+
+    create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
     query_result = query_context_ptr->QueryStatement(create_statement.get());
     return query_result;
 }

@@ -42,6 +42,7 @@ module;
 #include "utils/type_info.hpp"
 
 #include "parallel_hashmap/phmap.h"
+#include "pgm/pgm_index.hpp"
 
 export module third_party;
 
@@ -202,5 +203,8 @@ export template <class K,
                  class Eq = HashDefaultEQ<K>,
                  class Alloc = PHAlloc<PHPair<const K, V>>> // alias for std::allocator
 using FlatHashMap = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
+
+export template <typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
+using PGMIndex = pgm::PGMIndex<K, Epsilon, EpsilonRecursive, Floating>;
 
 } // namespace infinity

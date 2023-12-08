@@ -41,6 +41,8 @@ public:
 
     u32 WriteVInt(u32 value);
 
+    u32 WriteVLong(u64 value);
+
     SizeT GetSize() const;
 
     ByteSliceList *GetByteSliceList() { return slice_list_; }
@@ -111,6 +113,17 @@ inline void ByteSliceWriter::Write(T value) {
 }
 
 inline u32 ByteSliceWriter::WriteVInt(u32 value) {
+    u32 len = 1;
+    while (value > 0x7F) {
+        WriteByte(0x80 | (value & 0x7F));
+        value >>= 7;
+        ++len;
+    }
+    WriteByte(value & 0x7F);
+    return len;
+}
+
+inline u32 ByteSliceWriter::WriteVLong(u64 value) {
     u32 len = 1;
     while (value > 0x7F) {
         WriteByte(0x80 | (value & 0x7F));
