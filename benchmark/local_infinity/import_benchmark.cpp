@@ -29,6 +29,7 @@ import parser;
 import profiler;
 import local_file_system;
 import third_party;
+import logical_node_type;
 
 import query_options;
 import query_result;
@@ -79,7 +80,7 @@ int main() {
 
         std::shared_ptr<Table> table = data_base->GetTable(table_name);
 
-        std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_base.fvecs";
+        std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
         if (!fs.Exists(sift_base_path)) {
             std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
             break;
@@ -111,16 +112,18 @@ int main() {
             index_info_list->emplace_back(index_info);
         }
 
-        table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+        QueryResult query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
 
-
-        if(query_result.IsOk() && query_result.root_operator_type_ == LogicalNodeType::kImport) {
-            FlushStatement flush_statement;
-            flush_statement.type_ = FlushType::kData;
-            query_result = QueryStatement(&flush_statement);
+        if(query_result.IsOk()) {
+            std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
+            query_result = infinity->Flush();
+            profiler.End();
+            std::cout << "Flush data cost: " << profiler.ElapsedToString() << std::endl;
+        } else {
+            std::cout << "Fail to create index." << profiler.ElapsedToString() << std::endl;
+            profiler.End();
+            break;
         }
-        profiler.End();
-        std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
     } while (false);
 
     std::cout << ">>> Import Benchmark End <<<" << std::endl;

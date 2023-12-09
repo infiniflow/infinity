@@ -133,7 +133,7 @@ int main() {
             assert(dimension == dim || !"query vector dim isn't 128");
         }
 
-        for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
+        for (size_t query_idx = 0; query_idx < 1; ++query_idx) {
             SearchExpr *search_expr = new SearchExpr();
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
@@ -146,8 +146,23 @@ int main() {
             ColumnExpr* column_expr = new ColumnExpr();
             column_expr->names_.emplace_back("col1");
             knn_expr->column_expr_ = column_expr;
+            search_expr->knn_exprs_.emplace_back(knn_expr);
 
-            auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(search_expr, nullptr, nullptr);
+            std::shared_ptr<Database> data_base = infinity->GetDatabase("default");
+            std::shared_ptr<Table> table = data_base->GetTable("knn_benchmark");
+
+            std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>;
+            ColumnExpr* select_column_expr = new ColumnExpr();
+            select_column_expr->names_.emplace_back("col1");
+            output_columns->emplace_back(select_column_expr);
+            auto result = table->Search(search_expr, nullptr, output_columns);
+            if(!result.IsOk()) {
+                std::cerr << "Error: " << result.ErrorStr() << std::endl;
+                return 0;
+            }
+            std::cout << "Result row count: " << result.ResultTable()->row_count() << std::endl;
+
+            delete[] (float*)(knn_expr->embedding_data_ptr_);
         }
 
         results.push_back(Format("-> SEARCH QPS: {}", total_times));

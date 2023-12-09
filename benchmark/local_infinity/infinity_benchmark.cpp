@@ -259,7 +259,7 @@ int main() {
 
         std::shared_ptr<Table> table = data_base->GetTable(table_name);
 
-        std::string sift_base_path = std::string(benchmark_data_path()) + "/sift/base.fvecs";
+        std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift/base.fvecs";
         if (!fs.Exists(sift_base_path)) {
             std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
             break;

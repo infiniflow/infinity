@@ -670,7 +670,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const StdFunction<u64(const String &)>& file_size_func, const String &path) {
+    auto chuck_filling = [&](const StdFunction<u64(const String &)> &file_size_func, const String &path) {
         SizeT column_id = 0;
         {
             Value value = Value::MakeVarchar(path);
@@ -700,7 +700,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             auto version_path = block->VersionFilePath();
 
             chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
-            for (auto &column: block->columns_) {
+            for (auto &column : block->columns_) {
                 auto col_file_path = column->FilePath();
 
                 chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
@@ -1272,7 +1272,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Status table_status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = Move(table_status.msg_);
-//        Error<ExecutorException>(table_status.message());
+        //        Error<ExecutorException>(table_status.message());
         return;
     }
 
@@ -1338,8 +1338,24 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 switch (index_base->index_type_) {
                     case IndexType::kIVFFlat: {
                         const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base.get());
-                        other_parameters =
-                            Format("metric = {}, centroids_count = {}", MetricTypeToString(index_ivfflat->metric_type_), index_ivfflat->centroids_count_);
+                        other_parameters = Format("metric = {}, centroids_count = {}",
+                                                  MetricTypeToString(index_ivfflat->metric_type_),
+                                                  index_ivfflat->centroids_count_);
+                        break;
+                    }
+                    case IndexType::kHnsw: {
+                        const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
+                        other_parameters = Format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
+                                                  MetricTypeToString(index_hnsw->metric_type_),
+                                                  HnswEncodeTypeToString(index_hnsw->encode_type_),
+                                                  index_hnsw->M_,
+                                                  index_hnsw->ef_construction_,
+                                                  index_hnsw->ef_);
+                        break;
+                    }
+                    case IndexType::kIRSFullText: {
+                        const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base.get());
+                        other_parameters = Format("analyzer = {}", index_full_text->analyzer_);
                         break;
                     }
                     case IndexType::kInvalid: {
@@ -1527,7 +1543,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
         }
         {
             // option value
-            BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
             u64 memory_limit = buffer_manager->memory_limit();
             u64 memory_usage = buffer_manager->memory_usage();
             Value value = Value::MakeVarchar(Format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
@@ -1545,7 +1561,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
         }
         {
             // option value
-            SessionManager* session_manager = query_context->session_manager();
+            SessionManager *session_manager = query_context->session_manager();
             u64 session_count = session_manager->GetSessionCount();
             Value value = Value::MakeVarchar(ToStr(session_count));
             ValueExpression value_expr(value);
