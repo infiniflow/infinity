@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from infinity.remote_thrift.infinity_thrift_rpc import *
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket
 
 from infinity import URI
-from infinity.remote_thrift.infinity_thrift_rpc import *
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 
 
 class ThriftInfinityClient:
@@ -62,10 +62,11 @@ class ThriftInfinityClient:
                                                           column_defs=column_defs,
                                                           option=option))
 
-    def drop_table(self, db_name: str, table_name: str):
+    def drop_table(self, db_name: str, table_name: str, if_exists: bool):
         return self.client.DropTable(DropTableRequest(session_id=self.session_id,
                                                       db_name=db_name,
-                                                      table_name=table_name))
+                                                      table_name=table_name,
+                                                      options=DropTableOptions(conflict_type=ConflictType.Ignore if if_exists else ConflictType.Error,)))
 
     def list_tables(self, db_name: str):
         return self.client.ListTable(ListTableRequest(session_id=self.session_id,

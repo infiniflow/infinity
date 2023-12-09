@@ -18,7 +18,18 @@ Embedding,
 Invalid
 }
 
+enum ConflictType {
+    Invalid,
+    Ignore,
+    Error,
+    Replace,
+}
+
 struct Option {}
+
+struct DropTableOptions {
+1:  ConflictType conflict_type,
+}
 
 struct NumberType {}
 
@@ -340,7 +351,7 @@ struct DropTableRequest {
 1:  string db_name,
 2:  string table_name,
 3:  i64 session_id,
-4:  Option option,
+4:  DropTableOptions options,
 }
 
 struct InsertRequest {

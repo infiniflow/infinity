@@ -129,8 +129,8 @@ class RemoteDatabase(Database, ABC):
                                        column_defs=column_defs,
                                        option=options)
 
-    def drop_table(self, table_name):
-        return self._conn.drop_table(db_name=self._db_name, table_name=table_name)
+    def drop_table(self, table_name, if_exists=True):
+        return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
         return self._conn.list_tables(self._db_name)

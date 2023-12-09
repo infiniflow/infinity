@@ -28,7 +28,10 @@ public:
     ConflictType conflict_type_{ConflictType::kError};
 };
 
-export class DropTableOptions {};
+export class DropTableOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class CreateIndexOptions {};
 

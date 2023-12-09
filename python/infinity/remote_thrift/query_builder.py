@@ -15,15 +15,13 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import List, Optional, Union
+from typing import List, Optional
+
 import numpy as np
 import pandas as pd
-import pydantic
-
 from infinity.common import VEC
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-
 
 '''FIXME: How to disable validation of only the search field?'''
 
@@ -84,7 +82,6 @@ class InfinityThriftQueryBuilder(ABC):
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
 
-        dimension = len(embedding_data)
         dist_type = KnnDistanceType.L2
         if distance_type == 'l2':
             dist_type = KnnDistanceType.L2
@@ -96,6 +93,7 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.Hamming
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn)
+        print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self
 

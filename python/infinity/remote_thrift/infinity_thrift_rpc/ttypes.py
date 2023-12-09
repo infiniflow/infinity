@@ -61,6 +61,27 @@ class LogicType(object):
     }
 
 
+class ConflictType(object):
+    Invalid = 0
+    Ignore = 1
+    Error = 2
+    Replace = 3
+
+    _VALUES_TO_NAMES = {
+        0: "Invalid",
+        1: "Ignore",
+        2: "Error",
+        3: "Replace",
+    }
+
+    _NAMES_TO_VALUES = {
+        "Invalid": 0,
+        "Ignore": 1,
+        "Error": 2,
+        "Replace": 3,
+    }
+
+
 class ElementType(object):
     ElementBit = 0
     ElementInt8 = 1
@@ -263,6 +284,63 @@ class Option(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('Option')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class DropTableOptions(object):
+    """
+    Attributes:
+     - conflict_type
+
+    """
+
+
+    def __init__(self, conflict_type=None,):
+        self.conflict_type = conflict_type
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.conflict_type = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('DropTableOptions')
+        if self.conflict_type is not None:
+            oprot.writeFieldBegin('conflict_type', TType.I32, 1)
+            oprot.writeI32(self.conflict_type)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -3863,16 +3941,16 @@ class DropTableRequest(object):
      - db_name
      - table_name
      - session_id
-     - option
+     - options
 
     """
 
 
-    def __init__(self, db_name=None, table_name=None, session_id=None, option=None,):
+    def __init__(self, db_name=None, table_name=None, session_id=None, options=None,):
         self.db_name = db_name
         self.table_name = table_name
         self.session_id = session_id
-        self.option = option
+        self.options = options
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -3900,8 +3978,8 @@ class DropTableRequest(object):
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.STRUCT:
-                    self.option = Option()
-                    self.option.read(iprot)
+                    self.options = DropTableOptions()
+                    self.options.read(iprot)
                 else:
                     iprot.skip(ftype)
             else:
@@ -3926,9 +4004,9 @@ class DropTableRequest(object):
             oprot.writeFieldBegin('session_id', TType.I64, 3)
             oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
-        if self.option is not None:
-            oprot.writeFieldBegin('option', TType.STRUCT, 4)
-            self.option.write(oprot)
+        if self.options is not None:
+            oprot.writeFieldBegin('options', TType.STRUCT, 4)
+            self.options.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -4855,6 +4933,11 @@ class UpdateRequest(object):
 all_structs.append(Option)
 Option.thrift_spec = (
 )
+all_structs.append(DropTableOptions)
+DropTableOptions.thrift_spec = (
+    None,  # 0
+    (1, TType.I32, 'conflict_type', None, None, ),  # 1
+)
 all_structs.append(NumberType)
 NumberType.thrift_spec = (
 )
@@ -5168,7 +5251,7 @@ DropTableRequest.thrift_spec = (
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
     (3, TType.I64, 'session_id', None, None, ),  # 3
-    (4, TType.STRUCT, 'option', [Option, None], None, ),  # 4
+    (4, TType.STRUCT, 'options', [DropTableOptions, None], None, ),  # 4
 )
 all_structs.append(InsertRequest)
 InsertRequest.thrift_spec = (
