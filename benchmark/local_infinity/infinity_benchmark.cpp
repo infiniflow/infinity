@@ -70,15 +70,15 @@ int main() {
     size_t thread_num = 8;
     size_t total_times = 8192 * 4;
 
-    std::string path = "/tmp/infinity";
+    std::string data_path = "/tmp/infinity";
 
     LocalFileSystem fs;
-    if (fs.Exists(path)) {
-        fs.DeleteDirectory(path);
+    if (fs.Exists(data_path)) {
+        fs.DeleteDirectory(data_path);
     }
-    fs.CreateDirectory(path);
+    fs.CreateDirectory(data_path);
 
-    Infinity::LocalInit(path);
+    Infinity::LocalInit(data_path);
 
     std::cout << ">>> Infinity Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
@@ -233,7 +233,7 @@ int main() {
     //    }
 
     // hnsw benchmark
-    {
+    do {
         std::vector<ColumnDef *> column_defs;
 
         // init column defs
@@ -260,6 +260,11 @@ int main() {
         std::shared_ptr<Table> table = data_base->GetTable(table_name);
 
         std::string sift_base_path = std::string(benchmark_data_path()) + "/sift/base.fvecs";
+        if (!fs.Exists(sift_base_path)) {
+            std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
+            break;
+        }
+
         ImportOptions import_options;
         import_options.copy_file_type_ = CopyFileType::kFVECS;
         auto r3 = table->Import(sift_base_path, import_options);
@@ -283,7 +288,17 @@ int main() {
         }
 
         table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
-    }
+    } while(false);
+
+//    {
+//        std::cout << "--- Start to run search benchmark: ";
+//        auto tims_costing_second = Measurement(thread_num, total_times, [&](size_t i, std::shared_ptr<Infinity> infinity,
+//        std::thread::id thread_id) {
+//            auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(nullptr, nullptr, nullptr);
+//        });
+//        results.push_back(Format("-> SEARCH QPS: {}", total_times / tims_costing_second));
+//        std::cout << "OK"  << std::endl;
+//    }
 
     std::cout << ">>> Infinity Benchmark End <<<" << std::endl;
     for (const auto &item : results) {

@@ -40,10 +40,10 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
 
         task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
+        session_mgr_ = MakeUnique<SessionManager>();
+
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
-
-        session_mgr_ = MakeUnique<SessionManager>();
 
         initialized_ = true;
     }
@@ -55,10 +55,10 @@ void InfinityContext::UnInit() {
     }
     initialized_ = false;
 
-    session_mgr_.reset();
-
     storage_->UnInit();
     storage_.reset();
+
+    session_mgr_.reset();
 
     task_scheduler_->UnInit();
     task_scheduler_.reset();

@@ -16,12 +16,14 @@ module;
 
 import stl;
 import wal_entry;
+import bg_task;
 
 export module wal_manager;
 
 namespace infinity {
 
 class Storage;
+class BGTaskProcessor;
 
 class SeqGenerator {
 public:
@@ -64,8 +66,12 @@ public:
     void Flush();
 
     // Checkpoint is scheduled regularly.
-    // Checkpoint for transactions which's lsn no larger than lsn_pend_chk_.
+    // Checkpoint for transactions which lsn no larger than lsn_pend_chk_.
+    void CheckpointTimer();
+
     void Checkpoint();
+
+    void Checkpoint(ForceCheckpointTask* ckp_task);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
@@ -73,11 +79,11 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry);
 
-    void RecycleWalFile();
+    void RecycleWalFile(TxnTimeStamp full_ckp_ts);
 
 private:
     void SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size);
-    i64 GetWalState(TxnTimeStamp &max_commit_ts);
+    Tuple<TxnTimeStamp, i64> GetWalState();
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts);
     void WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts);
@@ -120,7 +126,6 @@ private:
     i64 wal_size_{};
 
     // Only Checkpoint thread access following members
-    TxnTimeStamp ckp_commit_ts_{};
     TxnTimeStamp full_ckp_commit_ts_{};
     i64 full_ckp_wal_size_{};
     i64 full_ckp_when_{};

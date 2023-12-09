@@ -85,6 +85,8 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         }
     }
     import_op_state->SetComplete();
+    Txn* txn = query_context->GetTxn();
+    txn->BeginTS();
     return true;
 }
 
@@ -453,7 +455,7 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
 
     LOG_TRACE(Format("Block rows count {}", block_row_counts.size()));
     for (SizeT i = 0; i < block_row_counts.size(); ++i) {
-        LOG_TRACE(Format("Block {} rows count {}", i, block_row_counts[i]));
+        LOG_TRACE(Format("Block {} row count {}", i, block_row_counts[i]));
     }
 
     const String &db_name = *TableCollectionEntry::GetDBName(txn_store->table_entry_);

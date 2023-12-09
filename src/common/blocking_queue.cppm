@@ -55,6 +55,15 @@ public:
         full_cv_.notify_one();
     }
 
+    T DequeueReturn() {
+        UniqueLock<Mutex> lock(queue_mutex_);
+        empty_cv_.wait(lock, [this] { return !queue_.empty(); });
+        T res = Move(queue_.front());
+        queue_.pop_front();
+        full_cv_.notify_one();
+        return res;
+    }
+
     void DequeueBulk(List<T> &output_queue) {
         UniqueLock<Mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
