@@ -56,7 +56,7 @@ export {
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
 
     // segment related constants
-    constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * DEFAULT_BLOCK_CAPACITY; // 1024 * 8192 = 8M rows
+    constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 16384; // 1024 * 8192 = 8M rows
     constexpr i32 INVALID_SEGMENT_ID = i32_max;
 
     // queue related constants, TODO: double check the necessary

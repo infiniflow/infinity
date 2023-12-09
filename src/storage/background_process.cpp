@@ -34,7 +34,7 @@ void BGTaskProcessor::Stop() {
     UniquePtr<StopProcessorTask> stop_task = MakeUnique<StopProcessorTask>();
     StopProcessorTask* stop_task_ptr = stop_task.get();
     task_queue_.Enqueue(Move(stop_task));
-    stop_task->Wait();
+    stop_task_ptr->Wait();
     processor_thread_.join();
     LOG_INFO("Shutdown the background processor.");
 }
