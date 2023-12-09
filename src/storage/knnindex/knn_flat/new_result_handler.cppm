@@ -71,6 +71,7 @@ struct NewHeapResultHandler : public ResultHandler {
     struct HeapSingleResultHandler : public SingleResultHandler {
         NewHeapResultHandler &hr;
         SizeT k{};
+        SizeT cnt{};
 
         Vector<T *> heap_dis{};
         Vector<TI *> heap_ids{};
@@ -89,7 +90,11 @@ struct NewHeapResultHandler : public ResultHandler {
 
         /// add one result for query i
         void add_result(T dis, TI idx, SizeT i) {
-            if (C::cmp(thresh[i], dis)) {
+            if (cnt < k) {
+                heap_push<C>(cnt + 1, heap_dis[i], heap_ids[i], dis, idx);
+                thresh[i] = *heap_dis[i];
+                cnt++;
+            } else if (C::cmp(thresh[i], dis)) {
                 heap_replace_top<C>(k, heap_dis[i], heap_ids[i], dis, idx);
                 thresh[i] = *heap_dis[i];
             }

@@ -45,3 +45,20 @@ SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3
 8
 8
 8
+
+# query shall work when topn exceeds the row count
+query I
+SELECT c1 FROM test_knn_ip SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 100);
+----
+8
+8
+8
+6
+6
+6
+4
+4
+4
+2
+2
+2
