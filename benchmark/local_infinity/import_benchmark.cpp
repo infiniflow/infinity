@@ -113,6 +113,12 @@ int main() {
 
         table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
 
+
+        if(query_result.IsOk() && query_result.root_operator_type_ == LogicalNodeType::kImport) {
+            FlushStatement flush_statement;
+            flush_statement.type_ = FlushType::kData;
+            query_result = QueryStatement(&flush_statement);
+        }
         profiler.End();
         std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
     } while (false);

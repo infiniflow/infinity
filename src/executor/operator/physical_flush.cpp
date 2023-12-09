@@ -22,6 +22,8 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
+import logger;
+import bg_task;
 
 module physical_flush;
 
@@ -32,15 +34,15 @@ void PhysicalFlush::Init() {}
 bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
     switch (flush_type_) {
         case FlushType::kData: {
-            FlushData(query_context);
+            FlushData(query_context, operator_state);
             break;
         }
         case FlushType::kLog: {
-            FlushLog(query_context);
+            FlushLog(query_context, operator_state);
             break;
         }
         case FlushType::kBuffer: {
-            FlushBuffer(query_context);
+            FlushBuffer(query_context, operator_state);
             break;
         }
     }
@@ -48,31 +50,21 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     return true;
 }
 
-void PhysicalFlush::FlushData(QueryContext *) {
+void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
+    UniquePtr<ForceCheckpointTask> force_ckp_task = MakeUnique<ForceCheckpointTask>(query_context->GetTxn());
+    ForceCheckpointTask* force_ckp_task_ptr = force_ckp_task.get();
+    query_context->storage()->bg_processor()->Submit(Move(force_ckp_task));
+    force_ckp_task_ptr->Wait();
+    LOG_TRACE("Flushed data");
 }
 
-void PhysicalFlush::FlushLog(QueryContext *) {
+void PhysicalFlush::FlushLog(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
 }
 
-void PhysicalFlush::FlushBuffer(QueryContext *) {
+void PhysicalFlush::FlushBuffer(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
-
-    SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
-    output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
 }
 
 } // namespace infinity

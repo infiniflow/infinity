@@ -312,6 +312,10 @@ void WalManager::Checkpoint() {
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
 
     auto [max_commit_ts, wal_size] = GetWalState();
+    if (wal_size == full_ckp_wal_size_) {
+        return ;
+    }
+
     bool is_full_checkpoint = true;
 
     LOG_INFO(Format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
@@ -319,7 +323,6 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
                     ckp_task->txn_->BeginTS(),
                     max_commit_ts));
 
-    TxnManager *txn_mgr = storage_->txn_manager();
     ckp_task->txn_->Checkpoint(max_commit_ts, is_full_checkpoint);
 
     // This function doesn't change the ckp related variable, which won't affect the following checkpoint correctness.
