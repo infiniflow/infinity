@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import struct
-from typing import Dict, Any
-
-import pandas as pd
-from numpy import dtype
+from typing import Any, Dict
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+import pandas as pd
+from numpy import dtype
 
 
 def column_type_to_dtype(ttype: ttypes.ColumnType):
@@ -102,22 +101,28 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             # print(len(column_vector))
             # print(len(column_vector) // dimension)
             if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
-                all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+                all_list = list(struct.unpack(
+                    '<{}b'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
-                all_list = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+                all_list = list(struct.unpack('<{}h'.format(
+                    len(column_vector) // 2), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt32:
-                all_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+                all_list = list(struct.unpack('<{}i'.format(
+                    len(column_vector) // 4), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat32:
-                all_list = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+                all_list = list(struct.unpack('<{}f'.format(
+                    len(column_vector) // 4), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
-                all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+                all_list = list(struct.unpack('<{}d'.format(
+                    len(column_vector) // 8), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
-                all_list = list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+                all_list = list(struct.unpack(
+                    '<{}?'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             else:
                 raise NotImplementedError(
@@ -137,30 +142,32 @@ def parse_bytes(bytes_data):
         offset += length
     return results
 
-def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef])->ttypes.DataType:
+
+def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:
     for column_def in column_defs:
         if column_def.name == column_name:
             return column_def.data_type
     raise KeyError(f"column name {column_name} not found in column defs")
 
+
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
     data_dict: Dict[str, list[Any, ...]] = {}
     column_names = []
     types = []
-    for column_def in res.column_defs:
+    print('received response with {} column defs and {} column fields'.format(len(
+        res.column_defs), len(res.column_fields)))
+    for i in range(len(res.column_defs)):
+        column_def = res.column_defs[i]
         column_names.append(column_def.name)
         types.append(logic_type_to_dtype(column_def.data_type))
         # print()
         # print(column_def.id)
-        match res.column_fields.__len__():
-            case 0:
-                data_dict[column_def.name] = []
-            case _:
-                column_field = res.column_fields[column_def.id]
-                column_type = column_field.column_type
-                column_data_type = column_def.data_type
-                column_vectors = column_field.column_vectors
-                data_dict[column_def.name] = column_vector_to_list(column_type, column_data_type, column_vectors)
+        column_field = res.column_fields[i]
+        column_type = column_field.column_type
+        column_data_type = column_def.data_type
+        column_vectors = column_field.column_vectors
+        data_dict[column_def.name] = column_vector_to_list(
+            column_type, column_data_type, column_vectors)
 
     type_dict = dict(zip(column_names, types))
     # print()

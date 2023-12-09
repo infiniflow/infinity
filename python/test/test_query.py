@@ -1,7 +1,8 @@
+import infinity.index as index
 from infinity.common import REMOTE_HOST
-from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
+from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 
 
@@ -24,6 +25,13 @@ class TestQuery:
             [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
         assert res.success
 
+        res = table.create_index("my_index",
+                                 [index.IndexInfo("body",
+                                                  index.IndexType.IRSFullText,
+                                                  [index.InitParameter("ANALYZER", "segmentation")]),
+                                  ], None)
+        assert res.success
+
         # select_res = table.query_builder().output(["*"]).to_df()
         # print(select_res)
         # Create a query builder
@@ -33,6 +41,4 @@ class TestQuery:
         query_builder.match('body', 'harmful', 'topn=2')
         query_builder.fusion('rrf')
         res = query_builder.to_df()
-        #
-        # print result
         print(res)

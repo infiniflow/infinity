@@ -121,8 +121,20 @@ public:
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
-        auto result = database->DropTable(request.table_name, (const DropTableOptions &)request.option);
-
+        DropTableOptions drop_table_opts;
+        switch(request.options.conflict_type) {
+            case infinity_thrift_rpc::ConflictType::Ignore:
+                drop_table_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            case infinity_thrift_rpc::ConflictType::Replace:
+                drop_table_opts.conflict_type_ = ConflictType::kReplace;
+                break;
+            case infinity_thrift_rpc::ConflictType::Error:
+            default:
+                drop_table_opts.conflict_type_ = ConflictType::kError;
+            break;
+        }
+        auto result = database->DropTable(request.table_name, drop_table_opts);
         ProcessCommonResult(response, result);
     }
 
@@ -781,6 +793,7 @@ private:
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
         std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        knn_expr->topn_ = expr.topn;
         return knn_expr;
     }
 
