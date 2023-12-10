@@ -91,7 +91,7 @@ int main() {
 
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        auto r3 = table->Import(sift_base_path, import_options);
+        QueryResult query_result = table->Import(sift_base_path, import_options);
         std::cout << "Import data cost: " << profiler.ElapsedToString() << std::endl;
 
         auto index_info_list = new std::vector<IndexInfo *>();
@@ -112,7 +112,7 @@ int main() {
             index_info_list->emplace_back(index_info);
         }
 
-        QueryResult query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+//        query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
 
         if(query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;

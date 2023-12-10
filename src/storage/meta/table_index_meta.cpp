@@ -328,4 +328,9 @@ void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager
     meta->entry_list_.erase(removed_iter, meta->entry_list_.end());
 }
 
+void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
+    Assert<StorageException>(IsEqual(*this->index_name_, *other.index_name_), "TableIndexMeta::MergeFrom requires index_name_ match");
+    MergeLists(this->entry_list_, other.entry_list_);
+}
+
 } // namespace infinity

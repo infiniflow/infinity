@@ -551,6 +551,15 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
         Assert<StorageException>(seg_it != this->segment_map_.end(), Format("max_segment_id {} is invalid", max_segment_id));
         this->unsealed_segment_ = seg_it->second.get();
     }
+
+    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {
+        auto it = this->index_meta_map_.find(index_name);
+        if (it == this->index_meta_map_.end()) {
+            this->index_meta_map_.emplace(index_name, Move(table_index_meta));
+        } else {
+            it->second->MergeFrom(*table_index_meta.get());
+        }
+    }
 }
 
 } // namespace infinity
