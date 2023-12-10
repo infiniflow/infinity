@@ -112,7 +112,6 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
-            SizeT column_n = 0;
             for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
                 u32 segment_id = result_row_ids[top_idx].segment_id_;
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
@@ -134,29 +133,30 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                     output_row_count -= DEFAULT_BLOCK_CAPACITY;
                 }
 
-                column_n = table_ref_->column_ids_.size();
+                SizeT column_n = table_ref_->column_ids_.size();
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = table_ref_->column_ids_[i];
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), buffer_mgr);
+                    auto &column_type = block_entry->columns_[column_id]->column_type_;
 
-                    if(output_types_->at(column_id)->Plain()) {
-                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
-                        output_data_block->AppendValueByPtr(column_id, ptr);
+                    if (column_type->Plain()) {
+                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column_type);
+                        output_data_block->AppendValueByPtr(i, ptr);
                     } else {
-                        if(output_types_->at(column_id)->type() != LogicalType::kVarchar) {
+                        if (column_type->type() != LogicalType::kVarchar) {
                             Error<NotImplementException>("Not implement complex type reading from column buffer.");
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
                         Value value = Value::MakeVarchar(varchar_ptr, data_size);
-                        output_data_block->AppendValue(column_id, value);
+                        output_data_block->AppendValue(i, value);
                     }
                 }
                 output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
             }
-            for (SizeT column_id = 0; column_id < column_n; ++column_id) {
-                LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[column_id], output_names_->at(column_id)));
+            for (SizeT i = 0; i < column_n; ++i) {
+                LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
             }
         }
 

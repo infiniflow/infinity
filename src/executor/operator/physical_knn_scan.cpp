@@ -376,14 +376,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
                 }
 
-                for (SizeT column_id : base_table_ref_->column_ids_) {
+                SizeT column_n = base_table_ref_->column_ids_.size();
+                for (SizeT i = 0; i < column_n; ++i) {
+                    SizeT column_id = base_table_ref_->column_ids_[i];
                     ColumnBuffer column_buffer =
                         BlockColumnEntry::GetColumnData(block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
-                    if(output_types_->at(column_id)->Plain()) {
-                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *output_types_->at(column_id));
-                        output_block_ptr->AppendValueByPtr(column_id, ptr);
+                    auto &column_type = block_entry->columns_[column_id]->column_type_;
+                    if (column_type->Plain()) {
+                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column_type);
+                        output_block_ptr->AppendValueByPtr(i, ptr);
                     } else {
-                        if(output_types_->at(column_id)->type() != LogicalType::kVarchar) {
+                        if (column_type->type() != LogicalType::kVarchar) {
                             Error<NotImplementException>("Not implement complex type reading from column buffer.");
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
@@ -391,9 +394,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         output_block_ptr->AppendValue(column_id, value);
                     }
                 }
-                SizeT last = base_table_ref_->column_ids_.size();
-                output_block_ptr->AppendValueByPtr(last++, (ptr_t)&result_dists[id]);
-                output_block_ptr->AppendValueByPtr(last, (ptr_t)&row_ids[id]);
+                output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
+                output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
 
                 ++ output_block_row_id;
             }
