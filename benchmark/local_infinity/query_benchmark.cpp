@@ -116,7 +116,7 @@ int main() {
     std::vector<std::string> results;
 
     do {
-        std::cout << "--- Start to run search benchmark: ";
+        std::cout << "--- Start to run search benchmark: " << std::endl;
 
         std::string sift_query_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
         if (!fs.Exists(sift_query_path)) {
@@ -132,8 +132,9 @@ int main() {
             queries = const_cast<const float *>(fvecs_read(sift_query_path.c_str(), &dim, &query_count));
             assert(dimension == dim || !"query vector dim isn't 128");
         }
-
-        for (size_t query_idx = 0; query_idx < 1; ++query_idx) {
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
+        for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
             SearchExpr *search_expr = new SearchExpr();
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
@@ -141,7 +142,8 @@ int main() {
             knn_expr->topn_ = 100;
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             knn_expr->embedding_data_ptr_ = new float[dimension];
-            memmove(knn_expr->embedding_data_ptr_, queries + query_idx * dimension * sizeof(float), dimension * sizeof(float));
+            char* src_ptr = (char*)queries + query_idx * dimension * sizeof(float);
+            memmove((char*)(knn_expr->embedding_data_ptr_), src_ptr, dimension * sizeof(float));
 
             ColumnExpr* column_expr = new ColumnExpr();
             column_expr->names_.emplace_back("col1");
@@ -160,13 +162,19 @@ int main() {
                 std::cerr << "Error: " << result.ErrorStr() << std::endl;
                 return 0;
             }
-            std::cout << "Result row count: " << result.ResultTable()->row_count() << std::endl;
+
+            if(query_idx % 1000 == 999) {
+                std::cout << Format("{}: cost {}", query_idx + 1, profiler.ElapsedToString()) << std::endl;
+            }
+
+            if(result.ResultTable()->row_count() != knn_expr->topn_) {
+                std::cout << "Result row count: " << result.ResultTable()->row_count() << std::endl;
+            }
 
             delete[] (float*)(knn_expr->embedding_data_ptr_);
         }
-
-        results.push_back(Format("-> SEARCH QPS: {}", total_times));
-        std::cout << "OK" << std::endl;
+        profiler.End();
+        results.push_back(Format("Total cost= : {}", profiler.ElapsedToString()));
     } while (false);
 
     std::cout << ">>> Query Benchmark End <<<" << std::endl;
