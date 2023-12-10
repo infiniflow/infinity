@@ -41,9 +41,10 @@ import data_access_state;
 import table_index_entry;
 import status;
 import base_entry;
+import bg_task;
 
 import infinity_exception;
-#include "statement/extra/extra_ddl_info.h"
+// #include "statement/extra/extra_ddl_info.h"
 
 module wal_manager;
 
@@ -122,7 +123,7 @@ void WalManager::Start() {
     max_commit_ts_ = 0;
     wal_size_ = 0;
     flush_thread_ = std::thread([this] { Flush(); });
-    checkpoint_thread_ = std::thread([this] { Checkpoint(); });
+    checkpoint_thread_ = std::thread([this] { CheckpointTimer(); });
 }
 
 void WalManager::Stop() {
@@ -184,13 +185,14 @@ void WalManager::SetWalState(TxnTimeStamp max_commit_ts, int64_t wal_size) {
     mutex2_.unlock();
 }
 
-int64_t WalManager::GetWalState(TxnTimeStamp &max_commit_ts) {
+Tuple<TxnTimeStamp, int64_t> WalManager::GetWalState() {
     int64_t wal_size{0};
+    TxnTimeStamp max_commit_ts{};
     mutex2_.lock();
     max_commit_ts = this->max_commit_ts_;
     wal_size = this->wal_size_;
     mutex2_.unlock();
-    return wal_size;
+    return {max_commit_ts, wal_size};
 }
 
 // Flush is scheduled regularly. It collects a batch of transactions, sync
@@ -200,8 +202,6 @@ int64_t WalManager::GetWalState(TxnTimeStamp &max_commit_ts) {
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush mainloop begin");
     while (running_.load()) {
-        TxnTimeStamp max_commit_ts = 0;
-
         mutex_.lock();
         que_.swap(que2_);
         mutex_.unlock();
@@ -209,7 +209,7 @@ void WalManager::Flush() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-        int64_t wal_size = GetWalState(max_commit_ts);
+        auto [max_commit_ts, wal_size] = GetWalState();
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             Assert<StorageException>(!entry->cmds.empty(), Format("WalEntry of txn_id {} commands is empty", entry->txn_id));
@@ -259,54 +259,75 @@ void WalManager::Flush() {
  * CHECKPOINT WAL FILE
  *****************************************************************************/
 
-// Do checkpoint for transactions which's lsn no larger than the given one.
-void WalManager::Checkpoint() {
+void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
     while (running_.load()) {
-        auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
-        int64_t now = seconds_since_epoch.count();
-        TxnTimeStamp max_commit_ts;
-        int64_t wal_size = GetWalState(max_commit_ts);
-        bool is_full_checkpoint = false;
-//        bool is_delta_checkpoint = false;
-        if (now - full_ckp_when_ > full_checkpoint_interval_sec_ && wal_size != full_ckp_wal_size_) {
-            is_full_checkpoint = true;
-        } else if ((now - delta_ckp_when_ > delta_checkpoint_interval_sec_ && wal_size != delta_ckp_wal_size_) ||
-                   wal_size - delta_ckp_wal_size_ > delta_checkpoint_interval_wal_bytes_) {
-//            is_delta_checkpoint = true;
-        } else {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            continue;
-        }
-
-        TxnManager *txn_mgr = nullptr;
-        Txn *txn = nullptr;
-        try {
-            txn_mgr = storage_->txn_manager();
-            txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            LOG_INFO(Format("created transaction for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                            txn->TxnID(),
-                            txn->BeginTS(),
-                            max_commit_ts));
-            txn->Checkpoint(max_commit_ts, is_full_checkpoint);
-            txn_mgr->CommitTxn(txn);
-
-            ckp_commit_ts_ = max_commit_ts;
-            delta_ckp_when_ = now;
-            delta_ckp_wal_size_ = wal_size;
-            if (is_full_checkpoint) {
-                full_ckp_when_ = now;
-                full_ckp_wal_size_ = wal_size;
-                full_ckp_commit_ts_ = max_commit_ts;
-            }
-            LOG_INFO(Format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
-            RecycleWalFile();
-        } catch (Exception &e) {
-            LOG_ERROR(Format("WalManager::Checkpoint failed: {}", e.what()));
-        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        storage_->bg_processor()->Submit(MakeUnique<TryCheckpointTask>(true));
     }
-    LOG_TRACE("WalManager::Checkpoint mainloop end");
+}
+
+// Do checkpoint for transactions which lsn no larger than the given one.
+void WalManager::Checkpoint() {
+
+    auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
+    int64_t now = seconds_since_epoch.count();
+    auto [max_commit_ts, wal_size] = GetWalState();
+    bool is_full_checkpoint = false;
+    //        bool is_delta_checkpoint = false;
+    if (now - full_ckp_when_ > full_checkpoint_interval_sec_ && wal_size != full_ckp_wal_size_) {
+        is_full_checkpoint = true;
+    } else if ((now - delta_ckp_when_ > delta_checkpoint_interval_sec_ && wal_size != delta_ckp_wal_size_) ||
+               wal_size - delta_ckp_wal_size_ > delta_checkpoint_interval_wal_bytes_) {
+        //            is_delta_checkpoint = true;
+    } else {
+        return;
+    }
+
+    TxnManager *txn_mgr = nullptr;
+    Txn *txn = nullptr;
+    try {
+        txn_mgr = storage_->txn_manager();
+        txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        LOG_INFO(Format("created txn for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
+
+        txn->Checkpoint(max_commit_ts, is_full_checkpoint);
+        txn_mgr->CommitTxn(txn);
+
+        delta_ckp_when_ = now;
+        delta_ckp_wal_size_ = wal_size;
+        if (is_full_checkpoint) {
+            full_ckp_when_ = now;
+            full_ckp_wal_size_ = wal_size;
+            full_ckp_commit_ts_ = max_commit_ts;
+            RecycleWalFile(full_ckp_commit_ts_);
+        }
+        LOG_INFO(Format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
+    } catch (Exception &e) {
+        LOG_ERROR(Format("WalManager::Checkpoint failed: {}", e.what()));
+    }
+}
+
+void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
+
+    auto [max_commit_ts, wal_size] = GetWalState();
+    if (wal_size == full_ckp_wal_size_) {
+        return ;
+    }
+
+    bool is_full_checkpoint = true;
+
+    LOG_INFO(Format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
+                    ckp_task->txn_->TxnID(),
+                    ckp_task->txn_->BeginTS(),
+                    max_commit_ts));
+
+    ckp_task->txn_->Checkpoint(max_commit_ts, is_full_checkpoint);
+
+    // This function doesn't change the ckp related variable, which won't affect the following checkpoint correctness.
+
+    LOG_INFO(Format("Full Checkpoint is done for commit_ts <= {}", max_commit_ts));
 }
 
 /**
@@ -532,14 +553,14 @@ i64 WalManager::ReplayWalFile() {
  * Check if the wal.log.* files are too old.
  * if * is little than the max_commit_ts, we will delete it.
  */
-void WalManager::RecycleWalFile() {
+void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
     // Gc old wal files.
     LOG_INFO("WalManager::Checkpoint begin to gc wal files");
     if (std::filesystem::exists(wal_path_)) {
         for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
             if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
                 auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                if (std::stoll(suffix) < full_ckp_commit_ts_) {
+                if (std::stoll(suffix) < full_ckp_ts) {
                     std::filesystem::remove(entry.path());
                     LOG_TRACE(Format("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str()));
                 }

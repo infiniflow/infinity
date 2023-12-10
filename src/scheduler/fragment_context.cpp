@@ -188,6 +188,9 @@ UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
         case PhysicalOperatorType::kExport: {
             return MakeTaskStateTemplate<ExportOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kFlush: {
+            return MakeTaskStateTemplate<FlushOperatorState>(physical_ops[operator_id]);
+        }
         case PhysicalOperatorType::kCreateTable: {
             return MakeTaskStateTemplate<CreateTableOperatorState>(physical_ops[operator_id]);
         }
@@ -244,7 +247,6 @@ UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kAlter:
-        case PhysicalOperatorType::kFlush:
         case PhysicalOperatorType::kSink:
         case PhysicalOperatorType::kSource: {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())));
@@ -599,8 +601,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
-        case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kFlush: {
+        case PhysicalOperatorType::kPreparedPlan: {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(first_operator->operator_type())));
         }
         case PhysicalOperatorType::kTableScan: {
@@ -651,7 +652,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kDropView:
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow:
-        case PhysicalOperatorType::kMatch: {
+        case PhysicalOperatorType::kMatch:
+        case PhysicalOperatorType::kFlush:  {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -808,8 +810,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct:
         case PhysicalOperatorType::kAlter:
-        case PhysicalOperatorType::kPreparedPlan:
-        case PhysicalOperatorType::kFlush: {
+        case PhysicalOperatorType::kPreparedPlan: {
             Error<SchedulerException>(Format("Not support {} now", PhysicalOperatorToString(last_operator->operator_type())));
         }
         case PhysicalOperatorType::kDelete:
@@ -844,7 +845,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kDropIndex:
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
-        case PhysicalOperatorType::kDropView: {
+        case PhysicalOperatorType::kDropView:
+        case PhysicalOperatorType::kFlush: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -893,6 +895,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
             for(auto& data_block: materialize_sink_state->data_block_array_) {
+                result_table->UpdateRowCount(data_block->row_count());
                 result_table->data_blocks_.emplace_back(Move(data_block));
             }
 //            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);

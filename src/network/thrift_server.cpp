@@ -121,8 +121,20 @@ public:
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
-        auto result = database->DropTable(request.table_name, (const DropTableOptions &)request.option);
-
+        DropTableOptions drop_table_opts;
+        switch(request.options.conflict_type) {
+            case infinity_thrift_rpc::ConflictType::Ignore:
+                drop_table_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            case infinity_thrift_rpc::ConflictType::Replace:
+                drop_table_opts.conflict_type_ = ConflictType::kReplace;
+                break;
+            case infinity_thrift_rpc::ConflictType::Error:
+            default:
+                drop_table_opts.conflict_type_ = ConflictType::kError;
+            break;
+        }
+        auto result = database->DropTable(request.table_name, drop_table_opts);
         ProcessCommonResult(response, result);
     }
 
@@ -304,16 +316,33 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        Vector<ParsedExpr *> *knn_expr_list = new Vector<ParsedExpr *>();
-        knn_expr_list->reserve(request.knn_expr_list.size());
-        if (request.__isset.knn_expr_list == true) {
-            for (auto &knn_expr : request.knn_expr_list) {
-                auto parsed_expr = GetKnnExprFromProto(knn_expr);
-                knn_expr_list->emplace_back(parsed_expr);
-            }
+
+
+        SizeT knn_expr_count = request.search_expr.knn_exprs.size();
+        SizeT match_expr_count = request.search_expr.match_exprs.size();
+        bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
+        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+
+        Vector<ParsedExpr *> *search_expr_list = new Vector<ParsedExpr *>();
+        search_expr_list->reserve(total_expr_count);
+
+        for(SizeT idx = 0; idx < knn_expr_count; ++ idx) {
+            ParsedExpr* knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+            search_expr_list->emplace_back(knn_expr);
         }
 
-        Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_expr{};
+        for(SizeT idx = 0; idx < match_expr_count; ++ idx) {
+            ParsedExpr* match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
+            search_expr_list->emplace_back(match_expr);
+        }
+
+        if(fusion_expr_exists) {
+            ParsedExpr* fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+            search_expr_list->emplace_back(fusion_expr);
+        }
+
+        infinity::SearchExpr *search_expr = new infinity::SearchExpr();
+        search_expr->SetExprs(search_expr_list);
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
@@ -339,7 +368,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Search(knn_expr_list, filter, output_columns);
+        const QueryResult result = table->Search(search_expr, filter, output_columns);
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
@@ -727,8 +756,9 @@ private:
                 }
                 return parsed_expr;
             }
-            default:
+            default: {
                 Error<TypeException>("Invalid constant type", __FILE_NAME__, __LINE__);
+            }
         }
     }
 
@@ -760,12 +790,27 @@ private:
 
     static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
         auto knn_expr = new KnnExpr();
-        knn_expr->column_expr_ = GetColumnExprFromProto(*expr.column_expr.type.column_expr);
+        knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
-        knn_expr->dimension_ = expr.dimension;
-        knn_expr->embedding_data_ptr_ = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        knn_expr->topn_ = expr.topn;
         return knn_expr;
+    }
+
+    static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr) {
+        auto match_expr = new MatchExpr();
+        match_expr->fields_ = expr.fields;
+        match_expr->matching_text_ = expr.matching_text;
+        match_expr->options_text_ = expr.options_text;
+        return match_expr;
+    }
+
+    static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr) {
+        auto fusion_expr = new FusionExpr();
+        fusion_expr->method_ = expr.method;
+        fusion_expr->SetOptions(expr.options_text);
+        return fusion_expr;
     }
 
     static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
@@ -801,15 +846,19 @@ private:
         }
     }
 
-    static void *GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
-        if (embedding_data.__isset.f32_array_value) {
-            return (void *)embedding_data.f32_array_value.data();
-        } else if (embedding_data.__isset.f64_array_value) {
-            return (void *)embedding_data.f64_array_value.data();
+    static std::pair<void *, int64_t> GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+        if (embedding_data.__isset.i8_array_value) {
+            return std::make_pair((void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size());
+        } else if (embedding_data.__isset.i16_array_value) {
+            return std::make_pair((void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size());
         } else if (embedding_data.__isset.i32_array_value) {
-            return (void *)embedding_data.i32_array_value.data();
+            return std::make_pair((void *)embedding_data.i32_array_value.data(), embedding_data.i32_array_value.size());
         } else if (embedding_data.__isset.i64_array_value) {
-            return (void *)embedding_data.i64_array_value.data();
+            return std::make_pair((void *)embedding_data.i64_array_value.data(), embedding_data.i64_array_value.size());
+        } else if (embedding_data.__isset.f32_array_value) {
+            return std::make_pair((void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size());
+        } else if (embedding_data.__isset.f64_array_value) {
+            return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
             Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
         }

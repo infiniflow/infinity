@@ -19,9 +19,9 @@ import compilation_config;
 using namespace infinity;
 
 int main() {
-    String base_file = String(benchmark_data_path()) + "/sift/base.fvecs";
-    String query_file = String(benchmark_data_path()) + "/sift/query.fvecs";
-    String groundtruth_file = String(benchmark_data_path()) + "/sift/l2_groundtruth.ivecs";
+    String base_file = String(test_data_path()) + "/benchmark/sift/base.fvecs";
+    String query_file = String(test_data_path()) + "/benchmark/sift/query.fvecs";
+    String groundtruth_file = String(test_data_path()) + "/benchmark/sift/l2_groundtruth.ivecs";
 
     LocalFileSystem fs;
     std::string save_dir = tmp_data_path();

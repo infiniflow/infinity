@@ -69,13 +69,13 @@ TableCollectionEntry::TableCollectionEntry(const SharedPtr<String> &db_entry_dir
 }
 
 Status TableCollectionEntry::CreateIndex(TableCollectionEntry *table_entry,
-                                         const SharedPtr<IndexDef>& index_def,
+                                         const SharedPtr<IndexDef> &index_def,
                                          ConflictType conflict_type,
                                          u64 txn_id,
                                          TxnTimeStamp begin_ts,
                                          TxnManager *txn_mgr,
                                          BaseEntry *&new_index_entry) {
-    if(index_def->index_name_->empty()) {
+    if (index_def->index_name_->empty()) {
         // Index name shouldn't be empty
         Error<StorageException>("Attempt to create no name index.");
     }
@@ -185,7 +185,7 @@ void TableCollectionEntry::GetFullTextAnalyzers(TableCollectionEntry *table_entr
             for (SharedPtr<IndexBase> &indexBase : table_index_entry->index_def_->index_array_) {
                 if (indexBase->index_type_ != IndexType::kIRSFullText)
                     continue;
-                IndexFullText* index_full_text = static_cast<IndexFullText*>(indexBase.get());
+                IndexFullText *index_full_text = static_cast<IndexFullText *>(indexBase.get());
                 for (auto &column_name : index_full_text->column_names_) {
                     column2analyzer[column_name] = index_full_text->analyzer_;
                 }
@@ -239,16 +239,18 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
         irs_index_entry->irs_index_->StopSchedule();
     }
     auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-    for(const auto& base_index_pair: table_index_entry->column_index_map_) {
+    for (const auto &base_index_pair : table_index_entry->column_index_map_) {
         u64 column_id = base_index_pair.first;
-        BaseEntry* base_entry = base_index_pair.second.get();
-        if(base_entry->entry_type_ == EntryType::kColumnIndex) {
-            ColumnIndexEntry* column_index_entry = (ColumnIndexEntry*)(base_entry);
+        BaseEntry *base_entry = base_index_pair.second.get();
+        if (base_entry->entry_type_ == EntryType::kColumnIndex) {
+            ColumnIndexEntry *column_index_entry = (ColumnIndexEntry *)(base_entry);
             SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
-            for (const auto &[_segment_id, segment_entry] : table_entry->segment_map_) {
-                SegmentEntry::CreateIndexFile(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+            for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
+                SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
+                    SegmentEntry::CreateIndexFile(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+                column_index_entry->index_by_segment.emplace(segment_id, segment_column_index_entry);
             }
-        } else if(base_entry->entry_type_ == EntryType::kIRSIndex) {
+        } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
             continue;
         } else {
             Error<StorageException>("Invalid entry type");
@@ -288,20 +290,19 @@ void TableCollectionEntry::CommitCreateIndex(TableCollectionEntry *, HashMap<Str
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
         for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
-            for(auto &[segment_id, segment_column_index] : segment_index_map) {
+            for (auto &[segment_id, segment_column_index] : segment_index_map) {
                 TableIndexEntry::CommitCreateIndex(table_index_entry, column_id, segment_id, segment_column_index);
             }
         }
-        if(table_index_entry->irs_index_entry_.get() != nullptr) {
+        if (table_index_entry->irs_index_entry_.get() != nullptr) {
             TableIndexEntry::CommitCreateIndex(table_index_entry, table_index_entry->irs_index_entry_);
         }
     }
-
 }
 
 void TableCollectionEntry::RollbackAppend(TableCollectionEntry *, Txn *, void *) {
-//    auto *txn_store_ptr = (TxnTableStore *)txn_store;
-//    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
+    //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
+    //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Error<NotImplementException>("TableCollectionEntry::RollbackAppend");
 }
 
@@ -320,8 +321,7 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
     table_entry->row_count_ += row_count;
 }
 
-UniquePtr<String>
-TableCollectionEntry::RollbackDelete(TableCollectionEntry *, Txn *, DeleteState &, BufferManager *) {
+UniquePtr<String> TableCollectionEntry::RollbackDelete(TableCollectionEntry *, Txn *, DeleteState &, BufferManager *) {
     Error<NotImplementException>("TableCollectionEntry::RollbackDelete");
     return nullptr;
 }
@@ -412,9 +412,9 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
 
         segment_candidates.reserve(table_entry->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
-//            if(segment_entry->commit_ts_ <= max_commit_ts) {
+            //            if(segment_entry->commit_ts_ <= max_commit_ts) {
             segment_candidates.emplace_back(segment_entry.get());
-//            }
+            //            }
         }
 
         table_index_meta_candidates.reserve(table_entry->index_meta_map_.size());
@@ -432,8 +432,8 @@ Json TableCollectionEntry::Serialize(TableCollectionEntry *table_entry, TxnTimeS
 
     // Serialize indexes
     SizeT table_index_count = table_index_meta_candidates.size();
-    for(SizeT idx = 0; idx < table_index_count; ++ idx) {
-        TableIndexMeta* table_index_meta = table_index_meta_candidates[idx];
+    for (SizeT idx = 0; idx < table_index_count; ++idx) {
+        TableIndexMeta *table_index_meta = table_index_meta_candidates[idx];
         Json index_def_meta_json = TableIndexMeta::Serialize(table_index_meta, max_commit_ts);
         index_def_meta_json["index_name"] = table_index_name_candidates[idx];
         json_res["table_indexes"].emplace_back(index_def_meta_json);
@@ -497,7 +497,8 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     if (table_entry->deleted_)
         Assert<StorageException>(table_entry->segment_map_.empty(), "deleted table should have no segment");
     else
-        Assert<StorageException>(table_entry->segment_map_.empty() || table_entry->segment_map_[0].get() != nullptr, "table segment 0 should be valid");
+        Assert<StorageException>(table_entry->segment_map_.empty() || table_entry->segment_map_[0].get() != nullptr,
+                                 "table segment 0 should be valid");
 
     if (table_entry_json.contains("table_indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["table_indexes"]) {
@@ -549,6 +550,15 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
         auto seg_it = this->segment_map_.find(max_segment_id);
         Assert<StorageException>(seg_it != this->segment_map_.end(), Format("max_segment_id {} is invalid", max_segment_id));
         this->unsealed_segment_ = seg_it->second.get();
+    }
+
+    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {
+        auto it = this->index_meta_map_.find(index_name);
+        if (it == this->index_meta_map_.end()) {
+            this->index_meta_map_.emplace(index_name, Move(table_index_meta));
+        } else {
+            it->second->MergeFrom(*table_index_meta.get());
+        }
     }
 }
 

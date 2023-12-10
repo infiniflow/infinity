@@ -236,9 +236,9 @@ TEST_F(InfinityTest, test1) {
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
-        Vector<ParsedExpr *>* vec_search_exprs = nullptr;
+        SearchExpr * search_expr = nullptr;
 
-        result = table1->Search(vec_search_exprs, nullptr, output_columns);
+        result = table1->Search(search_expr, nullptr, output_columns);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);

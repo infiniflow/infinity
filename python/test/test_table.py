@@ -51,27 +51,33 @@ class TestTable:
         4. list tables: empty
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
         # infinity
-        res = db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "float"}, None)
+        res = db_obj.create_table(
+            "my_table", {"c1": "int, primary key", "c2": "float"}, None)
         assert res.success
 
-        res = db_obj.create_table("my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
+        res = db_obj.create_table(
+            "my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
         assert not res.success
 
-        res = db_obj.create_table("my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
+        res = db_obj.create_table(
+            "my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
         assert not res.success
 
-        res = db_obj.create_table("123_table", {"c1": "int, primary key", "c1": "float"}, None)
+        res = db_obj.create_table(
+            "123_table", {"c1": "int, primary key", "c1": "float"}, None)
         assert not res.success
 
-        res = db_obj.create_table("bad_column", {"123": "int, primary key", "c2": "float"}, None)
+        res = db_obj.create_table(
+            "bad_column", {"123": "int, primary key", "c2": "float"}, None)
         assert not res.success
 
-        res = db_obj.create_table("", {"c1": "int, primary key", "c2": "float"}, None)
+        res = db_obj.create_table(
+            "", {"c1": "int, primary key", "c2": "float"}, None)
         assert not res.success
 
         # FIXME: res = db_obj.describe_table("my_table")

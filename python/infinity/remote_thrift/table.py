@@ -21,7 +21,7 @@ from sqlglot import condition
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import VEC
 from infinity.index import IndexInfo
-from infinity.query import Query, InfinityVectorQueryBuilder
+from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions
 from infinity.table import Table
@@ -44,7 +44,8 @@ class RemoteTable(Table, ABC):
             index_info_to_use = ttypes.IndexInfo()
             index_info_to_use.column_name = index_info.column_name.strip()
             index_info_to_use.index_type = index_info.index_type.to_ttype()
-            index_info_to_use.index_param_list = [init_param.to_ttype() for init_param in index_info.params]
+            index_info_to_use.index_param_list = [
+                init_param.to_ttype() for init_param in index_info.params]
 
             index_info_list_to_use.append(index_info_to_use)
 
@@ -201,20 +202,8 @@ class RemoteTable(Table, ABC):
 
         pass
 
-    def search(
-            self,
-            embedding: Optional[Union[VEC, str]] = None,
-            vector_column_name: str = "vector",
-            distance: str = "L2",
-            threshold: Optional[float] = None,
-    ) -> InfinityVectorQueryBuilder:
-        return InfinityVectorQueryBuilder.create(
-            table=self,
-            embedding=embedding,
-            vector_column_name=vector_column_name,
-            distance=distance,
-            threshold=threshold
-        )
+    def query_builder(self) -> InfinityThriftQueryBuilder:
+        return InfinityThriftQueryBuilder(table=self)
 
     def _execute_query(self, query: Query) -> pd.DataFrame:
         # process select_list
@@ -265,56 +254,15 @@ class RemoteTable(Table, ABC):
                 offset_expr.type = paser_expr_type
                 offset_expr.i64_value = query.offset
 
-        # process knn_exprs
-        match query.embedding:
-            case None:
-                knn_exprs_list = None
-
-            case _:
-                knn_exprs_list = []
-                embedding = query.embedding
-                vector_column_name = query.vector_column_name
-                distance = query.distance
-                threshold = query.threshold
-
-                knn_expr = ttypes.KnnExpr()
-
-                knn_expr.column_expr = traverse_conditions(condition(vector_column_name))
-
-                if isinstance(embedding[0], int):
-                    data = ttypes.EmbeddingData()
-                    data.i64_array_value = embedding
-                    knn_expr.embedding_data = data
-                    knn_expr.embedding_data_type = ttypes.ElementType.ElementInt64
-                elif isinstance(embedding[0], float):
-                    data = ttypes.EmbeddingData()
-                    data.f32_array_value = embedding
-                    knn_expr.embedding_data = data
-                    knn_expr.embedding_data_type = ttypes.ElementType.ElementFloat32
-                else:
-                    raise Exception(f"Invalid embedding {embedding[0]} type")
-
-                match query.distance:
-                    case "L2":
-                        knn_expr.distance = ttypes.KnnDistanceType.L2
-                    case "IP":
-                        knn_expr.distance = ttypes.KnnDistanceType.InnerProduct
-                    case _:
-                        raise Exception("Invalid distance type")
-
-                knn_expr.dimension = len(embedding)
-                knn_exprs_list.append(knn_expr)
-
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=select_list,
+                                search_expr=query.search,
                                 where_expr=where_expr,
                                 group_by_list=None,
                                 limit_expr=limit_expr,
-                                offset_expr=offset_expr,
-                                search_expr=None,
-                                knn_expr_list=knn_exprs_list)
+                                offset_expr=offset_expr)
 
         # process the results
         if res.success:

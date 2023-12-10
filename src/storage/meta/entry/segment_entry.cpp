@@ -492,7 +492,7 @@ SegmentEntry::GetCreateIndexParam(const SegmentEntry *segment_entry, const Index
             return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, segment_entry->row_count_);
         }
         case IndexType::kHnsw: {
-            SizeT max_element = segment_entry->row_capacity_;
+            SizeT max_element = segment_entry->row_count_;
             return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
         }
         case IndexType::kIRSFullText: {

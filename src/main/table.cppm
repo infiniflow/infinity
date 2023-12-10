@@ -39,9 +39,7 @@ public:
 
     QueryResult Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
 
-    QueryResult Search(Vector<ParsedExpr *>* search_exprs,
-                       ParsedExpr *filter,
-                       Vector<ParsedExpr *> *output_columns);
+    QueryResult Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
 private:
     String table_name_{};

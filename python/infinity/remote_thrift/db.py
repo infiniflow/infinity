@@ -32,7 +32,7 @@ def get_ordinary_info(column_big_info, column_defs, column_name, index):
         proto_column_type.logic_type = ttypes.LogicType.TinyInt
     elif datatype == "int16":
         proto_column_type.logic_type = ttypes.LogicType.SmallInt
-    elif datatype == "int32" or datatype == "int":
+    elif datatype == "int32" or datatype == "int" or datatype == "integer":
         proto_column_type.logic_type = ttypes.LogicType.Integer
     elif datatype == "int64":
         proto_column_type.logic_type = ttypes.LogicType.BigInt
@@ -118,17 +118,19 @@ class RemoteDatabase(Database, ABC):
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             column_big_info = [item.strip() for item in column_info.split(",")]
             if column_big_info[0] == "vector":
-                get_embedding_info(column_big_info, column_defs, column_name, index)
+                get_embedding_info(
+                    column_big_info, column_defs, column_name, index)
 
             else:  # numeric or varchar
-                get_ordinary_info(column_big_info, column_defs, column_name, index)
-        # print(column_defs)
+                get_ordinary_info(
+                    column_big_info, column_defs, column_name, index)
+        print(column_defs)
         return self._conn.create_table(db_name=self._db_name, table_name=table_name,
-                                              column_defs=column_defs,
-                                              option=options)
+                                       column_defs=column_defs,
+                                       option=options)
 
-    def drop_table(self, table_name):
-        return self._conn.drop_table(db_name=self._db_name, table_name=table_name)
+    def drop_table(self, table_name, if_exists=True):
+        return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
         return self._conn.list_tables(self._db_name)
@@ -137,7 +139,8 @@ class RemoteDatabase(Database, ABC):
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
-        res = self._conn.get_table(db_name=self._db_name, table_name=table_name)
+        res = self._conn.get_table(
+            db_name=self._db_name, table_name=table_name)
         if res.success is True:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:

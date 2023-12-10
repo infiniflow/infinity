@@ -46,7 +46,7 @@ QueryResult Database::CreateTable(const String &table_name,
     return result;
 }
 
-QueryResult Database::DropTable(const String &table_name, const DropTableOptions &) {
+QueryResult Database::DropTable(const String &table_name, const DropTableOptions &options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -57,6 +57,7 @@ QueryResult Database::DropTable(const String &table_name, const DropTableOptions
     SharedPtr<DropTableInfo> drop_table_info = MakeShared<DropTableInfo>();
     drop_table_info->schema_name_ = db_name_;
     drop_table_info->table_name_ = table_name;
+    drop_table_info->conflict_type_ = options.conflict_type_;
     drop_statement->drop_info_ = drop_table_info;
     QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;

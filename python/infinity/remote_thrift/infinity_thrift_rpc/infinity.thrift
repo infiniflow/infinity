@@ -18,7 +18,18 @@ Embedding,
 Invalid
 }
 
+enum ConflictType {
+    Invalid,
+    Ignore,
+    Error,
+    Replace,
+}
+
 struct Option {}
+
+struct DropTableOptions {
+1:  ConflictType conflict_type,
+}
 
 struct NumberType {}
 
@@ -79,8 +90,11 @@ union ParsedExprType {
 1: ConstantExpr & constant_expr,
 2: ColumnExpr & column_expr,
 3: FunctionExpr & function_expr,
-4: KnnExpr  & knn_expr,
-5: BetweenExpr & between_expr,
+4: BetweenExpr & between_expr,
+5: KnnExpr  & knn_expr,
+6: MatchExpr  & match_expr,
+7: FusionExpr & fusion_expr,
+8: SearchExpr & search_expr,
 }
 
 struct ParsedExpr {
@@ -111,11 +125,28 @@ union EmbeddingData {
 }
 
 struct KnnExpr {
-1: ParsedExpr  column_expr,
+1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
-3: i64 dimension,
+3: ElementType embedding_data_type,
 4: KnnDistanceType distance_type,
-5: ElementType embedding_data_type,
+5: i64 topn,
+}
+
+struct MatchExpr {
+	1: string fields,
+	2: string matching_text,
+	3: string options_text,
+}
+
+struct FusionExpr {
+	1: string method,
+	2: string options_text,
+}
+
+struct SearchExpr {
+	1: list<MatchExpr> match_exprs,
+	2: list<KnnExpr> knn_exprs,
+	3: FusionExpr fusion_expr,
 }
 
 struct ConstantExpr {
@@ -320,7 +351,7 @@ struct DropTableRequest {
 1:  string db_name,
 2:  string table_name,
 3:  i64 session_id,
-4:  Option option,
+4:  DropTableOptions options,
 }
 
 struct InsertRequest {
@@ -356,13 +387,13 @@ struct SelectRequest {
 2:  string db_name,
 3:  string table_name,
 4:  list<ParsedExpr> select_list = [],
-5:  ParsedExpr where_expr,
-6:  list<ParsedExpr> group_by_list = [],
-7:  ParsedExpr having_expr,
-8:  ParsedExpr limit_expr,
-9:  ParsedExpr offset_expr,
-10:  list<OrderByExpr> order_by_list = [],
-11:  list<KnnExpr> knn_expr_list = [],
+5:  SearchExpr search_expr,
+6:  ParsedExpr where_expr,
+7:  list<ParsedExpr> group_by_list = [],
+8:  ParsedExpr having_expr,
+9:  ParsedExpr limit_expr,
+10:  ParsedExpr offset_expr,
+11:  list<OrderByExpr> order_by_list = [],
 }
 
 struct SelectResponse {

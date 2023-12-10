@@ -1,44 +1,44 @@
+import infinity.index as index
 from infinity.common import REMOTE_HOST
-from infinity.query import InfinityVectorQueryBuilder
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
+from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 
 
 class TestQuery:
-
     def test_query(self):
         conn = ThriftInfinityClient(REMOTE_HOST)
         db = RemoteDatabase(conn, "default")
-        db.create_table("my_table", {"c1": "vector,5,float"}, None)
+        db.drop_table("my_table")
+        db.create_table(
+            "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
 
         table = RemoteTable(conn, "default", "my_table")
-        res = table.insert([{"c1": [1.0] * 5}])
+        res = table.insert(
+            [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
         assert res.success
-        res = table.insert([{"c1": [4.0] * 5}])
+        res = table.insert(
+            [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
         assert res.success
-        res = table.insert([{"c1": [7.0] * 5}])
+        res = table.insert(
+            [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
         assert res.success
 
-        # select_res = table.search().output(["*"]).to_df()
+        res = table.create_index("my_index",
+                                 [index.IndexInfo("body",
+                                                  index.IndexType.IRSFullText,
+                                                  [index.InitParameter("ANALYZER", "segmentation")]),
+                                  ], None)
+        assert res.success
+
+        # select_res = table.query_builder().output(["*"]).to_df()
         # print(select_res)
         # Create a query builder
-        query_builder = InfinityVectorQueryBuilder.create(
-            table=table,
-            embedding=[0.1, 0.2, 0.3, 0.4, 0.5],  # query embedding
-            vector_column_name="c1",  # vector column name
-            distance="L2",  # distance type
-            threshold=0.5  # threshold
-        )
-
-
-        query_builder.output(["c1"])
-
-        # set topk
-        query_builder.limit(10)
-        #
-        # result
+        query_builder = InfinityThriftQueryBuilder(table)
+        query_builder.output(["num", "body"])
+        query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
+        query_builder.match('body', 'harmful', 'topn=2')
+        query_builder.fusion('rrf')
         res = query_builder.to_df()
-        #
-        # print result
         print(res)

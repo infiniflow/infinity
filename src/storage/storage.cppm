@@ -20,6 +20,7 @@ import new_catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
+import backgroud_process;
 
 export module storage;
 
@@ -34,6 +35,10 @@ public:
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
     [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
+
+    [[nodiscard]] inline WalManager *wal_manager() const noexcept { return wal_mgr_.get(); }
+
+    [[nodiscard]] inline BGTaskProcessor *bg_processor() const noexcept { return bg_processor_.get(); }
 
     void Init();
 
@@ -55,6 +60,7 @@ private:
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
+    UniquePtr<BGTaskProcessor> bg_processor_{};
 };
 
 } // namespace infinity

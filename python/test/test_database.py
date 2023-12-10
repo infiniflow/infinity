@@ -40,7 +40,7 @@ class TestDatabase:
             - 'default'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('192.168.200.151', 9080))
+        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
 
         # infinity
         res = infinity_obj.create_database("my_database")

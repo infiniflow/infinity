@@ -47,4 +47,6 @@ ENV LZ4_ROOT=/usr/local
 # build dependencies
 RUN apt install -y libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev libevent-dev libthrift-dev
 
+RUN apt install python3.11-venv thrift-compiler
+
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

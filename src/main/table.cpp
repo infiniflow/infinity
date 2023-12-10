@@ -142,7 +142,11 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
     return result;
 }
 
-QueryResult Table::Search(Vector<ParsedExpr *> *search_exprs, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
+QueryResult Table::Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
+    if(search_expr == nullptr) {
+        LOG_ERROR("Not search expression why use search?");
+    }
+
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -157,14 +161,7 @@ QueryResult Table::Search(Vector<ParsedExpr *> *search_exprs, ParsedExpr *filter
     select_statement->table_ref_ = table_ref;
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
-    if(search_exprs != nullptr) {
-        infinity::SearchExpr *search_expr = new infinity::SearchExpr();
-        search_expr->SetExprs(search_exprs);
-        select_statement->search_expr_ = search_expr;
-    } else {
-        LOG_ERROR("Not search expression why use search?");
-    }
-
+    select_statement->search_expr_ = search_expr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

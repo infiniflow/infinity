@@ -65,6 +65,9 @@ public:
 
     static void DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager *txn_mgr);
 
+
+    void MergeFrom(TableIndexMeta &other);
+
 private:
     static Status CreateTableIndexEntryInternal(TableIndexMeta *table_index_meta,
                                                 const SharedPtr<IndexDef> &index_def,
