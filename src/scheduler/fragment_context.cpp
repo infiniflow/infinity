@@ -895,6 +895,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
             for(auto& data_block: materialize_sink_state->data_block_array_) {
+                result_table->UpdateRowCount(data_block->row_count());
                 result_table->data_blocks_.emplace_back(Move(data_block));
             }
 //            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);

@@ -112,7 +112,7 @@ int main() {
             index_info_list->emplace_back(index_info);
         }
 
-//        query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+        query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
 
         if(query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
