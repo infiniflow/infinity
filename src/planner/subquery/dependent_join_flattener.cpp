@@ -315,10 +315,8 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     }
 
     NewCatalog *catalog = query_context_->storage()->catalog();
-    SharedPtr<TableScanFunction> scan_function = TableScanFunction::Make(catalog, "table_scan");
 
-    SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(scan_function,
-                                                                      table_binding_ptr->table_collection_entry_ptr_,
+    SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(table_binding_ptr->table_collection_entry_ptr_,
                                                                       column_ids,
                                                                       table_binding_ptr->block_index_,
                                                                       table_binding_ptr->table_name_,

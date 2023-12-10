@@ -54,7 +54,7 @@ public:
 
     static void DeleteNewEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnManager *txn_mgr);
 
-    static Status GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_table_entry);
+    static Tuple<BaseEntry*, Status> GetEntry(TableCollectionMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<String> ToString(TableCollectionMeta *table_meta);
 

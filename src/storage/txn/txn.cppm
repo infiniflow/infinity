@@ -86,7 +86,7 @@ public:
 
     Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type, BaseEntry *&drop_table_entry);
 
-    Status GetTableByName(const String &db_name, const String &table_name, BaseEntry *&new_table_entry);
+    Tuple<BaseEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 

@@ -424,6 +424,18 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         Error<PlannerException>("Knn expression expect a column expression");
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
+    TypeInfo *type_info = expr_ptr->Type().type_info().get();
+    if (type_info->type() != TypeInfoType::kEmbedding) {
+        Error<PlannerException>("Expect the column search is an embedding column");
+    } else {
+        EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
+        if (embedding_info->Dimension() != parsed_knn_expr.dimension_) {
+            Error<PlannerException>(Format("Query embedding with dimension: {} which doesn't not matched with {}",
+                                           parsed_knn_expr.dimension_,
+                                           embedding_info->Dimension()));
+        }
+    }
+
     arguments.emplace_back(expr_ptr);
 
     // Create query embedding
@@ -468,9 +480,9 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
 
             SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
-            SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
+            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
+            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
             in_subquery_expr->left_ = bound_left_expr;
             in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return in_subquery_expr;
@@ -480,9 +492,9 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
         case SubqueryType::kScalar: {
             SharedPtr<BindContext> subquery_binding_context_ptr = BindContext::Make(bind_context_ptr);
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
-            SharedPtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
+            UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(bound_statement_ptr, subquery_type);
+            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
 
             subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return subquery_expr;

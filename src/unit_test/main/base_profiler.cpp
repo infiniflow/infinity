@@ -22,7 +22,7 @@ import profiler;
 class BaseProfilerTest : public BaseTest {};
 
 TEST_F(BaseProfilerTest, test1) {
-    infinity::BaseProfiler prof;
+    infinity::BaseProfiler prof("test1");
     prof.Begin();
     prof.End();
     //    std::cout << prof.Elapsed() << std::endl;

@@ -44,8 +44,6 @@ public:
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
 
-    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { txn_->GetCatalog()->AppendProfilerRecord(Move(profiler)); }
-
     const QueryProfiler *GetProfilerRecord(SizeT index) { return txn_->GetCatalog()->GetProfilerRecord(index); }
 
     void IncreaseQueryCount() { ++query_count_; }

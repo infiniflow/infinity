@@ -122,10 +122,9 @@ TEST_F(TableTxnTest, test1) {
     EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Get db1, OK
-    table_entry = nullptr;
-    Status status3 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry1, status3] = new_txn->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(status3.ok());
-    EXPECT_NE(table_entry, nullptr);
+    EXPECT_NE(table_entry1, nullptr);
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -155,10 +154,9 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Get db1, OK
-    table_entry = nullptr;
-    Status status2 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry2, status2] = new_txn->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(status2.ok());
-    EXPECT_NE(table_entry, nullptr);
+    EXPECT_NE(table_entry2, nullptr);
 
     // Txn1: Drop tbl1, OK
     table_entry = nullptr;
@@ -167,10 +165,9 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_NE(table_entry, nullptr);
 
     // Txn1: Get db1, OK
-    table_entry = nullptr;
-    Status status4 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry4, status4] = new_txn->GetTableByName("db1", "tbl1");
     EXPECT_FALSE(status4.ok());
-    EXPECT_EQ(table_entry, nullptr);
+    EXPECT_EQ(table_entry4, nullptr);
 
     // Txn1: Create tbl1, OK
     table_entry = nullptr;
@@ -194,10 +191,9 @@ TEST_F(TableTxnTest, test2) {
     EXPECT_EQ(table_entry, nullptr);
 
     // Txn2: Get db1, OK
-    table_entry = nullptr;
-    Status status7 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry7, status7] = new_txn->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(status7.ok());
-    EXPECT_NE(table_entry, nullptr);
+    EXPECT_NE(table_entry7, nullptr);
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -256,10 +252,9 @@ TEST_F(TableTxnTest, test3) {
     new_txn->Begin();
 
     // Txn3: Get tbl1, OK
-    table_entry = nullptr;
-    Status status4 = new_txn->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry4, status4] = new_txn->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(status4.ok());
-    EXPECT_NE(table_entry, nullptr);
+    EXPECT_NE(table_entry4, nullptr);
 
     // Txn3: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -458,10 +453,9 @@ TEST_F(TableTxnTest, test7) {
     EXPECT_EQ(db_entry, nullptr);
 
     // Txn3: Get tbl1, NOT OK
-    table_entry = nullptr;
-    Status s3 = new_txn2->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry3, s3] = new_txn2->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(!s3.ok());
-    EXPECT_EQ(table_entry, nullptr);
+    EXPECT_EQ(table_entry3, nullptr);
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn2);
@@ -512,10 +506,9 @@ TEST_F(TableTxnTest, test8) {
     EXPECT_NE(db_entry, nullptr);
 
     // Txn3: Get tbl1, NOT OK
-    table_entry = nullptr;
-    Status s3 = new_txn3->GetTableByName("db1", "tbl1", table_entry);
+    auto [table_entry3, s3] = new_txn3->GetTableByName("db1", "tbl1");
     EXPECT_TRUE(!s3.ok());
-    EXPECT_EQ(table_entry, nullptr);
+    EXPECT_EQ(table_entry3, nullptr);
 
     // Txn3: Commit, OK
     txn_mgr->CommitTxn(new_txn3);

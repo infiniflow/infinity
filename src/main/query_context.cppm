@@ -78,10 +78,6 @@ public:
 
     [[nodiscard]] inline u64 max_node_id() const { return current_max_node_id_; }
 
-    void FlushProfiler(TaskProfiler &&profiler) {
-        query_metrics_->Flush(Move(profiler));
-    }
-
     inline void set_max_node_id(u64 node_id) { current_max_node_id_ = node_id; }
 
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
@@ -94,11 +90,7 @@ public:
 
     void RollbackTxn();
 
-    void TryMarkProfiler(const StatementType &type) const {
-        if (is_enable_profiling() && type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-            session_ptr_->AppendProfilerRecord(query_metrics_);
-        }
-    }
+
 
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
 
@@ -119,6 +111,43 @@ public:
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
 
     [[nodiscard]] BaseSession* current_session() const { return session_ptr_; }
+
+    void FlushProfiler(TaskProfiler &&profiler) {
+        if(query_profiler_) {
+            query_profiler_->Flush(Move(profiler));
+        }
+    }
+
+private:
+    inline void CreateQueryProfiler() {
+        if (is_enable_profiling()) {
+            query_profiler_ = MakeShared<QueryProfiler>(true);
+        }
+    }
+
+    inline void RecordQueryProfiler(const StatementType &type) {
+        if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
+            GetTxn()->GetCatalog()->AppendProfilerRecord(query_profiler_);
+        }
+    }
+
+    inline void StartProfile(QueryPhase phase) {
+        if(query_profiler_) {
+            query_profiler_->StartPhase(phase);
+        }
+    }
+    inline void StopProfile(QueryPhase phase) {
+        if(query_profiler_) {
+            query_profiler_->StopPhase(phase);
+        }
+    }
+
+    inline void StopProfile() {
+        if(query_profiler_) {
+            query_profiler_->Stop();
+        }
+    }
+
 private:
     // Parser
     UniquePtr<SQLParser> parser_{};
@@ -127,7 +156,7 @@ private:
     UniquePtr<PhysicalPlanner> physical_planner_{};
     UniquePtr<FragmentBuilder> fragment_builder_{};
 
-    SharedPtr<QueryProfiler> query_metrics_;
+    SharedPtr<QueryProfiler> query_profiler_{};
 
     Config *global_config_{};
     TaskScheduler *scheduler_{};
