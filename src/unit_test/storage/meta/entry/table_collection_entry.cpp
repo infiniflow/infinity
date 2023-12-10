@@ -160,8 +160,7 @@ TEST_F(TableCollectionEntryTest, test2) {
         new_txn->Begin();
 
         // Txn2: Get db1, OK
-        base_table_entry = nullptr;
-        Status s2 = new_txn->GetTableByName("db1", "tbl1", base_table_entry);
+        auto [base_table_entry, s2] = new_txn->GetTableByName("db1", "tbl1");
         EXPECT_TRUE(s2.ok());
         EXPECT_NE(base_table_entry, nullptr);
 
