@@ -58,6 +58,7 @@ import local_file_system;
 import utility;
 import buffer_manager;
 import session_manager;
+import column_index_entry;
 
 module physical_show;
 
@@ -118,14 +119,20 @@ void PhysicalShow::Init() {
         }
         case ShowType::kShowIndexes: {
 
-            output_names_->reserve(4);
-            output_types_->reserve(4);
+            output_names_->reserve(7);
+            output_types_->reserve(7);
 
             output_names_->emplace_back("index_name");
             output_names_->emplace_back("index_type");
-            output_names_->emplace_back("column_names");
+            output_names_->emplace_back("column_id");
+            output_names_->emplace_back("column_name");
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("index segments");
             output_names_->emplace_back("other_parameters");
 
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -670,7 +677,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const StdFunction<u64(const String &)>& file_size_func, const String &path) {
+    auto chuck_filling = [&](const StdFunction<u64(const String &)> &file_size_func, const String &path) {
         SizeT column_id = 0;
         {
             Value value = Value::MakeVarchar(path);
@@ -700,7 +707,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             auto version_path = block->VersionFilePath();
 
             chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
-            for (auto &column: block->columns_) {
+            for (auto &column : block->columns_) {
                 auto col_file_path = column->FilePath();
 
                 chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
@@ -1272,22 +1279,26 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Status table_status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = Move(table_status.msg_);
-//        Error<ExecutorException>(table_status.message());
+        //        Error<ExecutorException>(table_status.message());
         return;
     }
 
     auto table_collection_entry = static_cast<TableCollectionEntry *>(base_table_entry);
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, varchar_type, "index_name", HashSet<ConstraintType>()),
                                                 MakeShared<ColumnDef>(1, varchar_type, "method_type", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(2, varchar_type, "column_names", HashSet<ConstraintType>()),
-                                                MakeShared<ColumnDef>(3, varchar_type, "other_parameters", HashSet<ConstraintType>())};
+                                                MakeShared<ColumnDef>(2, bigint_type, "column_id", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(3, varchar_type, "column_name", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(4, varchar_type, "path", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(5, varchar_type, "index_segment", HashSet<ConstraintType>()),
+                                                MakeShared<ColumnDef>(6, varchar_type, "other_parameters", HashSet<ConstraintType>())};
 
     auto table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types(4, varchar_type);
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
     for (const auto &[index_name, index_def_meta] : table_collection_entry->index_meta_map_) {
@@ -1300,7 +1311,10 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
         auto table_index_entry = static_cast<TableIndexEntry *>(base_entry);
         auto index_def = table_index_entry->index_def_.get();
 
-        for (const SharedPtr<IndexBase> &index_base : index_def->index_array_) {
+        for (const auto &column_index_entry_pair : table_index_entry->column_index_map_) {
+            u64 index_column_id = column_index_entry_pair.first;
+            ColumnIndexEntry* column_index_entry = column_index_entry_pair.second.get();
+            const IndexBase* index_base = column_index_entry->index_base_.get();
             SizeT column_id = 0;
             {
                 // Append index name to the first column
@@ -1312,6 +1326,13 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             {
                 // Append index method type to the second column
                 Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(index_base->index_type_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
+                // Append index column id
+                Value value = Value::MakeBigInt(index_column_id);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -1333,13 +1354,46 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             }
             ++column_id;
             {
+                // Append index path
+                Value value = Value::MakeVarchar(*column_index_entry->index_dir_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
+                // Append Index segment
+                SizeT segment_count = table_collection_entry->segment_map_.size();
+                SizeT index_segment_count = column_index_entry->index_by_segment.size();
+                String result_value = Format("{}/{}", index_segment_count, segment_count);
+                Value value = Value::MakeVarchar(result_value);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+            ++column_id;
+            {
                 // Append index other parameters to the fourth column
                 String other_parameters;
                 switch (index_base->index_type_) {
                     case IndexType::kIVFFlat: {
-                        const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base.get());
-                        other_parameters =
-                            Format("metric = {}, centroids_count = {}", MetricTypeToString(index_ivfflat->metric_type_), index_ivfflat->centroids_count_);
+                        const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base);
+                        other_parameters = Format("metric = {}, centroids_count = {}",
+                                                  MetricTypeToString(index_ivfflat->metric_type_),
+                                                  index_ivfflat->centroids_count_);
+                        break;
+                    }
+                    case IndexType::kHnsw: {
+                        const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+                        other_parameters = Format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
+                                                  MetricTypeToString(index_hnsw->metric_type_),
+                                                  HnswEncodeTypeToString(index_hnsw->encode_type_),
+                                                  index_hnsw->M_,
+                                                  index_hnsw->ef_construction_,
+                                                  index_hnsw->ef_);
+                        break;
+                    }
+                    case IndexType::kIRSFullText: {
+                        const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
+                        other_parameters = Format("analyzer = {}", index_full_text->analyzer_);
                         break;
                     }
                     case IndexType::kInvalid: {
@@ -1527,7 +1581,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
         }
         {
             // option value
-            BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
             u64 memory_limit = buffer_manager->memory_limit();
             u64 memory_usage = buffer_manager->memory_usage();
             Value value = Value::MakeVarchar(Format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
@@ -1545,7 +1599,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
         }
         {
             // option value
-            SessionManager* session_manager = query_context->session_manager();
+            SessionManager *session_manager = query_context->session_manager();
             u64 session_count = session_manager->GetSessionCount();
             Value value = Value::MakeVarchar(ToStr(session_count));
             ValueExpression value_expr(value);

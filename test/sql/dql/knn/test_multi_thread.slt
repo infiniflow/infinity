@@ -28,7 +28,7 @@ COPY test_knn_hnsw_l2 FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WI
 
 # create hnsw index on existing 5 segments
 statement ok
-CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);\
+CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
 
 # create another 10 blocks with no index
 statement ok

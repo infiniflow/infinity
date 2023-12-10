@@ -756,8 +756,9 @@ private:
                 }
                 return parsed_expr;
             }
-            default:
+            default: {
                 Error<TypeException>("Invalid constant type", __FILE_NAME__, __LINE__);
+            }
         }
     }
 

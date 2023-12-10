@@ -29,9 +29,6 @@ export module compilation_config;
 #define CSV_DATA_PATH "@CSV_DATA_PATH@"
 #define TMP_DATA_PATH "@TMP_DATA_PATH@"
 
-// This file is your own path
-#define BENCHMARK_DATA_PATH "/home/shenyushi/Documents/benchmark_data"
-
 namespace infinity {
 
 export int version_major() {
@@ -73,10 +70,5 @@ export char* csv_data_path() {
 export char* tmp_data_path() {
     return (char*)TMP_DATA_PATH;
 }
-
-export char* benchmark_data_path() {
-    return (char*)BENCHMARK_DATA_PATH;
-}
-
 
 }

@@ -165,4 +165,18 @@ QueryResult Infinity::Query(const String &query_text) {
     return result;
 }
 
+QueryResult Infinity::Flush() {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<FlushStatement> flush_statement = MakeUnique<FlushStatement>();
+    flush_statement->type_ = FlushType::kData;
+
+    QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
+    return result;
+}
+
 } // namespace infinity

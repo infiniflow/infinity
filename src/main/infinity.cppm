@@ -56,6 +56,8 @@ public:
 
     SharedPtr<Database> GetDatabase(const String &db_name);
 
+    QueryResult Flush();
+
     // For embedded sqllogictest
     QueryResult Query(const String& query_text);
 

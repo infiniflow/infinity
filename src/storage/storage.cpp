@@ -35,6 +35,7 @@ import parser;
 import txn;
 import infinity_exception;
 import status;
+import backgroud_process;
 
 module storage;
 
@@ -72,12 +73,17 @@ void Storage::Init() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get());
+    bg_processor_->Start();
+
     BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();
 }
 
 void Storage::UnInit() {
     Printf("Shutdown storage ...\n");
+    bg_processor_->Stop();
+
     wal_mgr_->Stop();
 
     txn_mgr_.reset();

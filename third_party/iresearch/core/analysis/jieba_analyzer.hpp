@@ -41,7 +41,7 @@ class jieba_analyzer final : public TypedAnalyzer<jieba_analyzer>,
   using attributes = std::tuple<increment, offset, term_attribute>;
   cppjieba::Jieba* jieba_ = nullptr;
   std::string dict_path_;
-  bool own_jieba_;
+  bool own_jieba_{};
   size_t cursor_;
   std::vector<cppjieba::Word> cut_words_;
   std::string term_buf_;

@@ -1,0 +1,134 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <cassert>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <unordered_set>
+
+import compilation_config;
+
+import infinity;
+import database;
+import table;
+
+import parser;
+import profiler;
+import local_file_system;
+import third_party;
+import logical_node_type;
+
+import query_options;
+import query_result;
+
+using namespace infinity;
+
+int main() {
+    std::string data_path = "/tmp/infinity";
+
+    LocalFileSystem fs;
+    if (fs.Exists(data_path)) {
+        std::cout << "Data path: " << data_path << " is already existed." << std::endl;
+    } else {
+        fs.CreateDirectory(data_path);
+        std::cout << "Data path: " << data_path << " is created." << std::endl;
+    }
+
+    Infinity::LocalInit(data_path);
+
+    std::cout << ">>> Import Benchmark Start <<<" << std::endl;
+
+    std::vector<std::string> results;
+
+    // hnsw benchmark
+    do {
+        std::vector<ColumnDef *> column_defs;
+
+        // init column defs
+        std::shared_ptr<DataType> col1_type =
+            std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
+        std::string col1_name = "col1";
+        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
+        column_defs.emplace_back(col1_def.release());
+
+        std::string db_name = "default";
+        std::string table_name = "knn_benchmark";
+        std::string index_name = "hnsw_index";
+
+        std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+        CreateDatabaseOptions create_db_options;
+        create_db_options.conflict_type_ = ConflictType::kIgnore;
+        auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
+
+        std::shared_ptr<Database> data_base = infinity->GetDatabase(db_name);
+        CreateTableOptions create_tb_options;
+        create_tb_options.conflict_type_ = ConflictType::kIgnore;
+        auto r2 = data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
+
+        std::shared_ptr<Table> table = data_base->GetTable(table_name);
+
+        std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_base.fvecs";
+        if (!fs.Exists(sift_base_path)) {
+            std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
+            break;
+        }
+
+        ImportOptions import_options;
+        import_options.copy_file_type_ = CopyFileType::kFVECS;
+
+        infinity::BaseProfiler profiler;
+        profiler.Begin();
+        QueryResult query_result = table->Import(sift_base_path, import_options);
+        std::cout << "Import data cost: " << profiler.ElapsedToString() << std::endl;
+
+        auto index_info_list = new std::vector<IndexInfo *>();
+        {
+            auto index_info = new IndexInfo();
+            index_info->index_type_ = IndexType::kHnsw;
+            index_info->column_name_ = col1_name;
+
+            {
+                auto index_param_list = new std::vector<InitParameter *>();
+                index_param_list->emplace_back(new InitParameter("M", std::to_string(16)));
+                index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
+                index_param_list->emplace_back(new InitParameter("ef", std::to_string(200)));
+                index_param_list->emplace_back(new InitParameter("metric", "l2"));
+                index_param_list->emplace_back(new InitParameter("encode", "lvq"));
+                index_info->index_param_list_ = index_param_list;
+            }
+            index_info_list->emplace_back(index_info);
+        }
+
+        query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+
+        if(query_result.IsOk()) {
+            std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
+            query_result = infinity->Flush();
+            profiler.End();
+            std::cout << "Flush data cost: " << profiler.ElapsedToString() << std::endl;
+        } else {
+            std::cout << "Fail to create index." << profiler.ElapsedToString() << std::endl;
+            profiler.End();
+            break;
+        }
+    } while (false);
+
+    std::cout << ">>> Import Benchmark End <<<" << std::endl;
+    for (const auto &item : results) {
+        std::cout << item << std::endl;
+    }
+    Infinity::LocalUnInit();
+}
