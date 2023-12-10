@@ -243,4 +243,5 @@ TEST_F(TableScanTest, block_read_test) {
         EXPECT_EQ(times, ceil(total_row / 1024.0));
     }
 #endif
+    storage.UnInit();
 }

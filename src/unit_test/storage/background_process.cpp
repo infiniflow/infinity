@@ -54,8 +54,7 @@ class BGProcessTest : public BaseTest {
 TEST_F(BGProcessTest, test1) {
     using namespace infinity;
 
-    BGTaskProcessor processor;
-    processor.Init(infinity::InfinityContext::instance().storage()->wal_manager());
+    BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager());
 
     processor.Start();
 
