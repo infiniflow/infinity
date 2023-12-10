@@ -34,9 +34,9 @@ RUN cargo install sqllogictest-bin
 
 
 # CMake 3.28+ is requrired for C++20 modules.
-# download https://github.com/Kitware/CMake/releases/download/v3.28.0-rc5/cmake-3.28.0-rc5-linux-x86_64.tar.gz
-COPY cmake-3.28.0-rc5-linux-x86_64.tar.gz .
-RUN tar xzf cmake-3.28.0-rc5-linux-x86_64.tar.gz && cp -rf cmake-3.28.0-rc5-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.0-rc5-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.0-rc5-linux-x86_64
+# download https://github.com/Kitware/CMake/releases/download/v3.28.0/cmake-3.28.0-linux-x86_64.tar.gz
+COPY cmake-3.28.0-linux-x86_64.tar.gz .
+RUN tar xzf cmake-3.28.0-linux-x86_64.tar.gz && cp -rf cmake-3.28.0-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.0-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.0-linux-x86_64
 
 # iresearch requires lz4
 # git clone https://github.com/lz4/lz4.git && tar czvf lz4.tgz lz4
@@ -47,6 +47,6 @@ ENV LZ4_ROOT=/usr/local
 # build dependencies
 RUN apt install -y libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev libevent-dev libthrift-dev
 
-RUN apt install python3.11-venv thrift-compiler
+RUN apt install -y thrift-compiler python3-pytest python3-venv
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

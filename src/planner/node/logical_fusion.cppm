@@ -32,27 +32,19 @@ class TableCollectionEntry;
 export class LogicalFusion : public LogicalNode {
 public:
     explicit LogicalFusion(u64 node_id,
-                           SharedPtr<FusionExpression> fusion_expr,
-                           const Vector<ColumnBinding> &column_bindings,
-                           SharedPtr<Vector<String>> output_names,
-                           SharedPtr<Vector<SharedPtr<DataType>>> output_types);
+                           SharedPtr<FusionExpression> fusion_expr);
 
-    [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
+    Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); };
 
-    SharedPtr<Vector<String>> GetOutputNames() const final;
+    SharedPtr<Vector<String>> GetOutputNames() const final { return left_node_->GetOutputNames(); };
 
-    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_node_->GetOutputTypes(); };
 
     String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalFusion"; }
 
     SharedPtr<FusionExpression> fusion_expr_{};
-
-private:
-    Vector<ColumnBinding> column_bindings_{};
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 } // namespace infinity

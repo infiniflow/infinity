@@ -27,6 +27,17 @@ Anarchism 30-APR-2012 03:25:17.000  http://web.archive.org/web/20061214085638/ht
 Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<ref name=watkins_sjsu/>  ===Valence and bonding behavior=== {{Main|Valence (chemistry)|Chemical bond}}  The outermost electron shell of an atom in its uncombined state is known as the valence shell, and the electrons in that shell are called [[valence electron]]s. The number of valence electrons determines the [[chemical bond|bonding]] behavior with other atoms. Atoms tend to [[Chemical reaction|chemically react]] with each other in a manner that fills (or empties) their outer valence shells.<ref name=reusch20070716/> For example, a transfer of a single electron between atoms is a useful approximation for bonds that form between atoms with one-electron more than a filled shell, and others that are one-electron short of a full shell, such as occurs in the compound [[sodium chloride]] and other chemical ionic salts. However, many elements display multiple valences, or tendencies to share differing numbers of electrons in different compounds. Thus, [[chemical 7207 7207,7207,7207,7207
 Anarchism 30-APR-2012 03:25:17.000  [[hierarchical organization]] in the conduct of human relations.<ref name="iaf-ifa.org">"The [[International of Anarchist Federations|IAF - IFA]] fights for : the abolition of all forms of authority whether economical, political, social, religious, cultural or sexual."[http://www.iaf-ifa.org/principles/english.html "Principles of The [[International of Anarchist Federations]]"]</ref><ref>"Anarchism, then, really stands for the liberation of the human mind from the dominion of religion; the liberation of the human body from the dominion of property; liberation from the shackles and restraint of government. Anarchism stands for a social order based on the free grouping of individuals for the purpose of producing real social wealth; an order that will guarantee to every human being free access to the earth and full enjoyment of the necessities of life, according to individual desires, tastes, and inclinations." [[Emma Goldman]]. "What it Really Stands for Anarchy" in ''[[Anarchism and Other 2 2,2,2,2
 
+
+query I
+SELECT num FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
+----
+9893
+0
+2681
+1
+7207
+2
+
 # Clean up
 statement ok
 DROP TABLE enwiki_embedding;
