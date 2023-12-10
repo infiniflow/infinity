@@ -152,14 +152,14 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
             throw ExecutorException(Format("Cannot find block_idx"));
         }
 
-        SizeT column_id = 0;
-        for (; column_id < GetOutputTypes()->size() - 2; ++column_id) {
-            output_data_block->column_vectors[column_id]->AppendWith(*input_blocks[block_idx]->column_vectors[column_id], row_idx, 1);
+        SizeT column_n = GetOutputTypes()->size() - 2;
+        for (SizeT i = 0; i < column_n; ++i) {
+            output_data_block->column_vectors[i]->AppendWith(*input_blocks[block_idx]->column_vectors[i], row_idx, 1);
         }
         // 4.2 add hidden columns: score, row_id
         Value v = Value::MakeFloat(doc.score);
-        output_data_block->column_vectors[column_id++]->AppendValue(v);
-        output_data_block->column_vectors[column_id]->AppendWith(doc.row_id, 1);
+        output_data_block->column_vectors[column_n]->AppendValue(v);
+        output_data_block->column_vectors[column_n + 1]->AppendWith(doc.row_id, 1);
         row_count++;
     }
     output_data_block->Finalize();

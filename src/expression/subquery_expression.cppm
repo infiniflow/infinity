@@ -28,13 +28,13 @@ namespace infinity {
 
 export class SubqueryExpression : public BaseExpression {
 public:
-    explicit SubqueryExpression(SharedPtr<BoundSelectStatement> select_node, SubqueryType subquery_type);
+    explicit SubqueryExpression(UniquePtr<BoundSelectStatement> select_node, SubqueryType subquery_type);
 
     String ToString() const override;
 
     DataType Type() const override;
 
-    SharedPtr<BoundSelectStatement> bound_select_statement_ptr_{};
+    UniquePtr<BoundSelectStatement> bound_select_statement_ptr_{};
     SubqueryType subquery_type_;
 
     // Used in IN subquery, EXISTS won't use it.

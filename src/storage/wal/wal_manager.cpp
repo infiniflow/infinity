@@ -675,8 +675,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-    Status table_status = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts, base_table_entry);
+    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Get table failed");
     }
@@ -704,8 +703,7 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-    Status table_status = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts, base_table_entry);
+    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>(Format("Wal Replay: Get table failed {}", table_status.message()));
     }
@@ -728,8 +726,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-    Status table_status = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts, base_table_entry);
+    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Get table failed");
     }
@@ -763,8 +760,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 com
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-    Status table_status = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts, base_table_entry);
+    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Get table failed");
     }
@@ -785,9 +781,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     }
     auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-
-    Status table_status = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts, base_table_entry);
+    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Get table failed");
     }

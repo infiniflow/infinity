@@ -28,6 +28,7 @@ import third_party;
 import buffer_manager;
 import profiler;
 import status;
+import default_values;
 
 export module new_catalog;
 
@@ -36,13 +37,13 @@ namespace infinity {
 class ProfileHistory {
 private:
     Mutex lock_{};
-    Vector<SharedPtr<QueryProfiler>> queue;
-    SizeT front;
-    SizeT rear;
-    SizeT max_size;
+    Vector<SharedPtr<QueryProfiler>> queue{};
+    SizeT front{};
+    SizeT rear{};
+    SizeT max_size{};
 
 public:
-    ProfileHistory(SizeT size) {
+    explicit ProfileHistory(SizeT size) {
         max_size = size + 1;
         queue.resize(max_size);
         front = 0;
@@ -60,6 +61,8 @@ public:
 
     QueryProfiler *GetElement(SizeT index) {
         UniqueLock<Mutex> lk(lock_);
+
+        // FIXME: Bug, unsigned integer: index will always >= 0
         if (index < 0 || index >= (rear - front + max_size) % max_size) {
             return nullptr;
         }
@@ -146,14 +149,14 @@ public:
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     u64 next_txn_id_{};
     u64 catalog_version_{};
-    RWMutex rw_locker_;
+    RWMutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.
-    HashMap<String, SharedPtr<FunctionSet>> function_sets_;
-    HashMap<String, SharedPtr<TableFunction>> table_functions_;
-    HashMap<String, SharedPtr<SpecialFunction>> special_functions_;
+    HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
+    HashMap<String, SharedPtr<TableFunction>> table_functions_{};
+    HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
-    ProfileHistory history{128};
+    ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 };
 
 } // namespace infinity

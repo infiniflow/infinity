@@ -32,8 +32,8 @@ namespace infinity {
 
 export struct BoundUpdateStatement final : public BoundStatement {
 public:
-    static inline SharedPtr<BoundUpdateStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeShared<BoundUpdateStatement>(Move(bind_context));
+    static inline UniquePtr<BoundUpdateStatement> Make(SharedPtr<BindContext> bind_context) {
+        return MakeUnique<BoundUpdateStatement>(Move(bind_context));
     }
 
 public:

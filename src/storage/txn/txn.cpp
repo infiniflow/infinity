@@ -69,8 +69,7 @@ Status Txn::GetTableEntry(const String &db_name, const String &table_name, Table
     auto table_iter = txn_table_entries_.find(table_name);
     if (table_iter == txn_table_entries_.end()) {
         // not found the table in cached entries
-        BaseEntry *base_table_entry{};
-        Status status = this->GetTableByName(db_name, table_name, base_table_entry);
+        auto [base_table_entry, status] = this->GetTableByName(db_name, table_name);
         if (!status.ok()) {
             return status;
         }
@@ -455,7 +454,7 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     return index_status;
 }
 
-Status Txn::GetTableByName(const String &db_name, const String &table_name, BaseEntry *&new_table_entry) {
+Tuple<BaseEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -469,13 +468,13 @@ Status Txn::GetTableByName(const String &db_name, const String &table_name, Base
     Status status = NewCatalog::GetDatabase(catalog_, db_name, this->txn_id_, begin_ts, base_db_entry);
     if (!status.ok()) {
         // Error
-        return status;
+        return {nullptr, status};
     }
 
     // Check the table entries
     auto db_entry = (DBEntry *)base_db_entry;
 
-    return DBEntry::GetTableCollection(db_entry, table_name, txn_id_, begin_ts, new_table_entry);
+    return DBEntry::GetTableCollection(db_entry, table_name, txn_id_, begin_ts);
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType , BaseEntry *&) {

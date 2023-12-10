@@ -72,21 +72,22 @@ void QueryContext::Init(Config *global_config_ptr,
     optimizer_ = MakeUnique<Optimizer>(this);
     physical_planner_ = MakeUnique<PhysicalPlanner>(this);
     fragment_builder_ = MakeUnique<FragmentBuilder>(this);
-    query_metrics_ = MakeShared<QueryProfiler>(is_enable_profiling());
 }
 
 QueryResult QueryContext::Query(const String &query) {
-    query_metrics_->StartPhase(QueryPhase::kParser);
+    CreateQueryProfiler();
+
+    StartProfile(QueryPhase::kParser);
     UniquePtr<ParserResult> parsed_result = MakeUnique<ParserResult>();
     parser_->Parse(query, parsed_result.get());
 
     if (parsed_result->IsError()) {
-        query_metrics_->StopPhase(QueryPhase::kParser);
+        StopProfile(QueryPhase::kParser);
         Error<PlannerException>(parsed_result->error_message_);
     }
 
     Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
-    query_metrics_->StopPhase(QueryPhase::kParser);
+    StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResult query_result = QueryStatement(statement);
         return query_result;
@@ -106,10 +107,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
 //                        statement->ToString()));
-        TryMarkProfiler(statement->type_);
+        RecordQueryProfiler(statement->type_);
 
         // Build unoptimized logical plan for each SQL statement.
-        query_metrics_->StartPhase(QueryPhase::kLogicalPlan);
+        StartProfile(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
         auto state = logical_planner_->Build(statement, bind_context);
         // FIXME
@@ -119,41 +120,46 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
         SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
-        query_metrics_->StopPhase(QueryPhase::kLogicalPlan);
+        StopProfile(QueryPhase::kLogicalPlan);
 
         // Apply optimized rule to the logical plan
-        query_metrics_->StartPhase(QueryPhase::kOptimizer);
+        StartProfile(QueryPhase::kOptimizer);
         SharedPtr<LogicalNode> optimized_plan = optimizer_->optimize(unoptimized_plan);
-        query_metrics_->StopPhase(QueryPhase::kOptimizer);
+        StopProfile(QueryPhase::kOptimizer);
 
         // Build physical plan
-        query_metrics_->StartPhase(QueryPhase::kPhysicalPlan);
+        StartProfile(QueryPhase::kPhysicalPlan);
         UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
-        query_metrics_->StopPhase(QueryPhase::kPhysicalPlan);
+        StopProfile(QueryPhase::kPhysicalPlan);
 
-        query_metrics_->StartPhase(QueryPhase::kPipelineBuild);
+        StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
-        query_metrics_->StopPhase(QueryPhase::kPipelineBuild);
+        StopProfile(QueryPhase::kPipelineBuild);
 
-        query_metrics_->StartPhase(QueryPhase::kTaskBuild);
+        StartProfile(QueryPhase::kTaskBuild);
         Vector<FragmentTask *> tasks;
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), tasks);
-        query_metrics_->StopPhase(QueryPhase::kTaskBuild);
+        StopProfile(QueryPhase::kTaskBuild);
 
-        query_metrics_->StartPhase(QueryPhase::kExecution);
+        StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(tasks);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
-        query_metrics_->StopPhase(QueryPhase::kExecution);
+        StopProfile(QueryPhase::kExecution);
 
+        StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
+        StopProfile(QueryPhase::kCommit);
     } catch (const Exception &e) {
+        StopProfile();
+        StartProfile(QueryPhase::kRollback);
         this->RollbackTxn();
+        StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
         query_result.status_.Init(ErrorCode::kError, e.what());
-        query_metrics_->Stop();
+
     }
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();

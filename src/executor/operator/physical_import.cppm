@@ -59,7 +59,7 @@ export class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(u64 id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type, SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_collection_entry_(table_collection_entry),
-          file_path_(Move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
+          file_type_(type), file_path_(Move(file_path)), header_(header), delimiter_(delimiter) {}
 
     ~PhysicalImport() override = default;
 

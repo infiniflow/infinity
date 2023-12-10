@@ -104,10 +104,12 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     profiler_.End();
 
     uint64_t input_rows{};
-    SizeT input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
-    for(SizeT block_id = 0; block_id < input_data_block_count; ++ block_id) {
-        DataBlock* input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
-        input_rows += input_data_block->Finalized() ? input_data_block->row_count() : 0;
+    if(operator_state->prev_op_state_ != nullptr) {
+        SizeT input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
+        for(SizeT block_id = 0; block_id < input_data_block_count; ++ block_id) {
+            DataBlock* input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
+            input_rows += input_data_block->Finalized() ? input_data_block->row_count() : 0;
+        }
     }
 
     uint64_t output_rows{};
@@ -147,6 +149,12 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
         }
         case QueryPhase::kExecution: {
             return "Execution";
+        }
+        case QueryPhase::kCommit: {
+            return "Commit";
+        }
+        case QueryPhase::kRollback: {
+            return "Rollback";
         }
         default: {
             Error<ExecutorException>("Invalid query phase in query profiler");
@@ -192,6 +200,7 @@ void QueryProfiler::Stop() {
         return;
     }
     profilers_[EnumInteger(current_phase_)].End();
+    current_phase_ = QueryPhase::kInvalid;
 }
 
 void QueryProfiler::Flush(TaskProfiler &&profiler) {

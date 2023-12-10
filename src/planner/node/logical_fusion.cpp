@@ -29,18 +29,8 @@ module logical_fusion;
 namespace infinity {
 
 LogicalFusion::LogicalFusion(u64 node_id,
-                             SharedPtr<FusionExpression> fusion_expr,
-                             const Vector<ColumnBinding> &column_bindings,
-                             SharedPtr<Vector<String>> output_names,
-                             SharedPtr<Vector<SharedPtr<DataType>>> output_types)
-    : LogicalNode(node_id, LogicalNodeType::kFusion), fusion_expr_(fusion_expr), column_bindings_(column_bindings), output_names_(Move(output_names)),
-      output_types_(Move(output_types)) {}
-
-Vector<ColumnBinding> LogicalFusion::GetColumnBindings() const { return column_bindings_; }
-
-SharedPtr<Vector<String>> LogicalFusion::GetOutputNames() const { return output_names_; };
-
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalFusion::GetOutputTypes() const { return output_types_; };
+                             SharedPtr<FusionExpression> fusion_expr)
+    : LogicalNode(node_id, LogicalNodeType::kFusion), fusion_expr_(fusion_expr) {}
 
 String LogicalFusion::ToString(i64 &space) const {
     std::stringstream ss;

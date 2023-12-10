@@ -1751,12 +1751,20 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
     // KNN data type
     ParserHelper::ToLower($7);
     if(strcmp($7, "float") == 0 and knn_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        knn_expr->dimension_ = $5->double_array_.size();
         knn_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
-        knn_expr->embedding_data_ptr_ = new float[knn_expr->dimension_];
-
-        for(long i = 0; i < knn_expr->dimension_; ++ i) {
-            ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
+        if(!($5->double_array_.empty())) {
+            knn_expr->dimension_ = $5->double_array_.size();
+            knn_expr->embedding_data_ptr_ = new float[knn_expr->dimension_];
+            for(long i = 0; i < knn_expr->dimension_; ++ i) {
+                ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->double_array_[i];
+            }
+        }
+        if(!($5->long_array_.empty())) {
+            knn_expr->dimension_ = $5->long_array_.size();
+            knn_expr->embedding_data_ptr_ = new float[knn_expr->dimension_];
+            for(long i = 0; i < knn_expr->dimension_; ++ i) {
+                ((float*)(knn_expr->embedding_data_ptr_))[i] = $5->long_array_[i];
+            }
         }
         free($7);
         free($9);

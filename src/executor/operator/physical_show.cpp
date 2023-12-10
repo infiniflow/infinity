@@ -159,15 +159,19 @@ void PhysicalShow::Init() {
             output_types_->reserve(9);
 
             output_names_->emplace_back("record_no");
-            output_names_->emplace_back("parser");
-            output_names_->emplace_back("logical planner");
-            output_names_->emplace_back("optimizer");
-            output_names_->emplace_back("physical planner");
-            output_names_->emplace_back("pipeline builder");
-            output_names_->emplace_back("task builder");
-            output_names_->emplace_back("executor");
+            output_names_->emplace_back("command parsing");
+            output_names_->emplace_back("logical plann building");
+            output_names_->emplace_back("plan optimizing");
+            output_names_->emplace_back("physical plann building");
+            output_names_->emplace_back("pipeline building");
+            output_names_->emplace_back("task building");
+            output_names_->emplace_back("execution");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("rollback");
             output_names_->emplace_back("total_cost");
 
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
@@ -534,7 +538,9 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         MakeShared<ColumnDef>(5, varchar_type, "pipeline_build", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(6, varchar_type, "task_build", HashSet<ConstraintType>()),
         MakeShared<ColumnDef>(7, varchar_type, "execution", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(8, varchar_type, "total_cost", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(8, varchar_type, "commit", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(9, varchar_type, "rollback", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(10, varchar_type, "total_cost", HashSet<ConstraintType>()),
     };
 
     auto catalog = txn->GetCatalog();
@@ -542,8 +548,17 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type,
+                                             varchar_type};
     output_block_ptr->Init(column_types);
 
     auto records = catalog->GetProfilerRecords();
@@ -555,7 +570,8 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 
         // Output each query phase
         i64 total_cost{};
-        for (SizeT j = 0; j < 7; ++j) {
+        SizeT column_count = column_defs.size();
+        for (SizeT j = 0; j < column_count - 2; ++j) {
             i64 this_time = records[i]->ElapsedAt(j);
             total_cost += this_time;
 
@@ -567,10 +583,9 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         // Output total query duration
         NanoSeconds total_duration(total_cost);
         ValueExpression phase_cost_expr(Value::MakeVarchar(BaseProfiler::ElapsedToString(total_duration)));
-        phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
-
-        output_block_ptr->Finalize();
+        phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors.back());
     }
+    output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(Move(output_block_ptr));
 }
 
@@ -583,8 +598,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    BaseEntry *base_table_entry{nullptr};
-    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    auto [base_table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
         Error<ExecutorException>(Format("{} isn't found", object_name_));
@@ -660,8 +674,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    BaseEntry *base_table_entry{nullptr};
-    Status status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    auto [base_table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
         Error<ExecutorException>(Format("{} isn't found", object_name_));
@@ -1229,7 +1242,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar("enable profiling");
+            Value value = Value::MakeVarchar("enable_profile");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
@@ -1275,8 +1288,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    BaseEntry *base_table_entry{nullptr};
-    Status table_status = txn->GetTableByName(db_name_, object_name_, base_table_entry);
+    auto [base_table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = Move(table_status.msg_);
         //        Error<ExecutorException>(table_status.message());
