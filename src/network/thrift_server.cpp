@@ -50,6 +50,7 @@ import local_file_system;
 import infinity_context;
 import config;
 import data_block;
+import query_options;
 
 namespace infinity {
 
@@ -122,7 +123,7 @@ public:
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         DropTableOptions drop_table_opts;
-        switch(request.options.conflict_type) {
+        switch (request.options.conflict_type) {
             case infinity_thrift_rpc::ConflictType::Ignore:
                 drop_table_opts.conflict_type_ = ConflictType::kIgnore;
                 break;
@@ -132,7 +133,7 @@ public:
             case infinity_thrift_rpc::ConflictType::Error:
             default:
                 drop_table_opts.conflict_type_ = ConflictType::kError;
-            break;
+                break;
         }
         auto result = database->DropTable(request.table_name, drop_table_opts);
         ProcessCommonResult(response, result);
@@ -316,32 +317,30 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-
-
         SizeT knn_expr_count = request.search_expr.knn_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
         SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
 
-        Vector<ParsedExpr *> *search_expr_list = new Vector<ParsedExpr *>();
+        auto search_expr_list = new Vector<ParsedExpr *>();
         search_expr_list->reserve(total_expr_count);
 
-        for(SizeT idx = 0; idx < knn_expr_count; ++ idx) {
-            ParsedExpr* knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+        for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
+            ParsedExpr *knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
             search_expr_list->emplace_back(knn_expr);
         }
 
-        for(SizeT idx = 0; idx < match_expr_count; ++ idx) {
-            ParsedExpr* match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
+        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
+            ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
             search_expr_list->emplace_back(match_expr);
         }
 
-        if(fusion_expr_exists) {
-            ParsedExpr* fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+        if (fusion_expr_exists) {
+            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
             search_expr_list->emplace_back(fusion_expr);
         }
 
-        infinity::SearchExpr *search_expr = new infinity::SearchExpr();
+        SearchExpr *search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
 
         ParsedExpr *filter = nullptr;
@@ -356,16 +355,6 @@ public:
         ParsedExpr *limit = nullptr;
         if (request.__isset.limit_expr == true) {
             limit = GetParsedExprFromProto(request.limit_expr);
-        }
-
-        Vector<OrderByExpr *> *order_by_list = new Vector<OrderByExpr *>();
-        if (request.__isset.order_by_list == true) {
-            order_by_list = new Vector<OrderByExpr *>();
-            order_by_list->reserve(request.order_by_list.size());
-            for (auto &order_by_expr : request.order_by_list) {
-                // auto parsed_expr = GetOrderByExprFromProto(order_by_expr);
-                // order_by_list->emplace_back(parsed_expr);
-            }
         }
 
         const QueryResult result = table->Search(search_expr, filter, output_columns);
@@ -825,6 +814,12 @@ private:
             return parsed_expr;
         } else if (expr.type.__isset.knn_expr == true) {
             auto parsed_expr = GetKnnExprFromProto(*expr.type.knn_expr);
+            return parsed_expr;
+        } else if (expr.type.__isset.match_expr == true) {
+            auto parsed_expr = GetMatchExprFromProto(*expr.type.match_expr);
+            return parsed_expr;
+        } else if (expr.type.__isset.fusion_expr == true) {
+            auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
             return parsed_expr;
         } else {
             Error<TypeException>("Invalid parsed expression type", __FILE_NAME__, __LINE__);

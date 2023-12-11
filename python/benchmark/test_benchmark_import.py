@@ -15,7 +15,7 @@
 import os
 
 import infinity
-from infinity import NetworkAddress
+from infinity.common import REMOTE_HOST
 
 
 class TestImport:
@@ -27,8 +27,7 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(
-            NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         assert infinity_obj
 
         # infinity
@@ -37,6 +36,7 @@ class TestImport:
         assert db_obj
 
         # import
+        db_obj.drop_table("benchmark", True)
         db_obj.create_table("benchmark", {"c1": "vector,128,float"}, None)
         table_obj = db_obj.get_table("benchmark")
         assert table_obj
@@ -55,15 +55,12 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(
-            NetworkAddress('127.0.0.1', 9080))
-        assert infinity_obj
-
-        # infinity
+        infinity_obj = infinity.connect(REMOTE_HOST)
 
         db_obj = infinity_obj.get_database("default")
 
         table_obj = db_obj.get_table("benchmark")
 
         # search ordinary
-        table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.query_builder().output(["c1"]).knn("c1", [0.1] * 128, "float", "ip", 10).to_df()
+        print(res)
