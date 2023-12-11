@@ -138,12 +138,12 @@ int main() {
             auto _ = infinity->GetDatabase("default")->CreateTable("benchmark_test", column_defs, Vector<TableConstraint *>(), create_table_opts);
             infinity->LocalDisconnect();
         }
-        {
-            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                auto _ = infinity->GetDatabase("default")->ListTables();
-            });
-            results.push_back(Format("-> List Tables QPS: {}", total_times / tims_costing_second));
-        }
+        // {
+        //     auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+        //         auto _ = infinity->GetDatabase("default")->ListTables();
+        //     });
+        //     results.push_back(Format("-> List Tables QPS: {}", total_times / tims_costing_second));
+        // }
         {
             auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
                 auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test");
@@ -184,19 +184,19 @@ int main() {
             results.push_back(Format("-> Drop Table QPS: {}", total_times / tims_costing_second));
         }
         {
-            Vector<ParsedExpr *> vec_knn_exprs;
-            Vector<Pair<ParsedExpr *, ParsedExpr *>> fts_search_exprs;
-
             {
                 auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id
                 thread_id) {
-                    ColumnExpr column_expr;
-                    column_expr.star_ = true;
+                    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+                    ColumnExpr *col1 = new ColumnExpr();
+                    col1->names_.emplace_back("col1");
+                    output_columns->emplace_back(col1);
 
-                    Vector<ParsedExpr *> columns;
-                    columns.push_back(&column_expr);
+                    ColumnExpr *col2 = new ColumnExpr();
+                    col2->names_.emplace_back("col2");
+                    output_columns->emplace_back(col2);
 
-                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(nullptr, nullptr, &columns);
+                    auto _ = infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(nullptr, nullptr, output_columns);
                 });
                 results.push_back(Format("-> Select QPS: {}", total_times / tims_costing_second));
             }
