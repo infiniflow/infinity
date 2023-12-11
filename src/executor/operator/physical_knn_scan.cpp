@@ -276,28 +276,18 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
             bool_column->Reset();
         }
-        bool use_bitmask = !bitmask.IsAllTrue();
 
         ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(block_column_entry, buffer_mgr);
 
         auto data = reinterpret_cast<const DataType *>(column_buffer.GetAll());
-
-        Vector <DataType> dists;
-        if (use_bitmask) {
-            dists = Move(dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_, bitmask));
-        } else {
-            dists = Move(dist_func->Calculate(data, row_count, query, knn_scan_shared_data->dimension_));
-        }
-
-        Vector<RowID> row_ids(row_count);
-        for (u16 i = 0; i < row_count; ++i) {
-            row_ids[i] = RowID(block_entry->segment_entry_->segment_id_, block_entry->block_id_ * DEFAULT_BLOCK_CAPACITY + i);
-        }
-        if (use_bitmask) {
-            merge_heap->Search(dists.data(), row_ids.data(), row_count, bitmask);
-        } else {
-            merge_heap->Search(dists.data(), row_ids.data(), row_count);
-        }
+        merge_heap->Search(query,
+                           data,
+                           knn_scan_shared_data->dimension_,
+                           dist_func->dist_func_,
+                           row_count,
+                           block_entry->segment_entry_->segment_id_,
+                           block_entry->block_id_,
+                           bitmask);
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
