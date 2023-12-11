@@ -11,26 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import infinity
-from infinity.common import REMOTE_HOST
-
-
-class TestConnection:
-    def test_connect_and_disconnect_ok(self):
-        """
-        target: test connect and server ok
-        method: connect server
-        expected: ok
-        """
-        infinity_obj = infinity.connect(REMOTE_HOST)
-        assert infinity_obj
-        assert infinity_obj.disconnect()
-        # self.assertIsNotNone(infinity_obj)
-        pass
-
-    def test_create_db(self):
-        pass
-
-    # with pytest.raises(NameError) as exception_info:
-    #     print('error type is {}'.format(exception_info.type))

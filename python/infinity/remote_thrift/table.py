@@ -19,7 +19,6 @@ import pandas as pd
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
@@ -257,8 +256,6 @@ class RemoteTable(Table, ABC):
                 offset_expr.type = paser_expr_type
                 offset_expr.i64_value = query.offset
 
-
-
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
@@ -272,4 +269,5 @@ class RemoteTable(Table, ABC):
         # process the results
         if res.success:
             return build_result(res)
-        # todo: how to convert bytes to string?
+        else:
+            raise Exception(res.error_msg)

@@ -309,6 +309,11 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
+        // select list
+        if (request.__isset.select_list == false) {
+            Error<NetworkException>("Select list is empty", __FILE_NAME__, __LINE__);
+        }
+
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(request.select_list.size());
 
@@ -317,32 +322,35 @@ public:
             output_columns->emplace_back(parsed_expr);
         }
 
-        SizeT knn_expr_count = request.search_expr.knn_exprs.size();
-        SizeT match_expr_count = request.search_expr.match_exprs.size();
-        bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
-        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+        // search expr
+        SearchExpr *search_expr = nullptr;
+        if (request.__isset.search_expr) {
+            search_expr = new SearchExpr();
+            auto search_expr_list = new Vector<ParsedExpr *>();
+            SizeT knn_expr_count = request.search_expr.knn_exprs.size();
+            SizeT match_expr_count = request.search_expr.match_exprs.size();
+            bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
+            SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+            search_expr_list->reserve(total_expr_count);
+            for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
+                ParsedExpr *knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+                search_expr_list->emplace_back(knn_expr);
+            }
 
-        auto search_expr_list = new Vector<ParsedExpr *>();
-        search_expr_list->reserve(total_expr_count);
+            for (SizeT idx = 0; idx < match_expr_count; ++idx) {
+                ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
+                search_expr_list->emplace_back(match_expr);
+            }
 
-        for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-            ParsedExpr *knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
-            search_expr_list->emplace_back(knn_expr);
+            if (fusion_expr_exists) {
+                ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+                search_expr_list->emplace_back(fusion_expr);
+            }
+
+            search_expr->SetExprs(search_expr_list);
         }
 
-        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
-            ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
-            search_expr_list->emplace_back(match_expr);
-        }
-
-        if (fusion_expr_exists) {
-            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
-            search_expr_list->emplace_back(fusion_expr);
-        }
-
-        SearchExpr *search_expr = new SearchExpr();
-        search_expr->SetExprs(search_expr_list);
-
+        // filter
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
             filter = GetParsedExprFromProto(request.where_expr);
@@ -352,6 +360,7 @@ public:
         //    ParsedExpr *offset;
         // offset = new ParsedExpr();
 
+        // limit
         ParsedExpr *limit = nullptr;
         if (request.__isset.limit_expr == true) {
             limit = GetParsedExprFromProto(request.limit_expr);

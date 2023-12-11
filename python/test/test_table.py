@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import infinity
-from infinity.common import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 
 
 class TestTable:
@@ -51,7 +51,7 @@ class TestTable:
         4. list tables: empty
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 

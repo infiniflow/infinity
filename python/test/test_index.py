@@ -22,7 +22,7 @@ class TestIndex:
     def test_create_index_IVFFlat(self):
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_index_ivfflat")
+        res = db_obj.drop_table("test_index_ivfflat", True)
         assert res.success
         res = db_obj.create_table("test_index_ivfflat", {
             "c1": "vector,1024,float"}, None)
@@ -45,7 +45,7 @@ class TestIndex:
         # CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_index_hnsw")
+        res = db_obj.drop_table("test_index_hnsw", True)
         assert res.success
         res = db_obj.create_table(
             "test_index_hnsw", {"c1": "vector,1024,float"}, None)

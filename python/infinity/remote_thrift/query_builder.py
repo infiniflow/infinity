@@ -96,7 +96,7 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.Hamming
         knn_expr = KnnExpr(column_expr=copy.deepcopy(column_expr), embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn)
-        print(knn_expr)
+        # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self
 
