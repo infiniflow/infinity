@@ -29,5 +29,5 @@ class NetworkAddress:
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
 
-REMOTE_HOST = NetworkAddress("127.0.0.1", 9080)
+REMOTE_HOST = NetworkAddress("192.168.200.151", 9080)
 LOCAL_HOST = NetworkAddress("0.0.0.0", 9080)

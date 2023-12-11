@@ -15,7 +15,7 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.common import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 
 
 class TestDelete:
@@ -49,7 +49,7 @@ class TestDelete:
             - 'table_3'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         # infinity

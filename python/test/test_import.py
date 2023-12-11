@@ -15,7 +15,7 @@
 import os
 
 import infinity
-from infinity.common import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 
 
 class TestImport:
@@ -31,7 +31,7 @@ class TestImport:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+            infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
 
             # infinity

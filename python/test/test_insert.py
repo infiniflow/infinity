@@ -196,8 +196,6 @@ class TestInsert:
         assert res.success
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
         assert res.success
-        res = table_obj.query_builder().output(["*"]).to_df()
-        print(res)
 
     def test_insert_big_embedding_float(self):
         """
@@ -227,7 +225,5 @@ class TestInsert:
         res = table_obj.insert([{"c1": [7.7] * 65535}])
         assert res.success
         res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
-        res = table_obj.query_builder().output(["*"]).to_df()
-        print(res)
-
+        assert res.success
         db_obj.drop_table("test_insert_big_embedding")

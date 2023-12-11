@@ -15,7 +15,7 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
+from infinity.common import REMOTE_HOST
 
 
 class TestUpdate:
@@ -57,6 +57,8 @@ class TestUpdate:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
+        db_obj.drop_table(table_name="table_4", if_exists=True)
+
         # infinity
         res = db_obj.create_table(
             "table_4", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
@@ -75,7 +77,7 @@ class TestUpdate:
         res = table_obj.query_builder().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
-            .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = table_obj.update(None, [{"c2": 80, "c3": 800}])
         assert res.success is False
@@ -83,7 +85,7 @@ class TestUpdate:
         res = table_obj.query_builder().output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
-            .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = db_obj.drop_table("table_4")
         assert res.success
