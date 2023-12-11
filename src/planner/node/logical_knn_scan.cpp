@@ -33,10 +33,10 @@ LogicalKnnScan::LogicalKnnScan(u64 node_id, SharedPtr<BaseTableRef> base_table_r
 
 Vector<ColumnBinding> LogicalKnnScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;
-    SizeT column_count = base_table_ref_->column_names_->size();
-    result.reserve(column_count);
+    SizeT column_count = base_table_ref_->column_ids_.size();
+    result.reserve(column_count + 1);
     for (SizeT i = 0; i < column_count; ++i) {
-        result.emplace_back(base_table_ref_->table_index_, i);
+        result.emplace_back(base_table_ref_->table_index_, base_table_ref_->column_ids_[i]);
     }
     result.emplace_back(knn_table_index_, 0);
     return result;

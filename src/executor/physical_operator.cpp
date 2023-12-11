@@ -47,27 +47,26 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
     Assert<ExecutorException>(table_ref.get() != nullptr, "TableRef not found!");
 
-    for (int i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {
+    for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {
         auto input_block = operator_state->prev_op_state_->data_block_array_[i].get();
-        Vector<SizeT> &column_ids = table_ref->column_ids_;
         SizeT load_column_count = load_metas_->size();
 
         u16 row_count = input_block->row_count();
         SizeT capacity = input_block->capacity();
 
         // Filling ColumnVector
-        for (int i = 0; i < load_column_count; ++i) {
-            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(load_metas[i].type_);
+        for (SizeT j = 0; j < load_column_count; ++j) {
+            SharedPtr<ColumnVector> column_vector = ColumnVector::Make(load_metas[j].type_);
             column_vector->Initialize(ColumnVectorType::kFlat, capacity);
 
-            input_block->InsertVector(column_vector, load_metas[i].index_);
+            input_block->InsertVector(column_vector, load_metas[j].index_);
         }
 
         auto row_column_id = input_block->column_count() - 1;
 
-        for (int i = 0; i < row_count; ++i) {
+        for (SizeT j = 0; j < row_count; ++j) {
             // If late materialization needs to be optional, then this needs to be modified
-            RowID row_id = input_block->GetValue(row_column_id, i).value_.row;
+            RowID row_id = input_block->GetValue(row_column_id, j).value_.row;
             u32 segment_id = row_id.segment_id_;
             u32 segment_offset = row_id.segment_offset_;
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
@@ -81,11 +80,11 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             if (block_entry == nullptr) {
                 throw ExecutorException(Format("Cannot find block, segment id: {}, block id: {}", segment_id, block_id));
             }
-            for (int j = 0; j < load_column_count; ++j) {
-                auto binding = load_metas[j].binding_;
+            for (SizeT k = 0; k < load_column_count; ++k) {
+                auto binding = load_metas[k].binding_;
                 UniquePtr<BlockColumnEntry> &column = block_entry->columns_[binding.column_idx];
                 ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(column.get(), query_context->storage()->buffer_manager());
-                input_block->column_vectors[load_metas[j].index_]->AppendWith(column_buffer, block_offset, 1);
+                input_block->column_vectors[load_metas[k].index_]->AppendWith(column_buffer, block_offset, 1);
             }
         }
     }
