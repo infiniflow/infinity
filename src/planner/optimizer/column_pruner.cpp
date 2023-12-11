@@ -194,6 +194,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kCommand:
             break;
+        case LogicalNodeType::kFusion:
+            break;
     }
     LogicalNodeVisitor::VisitNodeExpression(op);
     LogicalNodeVisitor::VisitNodeChildren(op);

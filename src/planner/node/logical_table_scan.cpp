@@ -20,6 +20,7 @@ import column_binding;
 import parser;
 import base_expression;
 import logical_node_type;
+import default_values;
 import base_table_ref;
 
 module logical_table_scan;
@@ -39,9 +40,28 @@ Vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalTableScan::GetOutputNames() const { return base_table_ref_->column_names_; }
+SharedPtr<Vector<String>> LogicalTableScan::GetOutputNames() const {
+    SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
+    SizeT column_count = base_table_ref_->column_names_->size();
+    result_names->reserve(column_count + 1);
+    for (SizeT col_idx = 0; col_idx < column_count; ++col_idx) {
+        const auto &column_name = base_table_ref_->column_names_->at(col_idx);
+        result_names->emplace_back(column_name);
+    }
+    if (add_row_id_) {
+        result_names->emplace_back(COLUMN_NAME_ROW_ID);
+    }
+    return result_names;
+}
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalTableScan::GetOutputTypes() const { return base_table_ref_->column_types_; }
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalTableScan::GetOutputTypes() const {
+    Vector<SharedPtr<DataType>> result_types = *base_table_ref_->column_types_;
+    result_types.reserve(result_types.size() + 1);
+    if (add_row_id_) {
+        result_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+    }
+    return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
+}
 
 TableCollectionEntry *LogicalTableScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 

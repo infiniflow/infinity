@@ -35,6 +35,7 @@ private:
     virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
 
     Vector<ColumnBinding> bindings_;
+    SizeT output_count_;
 };
 
 export class ColumnRemapper : public OptimizerRule {

@@ -19,7 +19,7 @@ PROJECT (3)
 -> TABLE SCAN (2)
    - table name: t1(default.t1)
    - table index: #1
-   - output columns: [c1, c2, c3, c4]
+   - output columns: [c1, c2, c3, c4, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT c2 FROM t1;
@@ -30,7 +30,7 @@ PROJECT (3)
 -> TABLE SCAN (2)
    - table name: t1(default.t1)
    - table index: #1
-   - output columns: [c2]
+   - output columns: [c2, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT c1 + 1 FROM t1;
@@ -41,7 +41,7 @@ EXPLAIN LOGICAL SELECT c1 + 1 FROM t1;
  -> TABLE SCAN (2)
     - table name: t1(default.t1)
     - table index: #1
-    - output columns: [c1]
+    - output columns: [c1, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT c1 + c2 FROM t1;
@@ -52,7 +52,7 @@ EXPLAIN LOGICAL SELECT c1 + c2 FROM t1;
  -> TABLE SCAN (2)
     - table name: t1(default.t1)
     - table index: #1
-    - output columns: [c1, c2]
+    - output columns: [c1, c2, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT c1 + c2 FROM t1 where c4 > 1;
@@ -62,11 +62,11 @@ PROJECT (4)
  - expressions: [c1 (#0) + c2 (#1)]
 -> FILTER (3)
    - filter: CAST(c4 (#0) AS BigInt) > 1
-   - output columns: [c4]
+   - output columns: [c4, __rowid]
   -> TABLE SCAN (2)
      - table name: t1(default.t1)
      - table index: #1
-     - output columns: [c4]
+     - output columns: [c4, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 INNER JOIN t2 ON t1.c1 = t2.c2;
@@ -76,15 +76,15 @@ PROJECT (5)
  - expressions: [c1 (#1), c2 (#0)]
 -> INNER JOIN(4)
    - filters: [c1 (#1) = c2 (#0)
-   - output columns: [c1, c2]
+   - output columns: [c1, __rowid, c2, __rowid]
   -> TABLE SCAN (2)
      - table name: t1(default.t1)
      - table index: #1
-     - output columns: [c1]
+     - output columns: [c1, __rowid]
   -> TABLE SCAN (3)
      - table name: t2(default.t2)
      - table index: #2
-     - output columns: [c2]
+     - output columns: [c2, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT t1.c1, t2.c2 FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c2 where t1.c4 > 1;
@@ -94,18 +94,18 @@ PROJECT (6)
  - expressions: [c1 (#0), c2 (#1)]
 -> FILTER (5)
    - filter: CAST(c4 (#2) AS BigInt) > 1
-   - output columns: [c1, c2]
+   - output columns: [c1, __rowid, c2, __rowid]
   -> LEFT JOIN(4)
      - filters: [c1 (#1) = c2 (#0)
-     - output columns: [c1, c2]
+     - output columns: [c1, __rowid, c2, __rowid]
     -> TABLE SCAN (2)
        - table name: t1(default.t1)
        - table index: #1
-       - output columns: [c1]
+       - output columns: [c1, __rowid]
     -> TABLE SCAN (3)
        - table name: t2(default.t2)
        - table index: #2
-       - output columns: [c2]
+       - output columns: [c2, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT MIN(c1 + 1), AVG(c2) FROM t1;
@@ -119,7 +119,7 @@ EXPLAIN LOGICAL SELECT MIN(c1 + 1), AVG(c2) FROM t1;
    -> TABLE SCAN (2)
       - table name: t1(default.t1)
       - table index: #1
-      - output columns: [c1, c2]
+      - output columns: [c1, c2, __rowid]
 
 query I
 EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
@@ -135,7 +135,7 @@ EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
    -> TABLE SCAN (2)
       - table name: t1(default.t1)
       - table index: #1
-      - output columns: [c1, c2]
+      - output columns: [c1, c2, __rowid]
 
 query I
 EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;
@@ -143,11 +143,11 @@ EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;
 DELETE FROM default.t1
 -> FILTER (4)
    - filter: CAST(c1 (#0) AS BigInt) = 1
-   - output columns: [c1]
+   - output columns: [c1, __rowid]
   -> TABLE SCAN (2)
      - table name: t1(default.t1)
      - table index: #1
-     - output columns: [c1]
+     - output columns: [c1, __rowid]
 
 statement ok
 DROP TABLE t1;

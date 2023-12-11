@@ -42,6 +42,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     if (op.operator_type() == LogicalNodeType::kJoin) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
+        output_count_ = op.GetOutputTypes()->size();
         load_func();
         VisitNodeExpression(op);
     } else {
@@ -49,6 +50,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         load_func();
         VisitNodeExpression(op);
         bindings_ = op.GetColumnBindings();
+        output_count_ = op.GetOutputTypes()->size();
     }
 }
 
@@ -61,7 +63,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->table_name(),
                                                  expression->column_name(),
                                                  expression->alias_,
-                                                 bindings_.size());
+                                                 output_count_ - 1);
             }
             default: {
                 LOG_ERROR(Format("Unknown special function: {}", expression->Name()));
