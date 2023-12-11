@@ -213,10 +213,13 @@ class RemoteTable(Table, ABC):
                 case "*":
                     column_expr = ttypes.ColumnExpr()
                     column_expr.star = True
-                    paser_expr_type = ttypes.ParsedExprType()
-                    paser_expr_type.column_expr = column_expr
+                    column_expr.column_name.clear()
+
+                    expr_type = ttypes.ParsedExprType()
+                    expr_type.column_expr = column_expr
+
                     parsed_expr = ttypes.ParsedExpr()
-                    parsed_expr.type = paser_expr_type
+                    parsed_expr.type = expr_type
                     select_list.append(parsed_expr)
                 case _:
                     select_list.append(traverse_conditions(condition(column)))
@@ -253,6 +256,8 @@ class RemoteTable(Table, ABC):
                 offset_expr = ttypes.ParsedExpr()
                 offset_expr.type = paser_expr_type
                 offset_expr.i64_value = query.offset
+
+
 
         # execute the query
         res = self._conn.select(db_name=self._db_name,

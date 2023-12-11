@@ -19,7 +19,7 @@ from sqlglot import condition
 
 import infinity
 import infinity.index as index
-from infinity.common import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 from infinity.remote_thrift.table import traverse_conditions
 
 
@@ -75,7 +75,7 @@ class TestCase:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+            infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
 
             # infinity

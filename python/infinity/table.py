@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing as tp
 from abc import ABC, abstractmethod
 from typing import Optional, Union
 
-from infinity.common import VEC
 from infinity.index import IndexInfo
 
 
@@ -43,12 +41,12 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def update(self, cond: Optional[str], data: Optional[list[dict[str, tp.Union[str, int, float]]]]):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         pass
 
     @abstractmethod
     def query_builder(self):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def _execute_query(self, query):

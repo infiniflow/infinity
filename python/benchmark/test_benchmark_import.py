@@ -62,5 +62,5 @@ class TestImport:
         table_obj = db_obj.get_table("benchmark")
 
         # search ordinary
-        res = table_obj.query_builder().output(["c1"]).knn("c1", [0.1] * 128, "float", "ip", 10).to_df()
+        res = table_obj.query_builder().output(["*"]).knn("c1", [0.1] * 128, "float", "ip", 10).to_df()
         print(res)

@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import copy
 from abc import ABC
 from typing import List, Optional
 
@@ -81,6 +82,8 @@ class InfinityThriftQueryBuilder(ABC):
         elif embedding_data_type == 'double':
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
+        else:
+            raise Exception(f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
         if distance_type == 'l2':
@@ -91,7 +94,7 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.InnerProduct
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.Hamming
-        knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
+        knn_expr = KnnExpr(column_expr=copy.deepcopy(column_expr), embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn)
         print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
