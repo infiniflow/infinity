@@ -102,8 +102,8 @@ void KnnScanFunctionData1::Init() {
     if (shared_data_->filter_expression_) {
         filter_state_ = ExpressionState::CreateState(shared_data_->filter_expression_);
         db_for_filter_ = MakeUnique<DataBlock>();
-        db_for_filter_->Init(*(shared_data_->table_ref_->column_types_));//default capacity
-        bool_column_ = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean));//default capacity
+        db_for_filter_->Init(*(shared_data_->table_ref_->column_types_));                         // default capacity
+        bool_column_ = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean)); // default capacity
     }
 }
 

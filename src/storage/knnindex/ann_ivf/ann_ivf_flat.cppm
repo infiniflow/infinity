@@ -64,15 +64,11 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *, u16, u32, u16) final {
-        Error<ExecutorException>("Unsupported search function");
-    }
+    void Search(const DistType *, u16, u32, u16) final { Error<ExecutorException>("Unsupported search function"); }
 
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final {
-        Error<ExecutorException>("Unsupported search function");
-    }
+    void Search(const DistType *, u16, u32, u16, Bitmask &) final { Error<ExecutorException>("Unsupported search function"); }
 
-    void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes) {
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticL2) {
             Error<ExecutorException>("Metric type is invalid");
@@ -130,7 +126,7 @@ public:
         }
     }
 
-    void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
         if (bitmask.IsAllTrue()) {
             Search(base_ivf, segment_id, n_probes);
             return;
@@ -148,7 +144,7 @@ public:
         }
         this->total_base_count_ += base_ivf->data_num_;
         if (n_probes == 1) {
-            Vector <u32> assign_centroid_ids(this->query_count_);
+            Vector<u32> assign_centroid_ids(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
                                                this->query_count_,
                                                this->queries_,
@@ -169,8 +165,8 @@ public:
                 }
             }
         } else {
-            Vector <DistType> centroid_dists(n_probes * this->query_count_);
-            Vector <u32> centroid_ids(n_probes * this->query_count_);
+            Vector<DistType> centroid_dists(n_probes * this->query_count_);
+            Vector<u32> centroid_ids(n_probes * this->query_count_);
             search_top_k_with_dis(n_probes,
                                   this->dimension_,
                                   this->query_count_,
@@ -182,8 +178,7 @@ public:
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0;
-                     k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
+                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -227,13 +222,10 @@ public:
         return id_array_->data() + idx * this->top_k_;
     }
 
-    [[nodiscard]] static constexpr DistType InvalidValue() {
-        return std::numeric_limits<DistType>::max();
-    }
+    [[nodiscard]] static constexpr DistType InvalidValue() { return std::numeric_limits<DistType>::max(); }
 
-    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) {
-        return a < b;
-    }
+    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) { return a < b; }
+
 private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
@@ -282,15 +274,11 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *, u16, u32, u16) final {
-        Error<ExecutorException>("Unsupported search function");
-    }
+    void Search(const DistType *, u16, u32, u16) final { Error<ExecutorException>("Unsupported search function"); }
 
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final {
-        Error<ExecutorException>("Unsupported search function");
-    }
+    void Search(const DistType *, u16, u32, u16, Bitmask &) final { Error<ExecutorException>("Unsupported search function"); }
 
-    void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes) {
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
             Error<ExecutorException>("Metric type is invalid");
@@ -348,7 +336,7 @@ public:
         }
     }
 
-    void Search(const AnnIVFFlatIndexData <DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
         if (bitmask.IsAllTrue()) {
             Search(base_ivf, segment_id, n_probes);
             return;
@@ -366,7 +354,7 @@ public:
         }
         this->total_base_count_ += base_ivf->data_num_;
         if (n_probes == 1) {
-            Vector <u32> assign_centroid_ids(this->query_count_);
+            Vector<u32> assign_centroid_ids(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
                                                this->query_count_,
                                                this->queries_,
@@ -387,8 +375,8 @@ public:
                 }
             }
         } else {
-            Vector <DistType> centroid_dists(n_probes * this->query_count_);
-            Vector <u32> centroid_ids(n_probes * this->query_count_);
+            Vector<DistType> centroid_dists(n_probes * this->query_count_);
+            Vector<u32> centroid_ids(n_probes * this->query_count_);
             search_top_k_with_dis(n_probes,
                                   this->dimension_,
                                   this->query_count_,
@@ -400,8 +388,7 @@ public:
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0;
-                     k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
+                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
                     const u32 selected_centroid = centroid_ids[k + i * n_probes];
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
@@ -444,13 +431,10 @@ public:
         return id_array_->data() + idx * this->top_k_;
     }
 
-    [[nodiscard]] static constexpr DistType InvalidValue() {
-        return std::numeric_limits<DistType>::lowest();
-    }
+    [[nodiscard]] static constexpr DistType InvalidValue() { return std::numeric_limits<DistType>::lowest(); }
 
-    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) {
-        return a > b;
-    }
+    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) { return a > b; }
+
 private:
     UniquePtr<Vector<RowID>> id_array_{};
     UniquePtr<Vector<DistType>> distance_array_{};
