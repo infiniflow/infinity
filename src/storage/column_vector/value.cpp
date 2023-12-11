@@ -14,6 +14,8 @@
 
 module;
 
+#include <algorithm>
+#include <ranges>
 import parser;
 import stl;
 import global_resource_usage;
@@ -33,266 +35,183 @@ namespace infinity {
 // Value maker
 Value Value::MakeValue(DataType type) {
     Value value(type.type(), type.type_info());
-    value.is_null_ = true;
+    return value;
+}
+
+Value Value::MakeNull() {
+    Value value(LogicalType::kNull);
+    return value;
+}
+
+Value Value::MakeInvalid() {
+    Value value(LogicalType::kInvalid);
     return value;
 }
 
 Value Value::MakeBool(BooleanT input) {
     Value value(LogicalType::kBoolean);
     value.value_.boolean = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeTinyInt(TinyIntT input) {
     Value value(LogicalType::kTinyInt);
     value.value_.tiny_int = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeSmallInt(SmallIntT input) {
     Value value(LogicalType::kSmallInt);
     value.value_.small_int = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeInt(IntegerT input) {
     Value value(LogicalType::kInteger);
     value.value_.integer = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeBigInt(BigIntT input) {
     Value value(LogicalType::kBigInt);
     value.value_.big_int = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeHugeInt(HugeIntT input) {
     Value value(LogicalType::kHugeInt);
     value.value_.huge_int = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeFloat(FloatT input) {
     Value value(LogicalType::kFloat);
     value.value_.float32 = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeDouble(DoubleT input) {
     Value value(LogicalType::kDouble);
     value.value_.float64 = input;
-    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeDecimal(DecimalT input, const SharedPtr<TypeInfo> &type_info_ptr) {
+Value Value::MakeDecimal(DecimalT input, SharedPtr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kDecimal, type_info_ptr);
     value.value_.decimal = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeVarchar(VarcharT &input) {
-    Value value(LogicalType::kVarchar);
-    if(input.IsInlined()) {
-        value.value_.varchar = input;
-    } else {
-        if(input.IsValue()) {
-            value.value_.varchar = input;
-        } else {
-            Error<StorageException>("Can't make varchar from column vector");
-        }
-    }
-    value.value_.varchar.is_value_ = true;
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeVarchar(const String &str) {
-    Value value(LogicalType::kVarchar);
-    value.value_.varchar.InitAsValue(str);
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeVarchar(const char *ptr, bool is_move) {
-    Value value(LogicalType::kVarchar);
-    value.value_.varchar.InitAsValue(ptr, is_move);
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeVarchar(const char* ptr, SizeT len) {
-    Value value(LogicalType::kVarchar);
-    value.value_.varchar.InitAsValue(ptr, len, false);
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeDate(DateT input) {
     Value value(LogicalType::kDate);
     value.value_.date = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeTime(TimeT input) {
     Value value(LogicalType::kTime);
     value.value_.time = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeDateTime(DateTimeT input) {
     Value value(LogicalType::kDateTime);
     value.value_.datetime = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeTimestamp(TimestampT input) {
     Value value(LogicalType::kTimestamp);
     value.value_.timestamp = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeInterval(IntervalT input) {
     Value value(LogicalType::kInterval);
     value.value_.interval = input;
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeArray(ArrayT input) {
-    Value value(LogicalType::kArray);
-    value.array = Move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeTuple(TupleT input) {
-    Value value(LogicalType::kTuple);
-    value.array = Move(input);
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakePoint(PointT input) {
     Value value(LogicalType::kPoint);
     value.value_.point = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeLine(LineT input) {
     Value value(LogicalType::kLine);
     value.value_.line = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeLineSegment(LineSegT input) {
     Value value(LogicalType::kLineSeg);
     value.value_.line_segment = input;
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeBox(BoxT input) {
     Value value(LogicalType::kBox);
     value.value_.box = input;
-    value.is_null_ = false;
     return value;
 }
-
-//Value Value::MakePath(PathT input) {
-//    Value value(LogicalType::kPath);
-//    value.value_.path = Move(input);
-//    value.is_null_ = false;
-//    return value;
-//}
-//
-//Value Value::MakePolygon(PolygonT input) {
-//    Value value(LogicalType::kPolygon);
-//    value.value_.polygon = Move(input);
-//    value.is_null_ = false;
-//    return value;
-//}
 
 Value Value::MakeCircle(CircleT input) {
     Value value(LogicalType::kCircle);
     value.value_.circle = input;
-    value.is_null_ = false;
     return value;
 }
-
-//Value Value::MakeBitmap(BitmapT input) {
-//    Value value(LogicalType::kBitmap);
-//    value.value_.bitmap = Move(input);
-//    value.is_null_ = false;
-//    return value;
-//}
 
 Value Value::MakeUuid(UuidT input) {
     Value value(LogicalType::kUuid);
     value.value_.uuid = Move(input);
-    value.is_null_ = false;
-    return value;
-}
-
-//Value Value::MakeBlob(BlobT input) {
-//    Value value(LogicalType::kBlob);
-//    value.value_.blob = Move(input);
-//    value.is_null_ = false;
-//    return value;
-//}
-
-Value Value::MakeEmbedding(EmbeddingDataType type, SizeT dimension) {
-    auto embedding_info_ptr = EmbeddingInfo::Make(type, dimension);
-    Value value(LogicalType::kEmbedding, embedding_info_ptr);
-    value.value_.embedding = EmbeddingT(type, dimension);
-    value.is_null_ = false;
-    return value;
-}
-
-Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
-    Value value(LogicalType::kEmbedding, Move(embedding_info));
-    value.value_.embedding = EmbeddingT(static_cast<char *>(ptr), false);
-    value.is_null_ = false;
     return value;
 }
 
 Value Value::MakeRow(RowID input) {
     Value value(LogicalType::kRowID);
     value.value_.row = input;
-    value.is_null_ = false;
     return value;
 }
 
-Value Value::MakeMixedData(MixedT input) {
-    Value value(LogicalType::kMixed);
-    value.value_.mixed_value = Move(input);
-    value.is_null_ = false;
+Value Value::MakeVarchar(const String &str) {
+    Value value(LogicalType::kVarchar);
+    value.value_info_ = MakeShared<StringValueInfo>(str);
     return value;
 }
 
-Value Value::MakeNull() {
-    Value value(LogicalType::kNull);
-    value.is_null_ = true;
+Value Value::MakeVarchar(const char *ptr, SizeT len) {
+    String tmp_str(ptr, len);
+    Value value(LogicalType::kVarchar);
+    value.value_info_ = MakeShared<StringValueInfo>(String(ptr, len));
     return value;
 }
 
-Value Value::MakeInvalid() {
-    Value value(LogicalType::kInvalid);
+Value Value::MakeVarchar(const VarcharT &input) {
+    Value value(LogicalType::kVarchar);
+    if (input.IsInlined()) {
+        String tmp_str(input.short_.data_, input.length_);
+        value.value_info_ = MakeShared<StringValueInfo>(Move(tmp_str));
+    } else if (input.IsValue()) {
+        String tmp_str(input.value_.ptr_, input.length_);
+        value.value_info_ = MakeShared<StringValueInfo>(Move(tmp_str));
+    } else {
+        throw TypeException("Value::MakeVarchar(VectorVarchar) is unsupported!");
+    }
+    return value;
+}
+
+Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        throw TypeException(Format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+    }
+    EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    SizeT len = embedding_info->Size();
+    SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
+    embedding_value_info->data_.resize(len);
+    Memcpy(embedding_value_info->data_.data(), ptr, len);
+    Value value(LogicalType::kEmbedding, type_info_ptr);
+    value.value_info_ = embedding_value_info;
     return value;
 }
 
@@ -370,14 +289,6 @@ DecimalT Value::GetValue() const {
 }
 
 template <>
-VarcharT Value::GetValue() const {
-    if (type_.type() != LogicalType::kVarchar) {
-        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
-    }
-    return value_.varchar;
-}
-
-template <>
 DateT Value::GetValue() const {
     if (type_.type() != LogicalType::kDate) {
         Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
@@ -418,14 +329,6 @@ IntervalT Value::GetValue() const {
 }
 
 template <>
-ArrayT Value::GetValue() const {
-    if (type_.type() != LogicalType::kArray) {
-        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
-    }
-    return array;
-}
-
-template <>
 PointT Value::GetValue() const {
     if (type_.type() != LogicalType::kPoint) {
         Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
@@ -457,18 +360,6 @@ BoxT Value::GetValue() const {
     return value_.box;
 }
 
-//template <>
-//PathT Value::GetValue() const {
-//    Assert<TypeException>(type_.type() == LogicalType::kPath, Format("Not matched type: {}", type_.ToString()));
-//    return value_.path;
-//}
-//
-//template <>
-//PolygonT Value::GetValue() const {
-//    Assert<TypeException>(type_.type() == LogicalType::kPolygon, Format("Not matched type: {}", type_.ToString()));
-//    return value_.polygon;
-//}
-
 template <>
 CircleT Value::GetValue() const {
     if (type_.type() != LogicalType::kCircle) {
@@ -477,32 +368,12 @@ CircleT Value::GetValue() const {
     return value_.circle;
 }
 
-//template <>
-//BitmapT Value::GetValue() const {
-//    Assert<TypeException>(type_.type() == LogicalType::kBitmap, Format("Not matched type: {}", type_.ToString()));
-//    return value_.bitmap;
-//}
-
 template <>
 UuidT Value::GetValue() const {
     if (type_.type() != LogicalType::kUuid) {
         Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
     }
     return value_.uuid;
-}
-
-//template <>
-//BlobT Value::GetValue() const {
-//    Assert<TypeException>(type_.type() == LogicalType::kBlob, Format("Not matched type: {}", type_.ToString()));
-//    return value_.blob;
-//}
-
-template <>
-EmbeddingT Value::GetValue() const {
-    if (type_.type() != LogicalType::kEmbedding) {
-        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
-    }
-    return value_.embedding;
 }
 
 template <>
@@ -513,70 +384,21 @@ RowID Value::GetValue() const {
     return value_.row;
 }
 
-template <>
-MixedT Value::GetValue() const {
-    if (type_.type() != LogicalType::kMixed) {
-        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
-    }
-    return value_.mixed_value;
-}
+Value::~Value() { GlobalResourceUsage::DecrObjectCount(); }
 
-Value::~Value() {
-    switch (type_.type()) {
-        case kVarchar: {
-            //            value_.varchar.~VarcharType();
-            value_.varchar.Reset();
-            break;
-        }
-//        case kPolygon: {
-//            //            value_.polygon.~PolygonType();
-//            value_.polygon.Reset();
-//            break;
-//        }
-//        case kPath: {
-//            //            value_.path.~PathType();
-//            value_.path.Reset();
-//            break;
-//        }
-//        case kBitmap: {
-//            //            value_.bitmap.~BitmapType();
-//            value_.bitmap.Reset();
-//            break;
-//        }
-//        case kBlob: {
-//            //            value_.blob.~BlobType();
-//            value_.blob.Reset();
-//            break;
-//        }
-        case kEmbedding: {
-            value_.embedding.Reset();
-            break;
-        }
-        case kMixed: {
-            //            value_.mixed_value.~MixedType();
-            value_.mixed_value.Reset();
-            break;
-        }
-        default: {
-        }
-    }
-    GlobalResourceUsage::DecrObjectCount();
-}
+Value::Value(const DataType &data_type) : type_(data_type) { GlobalResourceUsage::IncrObjectCount(); }
 
 Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, Move(typeinfo_ptr)) {
     GlobalResourceUsage::IncrObjectCount();
-    Init(true);
 }
 
-Value::Value(const Value &other) : type_(other.type_), is_null_(other.is_null_) {
+Value::Value(const Value &other) : type_(other.type_) {
     GlobalResourceUsage::IncrObjectCount();
-    Init(true);
     CopyUnionValue(other);
 }
 
-Value::Value(Value &&other) noexcept : type_(Move(other.type_)), is_null_(other.is_null_) {
+Value::Value(Value &&other) noexcept : type_(other.type_) {
     GlobalResourceUsage::IncrObjectCount();
-    Init(true);
     MoveUnionValue(Forward<Value>(other));
 }
 
@@ -584,163 +406,95 @@ Value &Value::operator=(const Value &other) {
     if (this == &other)
         return *this;
     this->Reset();
-    if (this->type_ != other.type_) {
-        this->type_ = other.type_;
-        this->Init(false);
-    }
-    this->is_null_ = other.is_null_;
     CopyUnionValue(other);
-
     return *this;
 }
 
 Value &Value::operator=(Value &&other) noexcept {
-    // Clear exist value, since some type need to free the allocated heap memory.
     this->Reset();
-    if (this->type_ != other.type_) {
-        this->type_ = Move(other.type_);
-        this->Init(false);
-    }
-    this->is_null_ = other.is_null_;
     MoveUnionValue(Forward<Value>(other));
-
     return *this;
 }
 
-void Value::Init(bool in_constructor) {
-    switch (type_.type()) {
+bool Value::operator==(const Value &other) const {
+    if (this->type_ != other.type_)
+        return false;
+    if (this->type_.type() == LogicalType::kInvalid)
+        return true;
+    switch (this->type_.type()) {
         case kBoolean: {
-            value_.boolean = false;
-            break;
+            return value_.boolean == other.value_.boolean;
         }
         case kTinyInt: {
-            value_.tiny_int = 0;
-            break;
+            return value_.tiny_int == other.value_.tiny_int;
         }
         case kSmallInt: {
-            value_.small_int = 0;
-            break;
+            return value_.small_int == other.value_.small_int;
         }
         case kInteger: {
-            value_.integer = 0;
-            break;
+            return value_.integer == other.value_.integer;
         }
         case kBigInt: {
-            value_.big_int = 0;
-            break;
+            return value_.big_int == other.value_.big_int;
         }
         case kHugeInt: {
-            value_.huge_int.Reset();
-            break;
+            return value_.huge_int == other.value_.huge_int;
         }
         case kFloat: {
-            value_.float32 = 0;
-            break;
+            return value_.float32 == other.value_.float32;
         }
         case kDouble: {
-            value_.float64 = 0;
-            break;
+            return value_.float64 == other.value_.float64;
         }
         case kDecimal: {
-            value_.decimal.Reset();
-            break;
-        }
-        case kVarchar: {
-            value_.varchar.value_.ptr_ = nullptr;
-            value_.varchar.length_ = 0;
-            break;
+            return value_.decimal == other.value_.decimal;
         }
         case kDate: {
-            value_.date.value = 0;
-            break;
-        }
-        case kTime: {
-            value_.time.value = 0;
-            break;
-        }
-        case kDateTime: {
-            value_.datetime.Reset();
-            break;
-        }
-        case kTimestamp: {
-            value_.timestamp.Reset();
-            break;
-        }
-        case kInterval: {
-            value_.interval.Reset();
-            break;
-        }
-        case kArray:
-        case kTuple: {
-            // empty function
-            array.clear();
-            break;
+            return value_.date == other.value_.date;
         }
         case kPoint: {
-            value_.point.Reset();
-            break;
+            return value_.point == other.value_.point;
         }
         case kLine: {
-            value_.line.Reset();
-            break;
+            return value_.line == other.value_.line;
         }
         case kLineSeg: {
-            value_.line_segment.Reset();
-            break;
+            return value_.line_segment == other.value_.line_segment;
         }
         case kBox: {
-            value_.box.Reset();
-            break;
+            return value_.box == other.value_.box;
         }
-//        case kPath: {
-//            value_.path.closed = false;
-//            value_.path.ptr = nullptr;
-//            value_.path.point_count = 0;
-//            break;
-//        }
-//        case kPolygon: {
-//            value_.polygon.point_count = 0;
-//            value_.polygon.ptr = nullptr;
-//            value_.polygon.bounding_box.Reset();
-//            break;
-//        }
         case kCircle: {
-            value_.circle.Reset();
-            break;
+            return value_.circle == other.value_.circle;
         }
-//        case kBitmap: {
-//            value_.bitmap.ptr = nullptr;
-//            value_.bitmap.count = 0;
-//            break;
-//        }
         case kUuid: {
-            value_.uuid.Reset();
-            break;
-        }
-//        case kBlob: {
-//            value_.blob.ptr = nullptr;
-//            value_.blob.size = 0;
-//            break;
-//        }
-        case kEmbedding: {
-            value_.embedding.SetNull();
-            break;
+            return value_.uuid == other.value_.uuid;
         }
         case kRowID: {
-            value_.row = -1;
+            return value_.row == other.value_.row;
         }
-        case kMixed: {
-            value_.mixed_value.Reset(in_constructor);
+        case kNull: {
+            return true;
+        }
+        case kVarchar: {
+            const String &s1 = this->value_info_->Get<StringValueInfo>().GetString();
+            const String &s2 = other.value_info_->Get<StringValueInfo>().GetString();
+            return s1 == s2;
+        }
+        case kEmbedding: {
+            const Vector<char> &data1 = this->value_info_->Get<EmbeddingValueInfo>().data_;
+            const Vector<char> &data2 = other.value_info_->Get<EmbeddingValueInfo>().data_;
+            return std::ranges::equal(data1, data2);
             break;
         }
-        case kNull:
-        case kMissing:
-        case kInvalid:
-            break;
+        default:
+            return false;
     }
+    return true;
 }
 
 void Value::CopyUnionValue(const Value &other) {
+    this->type_ = other.type_;
     switch (type_.type()) {
         case kBoolean: {
             value_.boolean = other.value_.boolean;
@@ -763,7 +517,6 @@ void Value::CopyUnionValue(const Value &other) {
             break;
         }
         case kHugeInt: {
-            // trivial copy-assignment
             value_.huge_int = other.value_.huge_int;
             break;
         }
@@ -776,127 +529,69 @@ void Value::CopyUnionValue(const Value &other) {
             break;
         }
         case kDecimal: {
-            // trivial copy-assignment
             value_.decimal = other.value_.decimal;
             break;
         }
-        case kVarchar: {
-            // Will use Varchar copy-assignment
-            value_.varchar = other.value_.varchar;
-            break;
-        }
         case kDate: {
-            // trivial copy-assignment
             value_.date = other.value_.date;
             break;
         }
         case kTime: {
-            // trivial copy-assignment
             value_.time = other.value_.time;
             break;
         }
         case kDateTime: {
-            // trivial copy-assignment
             value_.datetime = other.value_.datetime;
             break;
         }
         case kTimestamp: {
-            // trivial copy-assignment
             value_.timestamp = other.value_.timestamp;
             break;
         }
         case kInterval: {
-            // trivial copy-assignment
             value_.interval = other.value_.interval;
             break;
         }
-        case kArray:
-        case kTuple: {
-            // vector copy-assignment
-            array = other.array;
-            break;
-        }
         case kPoint: {
-            // trivial copy-assignment
             value_.point = other.value_.point;
             break;
         }
         case kLine: {
-            // trivial copy-assignment
             value_.line = other.value_.line;
             break;
         }
         case kLineSeg: {
-            // trivial copy-assignment
             value_.line_segment = other.value_.line_segment;
             break;
         }
         case kBox: {
-            // trivial copy-assignment
             value_.box = other.value_.box;
             break;
         }
-//        case kPath: {
-//            // PathT copy assignment
-//            value_.path = other.value_.path;
-//            break;
-//        }
-//        case kPolygon: {
-//            // Polygon copy assignment
-//            value_.polygon = other.value_.polygon;
-//            break;
-//        }
         case kCircle: {
-            // trivial copy-assignment
             value_.circle = other.value_.circle;
             break;
         }
-//        case kBitmap: {
-//            // bitmap copy assignment
-//            value_.bitmap = other.value_.bitmap;
-//            break;
-//        }
         case kUuid: {
-            // UUID copy assignment
             value_.uuid = other.value_.uuid;
-            break;
-        }
-//        case kBlob: {
-//            // Blob copy assignment
-//            value_.blob = other.value_.blob;
-//            break;
-//        }
-        case kEmbedding: {
-            SizeT embedding_size = type_.type_info()->Size();
-
-            if (value_.embedding.new_allocated_ && value_.embedding.ptr) {
-                delete[] value_.embedding.ptr;
-            }
-            if (other.value_.embedding.new_allocated_) {
-                const_cast<bool &>(value_.embedding.new_allocated_) = true;
-                value_.embedding.ptr = new char_t[embedding_size]{0};
-                Memcpy(value_.embedding.ptr, other.value_.embedding.ptr, embedding_size);
-            } else {
-                const_cast<bool &>(value_.embedding.new_allocated_) = false;
-                value_.embedding.ptr = other.value_.embedding.ptr;
-            }
             break;
         }
         case kRowID: {
             value_.row = other.value_.row;
             break;
         }
-        case kMixed: {
-            // Heterogeneous data copy assignment
-            value_.mixed_value = other.value_.mixed_value;
-            break;
-        }
         case kNull: {
             // No value for null value.
             break;
         }
+        case kVarchar:
+        case kEmbedding: {
+            this->value_info_ = other.value_info_;
+            break;
+        }
         case kMissing:
-        case kInvalid: {
+        case kInvalid:
+        default: {
             LOG_ERROR("Unexpected error!");
             break;
         }
@@ -904,6 +599,7 @@ void Value::CopyUnionValue(const Value &other) {
 }
 
 void Value::MoveUnionValue(Value &&other) noexcept {
+    this->type_ = Move(other.type_);
     switch (this->type_.type()) {
         case kBoolean: {
             this->value_.boolean = other.value_.boolean;
@@ -941,10 +637,6 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_.decimal = other.value_.decimal;
             break;
         }
-        case kVarchar: {
-            this->value_.varchar = Move(other.value_.varchar);
-            break;
-        }
         case kDate: {
             this->value_.date = other.value_.date;
             break;
@@ -965,11 +657,6 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_.interval = other.value_.interval;
             break;
         }
-        case kArray:
-        case kTuple: {
-            this->array = Move(other.array);
-            break;
-        }
         case kPoint: {
             this->value_.point = other.value_.point;
             break;
@@ -986,48 +673,30 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_.box = other.value_.box;
             break;
         }
-//        case kPath: {
-//            this->value_.path = Move(other.value_.path);
-//            break;
-//        }
-//        case kPolygon: {
-//            this->value_.polygon = Move(other.value_.polygon);
-//            break;
-//        }
         case kCircle: {
             this->value_.circle = other.value_.circle;
             break;
         }
-//        case kBitmap: {
-//            this->value_.bitmap = Move(other.value_.bitmap);
-//            break;
-//        }
         case kUuid: {
             this->value_.uuid = Move(other.value_.uuid);
-            break;
-        }
-//        case kBlob: {
-//            this->value_.blob = Move(other.value_.blob);
-//            break;
-//        }
-        case kEmbedding: {
-            this->value_.embedding = Move(other.value_.embedding);
             break;
         }
         case kRowID: {
             value_.row = other.value_.row;
             break;
         }
-        case kMixed: {
-            this->value_.mixed_value = Move(other.value_.mixed_value);
-            break;
-        }
         case kNull: {
             // No value for null type
             break;
         }
+        case kVarchar:
+        case kEmbedding: {
+            this->value_info_ = Move(other.value_info_);
+            break;
+        }
         case kMissing:
-        case kInvalid: {
+        case kInvalid:
+        default: {
             LOG_ERROR("Unexpected error!");
             break;
         }
@@ -1035,148 +704,8 @@ void Value::MoveUnionValue(Value &&other) noexcept {
 }
 
 void Value::Reset() {
-    switch (type_.type()) {
-        case kBoolean: {
-            value_.boolean = false;
-            break;
-        }
-        case kTinyInt: {
-            value_.tiny_int = 0;
-            break;
-        }
-        case kSmallInt: {
-            value_.small_int = 0;
-            break;
-        }
-        case kInteger: {
-            value_.integer = 0;
-            break;
-        }
-        case kBigInt: {
-            value_.big_int = 0;
-            break;
-        }
-        case kHugeInt: {
-            value_.huge_int.Reset();
-            break;
-        }
-        case kFloat: {
-            value_.float32 = 0;
-            break;
-        }
-        case kDouble: {
-            value_.float64 = 0;
-            break;
-        }
-        case kDecimal: {
-            value_.decimal.Reset();
-            break;
-        }
-        case kVarchar: {
-            value_.varchar.Reset();
-            break;
-        }
-        case kDate: {
-            value_.date.value = 0;
-            break;
-        }
-        case kTime: {
-            value_.time.value = 0;
-            break;
-        }
-        case kDateTime: {
-            value_.datetime.Reset();
-            break;
-        }
-        case kTimestamp: {
-            value_.timestamp.Reset();
-            break;
-        }
-        case kInterval: {
-            value_.interval.Reset();
-            break;
-        }
-        case kArray:
-        case kTuple: {
-            // empty function
-            array.clear();
-            break;
-        }
-        case kPoint: {
-            value_.point.Reset();
-            break;
-        }
-        case kLine: {
-            value_.line.Reset();
-            break;
-        }
-        case kLineSeg: {
-            value_.line_segment.Reset();
-            break;
-        }
-        case kBox: {
-            value_.box.Reset();
-            break;
-        }
-//        case kPath: {
-//            value_.path.Reset();
-//            break;
-//        }
-//        case kPolygon: {
-//            value_.polygon.Reset();
-//            break;
-//        }
-        case kCircle: {
-            value_.circle.Reset();
-            break;
-        }
-//        case kBitmap: {
-//            value_.bitmap.Reset();
-//            break;
-//        }
-        case kUuid: {
-            value_.uuid.Reset();
-            break;
-        }
-//        case kBlob: {
-//            value_.blob.Reset();
-//            break;
-//        }
-        case kEmbedding: {
-            if (value_.embedding.ptr != nullptr) {
-                LOG_TRACE("Need to manually reset the embedding type.");
-            }
-            break;
-        }
-        case kRowID: {
-            value_.row = -1;
-            break;
-        }
-        case kMixed: {
-            value_.mixed_value.Reset();
-            break;
-        }
-        case kNull:
-        case kMissing:
-        case kInvalid:
-            break;
-    }
-    type_.Reset();
-}
-
-bool Value::TryCastAs(const DataType &target_type, Value &new_value) const {
-    BoundCastFunc cast = CastFunction::GetBoundFunc(this->type_, target_type);
-    SharedPtr<ColumnVector> source_ptr = MakeShared<ColumnVector>(MakeShared<DataType>(this->type_));
-    source_ptr->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    source_ptr->AppendValue(*this);
-
-    SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(MakeShared<DataType>(target_type));
-    col_varchar_ptr->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-
-    CastParameters parameters;
-    cast.function(source_ptr, col_varchar_ptr, 1, parameters);
-    new_value = col_varchar_ptr->GetValue(0);
-    return true;
+    this->value_info_.reset();
+    this->type_.Reset();
 }
 
 String Value::ToString() const {
@@ -1205,97 +734,22 @@ String Value::ToString() const {
         case kDouble: {
             return ToStr(value_.float64);
         }
-        case kDecimal: {
-            Error<NotImplementException>("Decimal");
-            break;
-        }
-        case kVarchar: {
-            return value_.varchar.ToString();
-        }
         case kDate: {
             return value_.date.ToString();
-        }
-        case kTime: {
-            Error<NotImplementException>("Time");
-            break;
-        }
-        case kDateTime: {
-            Error<NotImplementException>("DateTime");
-            break;
-        }
-        case kTimestamp: {
-            Error<NotImplementException>("Timestamp");
-            break;
         }
         case kInterval: {
             return value_.interval.ToString();
         }
-        case kArray: {
-            Error<NotImplementException>("Array");
-            break;
-        }
-        case kTuple: {
-            Error<NotImplementException>("Tuple");
-            break;
-        }
-        case kPoint: {
-            Error<NotImplementException>("Point");
-            break;
-        }
-        case kLine: {
-            Error<NotImplementException>("Line");
-            break;
-        }
-        case kLineSeg: {
-            Error<NotImplementException>("Line Seg");
-            break;
-        }
-        case kBox: {
-            Error<NotImplementException>("Box");
-            break;
-        }
-//        case kPath: {
-//            Error<NotImplementException>("Path");
-//            break;
-//        }
-//        case kPolygon: {
-//            Error<NotImplementException>("Polygon");
-//            break;
-//        }
-        case kCircle: {
-            Error<NotImplementException>("Circle");
-            break;
-        }
-//        case kBitmap: {
-//            Error<NotImplementException>("Bitmap");
-//            break;
-//        }
-        case kUuid: {
-            Error<NotImplementException>("Uuid");
-            break;
-        }
-//        case kBlob: {
-//            return value_.blob.ToString();
-//        }
-        case kEmbedding: {
-            Error<NotImplementException>("Embedding");
-            break;
-        }
         case kRowID: {
             return value_.row.ToString();
         }
-        case kMixed: {
-            Error<NotImplementException>("Embedding");
-            break;
+        case kVarchar: {
+            return value_info_->Get<StringValueInfo>().GetString();
         }
-        case kNull:
-            break;
-        case kMissing:
-            break;
-        case kInvalid:
-            break;
+        default: {
+            Error<NotImplementException>(Format("Value::ToString() not inplemented for type {}", type_.ToString()));
+        }
     }
-    Error<TypeException>("Unexpected error.");
-    return String();
 }
+
 } // namespace infinity

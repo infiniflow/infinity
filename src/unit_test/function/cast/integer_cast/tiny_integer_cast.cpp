@@ -374,12 +374,11 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
         // Not all values are cast, then it's false.
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             i8 check_value = static_cast<i8>(i);
-            EXPECT_FALSE(vx.is_null());
             String check_str(ToStr(check_value));
-            EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_str.c_str());
+            Value vx = col_target->GetValue(i);
+            const String &s2 = vx.GetVarchar();
+            EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }
     }
 

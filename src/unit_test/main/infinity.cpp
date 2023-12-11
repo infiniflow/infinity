@@ -52,15 +52,8 @@ TEST_F(InfinityTest, test1) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "default");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "default");
-        }
+        const String &s2 = value.GetVarchar();
+        EXPECT_STREQ(s2.c_str(), "default");
     }
 
     {
@@ -70,26 +63,12 @@ TEST_F(InfinityTest, test1) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "db1");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "db1");
-        }
+        const String &s2 = value.GetVarchar();
+        EXPECT_STREQ(s2.c_str(), "db1");
 
         value = data_block->GetValue(0, 1);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "default");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "default");
-        }
+        const String &s3 = value.GetVarchar();
+        EXPECT_STREQ(s3.c_str(), "default");
 
         SharedPtr<Database> db1_ptr = infinity->GetDatabase("db1");
         EXPECT_EQ(db1_ptr->db_name(), "db1");
@@ -111,16 +90,8 @@ TEST_F(InfinityTest, test1) {
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "default");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "default");
-        }
-
+        const String &s4 = value.GetVarchar();
+        EXPECT_STREQ(s4.c_str(), "default");
         SharedPtr<Database> db_instance = infinity->GetDatabase("default");
     }
 
@@ -152,15 +123,8 @@ TEST_F(InfinityTest, test1) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(1, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "table1");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "table1");
-        }
+        const String &s2 = value.GetVarchar();
+        EXPECT_STREQ(s2.c_str(), "table1");
 
         SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
         EXPECT_NE(table1, nullptr);
@@ -260,26 +224,12 @@ TEST_F(InfinityTest, test1) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 2);
         Value value = data_block->GetValue(0, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "db1");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "db1");
-        }
+        const String &s2 = value.GetVarchar();
+        EXPECT_STREQ(s2.c_str(), "db1");
 
         value = data_block->GetValue(0, 1);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "default");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "default");
-        }
+        const String &s3 = value.GetVarchar();
+        EXPECT_STREQ(s3.c_str(), "default");
 
         result = infinity->Query("drop database db1");
         EXPECT_TRUE(result.IsOk());
@@ -288,16 +238,8 @@ TEST_F(InfinityTest, test1) {
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         value = data_block->GetValue(0, 0);
-        EXPECT_EQ(value.type().type(), LogicalType::kVarchar);
-        if (value.value_.varchar.IsInlined()) {
-            String prefix = String(value.value_.varchar.short_.data_, value.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), "default");
-        } else {
-            EXPECT_TRUE(value.value_.varchar.IsValue());
-            String whole_str = String(value.value_.varchar.value_.ptr_, value.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), "default");
-        }
-
+        const String &s4 = value.GetVarchar();
+        EXPECT_STREQ(s4.c_str(), "default");
         SharedPtr<Database> db_instance = infinity->GetDatabase("default");
     }
     infinity->LocalDisconnect();

@@ -129,7 +129,6 @@ TEST_F(IndexDefTest, index_def) {
     parameters1.emplace_back(new InitParameter("metric", "l2"));
 
     auto index_base_ivf = IndexIVFFlat::Make("name1", columns1, parameters1);
-
     for(auto* init_parameter: parameters1) {
         delete init_parameter;
     }
@@ -143,7 +142,6 @@ TEST_F(IndexDefTest, index_def) {
     parameters2.emplace_back(new InitParameter("ef", "200"));
 
     auto index_base_hnsw = IndexHnsw::Make("name2", columns2, parameters2);
-
     for(auto* init_parameter: parameters2) {
         delete init_parameter;
     }
@@ -153,7 +151,6 @@ TEST_F(IndexDefTest, index_def) {
     parameters3.emplace_back(new InitParameter("analyzer", "jieba"));
 
     auto index_base_ft = IndexFullText::Make("name3", columns3, parameters3);
-
     for(auto* init_parameter: parameters3) {
         delete init_parameter;
     }
@@ -162,6 +159,9 @@ TEST_F(IndexDefTest, index_def) {
     Vector<InitParameter *> parameters4;
 
     auto index_base_ft1 = IndexFullText::Make("name4", columns4, parameters4);
+    for (auto parameter : parameters4) {
+        delete parameter;
+    }
 
     auto index_def = MakeShared<IndexDef>(MakeShared<String>("index1"));
     index_def->index_array_.emplace_back(index_base_ivf);

@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/varchar.h"
 #include <sstream>
 import stl;
 import selection;
@@ -29,7 +30,6 @@ import serialize;
 import third_party;
 import logger;
 import value;
-#include "type/complex/varchar.h"
 
 module column_vector;
 
@@ -815,7 +815,9 @@ Value ColumnVector::GetValue(SizeT index) const {
             } else {
                 char *varchar_ptr = new char[varchar.length_ + 1]{0};
                 this->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr, varchar.vector_.chunk_id_, varchar.vector_.chunk_offset_, varchar.length_);
-                return Value::MakeVarchar(varchar_ptr, true);
+                Value value = Value::MakeVarchar(varchar_ptr, varchar.length_);
+                delete[] varchar_ptr;
+                return value;
             }
         }
         case kDate: {
@@ -832,9 +834,6 @@ Value ColumnVector::GetValue(SizeT index) const {
         }
         case kInterval: {
             return Value::MakeInterval(((IntervalT *)data_ptr_)[index]);
-        }
-        case kArray: {
-            return Value::MakeArray(((ArrayT *)data_ptr_)[index]);
         }
         case kTuple: {
             Error<TypeException>("Shouldn't access tuple directly, a tuple is flatten as many columns");
@@ -871,9 +870,6 @@ Value ColumnVector::GetValue(SizeT index) const {
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
-        }
-        case kMixed: {
-            return Value::MakeMixedData(((MixedT *)data_ptr_)[index]);
         }
         default: {
             Error<TypeException>("Attempt to access an unaccepted type");
@@ -941,28 +937,6 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             ((DecimalT *)data_ptr_)[index] = value.GetValue<DecimalT>();
             break;
         }
-        case kVarchar: {
-            // Copy string
-            const VarcharT &src_ref = value.value_.varchar;
-            if (!src_ref.IsValue()) {
-                Error<StorageException>("Only can set value not column vector here.");
-            }
-
-            u64 varchar_len = src_ref.length_;
-            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
-            target_ref.is_value_ = false;
-            target_ref.length_ = varchar_len;
-            if (src_ref.IsInlined()) {
-                // Only prefix is enough to contain all string data.
-                Memcpy(target_ref.short_.data_, src_ref.short_.data_, varchar_len);
-            } else {
-                Memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
-                target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_offset;
-            }
-            break;
-        }
         case kDate: {
             ((DateT *)data_ptr_)[index] = value.GetValue<DateT>();
             break;
@@ -1022,17 +996,38 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
             //        case kBlob: {
             //        }
-        case kEmbedding: {
-            ptr_t ptr = data_ptr_ + index * data_type_->Size();
-            Memcpy(ptr, value.value_.embedding.ptr, data_type_->Size());
-            break;
-        }
         case kRowID: {
             ((RowID *)data_ptr_)[index] = value.GetValue<RowID>();
             break;
         }
-        case kMixed: {
-            ((MixedT *)data_ptr_)[index] = value.GetValue<MixedT>();
+        case kVarchar: {
+            // Copy string
+            const String &src_str = value.GetVarchar();
+            u64 varchar_len = src_str.size();
+            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
+            target_ref.is_value_ = false;
+            target_ref.length_ = varchar_len;
+            if (varchar_len <= VARCHAR_INLINE_LENGTH) {
+                // Only prefix is enough to contain all string data.
+                Memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
+            } else {
+                Memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
+                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_str.c_str(), varchar_len);
+                target_ref.vector_.chunk_id_ = chunk_id;
+                target_ref.vector_.chunk_offset_ = chunk_offset;
+            }
+            break;
+        }
+        case kEmbedding: {
+            const_ptr_t src_ptr;
+            SizeT src_size;
+            std::tie(src_ptr, src_size) = value.GetEmbedding();
+            if (src_size != data_type_->Size()) {
+                Error<TypeException>(
+                    Format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
+            }
+            ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
+            Memcpy(dst_ptr, src_ptr, src_size);
             break;
         }
         default: {

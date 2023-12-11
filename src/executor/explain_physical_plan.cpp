@@ -1186,31 +1186,31 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalTop *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalTop *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     Error<NotImplementException>("Not implemented");
 }
 

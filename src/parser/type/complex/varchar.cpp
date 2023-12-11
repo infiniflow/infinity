@@ -243,7 +243,7 @@ void Varchar::DeepCopy(const Varchar &other) {
         this->length_ = other.length_;
         memcpy(this->value_.prefix_, other.value_.prefix_, VARCHAR_PREFIX_LENGTH);
 
-        this->value_.ptr_ = new char[this->length_]{0};
+        this->value_.ptr_ = new char[this->length_];
 
         memcpy(value_.ptr_, other.value_.ptr_, this->length_);
     }
@@ -277,14 +277,13 @@ void Varchar::InitAsValue(const char *input_ptr, size_t input_len, bool is_move)
             delete input_ptr;
         }
     } else {
+        memcpy(value_.prefix_, input_ptr, VARCHAR_PREFIX_LENGTH);
         if (is_move) {
             value_.ptr_ = const_cast<char *>(input_ptr);
         } else {
-            value_.ptr_ = new char[input_len]{0};
+            value_.ptr_ = new char[input_len];
+            memcpy(value_.ptr_, input_ptr, input_len);
         }
-
-        memcpy(value_.prefix_, input_ptr, VARCHAR_PREFIX_LENGTH);
-        memcpy(value_.ptr_, input_ptr, input_len);
     }
 }
 

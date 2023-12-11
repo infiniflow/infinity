@@ -266,7 +266,8 @@ void PhysicalSort::Sort(const SharedPtr<DataTable> &order_by_table, const Vector
     output_ = GenerateOutput(input_table_, rowid_vector);
 }
 
-SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector) {
+SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &, const SharedPtr<Vector<RowID>> &) {
+#if 0
     // output table definition is same as input
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
@@ -290,7 +291,6 @@ SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &in
 
     //    SizeT vector_count = rowid_vector->size();
     SizeT vector_idx = 0;
-#if 0
     SizeT block_count = input_table->data_blocks_.size();
     for(SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<DataBlock> output_datablock = DataBlock::Make();
