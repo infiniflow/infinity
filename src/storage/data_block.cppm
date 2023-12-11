@@ -55,6 +55,9 @@ public:
     // Reset to just initialized state.
     void Reset();
 
+    //TODO: May cause error when capacity is larger than the originally allocated size
+    void Reset(SizeT capacity);
+
     [[nodiscard]] Value GetValue(SizeT column_index, SizeT row_index) const;
 
     void SetValue(SizeT column_index, SizeT row_index, const Value &val);

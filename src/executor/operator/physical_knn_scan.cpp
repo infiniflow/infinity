@@ -73,21 +73,21 @@ module physical_knn_scan;
 
 namespace infinity {
 
-    void ReadDataBlock(DataBlock &output, BufferManager *buffer_mgr, const auto row_count,
+    void ReadDataBlock(DataBlock *output, BufferManager *buffer_mgr, const auto row_count,
                        const BlockEntry *current_block_entry, const Vector <SizeT> &column_ids) {
         auto block_id = current_block_entry->block_id_;
         auto segment_id = current_block_entry->segment_entry_->segment_id_;
         for (SizeT output_column_id = 0; auto column_id: column_ids) {
             if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
                 u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-                output.column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), row_count);
+                output->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), row_count);
             } else {
                 ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(
                         current_block_entry->columns_[column_id].get(), buffer_mgr);
-                output.column_vectors[output_column_id++]->AppendWith(column_buffer, 0, row_count);
+                output->column_vectors[output_column_id++]->AppendWith(column_buffer, 0, row_count);
             }
         }
-        output.Finalize();
+        output->Finalize();
     }
 
     void merge_into_bitmask(const u8 *__restrict input_bool_column, const SharedPtr <Bitmask> &input_null_mask,
@@ -137,7 +137,7 @@ namespace infinity {
         }
     }
 
-void PhysicalKnnScan::Init() {}
+    void PhysicalKnnScan::Init() {}
 
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
@@ -255,19 +255,20 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         Bitmask bitmask;
         bitmask.Initialize(std::bit_ceil(row_count));
         if (filter_expression_) {
+            auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
+            auto &filter_state_ = knn_scan_function_data->filter_state_;
+            auto &bool_column = knn_scan_function_data->bool_column_;
             //filter and build bitmask, if filter_expression_ != nullptr
-            DataBlock db_for_filter;
-            db_for_filter.Init(*(base_table_ref_->column_types_), row_count);
+            db_for_filter->Reset(row_count);
             ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-            auto filter_state = ExpressionState::CreateState(filter_expression_);
-            auto bool_column = MakeShared<ColumnVector>(MakeShared<infinity::DataType>(LogicalType::kBoolean));
-            bool_column->Initialize();
+            bool_column->Initialize(ColumnVectorType::kFlat, row_count);
             ExpressionEvaluator expr_evaluator;
-            expr_evaluator.Init(&db_for_filter);
-            expr_evaluator.Execute(filter_expression_, filter_state, bool_column);
+            expr_evaluator.Init(db_for_filter);
+            expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
             const auto *bool_column_ptr = (const u8 *) (bool_column->data());
             SharedPtr <Bitmask> &null_mask = bool_column->nulls_ptr_;
             merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
+            bool_column->Reset();
         }
         bool use_bitmask = !bitmask.IsAllTrue();
 
@@ -310,23 +311,22 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         bitmask.Initialize(std::bit_ceil(segment_row_count));
         if (filter_expression_) {
             SizeT segment_row_count_real = 0;
+            auto db_for_filter = knn_scan_function_data->db_for_filter_.get();
+            auto &filter_state_ = knn_scan_function_data->filter_state_;
+            auto &bool_column = knn_scan_function_data->bool_column_;
             //filter and build bitmask, if filter_expression_ != nullptr
-            auto filter_state = ExpressionState::CreateState(filter_expression_);
-            DataBlock db_for_filter;
-            auto bool_column = MakeShared<ColumnVector>(MakeShared<infinity::DataType>(LogicalType::kBoolean));
-            bool_column->Initialize();
             ExpressionEvaluator expr_evaluator;
             for (auto &block_entry: segment_entry->block_entries_) {
                 auto row_count = block_entry->row_count_;
-                db_for_filter.Init(*(base_table_ref_->column_types_), row_count);
+                db_for_filter->Reset(row_count);
                 ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry.get(), base_table_ref_->column_ids_);
-                expr_evaluator.Init(&db_for_filter);
-                expr_evaluator.Execute(filter_expression_, filter_state, bool_column);
+                bool_column->Initialize(ColumnVectorType::kFlat, row_count);
+                expr_evaluator.Init(db_for_filter);
+                expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
                 const auto *bool_column_ptr = (const u8 *) (bool_column->data());
                 SharedPtr <Bitmask> &null_mask = bool_column->nulls_ptr_;
                 merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true, segment_row_count_real);
                 segment_row_count_real += row_count;
-                db_for_filter.UnInit();
                 bool_column->Reset();
             }
             if (segment_row_count_real != segment_row_count) {

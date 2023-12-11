@@ -134,6 +134,20 @@ void DataBlock::Reset() {
     row_count_ = 0;
 }
 
+//TODO: May cause error when capacity is larger than the originally allocated size
+//TODO: Initialize() parameter may not be ColumnVectorType::kFlat ?
+void DataBlock::Reset(SizeT capacity) {
+    // Reset behavior:
+    // Reset each column into just initialized status.
+    // No data is appended into any column.
+    for (SizeT i = 0; i < column_count_; ++i) {
+        column_vectors[i]->Reset();
+        column_vectors[i]->Initialize(ColumnVectorType::kFlat, capacity);
+    }
+    row_count_ = 0;
+    capacity_ = capacity;
+}
+
 Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return column_vectors[column_index]->GetValue(row_index); }
 
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
