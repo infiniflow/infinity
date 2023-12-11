@@ -120,13 +120,13 @@ void BuiltinFunctions::RegisterTableFunction() {
 
 void BuiltinFunctions::RegisterSpecialFunction() {
 
-    SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1);
+    SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
 
-    SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("CREATE_TS", DataType(LogicalType::kBigInt), 2);
+    SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("CREATE_TS", DataType(LogicalType::kBigInt), 2, SpecialType::kCreateTs);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), create_ts_function);
 
-    SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("DELETE_TS", DataType(LogicalType::kBigInt), 3);
+    SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("DELETE_TS", DataType(LogicalType::kBigInt), 3, SpecialType::kDeleteTs);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
 
 }

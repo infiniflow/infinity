@@ -17,6 +17,7 @@ module;
 import column_binding;
 import base_expression;
 import parser;
+import special_function;
 import stl;
 
 export module column_expression;
@@ -25,13 +26,24 @@ namespace infinity {
 
 export class ColumnExpression final : public BaseExpression {
 public:
-    static inline SharedPtr<ColumnExpression>
-    Make(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth, bool special = false) {
+    static inline SharedPtr<ColumnExpression> Make(DataType data_type,
+                                                   String table_name,
+                                                   u64 table_index,
+                                                   String column_name,
+                                                   i64 column_index,
+                                                   i64 depth,
+                                                   Optional<SpecialType> special = None) {
         return MakeShared<ColumnExpression>(Move(data_type), Move(table_name), table_index, Move(column_name), column_index, depth, special);
     }
 
 public:
-    ColumnExpression(DataType data_type, String table_name, u64 table_index, String column_name, i64 column_index, i64 depth, bool special = false);
+    ColumnExpression(DataType data_type,
+                     String table_name,
+                     u64 table_index,
+                     String column_name,
+                     i64 column_index,
+                     i64 depth,
+                     Optional<SpecialType> special = None);
 
     inline DataType Type() const override { return data_type_; };
 
@@ -57,7 +69,7 @@ public:
 
     inline i64 depth() const { return depth_; }
 
-    inline bool special() const { return special_; }
+    inline Optional<SpecialType> special() const { return special_; }
 
 private:
     String ToString() const final;
@@ -73,7 +85,7 @@ private:
 
     i64 depth_{};
 
-    bool special_{false};
+    Optional<SpecialType> special_{None};
 };
 
 } // namespace infinity

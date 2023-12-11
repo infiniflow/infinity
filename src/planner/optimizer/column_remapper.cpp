@@ -20,6 +20,7 @@ import stl;
 import base_expression;
 import column_expression;
 import reference_expression;
+import special_function;
 import third_party;
 import logger;
 
@@ -52,8 +53,20 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
 }
 
 SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
-    if(expression->special()) {
-        return expression;
+    auto special = expression->special();
+    if (special.has_value()) {
+        switch (special.value()) {
+            case SpecialType::kRowID: {
+                return ReferenceExpression::Make(expression->Type(),
+                                                 expression->table_name(),
+                                                 expression->column_name(),
+                                                 expression->alias_,
+                                                 bindings_.size());
+            }
+            default: {
+                LOG_ERROR(Format("Unknown special function: {}", expression->Name()));
+            }
+        }
     }
 
     SizeT binding_count = bindings_.size();

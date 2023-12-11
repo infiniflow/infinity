@@ -75,6 +75,8 @@ public:
 
     //    SharedPtr<PlanBuilder> plan_builder_ptr_;
 protected:
+    Optional<SharedPtr<BaseExpression>> TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth);
+
     QueryContext *query_context_{};
 };
 
