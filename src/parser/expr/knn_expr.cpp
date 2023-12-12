@@ -26,39 +26,39 @@ KnnExpr::~KnnExpr() {
     if (embedding_data_ptr_ != nullptr) {
         switch (embedding_data_type_) {
             case EmbeddingDataType::kElemDouble: {
-                double *data_ptr = static_cast<double *>(embedding_data_ptr_);
+                double *data_ptr = reinterpret_cast<double *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemFloat: {
-                float *data_ptr = static_cast<float *>(embedding_data_ptr_);
+                float *data_ptr = reinterpret_cast<float *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemBit:
             case EmbeddingDataType::kElemInt8: {
-                int8_t *data_ptr = static_cast<int8_t *>(embedding_data_ptr_);
+                int8_t *data_ptr = reinterpret_cast<int8_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemInt16: {
-                int16_t *data_ptr = static_cast<int16_t *>(embedding_data_ptr_);
+                int16_t *data_ptr = reinterpret_cast<int16_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemInt32: {
-                int32_t *data_ptr = static_cast<int32_t *>(embedding_data_ptr_);
+                int32_t *data_ptr = reinterpret_cast<int32_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemInt64: {
-                int64_t *data_ptr = static_cast<int64_t *>(embedding_data_ptr_);
+                int64_t *data_ptr = reinterpret_cast<int64_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }
             case EmbeddingDataType::kElemInvalid: {
                 //                LOG_CRITICAL("Unexpected embedding data type")
-                int8_t *data_ptr = static_cast<int8_t *>(embedding_data_ptr_);
+                int8_t *data_ptr = reinterpret_cast<int8_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
                 break;
             }

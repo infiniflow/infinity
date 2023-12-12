@@ -33,6 +33,7 @@ import parser;
 import profiler;
 import local_file_system;
 import third_party;
+import defer_op;
 
 import query_options;
 import query_result;
@@ -129,6 +130,11 @@ int main() {
         size_t query_count;
         size_t dimension = 128;
         const float *queries = nullptr;
+        DeferFn defer_fn([&]() {
+            if(queries != nullptr) {
+                delete[] queries;
+            }
+        });
         {
             size_t dim = -1;
             queries = const_cast<const float *>(fvecs_read(sift_query_path.c_str(), &dim, &query_count));
@@ -170,21 +176,27 @@ int main() {
         }
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
-            SearchExpr *search_expr = new SearchExpr();
+
+        int64_t topk = 100;
+        for (size_t query_idx = 0; query_idx < 1; ++query_idx) {
+
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
             knn_expr->distance_type_ = KnnDistanceType::kL2;
-            knn_expr->topn_ = 100;
+            knn_expr->topn_ = topk;
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
-            knn_expr->embedding_data_ptr_ = new float[dimension];
+            float* embedding_data_ptr = new float[dimension];
+            knn_expr->embedding_data_ptr_ = reinterpret_cast<char*>(embedding_data_ptr);
             char* src_ptr = (char*)queries + query_idx * dimension * sizeof(float);
             memmove((char*)(knn_expr->embedding_data_ptr_), src_ptr, dimension * sizeof(float));
 
             ColumnExpr* column_expr = new ColumnExpr();
             column_expr->names_.emplace_back("col1");
             knn_expr->column_expr_ = column_expr;
-            search_expr->knn_exprs_.emplace_back(knn_expr);
+            std::vector<ParsedExpr *> *exprs = new std::vector<ParsedExpr *>();
+            exprs->emplace_back(knn_expr);
+            SearchExpr *search_expr = new SearchExpr();
+            search_expr->SetExprs(exprs);
 
             std::shared_ptr<Database> data_base = infinity->GetDatabase("default");
             std::shared_ptr<Table> table = data_base->GetTable("knn_benchmark");
@@ -203,9 +215,10 @@ int main() {
                 std::cout << Format("{}: cost {}", query_idx + 1, profiler.ElapsedToString()) << std::endl;
             }
 
-            if(result.ResultTable()->row_count() != knn_expr->topn_) {
+            if(result.ResultTable()->row_count() != topk) {
                 std::cout << "Result row count: " << result.ResultTable()->row_count() << std::endl;
             }
+
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];
@@ -216,7 +229,8 @@ int main() {
                 }
             }
 
-            delete[] (float*)(knn_expr->embedding_data_ptr_);
+            delete[] embedding_data_ptr;
+            knn_expr->embedding_data_ptr_ = nullptr;
         }
         profiler.End();
         results.push_back(Format("Total cost= : {}", profiler.ElapsedToString()));

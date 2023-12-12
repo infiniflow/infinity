@@ -159,7 +159,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
         query_result.status_.Init(ErrorCode::kError, e.what());
-
     }
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
