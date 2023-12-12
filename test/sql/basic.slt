@@ -35,9 +35,9 @@ SELECT N_NATIONKEY FROM NATION;
 query I
 SELECT N_NATIONKEY, ROW_ID() FROM NATION;
 ----
-0 0:0
-1 0:1
-2 0:2
+0 0
+1 1
+2 2
 
 # Clean up
 statement ok

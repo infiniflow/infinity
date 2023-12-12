@@ -31,9 +31,9 @@ SELECT c2 FROM test_knn_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3
 query II
 SELECT c1, ROW_ID() FROM test_knn_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
 ----
-8 0:3
-6 0:2
-4 0:1
+8 3
+6 2
+4 1
 
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge

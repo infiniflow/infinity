@@ -26,9 +26,9 @@ Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<
 query TTT
 SELECT doctitle, docdate, ROW_ID() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3');
 ----
-Avicenna 29-APR-2012 07:47:29.000 0:9893
-Alkali metal 30-APR-2012 05:35:44.000 0:2681
-Atom 20-APR-2012 03:53:14.000 0:7207
+Avicenna 29-APR-2012 07:47:29.000 9893
+Alkali metal 30-APR-2012 05:35:44.000 2681
+Atom 20-APR-2012 03:53:14.000 7207
 
 query TTT
 SELECT doctitle, docdate, body FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), FUSION('rrf');
@@ -50,12 +50,12 @@ Astronomer 17-APR-2012 19:09:32.000  York]]|ref=harv|postscript=<!--None-->|isbn
 query TTT
 SELECT doctitle, docdate, ROW_ID() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH('doctitle^2,body^5', 'society', 'topn=3'), FUSION('rrf');
 ----
-Avicenna 29-APR-2012 07:47:29.000 0:9893
-Anarcho-capitalism 24-APR-2012 15:46:17.000 0:8781
-Alkali metal 30-APR-2012 05:35:44.000 0:2681
-Alvin Toffler 25-APR-2012 18:37:38.000 0:7533
-Atom 20-APR-2012 03:53:14.000 0:7207
-Astronomer 17-APR-2012 19:09:32.000 0:1326
+Avicenna 29-APR-2012 07:47:29.000 9893
+Anarcho-capitalism 24-APR-2012 15:46:17.000 8781
+Alkali metal 30-APR-2012 05:35:44.000 2681
+Alvin Toffler 25-APR-2012 18:37:38.000 7533
+Atom 20-APR-2012 03:53:14.000 7207
+Astronomer 17-APR-2012 19:09:32.000 1326
 
 # Clean up
 statement ok
