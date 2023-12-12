@@ -10,7 +10,7 @@ from infinity.remote_thrift.table import RemoteTable
 
 def query():
     thread_num = 1
-    total_times = 10000
+    total_times = 1000
 
     print(">>> Query Benchmark Start <<<")
     print(f"Thread Num: {thread_num}, Times: {total_times}")

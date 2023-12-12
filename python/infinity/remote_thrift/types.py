@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import struct
-from typing import Any, Dict
+from collections import defaultdict
+from typing import Any
 
 import pandas as pd
 from numpy import dtype
@@ -152,28 +153,21 @@ def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> tty
 
 
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
-    data_dict: Dict[str, list[Any, ...]] = {}
-    column_names = []
-    types = []
-    # print('received response with {} column defs and {} column fields'.format(len(
-    #     res.column_defs), len(res.column_fields)))
-    for i in range(len(res.column_defs)):
-        column_def = res.column_defs[i]
-        column_names.append(column_def.name)
-        types.append(logic_type_to_dtype(column_def.data_type))
-        # print()
-        # print(column_def.id)
-        column_field = res.column_fields[i]
+    data_dict = {}
+    column_counter = defaultdict(int)
+    for column_def, column_field in zip(res.column_defs, res.column_fields):
+        original_column_name = column_def.name
+        column_counter[original_column_name] += 1
+        column_name = f"{original_column_name}_{column_counter[original_column_name]}" \
+            if column_counter[original_column_name] > 1 \
+            else original_column_name
+
         column_type = column_field.column_type
         column_data_type = column_def.data_type
         column_vectors = column_field.column_vectors
-        data_dict[column_def.name] = column_vector_to_list(
-            column_type, column_data_type, column_vectors)
 
-    type_dict = dict(zip(column_names, types))
-    # print()
-    # print(data_dict)
-    # print(type_dict)
-    # print()
-    # print(pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict))
-    return pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict)
+        data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
+        data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
+        data_dict[column_name] = data_series
+
+    return pd.DataFrame.from_dict(data_dict, orient='columns')

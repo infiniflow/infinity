@@ -386,6 +386,9 @@ class TestSelect:
             "c1": "int", "c2": "int"}, None)
 
         table_obj = db_obj.get_table("test_select_same_output")
+        table_obj.insert([{"c1": 1, "c2": 2}])
+        print()
         res = table_obj.query_builder().output(["c1", "c2"]).to_df()
+        print(res)
         res = table_obj.query_builder().output(["c1", "c1"]).to_df()
         print(res)
