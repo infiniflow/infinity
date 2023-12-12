@@ -33,7 +33,9 @@ export struct IntegerTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() != target.type(), Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    if (source.type() == target.type()) {
+        Error<FunctionException>("Can't cast from the same type");
+    }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, TinyIntT, IntegerTryCastToFixlen>);
@@ -144,7 +146,9 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length_ = static_cast<u32>(tmp_str.size());
-    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    if (target.length_ > VARCHAR_INLINE_LEN) {
+        Error<TypeException>("Integer digits number should less than 14.");
+    }
     Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
@@ -209,7 +213,9 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length_ = static_cast<u32>(tmp_str.size());
-    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    if (target.length_ > VARCHAR_INLINE_LEN) {
+        Error<TypeException>("Integer digits number should less than 14.");
+    }
     Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
@@ -277,7 +283,9 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
     // TODO: High performance itoa needed here.
     String tmp_str = ToStr(source);
     target.length_ = static_cast<u32>(tmp_str.size());
-    Assert<TypeException>(target.length_ <= VARCHAR_INLINE_LEN, "Integer digits number should less than 14.");
+    if (target.length_ > VARCHAR_INLINE_LEN) {
+        Error<TypeException>("Integer digits number should less than 14.");
+    }
     Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
@@ -352,7 +360,9 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
         Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
         Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer. ");
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+        }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
         target.vector_.chunk_offset_ = chunk_offset;

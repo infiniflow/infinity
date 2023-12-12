@@ -79,7 +79,9 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
         BufferObj *buffer_obj1 = nullptr;
         if (gc_queue_.TryDequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
-                Assert<StorageException>(buffer_obj1->status() == BufferStatus::kFreed, "Bug.");
+                if (buffer_obj1->status() != BufferStatus::kFreed) {
+                    Error<StorageException>("Bug.");
+                }
                 // prevent dead lock
                 continue;
             }

@@ -66,7 +66,9 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
     if (!fusion_operator_state->input_complete_) {
         return false;
     }
-    Assert<ExecutorException>(0 == fusion_expr_->method_.compare("rrf"), Format("Fusion method {} is not implemented.", fusion_expr_->method_));
+    if ( fusion_expr_->method_.compare("rrf") != 0) {
+        throw ExecutorException(Format("Fusion method {} is not implemented.", fusion_expr_->method_));
+    }
     SizeT rank_constant = 60;
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("rank_constant"); it != fusion_expr_->options_->options_.end()) {
@@ -86,9 +88,9 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         fragment_ids.push_back(fragment_id);
         SizeT base_rank = 1;
         for (UniquePtr<DataBlock> &input_data_block : input_blocks) {
-            Assert<ExecutorException>(
-                input_data_block->column_count() == GetOutputTypes()->size(),
-                Format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), GetOutputTypes()->size()));
+            if (input_data_block->column_count() != GetOutputTypes()->size()) {
+                Error<ExecutorException>(Format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), GetOutputTypes()->size()));
+            }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
             SizeT row_n = input_data_block->row_count();
@@ -141,7 +143,9 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         }
         u64 fragment_id = fragment_ids[fragment_idx];
         auto &input_blocks = fusion_operator_state->input_data_blocks_[fragment_id];
-        Assert<ExecutorException>(input_blocks.size() > 0, Format("input_data_blocks_[{}] is empty.", fragment_id));
+        if (input_blocks.size() == 0) {
+            throw ExecutorException(Format("input_data_blocks_[{}] is empty.", fragment_id));
+        }
         SizeT block_idx = 0;
         SizeT row_idx = doc.ranks[fragment_idx] - 1;
         while (row_idx >= input_blocks[block_idx]->row_count()) {

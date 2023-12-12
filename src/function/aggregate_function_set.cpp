@@ -77,8 +77,9 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 }
 
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
-
-    Assert<ExecutorException>(argument.get() != nullptr, "Argument is NULL");
+    if (argument.get() == nullptr) {
+        Error<ExecutorException>("Argument is NULL");
+    }
 
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());
 

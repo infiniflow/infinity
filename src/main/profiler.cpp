@@ -46,13 +46,13 @@ NanoSeconds BaseProfiler::ElapsedInternal() const {
     return ElapsedFromStart(now, begin_ts_);
 }
 
-String BaseProfiler::ElapsedToString(NanoSeconds duration) {
+String BaseProfiler::ElapsedToString(NanoSeconds duration, i64 scale) {
     String result;
-    if (duration.count() <= 1000) {
+    if (duration.count() <= 1000 * scale) {
         result.append(Format("{}ns", duration.count()));
-    } else if (duration.count() <= 1000 * 1000) {
+    } else if (duration.count() <= 1000 * 1000 * scale) {
         result.append(Format("{}us", ChronoCast<MicroSeconds>(duration).count()));
-    } else if (duration.count() <= 1000 * 1000 * 1000) {
+    } else if (duration.count() <= 1000 * 1000 * 1000 * scale) {
         result.append(Format("{}ms", ChronoCast<MilliSeconds>(duration).count()));
     } else {
         result.append(Format("{}s", ChronoCast<Seconds>(duration).count()));
@@ -60,8 +60,8 @@ String BaseProfiler::ElapsedToString(NanoSeconds duration) {
     return result;
 }
 
-String BaseProfiler::ElapsedToString() const {
-    return ElapsedToString(this->ElapsedInternal());
+String BaseProfiler::ElapsedToString(i64 scale) const {
+    return ElapsedToString(this->ElapsedInternal(), scale);
 }
 
 void OptimizerProfiler::StartRule(const String &rule_name) {

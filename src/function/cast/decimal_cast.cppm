@@ -33,8 +33,9 @@ export struct DecimalTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
-    Assert<FunctionException>(source.type() != target.type(),
-                              Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    if (source.type() == target.type()) {
+        Error<FunctionException>("Can't cast from the same type");
+    }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             Error<FunctionException>("Not implemented");

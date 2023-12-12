@@ -39,7 +39,9 @@ const_ptr_t ColumnBuffer::GetAll() {
 }
 
 Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
+    if (outline_buffer_.get() == nullptr) {
+        Error<StorageException>("Cannot get one element of an inline column");
+    }
     auto varchar_layout = reinterpret_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -58,8 +60,10 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     return {ptr, varchar_layout->length_};
 }
 
-Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
+Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {\
+    if (outline_buffer_.get() == nullptr) {
+        Error<StorageException>("Cannot get one element of an inline column");
+    }
     auto varchar_layout = static_cast<const VarcharLayout *>(inline_col_.GetData()) + row_idx;
     if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         const_ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -102,7 +106,9 @@ ptr_t ColumnBuffer::GetAllMut() {
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get one element of an inline column");
+    if (outline_buffer_.get() == nullptr) {
+        Error<StorageException>("Cannot get one element of an inline column");
+    }
     auto varchar_layout = reinterpret_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
     if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();
@@ -122,7 +128,9 @@ Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
 }
 
 Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtMut(SizeT row_idx) {
-    Assert<StorageException>(outline_buffer_.get() != nullptr, "Cannot get prefix of one element of an inline column");
+    if (outline_buffer_.get() == nullptr) {
+        Error<StorageException>("Cannot get one element of an inline column");
+    }
     auto varchar_layout = static_cast<VarcharLayout *>(inline_col_.GetDataMut()) + row_idx;
     if (varchar_layout->length_ <= VARCHAR_INLINE_LEN) {
         ptr_t ptr = varchar_layout->u.short_info_.data.data();

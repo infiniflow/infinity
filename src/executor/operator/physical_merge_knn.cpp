@@ -87,12 +87,16 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     auto &merge_knn_data = *merge_knn_state->merge_knn_function_data_;
 
     auto &input_data = *merge_knn_state->input_data_block_;
-    Assert<ExecutorException>(input_data.Finalized(), "data should finalized here.");
+    if (!input_data.Finalized()) {
+        Error<ExecutorException>("Input data block is not finalized");
+    }
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
-    Assert<ExecutorException>(column_n >= 0, "Error. The input data block is invalid");
+    if (column_n < 0) {
+        Error<ExecutorException>("Input data block is invalid");
+    }
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
 

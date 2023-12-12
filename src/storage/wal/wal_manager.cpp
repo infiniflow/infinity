@@ -212,7 +212,9 @@ void WalManager::Flush() {
         auto [max_commit_ts, wal_size] = GetWalState();
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
-            Assert<StorageException>(!entry->cmds.empty(), Format("WalEntry of txn_id {} commands is empty", entry->txn_id));
+            if (entry->cmds.empty()) {
+                Error<StorageException>(Format("WalEntry of txn_id {} commands is empty", entry->txn_id));
+            }
             int32_t exp_size = entry->GetSizeInBytes();
             Vector<char> buf(exp_size);
             char *ptr = buf.data();
@@ -527,8 +529,9 @@ i64 WalManager::ReplayWalFile() {
     }
 
     for (; replay_count < replay_entries.size(); ++replay_count) {
-        Assert<StorageException>(replay_entries[replay_count]->commit_ts > max_commit_ts,
-                                 "Wal Replay: Commit ts should be greater than max commit ts");
+        if (replay_entries[replay_count]->commit_ts <= max_commit_ts) {
+            Error<StorageException>("Wal Replay: Commit ts should be greater than max commit ts");
+        }
         system_start_ts = replay_entries[replay_count]->commit_ts;
         last_txn_id = replay_entries[replay_count]->txn_id;
         if (replay_entries[replay_count]->IsCheckPoint()) {

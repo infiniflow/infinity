@@ -40,7 +40,9 @@ public:
                 Error<TypeException>("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
-                Assert<TypeException>(result->vector_type() == ColumnVectorType::kFlat, "Target vector type isn't flat.");
+                if (result->vector_type() != ColumnVectorType::kFlat) {
+                    Error<TypeException>("Target vector type isn't flat.");
+                }
                 if (nullable) {
                     ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr);
 
@@ -52,7 +54,9 @@ public:
                 return;
             }
             case ColumnVectorType::kConstant: {
-                Assert<TypeException>(count == 1, "Attempting to execute more than one row of the constant column vector.");
+                if (count != 1) {
+                    Error<TypeException>("Attempting to execute more than one row of the constant column vector.");
+                }
                 if (nullable) {
                     if (input->nulls_ptr_->IsAllTrue()) {
                         result_null->SetAllTrue();

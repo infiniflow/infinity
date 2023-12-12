@@ -58,7 +58,9 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
         SharedPtr<IndexBase> &index_base = index_def->index_array_[idx];
 
         // Get column info
-        Assert<StorageException>(index_base->column_names_.size() == 1, "Currently, composite index doesn't supported.");
+        if (index_base->column_names_.size() != 1) {
+            Error<StorageException>("Currently, composite index doesn't supported.");
+        }
         u64 column_id = TableIndexMeta::GetTableCollectionEntry(table_index_meta)->GetColumnIdByName(index_base->column_names_[0]);
         if (index_base->index_type_ == IndexType::kIRSFullText) {
             index_info_map.emplace(column_id, std::static_pointer_cast<IndexFullText>(index_base));

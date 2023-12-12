@@ -169,7 +169,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         }
         case ExpressionType::kCase: {
             auto case_expression = static_pointer_cast<CaseExpression>(expression);
-            Assert<PlannerException>(case_expression->arguments().empty(), "Case expression shouldn't have arguments");
+            if (!case_expression->arguments().empty()) {
+                Error<PlannerException>("Case expression shouldn't have arguments");
+            }
             for (auto &case_expr : case_expression->CaseExpr()) {
                 VisitExpression(case_expr.then_expr_);
                 VisitExpression(case_expr.when_expr_);
@@ -197,7 +199,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         }
         case ExpressionType::kColumn: {
             auto column_expression = static_pointer_cast<ColumnExpression>(expression);
-            Assert<PlannerException>(column_expression->arguments().empty(), "Column expression shouldn't have arguments");
+            if (!column_expression->arguments().empty()) {
+                Error<PlannerException>("Column expression shouldn't have arguments");
+            }
 
             result = VisitReplace(column_expression);
             if (result.get() == nullptr) {
@@ -221,7 +225,9 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kValue: {
             auto value_expression = static_pointer_cast<ValueExpression>(expression);
 
-            Assert<PlannerException>(value_expression->arguments().empty(), "Column expression shouldn't have arguments");
+            if (!value_expression->arguments().empty()) {
+                Error<PlannerException>("Column expression shouldn't have arguments");
+            }
 
             result = VisitReplace(value_expression);
             if (result.get() != nullptr) {

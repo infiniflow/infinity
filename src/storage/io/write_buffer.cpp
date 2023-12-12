@@ -43,7 +43,9 @@ void WriteBuffer::Write(const char *from, SizeT n) {
     Error<StorageException>("Cannot write to finalized buffer");
     SizeT bytes_copied = 0;
 
-    Assert<StorageException>(!working_buffer_.Empty(), "working_buffer empty");
+    if (working_buffer_.Empty()) {
+        Error<StorageException>("working_buffer empty");
+    }
 
     while (bytes_copied < n) {
         NextIfAtEnd();

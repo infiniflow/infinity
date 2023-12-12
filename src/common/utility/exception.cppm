@@ -150,27 +150,12 @@ public:
 #ifdef INFINITY_DEBUG
 
 export template <typename ExceptionType>
-inline void Assert(bool is_true,
-                   const String &message,
-                   const char *file_name = std::source_location::current().file_name(),
-                   u32 line = std::source_location::current().line()) {
-    if (!(is_true)) {
-        String err_msg = message;
-        err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
-        throw ExceptionType(err_msg);
-    }
-}
-
-export template <typename ExceptionType>
 inline void
 Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line()) {
-    return Assert<ExceptionType>(false, message, file_name, line);
+    String err_msg = message;
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    throw ExceptionType(err_msg);
 }
-
-export void Assert(bool is_true,
-                   const String &message,
-                   const char *file_name = std::source_location::current().file_name(),
-                   u32 line = std::source_location::current().line());
 
 export void
 Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line());

@@ -299,121 +299,161 @@ Value Value::MakeInvalid() {
 // Value getter
 template <>
 BooleanT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBoolean, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kBoolean) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.boolean;
 }
 
 template <>
 TinyIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTinyInt, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kTinyInt) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.tiny_int;
 }
 
 template <>
 SmallIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kSmallInt, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kSmallInt) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.small_int;
 }
 
 template <>
 IntegerT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kInteger, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kInteger) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.integer;
 }
 
 template <>
 BigIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBigInt, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kBigInt) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.big_int;
 }
 
 template <>
 HugeIntT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kHugeInt, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kHugeInt) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.huge_int;
 }
 
 template <>
 FloatT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kFloat, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kFloat) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.float32;
 }
 
 template <>
 DoubleT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDouble, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kDouble) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.float64;
 }
 
 template <>
 DecimalT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDecimal, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kDecimal) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.decimal;
 }
 
 template <>
 VarcharT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kVarchar, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kVarchar) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.varchar;
 }
 
 template <>
 DateT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDate, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kDate) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.date;
 }
 
 template <>
 TimeT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTime, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kTime) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.time;
 }
 
 template <>
 DateTimeT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kDateTime, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kDateTime) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.datetime;
 }
 
 template <>
 TimestampT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kTimestamp, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kTimestamp) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.timestamp;
 }
 
 template <>
 IntervalT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kInterval, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kInterval) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.interval;
 }
 
 template <>
 ArrayT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kArray, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kArray) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return array;
 }
 
 template <>
 PointT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kPoint, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kPoint) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.point;
 }
 
 template <>
 LineT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kLine, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kLine) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.line;
 }
 
 template <>
 LineSegT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kLineSeg, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kLineSeg) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.line_segment;
 }
 
 template <>
 BoxT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kBox, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kBox) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.box;
 }
 
@@ -431,7 +471,9 @@ BoxT Value::GetValue() const {
 
 template <>
 CircleT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kCircle, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kCircle) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.circle;
 }
 
@@ -443,7 +485,9 @@ CircleT Value::GetValue() const {
 
 template <>
 UuidT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kUuid, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kUuid) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.uuid;
 }
 
@@ -455,19 +499,25 @@ UuidT Value::GetValue() const {
 
 template <>
 EmbeddingT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kEmbedding, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kEmbedding) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.embedding;
 }
 
 template <>
 RowID Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kRowID, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kRowID) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.row;
 }
 
 template <>
 MixedT Value::GetValue() const {
-    Assert<TypeException>(type_.type() == LogicalType::kMixed, Format("Not matched type: {}", type_.ToString()));
+    if (type_.type() != LogicalType::kMixed) {
+        Error<TypeException>(Format("Not matched type: {}", type_.ToString()));
+    }
     return value_.mixed_value;
 }
 

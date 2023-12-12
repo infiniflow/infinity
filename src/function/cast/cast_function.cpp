@@ -59,7 +59,9 @@ static BoundCastFunc NumericCast(const DataType &target) {
 }
 
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source != target, Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    if (source == target) {
+        Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    }
 
     switch (source.type()) {
         case kBoolean: {

@@ -42,7 +42,9 @@ void Bitmask::Reset() {
 }
 
 void Bitmask::Initialize(SizeT count) {
-    Assert<TypeException>(count_ == 0, "Bitmask is already initialized.");
+    if (count_ != 0) {
+        Error<TypeException>("Bitmask is already initialized.");
+    }
     if ((count & (count - 1)) != 0) {
         Error<TypeException>("Capacity need to be N power of 2.");
     }
@@ -73,8 +75,12 @@ void Bitmask::ShallowCopy(const Bitmask &ref) {
 
 void Bitmask::Resize(SizeT new_count) {
     u64 bit_count = new_count & (new_count - 1);
-    Assert<TypeException>(bit_count == 0, "New capacity need to be N power of 2.");
-    Assert<TypeException>(new_count >= count_, "New capacity <= old capacity.");
+    if (bit_count != 0) {
+        Error<TypeException>("New capacity need to be N power of 2.");
+    }
+    if (new_count < count_) {
+        Error<TypeException>("New capacity < old capacity.");
+    }
 
     if (buffer_ptr) {
         SharedPtr<BitmaskBuffer> new_buffer_ptr = BitmaskBuffer::Make(new_count);
@@ -223,7 +229,9 @@ void Bitmask::Merge(const Bitmask &other) {
         return;
     }
 
-    Assert<TypeException>(count() == other.count(), "Attempt to merge two bitmasks with different size.");
+    if (count() != other.count()) {
+        Error<TypeException>("Attempt to merge two bitmasks with different size.");
+    }
 
     SizeT u64_count = BitmaskBuffer::UnitCount(count_);
     for (SizeT i = 0; i < u64_count; ++i) {

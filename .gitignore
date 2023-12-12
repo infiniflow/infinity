@@ -105,3 +105,5 @@ python/.idea
 
 sift_1m
 
+# ignore all fvecs benchmark file
+test/data/benchmark/*

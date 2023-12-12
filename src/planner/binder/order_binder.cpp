@@ -30,7 +30,9 @@ namespace infinity {
 void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<BindContext> &bind_context_ptr) {
     if (expr->type_ == ParsedExprType::kConstant) {
         ConstantExpr *order_by_index = (ConstantExpr *)expr;
-        Assert<PlannerException>(order_by_index->literal_type_ == LiteralType::kInteger, "Error Order by expression");
+        if (order_by_index->literal_type_ != LiteralType::kInteger) {
+            Error<PlannerException>("Order by non-integer constant value.");
+        }
         // Order by 1, means order by 1st select list item.
         return;
     }

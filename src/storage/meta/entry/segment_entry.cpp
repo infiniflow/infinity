@@ -446,15 +446,27 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
 
 void SegmentEntry::MergeFrom(BaseEntry &other) {
     auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
-    Assert<StorageException>(segment_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
-    // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(*this->segment_dir_ == *segment_entry2->segment_dir_, "SegmentEntry::MergeFrom requires segment_dir_ match");
-    Assert<StorageException>(this->segment_id_ == segment_entry2->segment_id_, "SegmentEntry::MergeFrom requires segment_id_ match");
-    Assert<StorageException>(this->column_count_ == segment_entry2->column_count_, "SegmentEntry::MergeFrom requires column_count_ match");
-    Assert<StorageException>(this->row_capacity_ == segment_entry2->row_capacity_, "SegmentEntry::MergeFrom requires row_capacity_ match");
-    Assert<StorageException>(this->min_row_ts_ == segment_entry2->min_row_ts_, "SegmentEntry::MergeFrom requires min_row_ts_ match");
-    Assert<StorageException>(this->block_entries_.size() <= segment_entry2->block_entries_.size(),
-                             "SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
+    if (segment_entry2 == nullptr) {
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+    }
+    if (*this->segment_dir_ != *segment_entry2->segment_dir_) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires segment_dir_ match");
+    }
+    if (this->segment_id_ != segment_entry2->segment_id_) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires segment_id_ match");
+    }
+    if (this->column_count_ != segment_entry2->column_count_) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires column_count_ match");
+    }
+    if (this->row_capacity_ != segment_entry2->row_capacity_) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires row_capacity_ match");
+    }
+    if (this->min_row_ts_ != segment_entry2->min_row_ts_) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires min_row_ts_ match");
+    }
+    if (this->block_entries_.size() > segment_entry2->block_entries_.size()) {
+        Error<StorageException>("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
+    }
 
     this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
     this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);

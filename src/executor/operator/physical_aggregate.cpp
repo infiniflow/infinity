@@ -312,8 +312,9 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
             }
         }
 
-        Assert<ExecutorException>(output_row_idx == datablock_size,
-                                  "Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx));
+        if (output_row_idx != datablock_size) {
+            Error<ExecutorException>("Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx));
+        }
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
             output_datablock->column_vectors[column_id]->Finalize(datablock_size);
@@ -332,9 +333,9 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
-        Assert<ExecutorException>(*input_type == *output_type,
-                                  "Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
-
+        if (*input_type != *output_type) {
+            Error<ExecutorException>("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
+        }
         types.emplace_back(input_type);
     }
 
