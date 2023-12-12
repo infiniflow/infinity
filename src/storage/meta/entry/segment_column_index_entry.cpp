@@ -125,7 +125,9 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const Js
     // TODO: need to get create index param;
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());
-    Assert<StorageException>(segment_column_index_entry.get() != nullptr, "Failed to load index entry");
+    if (segment_column_index_entry.get() == nullptr) {
+        Error<StorageException>("Failed to load index entry");
+    }
     segment_column_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_column_index_entry->max_ts_ = index_entry_json["max_ts"];
     segment_column_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry

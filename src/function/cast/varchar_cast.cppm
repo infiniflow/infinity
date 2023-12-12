@@ -33,7 +33,9 @@ export struct TryCastVarcharToChar;
 export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() == LogicalType::kVarchar, Format("Expect Varchar type, but it is {}", source.ToString()));
+    if (source.type() != LogicalType::kVarchar) {
+        Error<TypeException>(Format("Expect Varchar type, but it is {}", source.ToString()));
+    }
     switch (target.type()) {
         case kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);

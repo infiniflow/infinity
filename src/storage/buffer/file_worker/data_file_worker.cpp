@@ -38,7 +38,9 @@ void DataFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
         Error<StorageException>("Data is already allocated.");
     }
-    Assert<StorageException>(buffer_size_ > 0, "Bug.");
+    if (buffer_size_ == 0) {
+        Error<StorageException>("Buffer size is 0.");
+    }
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 

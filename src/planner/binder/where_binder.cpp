@@ -51,12 +51,17 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
         result = bind_alias_proxy_->BindAlias(*this, expr, bind_context_ptr, depth, root);
     }
 
-    Assert<PlannerException>(result.get() != nullptr, Format("Can't bind the expr: {}", expr.GetName()));
+    if (result.get() == nullptr) {
+        Error<PlannerException>(Format("Can't bind the expr: {}", expr.GetName()));
+    }
     return result;
 }
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
-    Assert<PlannerException>(func_type == FunctionType::kScalar, "Only scalar function are allowed in where clause");
+    if (func_type != FunctionType::kScalar) {
+        Error<PlannerException>("Only scalar function are allowed in where clause");
+    }
+
 }
 
 } // namespace infinity

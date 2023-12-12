@@ -66,7 +66,9 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     // Call implemented BuildExpression
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
-        Assert<PlannerException>(result.get() != nullptr, Format("Fail to bind the expression: {}", expr.GetName()));
+        if (result.get() == nullptr) {
+            Error<PlannerException>(Format("Fail to bind the expression: {}", expr.GetName()));
+        }
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
     }
@@ -322,8 +324,12 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    Assert<PlannerException>(expr.case_check_array_, "No when and then expression");
-    Assert<PlannerException>(!expr.case_check_array_->empty(), "No when and then expression list");
+    if (!expr.case_check_array_) {
+        Error<PlannerException>("No when and then expression");
+    }
+    if (expr.case_check_array_->empty()) {
+        Error<PlannerException>("No when and then expression");
+    }
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
     // two kinds of case statement, please check:

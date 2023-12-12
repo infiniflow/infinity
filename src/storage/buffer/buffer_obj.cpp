@@ -43,7 +43,6 @@ BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    CheckState();
     switch (status_) {
         case BufferStatus::kLoaded: {
             break;
@@ -73,13 +72,11 @@ BufferHandle BufferObj::Load() {
 
 void BufferObj::GetMutPointer() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    CheckState();
     type_ = BufferType::kEphemeral;
 }
 
 void BufferObj::UnloadInner() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    CheckState();
     switch (status_) {
         case BufferStatus::kLoaded: {
             --rc_;
@@ -97,7 +94,6 @@ void BufferObj::UnloadInner() {
 
 bool BufferObj::Free() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    CheckState();
     switch (status_) {
         case BufferStatus::kFreed:
         case BufferStatus::kLoaded: {
@@ -134,7 +130,6 @@ bool BufferObj::Save() {
         // No need to save because of no change happens
         return false;
     }
-    CheckState();
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
@@ -162,19 +157,27 @@ void BufferObj::CloseFile() { file_worker_->CloseFile(); }
 void BufferObj::CheckState() const {
     switch (status_) {
         case BufferStatus::kLoaded: {
-            Assert<StorageException>(rc_ > 0, "Invalid status.");
+            if (rc_ == 0) {
+                Error<StorageException>("Invalid status.");
+            }
             break;
         }
         case BufferStatus::kUnloaded: {
-            Assert<StorageException>(rc_ == 0, "Invalid status.");
+            if (rc_ > 0) {
+                Error<StorageException>("Invalid status.");
+            }
             break;
         }
         case BufferStatus::kFreed: {
-            Assert<StorageException>(rc_ == 0, "Invalid status.");
+            if (rc_ > 0) {
+                Error<StorageException>("Invalid status.");
+            }
             break;
         }
         case BufferStatus::kNew: {
-            Assert<StorageException>(type_ == BufferType::kEphemeral && rc_ == 0, "Invalid status.");
+            if (type_ != BufferType::kEphemeral || rc_ > 0) {
+                Error<StorageException>("Invalid status.");
+            }
             break;
         }
     }

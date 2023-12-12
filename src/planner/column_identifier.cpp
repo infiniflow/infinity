@@ -36,7 +36,9 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const Co
     SharedPtr<String> column_name_ptr = nullptr;
 
     i64 name_count = expr.names_.size();
-    Assert<PlannerException>(name_count <= 4 && name_count > 0, "Star expression should be unfolded before.");
+    if (name_count > 4 || name_count <= 0) {
+        Error<PlannerException>("Star expression should be unfolded before.");
+    }
     --name_count;
     column_name_ptr = MakeShared<String>(expr.names_[name_count]);
     --name_count;

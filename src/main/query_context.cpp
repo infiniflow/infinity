@@ -86,7 +86,9 @@ QueryResult QueryContext::Query(const String &query) {
         Error<PlannerException>(parsed_result->error_message_);
     }
 
-    Assert<PlannerException>(parsed_result->statements_ptr_->size() == 1, "Only support single statement.");
+    if (parsed_result->statements_ptr_->size() != 1) {
+        Error<PlannerException>("Only support single statement.");
+    }
     StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
         QueryResult query_result = QueryStatement(statement);

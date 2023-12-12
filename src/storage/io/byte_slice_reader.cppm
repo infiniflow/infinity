@@ -119,7 +119,9 @@ inline i64 ByteSliceReader::ReadInt64() { return ReadInt<i64>(); }
 inline u64 ByteSliceReader::ReadUInt64() { return ReadInt<u64>(); }
 
 inline i32 ByteSliceReader::PeekInt32() {
-    Assert<StorageException>(current_slice_ != nullptr, "current_slice null");
+    if (current_slice_ == nullptr) {
+        Error<StorageException>("current_slice null");
+    }
     if (current_slice_offset_ + sizeof(i32) <= GetSliceDataSize(current_slice_)) {
         return *((i32 *)(current_slice_->data_ + current_slice_offset_));
     }

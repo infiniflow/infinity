@@ -1308,7 +1308,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
     switch (base_expression->type()) {
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
-            Assert<PlannerException>(aggregate_expression->arguments().size() == 1, "More than one argument in aggregate function");
+            if (aggregate_expression->arguments().size() != 1) {
+                Error<PlannerException>("More than one argument in aggregate function");
+            }
             expr_str += aggregate_expression->aggregate_function_.name();
             expr_str += "(";
             Explain(aggregate_expression->arguments()[0].get(), expr_str);
@@ -1317,7 +1319,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         }
         case ExpressionType::kCast: {
             CastExpression *cast_expression = (CastExpression *)base_expression;
-            Assert<PlannerException>(cast_expression->arguments().size() == 1, "More than one argument in cast function");
+            if (cast_expression->arguments().size() != 1) {
+                Error<PlannerException>("More than one argument in cast function");
+            }
             expr_str += "CAST(";
             Explain(cast_expression->arguments()[0].get(), expr_str);
             expr_str += " AS ";
@@ -1397,7 +1401,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         }
         case ExpressionType::kBetween: {
             BetweenExpression *between_expression = (BetweenExpression *)base_expression;
-            Assert<PlannerException>(between_expression->arguments().size() == 3, "Between expression should have three arguments.");
+            if (between_expression->arguments().size() != 3) {
+                Error<PlannerException>("Between expression should have three arguments.");
+            }
             Explain(between_expression->arguments()[0].get(), expr_str);
             expr_str += " BETWEEN ";
             Explain(between_expression->arguments()[1].get(), expr_str);

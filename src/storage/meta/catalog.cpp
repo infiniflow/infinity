@@ -291,7 +291,9 @@ void NewCatalog::CheckCatalog() {
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog1 = MakeUnique<NewCatalog>(nullptr);
-    Assert<CatalogException>(!catalog_paths.empty(), "Catalog paths is empty");
+    if (catalog_paths.empty()) {
+        Error<CatalogException>("Catalog paths is empty");
+    }
     // Load the latest full checkpoint.
     LOG_INFO(Format("Load base catalog1 from: {}", catalog_paths[0]));
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);

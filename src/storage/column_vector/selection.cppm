@@ -25,7 +25,9 @@ namespace infinity {
 
 struct SelectionData {
     explicit SelectionData(SizeT count) : capacity_(count) {
-        Assert<ExecutorException>(count <= u16_max, "Too large size for selection data.");
+        if (count > u16_max) {
+            Error<ExecutorException>("Too large size for selection data.");
+        }
         data_ = MakeUnique<u16[]>(count);
         GlobalResourceUsage::IncrObjectCount();
     }
@@ -48,8 +50,12 @@ public:
     }
 
     inline void Set(SizeT selection_idx, SizeT row_idx) {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
-        Assert<ExecutorException>(selection_idx < storage_->capacity_, "Exceed the selection vector capacity.");
+        if (selection_vector == nullptr) {
+            Error<ExecutorException>("Selection container isn't initialized");
+        }
+        if (selection_idx >= storage_->capacity_) {
+            Error<ExecutorException>("Exceed the selection vector capacity.");
+        }
         selection_vector[selection_idx] = row_idx;
     }
 
@@ -62,22 +68,30 @@ public:
         if (selection_vector == nullptr) {
             return idx;
         }
-        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.");
+        if (idx >= latest_selection_idx_) {
+            Error<ExecutorException>("Exceed the last row of the selection vector.");
+        }
         return selection_vector[idx];
     }
 
     inline u16 &operator[](SizeT idx) const {
-        Assert<ExecutorException>(idx < latest_selection_idx_, "Exceed the last row of the selection vector.");
+        if (idx >= latest_selection_idx_) {
+            Error<ExecutorException>("Exceed the last row of the selection vector.");
+        }
         return selection_vector[idx];
     }
 
     inline SizeT Capacity() const {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
+        if (selection_vector == nullptr) {
+            Error<ExecutorException>("Selection container isn't initialized");
+        }
         return storage_->capacity_;
     }
 
     inline SizeT Size() const {
-        Assert<ExecutorException>(selection_vector != nullptr, "Selection container isn't initialized");
+        if (selection_vector == nullptr) {
+            Error<ExecutorException>("Selection container isn't initialized");
+        }
         return latest_selection_idx_;
     }
 

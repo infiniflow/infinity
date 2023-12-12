@@ -98,9 +98,13 @@ public:
     void AppendWith(const ColumnVector &other) { return AppendWith(other, 0, other.Size()); }
 
     void AppendValue(const Value &value) {
-        Assert<StorageException>(initialized, "Column vector isn't initialized.");
+        if (!initialized) {
+            Error<StorageException>("Column vector isn't initialized.");
+        }
         if (vector_type_ == ColumnVectorType::kConstant) {
-            Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+            if (tail_index_ >= 1) {
+                Error<StorageException>("Constant column vector will only have 1 value.");
+            }
         }
 
         if (tail_index_ >= capacity_) {
@@ -110,8 +114,12 @@ public:
     }
 
     void SetVectorType(ColumnVectorType vector_type) {
-        Assert<TypeException>(!initialized, "Column Vector is initialized");
-        Assert<TypeException>(vector_type != ColumnVectorType::kInvalid, "Attempt to set invalid column vector type.");
+        if (initialized) {
+            Error<StorageException>("Column vector is initialized");
+        }
+        if (vector_type == ColumnVectorType::kInvalid) {
+            Error<StorageException>("Invalid column vector type.");
+        }
         if (vector_type_ == vector_type) {
             return;
         }

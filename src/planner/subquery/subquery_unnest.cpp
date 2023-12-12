@@ -221,7 +221,9 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
                                                            const SharedPtr<BindContext> &bind_context) {
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
-    Assert<PlannerException>(!correlated_columns.empty(), "No correlated column");
+    if (correlated_columns.empty()) {
+        Error<PlannerException>("No correlated column");
+    }
 
     // Valid the correlated columns are from one table.
     SizeT column_count = correlated_columns.size();

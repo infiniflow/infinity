@@ -24,7 +24,9 @@ module heap_chunk;
 namespace infinity {
 
 ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
-    Assert<ExecutorException>(nbytes > 0, "Attempt to allocate zero size memory.");
+    if (nbytes == 0) {
+        Error<ExecutorException>("Attempt to allocate zero size memory.");
+    }
     if (current_chunk_idx_ == u64_max) {
         // First chunk
         while (current_chunk_size_ < nbytes) {
@@ -41,7 +43,9 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
             chunks_.emplace_back(MakeUnique<HeapChunk>(current_chunk_size_));
             ++current_chunk_idx_;
         }
-        Assert<ExecutorException>(chunks_[current_chunk_idx_]->current_offset_ + nbytes <= current_chunk_size_, "Unexpected string chunk error");
+        if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
+            Error<ExecutorException>("Unexpected string chunk error");
+        }
     }
 
     auto &current_chunk = chunks_[current_chunk_idx_];

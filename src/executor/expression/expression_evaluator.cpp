@@ -70,7 +70,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
 void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
-    Assert<ExecutorException>(!in_aggregate_, "Recursive execute aggregate function!");
+    if (in_aggregate_) {
+        Error<ExecutorException>("Recursive execute aggregate function!");
+    }
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
     SharedPtr<BaseExpression> &child_expr = expr->arguments()[0];
@@ -80,9 +82,12 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     SharedPtr<ColumnVector> &child_output = child_state->OutputColumnVector();
     Execute(child_expr, child_state, child_output);
 
-    Assert<ExecutorException>(expr->aggregate_function_.argument_type_ == *child_output->data_type(),
-                              "Argument type isn't matched with the child expression output");
-    Assert<ExecutorException>(expr->aggregate_function_.return_type_ == *output_column_vector->data_type(), "Return type isn't matched");
+    if (expr->aggregate_function_.argument_type_ != *child_output->data_type()) {
+        Error<ExecutorException>("Argument type isn't matched with the child expression output");
+    }
+    if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
+        Error<ExecutorException>("Return type isn't matched with the output column vector");
+    }
 
     // 1. Initialize the aggregate state.
     expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());

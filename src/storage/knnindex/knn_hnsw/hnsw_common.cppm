@@ -108,7 +108,9 @@ public:
         file_handler.Read(&cur_vec_num, sizeof(SizeT));
         file_handler.Read(&max_vec_num, sizeof(SizeT));
         if (new_vec_n != 0) {
-            Assert<StorageException>(new_vec_n >= cur_vec_num, "input vec num is smaller than the stored vec num");
+            if (new_vec_n < cur_vec_num) {
+                Error<StorageException>("input vec num is smaller than the stored vec num");
+            }
             max_vec_num = new_vec_n;
         }
         file_handler.Read(&dim, sizeof(SizeT));

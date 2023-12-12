@@ -96,7 +96,9 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             start_pos += to_read;
         }
         if (start_pos < end_pos) {
-            Assert<StorageException>(buffer_offset_ == already_read_size_, "Error file read size");
+            if (buffer_offset_ != already_read_size_) {
+                Error<StorageException>("Error file read size");
+            }
             buffer_start_ += already_read_size_;
             buffer_offset_ = 0;
             already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);

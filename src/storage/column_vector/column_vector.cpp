@@ -36,8 +36,12 @@ module column_vector;
 namespace infinity {
 
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
-    Assert<StorageException>(!initialized, "Column vector is already initialized.");
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
+    if (initialized) {
+        Error<StorageException>("Column vector is already initialized.");
+    }
+    if (other.vector_type_ == ColumnVectorType::kInvalid) {
+        Error<StorageException>("Other column vector is invalid.");
+    }
 
     vector_type_ = other.vector_type_;
     data_type_size_ = data_type_->Size();
@@ -84,7 +88,9 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->fix_heap_mgr_.get() == nullptr, "Vector heap should be null.");
+            if (buffer_->fix_heap_mgr_.get() != nullptr) {
+                Error<StorageException>("Vector heap should be null.");
+            }
             buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
         }
     }
@@ -227,9 +233,15 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    Assert<StorageException>(!initialized, "Column vector is already initialized.");
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
-    Assert<StorageException>(vector_type != ColumnVectorType::kInvalid, "Attempt to initialize column vector to invalid type.");
+    if (initialized) {
+        Error<StorageException>("Column vector is already initialized.");
+    }
+    if (data_type_->type() == LogicalType::kInvalid) {
+        Error<StorageException>("Data type isn't assigned.");
+    }
+    if (vector_type == ColumnVectorType::kInvalid) {
+        Error<StorageException>("Attempt to initialize column vector to invalid type.");
+    }
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
@@ -269,7 +281,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->fix_heap_mgr_.get() == nullptr, "Vector heap should be null.");
+            if (buffer_->fix_heap_mgr_.get() != nullptr) {
+                Error<StorageException>("Vector heap should be null.");
+            }
             buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
         }
     }
@@ -278,10 +292,15 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
-
-    Assert<StorageException>(!initialized, "Column vector is already initialized.");
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
-    Assert<StorageException>(end_idx > start_idx, "End index should larger than start index.");
+    if (initialized) {
+        Error<StorageException>("Column vector is already initialized.");
+    }
+    if (data_type_->type() == LogicalType::kInvalid) {
+        Error<StorageException>("Data type isn't assigned.");
+    }
+    if (end_idx <= start_idx) {
+        Error<StorageException>("End index should larger than start index.");
+    }
 
     vector_type_ = vector_type;
     capacity_ = end_idx - start_idx;
@@ -322,7 +341,9 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
-            Assert<StorageException>(buffer_->fix_heap_mgr_.get() == nullptr, "Vector heap should be null.");
+            if (buffer_->fix_heap_mgr_.get() != nullptr) {
+                Error<StorageException>("Vector heap should be null.");
+            }
             buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
         }
     }
@@ -462,21 +483,33 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
 }
 
 void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_idx) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<StorageException>(data_type_->type() != LogicalType::kInvalid, "Data type isn't assigned.");
-    Assert<StorageException>(*data_type_ == *other.data_type_, "Data type isn't assigned.");
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
+    if (data_type_->type() == LogicalType::kInvalid) {
+        Error<StorageException>("Data type isn't assigned.");
+    }
+    if (*data_type_ != *other.data_type_) {
+        Error<StorageException>("Data type isn't assigned.");
+    }
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(dst_idx == 0, "Attempting to access non-zero position of constant vector");
+        if (dst_idx != 0) {
+            Error<StorageException>("Attempting to access non-zero position of constant vector");
+        }
         tail_index_ = 1;
     } else {
-        Assert<StorageException>(dst_idx < tail_index_, "Attempting to access invalid position of target column vector");
+        if (dst_idx >= tail_index_) {
+            Error<StorageException>("Attempting to access invalid position of target column vector");
+        }
     }
     if (other.vector_type_ == ColumnVectorType::kConstant) {
         // Copy from constant vector, only first row have value.
         src_idx = 0;
     }
 
-    Assert<StorageException>(src_idx < other.tail_index_, "Attempting to access invalid position of source column vector");
+    if (src_idx >= other.tail_index_) {
+        Error<StorageException>("Attempting to access invalid position of source column vector");
+    }
     switch (data_type_->type()) {
         case kBoolean: {
             CopyRowFrom<BooleanT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
@@ -603,7 +636,9 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
 }
 
 String ColumnVector::ToString(SizeT row_index) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
 
     // Not valid, make a same data type with null indicator
     if (!(this->nulls_ptr_->IsTrue(row_index))) {
@@ -727,7 +762,9 @@ String ColumnVector::ToString(SizeT row_index) const {
 }
 
 Value ColumnVector::GetValue(SizeT index) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
     if (index >= tail_index_) {
         Error<TypeException>(Format("Attempt to access an invalid index of column vector: {}", ToStr(index)));
     }
@@ -842,16 +879,23 @@ Value ColumnVector::GetValue(SizeT index) const {
 }
 
 void ColumnVector::SetValue(SizeT index, const Value &value) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<StorageException>(index <= tail_index_,
-                             Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                    ToStr(index),
-                                    ToStr(tail_index_),
-                                    ToStr(capacity_)));
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
+    if (index > tail_index_) {
+        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                                       ToStr(index),
+                                       ToStr(tail_index_),
+                                       ToStr(capacity_)));
+    }
 
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
-    Assert<StorageException>(value.type() == *data_type_, "Attempt to store a different type value into column vector.");
+    if (value.type() != *data_type_) {
+        Error<StorageException>(Format("Attempt to store a different type value into column vector: {}, column vector type: {}",
+                                       value.type().ToString(),
+                                       data_type_->ToString()));
+    }
 
     // TODO: Check if the value is null, then set the column vector validity.
     switch (data_type_->type()) {
@@ -994,20 +1038,25 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
 }
 
 void ColumnVector::Finalize(SizeT index) {
-    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+    if (index > capacity_) {
+        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+    }
     tail_index_ = index;
 }
 
 void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<StorageException>(index <= capacity_, Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
-
-    Assert<StorageException>(index <= tail_index_,
-                             Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                    ToStr(index),
-                                    ToStr(tail_index_),
-                                    ToStr(capacity_)));
-
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
+    if (index > capacity_) {
+        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+    }
+    if (index > tail_index_) {
+        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                                       ToStr(index),
+                                       ToStr(tail_index_),
+                                       ToStr(capacity_)));
+    }
     // We assume the value_ptr point to the same type data.
 
     switch (data_type_->type()) {
@@ -1161,9 +1210,13 @@ void ColumnVector::SetByPtr(SizeT index, const_ptr_t value_ptr) {
 }
 
 void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
     if (vector_type_ == ColumnVectorType::kConstant) {
-        Assert<StorageException>(tail_index_ < 1, Format("Constant column vector will only have 1 value.({}/{})", tail_index_, capacity_));
+        if (tail_index_ >= 1) {
+            Error<StorageException>("Constant column vector will only have 1 value.");
+        }
     }
     if (tail_index_ >= capacity_) {
         Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
@@ -1180,13 +1233,15 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         return;
     }
 
-    Assert<StorageException>(
-        *this->data_type_ == *other.data_type_,
-        Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
+    if (*this->data_type_ != *other.data_type_) {
+        Error<StorageException>(
+            Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
+    }
 
-    Assert<StorageException>(
-        this->tail_index_ + count <= this->capacity_,
-        Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
+    if (this->tail_index_ + count > this->capacity_) {
+        Error<StorageException>(
+            Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
+    }
 
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1419,7 +1474,9 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
-    Assert<StorageException>(data_type_->type() == LogicalType::kRowID, "Only RowID column vector supports this method");
+    if (data_type_->type() != LogicalType::kRowID) {
+        Error<StorageException>(Format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
+    }
     if (row_count == 0) {
         return 0;
     }
@@ -1541,9 +1598,12 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
 }
 
 i32 ColumnVector::GetSizeInBytes() const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<StorageException>(vector_type_ == ColumnVectorType::kFlat || vector_type_ == ColumnVectorType::kConstant,
-                             Format("Not supported vector_type {}", int(vector_type_)));
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
+    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant) {
+        Error<StorageException>(Format("Not supported vector_type {}", int(vector_type_)));
+    }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     switch (data_type_->type()) {
         case kBoolean:
@@ -1582,9 +1642,12 @@ i32 ColumnVector::GetSizeInBytes() const {
 }
 
 void ColumnVector::WriteAdv(char *&ptr) const {
-    Assert<StorageException>(initialized, "Column vector isn't initialized.");
-    Assert<NotImplementException>(vector_type_ == ColumnVectorType::kFlat || vector_type_ == ColumnVectorType::kConstant,
-                                  Format("Not supported vector_type {}", int(vector_type_)));
+    if (!initialized) {
+        Error<StorageException>("Column vector isn't initialized.");
+    }
+    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant) {
+        Error<NotImplementException>(Format("Not supported vector_type {}", int(vector_type_)));
+    }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     switch (data_type_->type()) {
@@ -1668,10 +1731,14 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         }
     }
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading ColumnVector");
+    if (maxbytes < 0) {
+        Error<StorageException>("ptr goes out of range when reading ColumnVector");
+    }
     column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
     maxbytes = ptr_end - ptr;
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading ColumnVector");
+    if (maxbytes < 0) {
+        Error<StorageException>("ptr goes out of range when reading ColumnVector");
+    }
     return column_vector;
 }
 
