@@ -20,6 +20,7 @@ import stl;
 import base_expression;
 import column_expression;
 import reference_expression;
+import special_function;
 import third_party;
 import logger;
 
@@ -41,6 +42,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     if (op.operator_type() == LogicalNodeType::kJoin or op.operator_type() == LogicalNodeType::kKnnScan) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
+        output_count_ = op.GetOutputTypes()->size();
         load_func();
         VisitNodeExpression(op);
     } else {
@@ -48,12 +50,25 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         load_func();
         VisitNodeExpression(op);
         bindings_ = op.GetColumnBindings();
+        output_count_ = op.GetOutputTypes()->size();
     }
 }
 
 SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
-    if(expression->special()) {
-        return expression;
+    auto special = expression->special();
+    if (special.has_value()) {
+        switch (special.value()) {
+            case SpecialType::kRowID: {
+                return ReferenceExpression::Make(expression->Type(),
+                                                 expression->table_name(),
+                                                 expression->column_name(),
+                                                 expression->alias_,
+                                                 output_count_ - 1);
+            }
+            default: {
+                LOG_ERROR(Format("Unknown special function: {}", expression->Name()));
+            }
+        }
     }
 
     SizeT binding_count = bindings_.size();

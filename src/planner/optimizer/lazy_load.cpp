@@ -116,6 +116,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
             table_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            table_scan.add_row_id_ = true;
             break;
         }
         case LogicalNodeType::kKnnScan: {

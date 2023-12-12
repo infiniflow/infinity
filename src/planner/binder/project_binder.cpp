@@ -86,6 +86,10 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
 }
 
 SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    auto special_function = TryBuildSpecialFuncExpr(expr, bind_context_ptr, depth);
+    if (special_function.has_value()) {
+        return special_function.value();
+    }
 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {

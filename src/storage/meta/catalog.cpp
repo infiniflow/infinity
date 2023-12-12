@@ -232,7 +232,7 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<Special
 
 SharedPtr<SpecialFunction> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
     StringToLower(function_name);
-    if (!catalog->table_functions_.contains(function_name)) {
+    if (!catalog->special_functions_.contains(function_name)) {
         return nullptr;
     }
     return catalog->special_functions_[function_name];

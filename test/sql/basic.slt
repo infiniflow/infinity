@@ -32,6 +32,13 @@ SELECT N_NATIONKEY FROM NATION;
 1
 2
 
+query I
+SELECT N_NATIONKEY, ROW_ID() FROM NATION;
+----
+0 0:0
+1 0:1
+2 0:2
+
 # Clean up
 statement ok
 DROP TABLE NATION;

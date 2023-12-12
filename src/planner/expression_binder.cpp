@@ -247,18 +247,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr,
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
-    if (special_function != nullptr) {
-        String &table_name = bind_context_ptr->table_names_[0];
-        TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
-                                                                               table_name,
-                                                                               bind_context_ptr->table_name2table_index_[table_name],
-                                                                               special_function->name(),
-                                                                               table_entry->columns_.size() + special_function->extra_idx(),
-                                                                               depth,
-                                                                               true);
-        return bound_column_expr;
+    auto special_function = TryBuildSpecialFuncExpr(expr, bind_context_ptr, depth);
+
+    if (special_function.has_value()) {
+        return special_function.value();
     }
 
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
@@ -507,6 +499,28 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
     Error<PlannerException>("Unreachable");
     return nullptr;
 }
+
+Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
+    SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    if (special_function != nullptr) {
+        String &table_name = bind_context_ptr->table_names_[0];
+        String column_name = special_function->name();
+        ToUpper(column_name);
+
+        TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
+                                                                               table_name,
+                                                                               bind_context_ptr->table_name2table_index_[table_name],
+                                                                               column_name,
+                                                                               table_entry->columns_.size() + special_function->extra_idx(),
+                                                                               depth,
+                                                                               special_function->special_type());
+        return bound_column_expr;
+    } else {
+        return None;
+    }
+}
+
 //
 //// Bind window function.
 // SharedPtr<BaseExpression>

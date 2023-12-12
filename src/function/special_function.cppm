@@ -22,10 +22,16 @@ export module special_function;
 
 namespace infinity {
 
+export enum class SpecialType {
+    kRowID,
+    kCreateTs,
+    kDeleteTs,
+};
+
 export class SpecialFunction final : public Function {
 public:
-    SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx)
-        : Function(Move(func_name), FunctionType::kSpecial), data_type_(Move(data_type)), extra_idx_(extra_idx) {}
+    SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx, SpecialType special_type)
+        : Function(Move(func_name), FunctionType::kSpecial), data_type_(Move(data_type)), extra_idx_(extra_idx), special_type_(special_type) {}
 
     const String &name() const { return name_; }
 
@@ -35,10 +41,13 @@ public:
 
     FunctionType type() { return type_; }
 
+    SpecialType special_type() { return special_type_; }
+
     String ToString() const final { return name(); }
 
 private:
     DataType data_type_;
+    SpecialType special_type_;
     SizeT extra_idx_{0};
 };
 

@@ -19,6 +19,7 @@ module;
 import stl;
 import parser;
 import expression_type;
+import special_function;
 import third_party;
 
 module column_expression;
@@ -31,7 +32,7 @@ ColumnExpression::ColumnExpression(DataType data_type,
                                    String column_name,
                                    i64 column_index,
                                    i64 depth,
-                                   bool special)
+                                   Optional<SpecialType> special)
     : BaseExpression(ExpressionType::kColumn, {}), data_type_(Move(data_type)), binding_(table_index, column_index), table_name_(Move(table_name)),
       column_name_(Move(column_name)), depth_(depth), special_(special) {}
 
