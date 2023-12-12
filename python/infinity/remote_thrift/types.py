@@ -15,9 +15,10 @@
 import struct
 from typing import Any, Dict
 
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 import pandas as pd
 from numpy import dtype
+
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
 
 def column_type_to_dtype(ttype: ttypes.ColumnType):
@@ -154,8 +155,8 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
     data_dict: Dict[str, list[Any, ...]] = {}
     column_names = []
     types = []
-    print('received response with {} column defs and {} column fields'.format(len(
-        res.column_defs), len(res.column_fields)))
+    # print('received response with {} column defs and {} column fields'.format(len(
+    #     res.column_defs), len(res.column_fields)))
     for i in range(len(res.column_defs)):
         column_def = res.column_defs[i]
         column_names.append(column_def.name)
