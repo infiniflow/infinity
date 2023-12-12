@@ -15,7 +15,7 @@
 import struct
 from collections import defaultdict
 from typing import Any
-
+import polars as pl
 import pandas as pd
 from numpy import dtype
 
@@ -76,11 +76,47 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
                     case ttypes.ElementType.ElementFloat64:
                         return object
                     case ttypes.ElementType.ElementBit:
-                        return
+                        return object
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype}")
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
+
+def logic_type_to_pl_type(ttype: ttypes.DataType):
+    match ttype.logic_type:
+        case ttypes.LogicType.Boolean:
+            return pl.Boolean
+        case ttypes.LogicType.TinyInt:
+            return pl.Int8
+        case ttypes.LogicType.SmallInt:
+            return pl.Int16
+        case ttypes.LogicType.Integer:
+            return pl.Int32
+        case ttypes.LogicType.BigInt:
+            return pl.Int64
+        case ttypes.LogicType.Float:
+            return pl.Float32
+        case ttypes.LogicType.Double:
+            return pl.Float64
+        case ttypes.LogicType.Varchar:
+            return pl.Utf8
+        case ttypes.LogicType.Embedding:
+            if ttype.physical_type.embedding_type is not None:
+                match ttype.physical_type.embedding_type.element_type:
+                    case ttypes.ElementType.ElementInt8:
+                        return pl.List
+                    case ttypes.ElementType.ElementInt16:
+                        return pl.List
+                    case ttypes.ElementType.ElementInt32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat64:
+                        return pl.List
+                    case ttypes.ElementType.ElementBit:
+                        return pl.List
+                    case _:
+                        raise NotImplementedError(f"Unsupported type {ttype}")
 
 
 def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
@@ -88,7 +124,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
     column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
-            return list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            return struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
         case ttypes.ColumnType.ColumnInt64:
             return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnFloat32:
@@ -167,7 +203,7 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         column_vectors = column_field.column_vectors
 
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
-        data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
+        data_series = pl.Series(data_list, dtype=logic_type_to_pl_type(column_data_type))
         data_dict[column_name] = data_series
 
-    return pd.DataFrame(data_dict)
+    return pl.DataFrame(data_dict)
