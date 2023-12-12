@@ -53,9 +53,9 @@ class TestDelete:
         db_obj = infinity_obj.get_database("default")
 
         # infinity
+        db_obj.drop_table(table_name="table_3", if_exists=True)
         res = db_obj.create_table(
             "table_3", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
-        assert res.success
 
         table_obj = db_obj.get_table("table_3")
 

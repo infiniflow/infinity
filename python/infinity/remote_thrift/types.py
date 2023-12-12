@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import struct
-from typing import Any, Dict
-
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from collections import defaultdict
+from typing import Any
+# import polars as pl
 import pandas as pd
 from numpy import dtype
+
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
 
 def column_type_to_dtype(ttype: ttypes.ColumnType):
@@ -74,11 +76,47 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
                     case ttypes.ElementType.ElementFloat64:
                         return object
                     case ttypes.ElementType.ElementBit:
-                        return
+                        return object
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype}")
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
+
+def logic_type_to_pl_type(ttype: ttypes.DataType):
+    match ttype.logic_type:
+        case ttypes.LogicType.Boolean:
+            return pl.Boolean
+        case ttypes.LogicType.TinyInt:
+            return pl.Int8
+        case ttypes.LogicType.SmallInt:
+            return pl.Int16
+        case ttypes.LogicType.Integer:
+            return pl.Int32
+        case ttypes.LogicType.BigInt:
+            return pl.Int64
+        case ttypes.LogicType.Float:
+            return pl.Float32
+        case ttypes.LogicType.Double:
+            return pl.Float64
+        case ttypes.LogicType.Varchar:
+            return pl.Utf8
+        case ttypes.LogicType.Embedding:
+            if ttype.physical_type.embedding_type is not None:
+                match ttype.physical_type.embedding_type.element_type:
+                    case ttypes.ElementType.ElementInt8:
+                        return pl.List
+                    case ttypes.ElementType.ElementInt16:
+                        return pl.List
+                    case ttypes.ElementType.ElementInt32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat64:
+                        return pl.List
+                    case ttypes.ElementType.ElementBit:
+                        return pl.List
+                    case _:
+                        raise NotImplementedError(f"Unsupported type {ttype}")
 
 
 def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
@@ -86,7 +124,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
     column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
-            return list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            return struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector)
         case ttypes.ColumnType.ColumnInt64:
             return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnFloat32:
@@ -151,28 +189,21 @@ def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> tty
 
 
 def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
-    data_dict: Dict[str, list[Any, ...]] = {}
-    column_names = []
-    types = []
-    print('received response with {} column defs and {} column fields'.format(len(
-        res.column_defs), len(res.column_fields)))
-    for i in range(len(res.column_defs)):
-        column_def = res.column_defs[i]
-        column_names.append(column_def.name)
-        types.append(logic_type_to_dtype(column_def.data_type))
-        # print()
-        # print(column_def.id)
-        column_field = res.column_fields[i]
+    data_dict = {}
+    column_counter = defaultdict(int)
+    for column_def, column_field in zip(res.column_defs, res.column_fields):
+        original_column_name = column_def.name
+        column_counter[original_column_name] += 1
+        column_name = f"{original_column_name}_{column_counter[original_column_name]}" \
+            if column_counter[original_column_name] > 1 \
+            else original_column_name
+
         column_type = column_field.column_type
         column_data_type = column_def.data_type
         column_vectors = column_field.column_vectors
-        data_dict[column_def.name] = column_vector_to_list(
-            column_type, column_data_type, column_vectors)
 
-    type_dict = dict(zip(column_names, types))
-    # print()
-    # print(data_dict)
-    # print(type_dict)
-    # print()
-    # print(pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict))
-    return pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict)
+        data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
+        data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
+        data_dict[column_name] = data_series
+
+    return pd.DataFrame(data_dict)
