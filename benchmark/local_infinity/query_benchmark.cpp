@@ -178,7 +178,7 @@ int main() {
         profiler.Begin();
 
         int64_t topk = 100;
-        for (size_t query_idx = 0; query_idx < 1; ++query_idx) {
+        for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
 
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
