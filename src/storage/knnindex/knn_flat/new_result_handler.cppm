@@ -69,7 +69,7 @@ struct NewHeapResultHandler : public ResultHandler {
      */
 
     struct HeapSingleResultHandler : public SingleResultHandler {
-        NewHeapResultHandler &hr;
+        NewHeapResultHandler* hr{};
         SizeT k{};
         SizeT cnt{};
 
@@ -77,13 +77,13 @@ struct NewHeapResultHandler : public ResultHandler {
         Vector<TI *> heap_ids{};
         Vector<T> thresh{};
 
-        explicit HeapSingleResultHandler(NewHeapResultHandler &hr, SizeT query_count)
-            : SingleResultHandler(ResultHandlerType::kHeap), hr(hr), k(hr.k), heap_dis(query_count), heap_ids(query_count), thresh(query_count) {}
+        explicit HeapSingleResultHandler(NewHeapResultHandler* hr, SizeT query_count)
+            : SingleResultHandler(ResultHandlerType::kHeap), hr(hr), k(hr->k), heap_dis(query_count), heap_ids(query_count), thresh(query_count) {}
 
         /// begin results for query # i
         void begin(SizeT i) {
-            heap_dis[i] = hr.heap_dis_tab + i * k;
-            heap_ids[i] = hr.heap_ids_tab + i * k;
+            heap_dis[i] = hr->heap_dis_tab + i * k;
+            heap_ids[i] = hr->heap_ids_tab + i * k;
             heap_heapify<C>(k, heap_dis[i], heap_ids[i]);
             thresh[i] = *heap_dis[i];
         }
