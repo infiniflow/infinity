@@ -1287,6 +1287,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
+                dst_ref.is_value_ = src_ref.is_value_;
                 dst_ref.length_ = src_ref.length_;
                 dst_ref.is_value_ = src_ref.is_value_;
                 if (src_ref.IsInlined()) {
