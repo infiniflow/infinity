@@ -6,6 +6,12 @@ from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 
 
+def python_skd_test(python_test_dir: str):
+    print("python test path is {}".format(python_test_dir))
+    # os.system(f"cd {python_test_dir}/test")
+    os.system(f"python -m pytest {python_test_dir}/test")
+
+
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
 
@@ -44,6 +50,7 @@ if __name__ == "__main__":
     test_dir = current_path + "/test/sql"
     data_dir = current_path + "/test/data"
     copy_dir = "/tmp/infinity/test_data"
+    python_test_dir = current_path + "/python"
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
@@ -97,4 +104,5 @@ if __name__ == "__main__":
     generate1(args.generate_if_exists, args.copy)
     generate2(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
+    python_skd_test(python_test_dir)
     test_process(args.path, args.test, args.data, args.copy)

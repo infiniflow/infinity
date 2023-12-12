@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import infinity
-from infinity.common import NetworkAddress
+from infinity.common import NetworkAddress, REMOTE_HOST
 
 
 class TestCreateTable:
@@ -24,7 +24,7 @@ class TestCreateTable:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("test_create_varchar_table", {
                                   "c1": "varchar, primary key", "c2": "float"}, None)
@@ -40,7 +40,7 @@ class TestCreateTable:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.create_table("test_create_embedding_table", {
                                   "c1": "vector,128,float"}, None)

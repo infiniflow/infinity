@@ -19,7 +19,6 @@ import pandas as pd
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
@@ -213,10 +212,13 @@ class RemoteTable(Table, ABC):
                 case "*":
                     column_expr = ttypes.ColumnExpr()
                     column_expr.star = True
-                    paser_expr_type = ttypes.ParsedExprType()
-                    paser_expr_type.column_expr = column_expr
+                    column_expr.column_name.clear()
+
+                    expr_type = ttypes.ParsedExprType()
+                    expr_type.column_expr = column_expr
+
                     parsed_expr = ttypes.ParsedExpr()
-                    parsed_expr.type = paser_expr_type
+                    parsed_expr.type = expr_type
                     select_list.append(parsed_expr)
                 case _:
                     select_list.append(traverse_conditions(condition(column)))
@@ -267,4 +269,5 @@ class RemoteTable(Table, ABC):
         # process the results
         if res.success:
             return build_result(res)
-        # todo: how to convert bytes to string?
+        else:
+            raise Exception(res.error_msg)

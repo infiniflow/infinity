@@ -13,12 +13,16 @@
 # limitations under the License.
 
 import os
+import time
 
 import infinity
-from infinity import NetworkAddress
+from infinity import index
+from infinity.common import REMOTE_HOST
+from infinity.remote_thrift.client import ThriftInfinityClient
+from infinity.remote_thrift.table import RemoteTable
 
 
-class TestImport:
+class TestImportBenchmark:
 
     def test_import(self):
         """
@@ -27,43 +31,75 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(
-            NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         assert infinity_obj
 
-        # infinity
+        st = time.process_time()
 
         db_obj = infinity_obj.get_database("default")
         assert db_obj
-
-        # import
-        db_obj.create_table("benchmark", {"c1": "vector,128,float"}, None)
-        table_obj = db_obj.get_table("benchmark")
+        db_obj.drop_table("knn_benchmark_1", True)
+        db_obj.create_table("knn_benchmark_1", {"c1": "vector,128,float"}, None)
+        table_obj = db_obj.get_table("knn_benchmark_1")
         assert table_obj
 
-        parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
-        test_fvecs_dir = parent_dir + "/sift/sift/base.fvecs"
+        test_fvecs_dir = os.getcwd() + "/sift_1m/sift/base.fvecs"
         assert os.path.exists(test_fvecs_dir)
-
+        #
         res = table_obj.import_data(test_fvecs_dir, None)
         assert res.success
 
-    def test_search(self):
+        end = time.process_time()
+        dur = end - st
+        print(dur)
+
+    def test_create_index(self):
+        st = time.process_time()
+        conn = ThriftInfinityClient(REMOTE_HOST)
+        table = RemoteTable(conn, "default", "knn_benchmark")
+        res = table.create_index("hnsw_index",
+                                 [index.IndexInfo("c1",
+                                                  index.IndexType.Hnsw,
+                                                  [
+                                                      index.InitParameter("M", "16"),
+                                                      index.InitParameter("ef_construction", "200"),
+                                                      index.InitParameter("ef", "200"),
+                                                      index.InitParameter("metric", "l2"),
+                                                      index.InitParameter("encode", "lvq")
+                                                  ])], None)
+
+        assert res.success
+
+        end = time.process_time()
+        dur = end - st
+        print(dur)
+
+
+    def test_import2(self):
         """
-        target: test search
+        target: test import data to remote server
         method: connect server, create table, import data, search, drop table, disconnect
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(
-            NetworkAddress('127.0.0.1', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         assert infinity_obj
 
-        # infinity
+        st = time.process_time()
 
         db_obj = infinity_obj.get_database("default")
+        assert db_obj
+        db_obj.drop_table("knn_benchmark_1", True)
+        db_obj.create_table("knn_benchmark_1", {"c1": "vector,128,float"}, None)
+        table_obj = db_obj.get_table("knn_benchmark_1")
+        assert table_obj
 
-        table_obj = db_obj.get_table("benchmark")
+        test_fvecs_dir = os.getcwd() + "/sift_1m/sift/base.fvecs"
+        assert os.path.exists(test_fvecs_dir)
+        #
+        res = table_obj.import_data(test_fvecs_dir, None)
+        assert res.success
 
-        # search ordinary
-        table_obj.query_builder().output(["*"]).to_df()
+        end = time.process_time()
+        dur = end - st
+        print(dur)

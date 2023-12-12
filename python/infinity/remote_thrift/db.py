@@ -124,7 +124,7 @@ class RemoteDatabase(Database, ABC):
             else:  # numeric or varchar
                 get_ordinary_info(
                     column_big_info, column_defs, column_name, index)
-        print(column_defs)
+        # print(column_defs)
         return self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                        column_defs=column_defs,
                                        option=options)

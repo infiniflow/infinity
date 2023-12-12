@@ -19,7 +19,7 @@ from sqlglot import condition
 
 import infinity
 import infinity.index as index
-from infinity.common import NetworkAddress
+from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.table import traverse_conditions
 
 
@@ -36,7 +36,7 @@ class TestCase:
         """
         ports = [9090, 9080, 9070]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', port))
+            infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
 
@@ -46,7 +46,7 @@ class TestCase:
         method: create db with empty name
         expect: create db fail with error message
         """
-        infinity_obj = infinity.connect(NetworkAddress('0.0.0.0', 9080))
+        infinity_obj = infinity.connect(REMOTE_HOST)
         assert infinity_obj
 
         res = infinity_obj.create_database("")
@@ -75,7 +75,7 @@ class TestCase:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+            infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
 
             # infinity
@@ -92,6 +92,7 @@ class TestCase:
             assert res.success
 
             db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("my_table1", if_exists=True)
             res = db_obj.create_table(
                 "my_table1", {"c1": "int, primary key"}, None)
             assert res.success
@@ -124,6 +125,7 @@ class TestCase:
             assert res.success
 
             # insert
+            db_obj.drop_table("my_table3", if_exists=True)
             res = db_obj.create_table(
                 "my_table3", {"c1": "int, primary key", "c2": "float"}, None)
             assert res.success

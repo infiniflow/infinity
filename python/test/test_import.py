@@ -15,7 +15,7 @@
 import os
 
 import infinity
-from infinity.common import NetworkAddress
+from infinity.common import REMOTE_HOST
 
 
 class TestImport:
@@ -31,7 +31,7 @@ class TestImport:
         """
         ports = [9080]
         for port in ports:
-            infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+            infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
 
             # infinity
@@ -40,14 +40,14 @@ class TestImport:
             assert db_obj
 
             # import
+            db_obj.drop_table("test_import", True)
             res = db_obj.create_table(
-                "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
-            assert res.success
-            table_obj = db_obj.get_table("my_table4")
+                "test_import", {"c1": "int", "c2": "vector,3,int"}, None)
+            table_obj = db_obj.get_table("test_import")
             assert table_obj
 
-            parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
-            test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
+            test_dir = "/tmp/infinity/test_data/"
+            test_csv_dir = test_dir + "embedding_int_dim3.csv"
             assert os.path.exists(test_csv_dir)
 
             res = table_obj.import_data(test_csv_dir, None)
@@ -57,7 +57,7 @@ class TestImport:
             res = table_obj.query_builder().output(
                 ["c1"]).filter("c1 > 1").to_df()
             print(res)
-            res = db_obj.drop_table("my_table4")
+            res = db_obj.drop_table("test_import")
             assert res.success
 
             # disconnect

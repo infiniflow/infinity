@@ -171,8 +171,8 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
 
     type_dict = dict(zip(column_names, types))
     # print()
-    print(data_dict)
-    print(type_dict)
+    # print(data_dict)
+    # print(type_dict)
     # print()
     # print(pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict))
     return pd.DataFrame.from_dict(data_dict, orient='columns').astype(type_dict)
