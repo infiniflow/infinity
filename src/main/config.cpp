@@ -98,7 +98,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     bool default_log_to_stdout = false;
     u64 default_log_max_size = 1024lu * 1024lu * 1024lu; // 1Gib
     u64 default_log_file_rotate_count = 10;
-    LogLevel default_log_level = LogLevel::kError;
+    LogLevel default_log_level = LogLevel::kTrace;
 
     // Default storage config
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
