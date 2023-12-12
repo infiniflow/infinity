@@ -17,6 +17,7 @@ import struct
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import infinity
 from benchmark.test_benchmark import trace_unhandled_exceptions
 from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
@@ -102,7 +103,6 @@ class TestQueryBenchmark:
         thread_num = 1
         total_times = 10000
 
-
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
         start = time.time()
@@ -142,3 +142,31 @@ class TestQueryBenchmark:
             print(query_vec)
             print(query_builder.to_df())
             break
+
+    def test_query_2(self):
+        thread_num = 1
+        total_times = 10000
+
+        print(">>> Query Benchmark Start <<<")
+        print(f"Thread Num: {thread_num}, Times: {total_times}")
+        start = time.time()
+
+        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+        if not os.path.exists(sift_query_path):
+            print(f"File: {sift_query_path} doesn't exist")
+            return
+
+        for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
+            infinity_obj = infinity.connect(REMOTE_HOST)
+            db_obj = infinity_obj.get_database("default")
+            assert db_obj is not None
+            if idx == total_times:
+                assert idx == total_times
+                break
+        end = time.time()
+        dur = end - start
+        print(">>> Query Benchmark End <<<")
+        qps = total_times / dur
+        print(f"Total Times: {total_times}")
+        print(f"Total Dur: {dur}")
+        print(f"QPS: {qps}")
