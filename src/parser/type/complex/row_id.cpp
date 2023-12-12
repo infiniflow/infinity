@@ -19,6 +19,6 @@
 
 namespace infinity {
 
-std::string RowID::ToString() const { return fmt::format("{}:{}", segment_id_, segment_offset_); }
+std::string RowID::ToString() const { return std::to_string(ToUint64()); }
 
 } // namespace infinity

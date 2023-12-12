@@ -21,6 +21,7 @@ import base_expression;
 import column_expression;
 import reference_expression;
 import special_function;
+import parser;
 import third_party;
 import logger;
 
@@ -42,7 +43,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
     if (op.operator_type() == LogicalNodeType::kJoin or op.operator_type() == LogicalNodeType::kKnnScan) {
         VisitNodeChildren(op);
         bindings_ = op.GetColumnBindings();
-        output_count_ = op.GetOutputTypes()->size();
+        output_types_ = op.GetOutputTypes();
         load_func();
         VisitNodeExpression(op);
     } else {
@@ -50,7 +51,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         load_func();
         VisitNodeExpression(op);
         bindings_ = op.GetColumnBindings();
-        output_count_ = op.GetOutputTypes()->size();
+        output_types_ = op.GetOutputTypes();
     }
 }
 
@@ -63,7 +64,15 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->table_name(),
                                                  expression->column_name(),
                                                  expression->alias_,
-                                                 output_count_ - 1);
+                                                 output_types_->size() - 1);
+            }
+            case SpecialType::kScore:
+            case SpecialType::kDistance: {
+                return ReferenceExpression::Make(expression->Type(),
+                                                 expression->table_name(),
+                                                 expression->column_name(),
+                                                 expression->alias_,
+                                                 output_types_->size() - 2);
             }
             default: {
                 LOG_ERROR(Format("Unknown special function: {}", expression->Name()));

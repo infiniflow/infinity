@@ -21,6 +21,7 @@ import base_expression;
 import column_binding;
 import query_context;
 import column_expression;
+import parser;
 import optimizer_rule;
 
 export module column_remapper;
@@ -35,7 +36,7 @@ private:
     virtual SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) override;
 
     Vector<ColumnBinding> bindings_;
-    SizeT output_count_;
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
 };
 
 export class ColumnRemapper : public OptimizerRule {

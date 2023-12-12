@@ -24,11 +24,11 @@ Alkali metal 30-APR-2012 05:35:44.000  royale des Sciences| title = Sur la Base 
 Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<ref name=watkins_sjsu/>  ===Valence and bonding behavior=== {{Main|Valence (chemistry)|Chemical bond}}  The outermost electron shell of an atom in its uncombined state is known as the valence shell, and the electrons in that shell are called [[valence electron]]s. The number of valence electrons determines the [[chemical bond|bonding]] behavior with other atoms. Atoms tend to [[Chemical reaction|chemically react]] with each other in a manner that fills (or empties) their outer valence shells.<ref name=reusch20070716/> For example, a transfer of a single electron between atoms is a useful approximation for bonds that form between atoms with one-electron more than a filled shell, and others that are one-electron short of a full shell, such as occurs in the compound [[sodium chloride]] and other chemical ionic salts. However, many elements display multiple valences, or tendencies to share differing numbers of electrons in different compounds. Thus, [[chemical
 
 query TTT
-SELECT doctitle, docdate, ROW_ID() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3');
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3');
 ----
-Avicenna 29-APR-2012 07:47:29.000 0:9893
-Alkali metal 30-APR-2012 05:35:44.000 0:2681
-Atom 20-APR-2012 03:53:14.000 0:7207
+Avicenna 29-APR-2012 07:47:29.000 9893 6.723495
+Alkali metal 30-APR-2012 05:35:44.000 2681 4.617455
+Atom 20-APR-2012 03:53:14.000 7207 4.617455
 
 query TTT
 SELECT doctitle, docdate, body FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), FUSION('rrf');
@@ -48,14 +48,14 @@ Atom 20-APR-2012 03:53:14.000  beam of light energy in a narrow frequency band.<
 Astronomer 17-APR-2012 19:09:32.000  York]]|ref=harv|postscript=<!--None-->|isbn=0300159110 }} * {{Cite journal|last=Kennedy|first=E.S.|title=A Survey of Islamic Astronomical Tables; Transactions of the American Philosophical Society| year=1956|location=[[Philadelphia]]| publisher=[[American Philosophical Society]]|volume=46|issue=2|ref=harv|postscript=<!--None-->}} * {{Cite encyclopedia   | last = Toomer   | first = Gerald   | title = Al-Khwārizmī, Abu Jaʿfar Muḥammad ibn Mūsā   | encyclopedia = [[Dictionary of Scientific Biography]]   | volume = 7   | editor = Gillispie, Charles Coulston   | publisher = Charles Scribner's Sons   | location = New York   | year = 1990   | isbn = 0-684-16962-2   | ref=harv  }}  ==External links== * [http://www.aas.org American Astronomical Society] * [http://www.iau.org International Astronomical Union] * [http://www.astrosociety.org Astronomical Society of the Pacific]  [[Category:Astronomy| ]] [[Category:Astronomers| ]] [[Category:Science occupations]]  [[als:Astronom]] [[ar:عالم فلك]]
 
 query TTT
-SELECT doctitle, docdate, ROW_ID() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH('doctitle^2,body^5', 'society', 'topn=3'), FUSION('rrf');
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH('doctitle^2,body^5', 'society', 'topn=3'), FUSION('rrf');
 ----
-Avicenna 29-APR-2012 07:47:29.000 0:9893
-Anarcho-capitalism 24-APR-2012 15:46:17.000 0:8781
-Alkali metal 30-APR-2012 05:35:44.000 0:2681
-Alvin Toffler 25-APR-2012 18:37:38.000 0:7533
-Atom 20-APR-2012 03:53:14.000 0:7207
-Astronomer 17-APR-2012 19:09:32.000 0:1326
+Avicenna 29-APR-2012 07:47:29.000 9893 0.016393
+Anarcho-capitalism 24-APR-2012 15:46:17.000 8781 0.016393
+Alkali metal 30-APR-2012 05:35:44.000 2681 0.016129
+Alvin Toffler 25-APR-2012 18:37:38.000 7533 0.016129
+Atom 20-APR-2012 03:53:14.000 7207 0.015873
+Astronomer 17-APR-2012 19:09:32.000 1326 0.015873
 
 # Clean up
 statement ok

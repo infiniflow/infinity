@@ -24,6 +24,8 @@ namespace infinity {
 
 export enum class SpecialType {
     kRowID,
+    kDistance,
+    kScore,
     kCreateTs,
     kDeleteTs,
 };

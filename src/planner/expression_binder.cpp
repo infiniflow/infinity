@@ -503,9 +503,26 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
     SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
     if (special_function != nullptr) {
+        switch (special_function->special_type()) {
+            case SpecialType::kDistance: {
+                if (!bind_context_ptr->allow_distance) {
+                    Error<PlannerException>("DISTANCE() needs to be allowed only when there is only KnnScan");
+                }
+                break;
+            }
+            case SpecialType::kScore: {
+                if (!bind_context_ptr->allow_score) {
+                    Error<PlannerException>("SCORE() requires Fusion or MatchScan");
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+
         String &table_name = bind_context_ptr->table_names_[0];
         String column_name = special_function->name();
-        ToUpper(column_name);
 
         TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
         SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
