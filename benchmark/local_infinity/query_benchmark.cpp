@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstring>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sys/stat.h>
@@ -119,6 +120,7 @@ int main() {
         std::cout << "--- Start to run search benchmark: " << std::endl;
 
         std::string sift_query_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
+        std::string sift_groundtruth_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
         if (!fs.Exists(sift_query_path)) {
             std::cout << "File: " << sift_query_path << " doesn't exist" << std::endl;
             break;
@@ -131,6 +133,40 @@ int main() {
             size_t dim = -1;
             queries = const_cast<const float *>(fvecs_read(sift_query_path.c_str(), &dim, &query_count));
             assert(dimension == dim || !"query vector dim isn't 128");
+        }
+        std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
+        {
+            std::unique_ptr<int[]> gt;
+            size_t gt_count;
+            size_t gt_top_k;
+            int *gt_ = nullptr;
+            {
+                gt_ = (int *)(fvecs_read(sift_groundtruth_path.c_str(), &gt_top_k, &gt_count));
+                assert(gt_top_k == 100 || !"gt top_k isn't 100");
+                assert(gt_count == 10000 || !"gt count isn't 10000");
+                gt.reset(gt_);
+            }
+            ground_truth_sets_1.resize(gt_count);
+            ground_truth_sets_10.resize(gt_count);
+            ground_truth_sets_100.resize(gt_count);
+            for (size_t i = 0; i < gt_count; ++i) {
+                for (int j = 0; j < gt_top_k; ++j) {
+                    auto x = gt_[i * gt_top_k + j];
+                    if (j < 1) {
+                        ground_truth_sets_1[i].insert(x);
+                    }
+                    if (j < 10) {
+                        ground_truth_sets_10[i].insert(x);
+                    }
+                    if (j < 100) {
+                        ground_truth_sets_100[i].insert(x);
+                    }
+                }
+            }
+        }
+        std::vector<std::vector<uint64_t>> query_results(query_count);
+        for (auto &v : query_results) {
+            v.reserve(100);
         }
         infinity::BaseProfiler profiler;
         profiler.Begin();
@@ -154,9 +190,9 @@ int main() {
             std::shared_ptr<Table> table = data_base->GetTable("knn_benchmark");
 
             std::vector<ParsedExpr *> *output_columns = new std::vector<ParsedExpr *>;
-            ColumnExpr* select_column_expr = new ColumnExpr();
-            select_column_expr->names_.emplace_back("col1");
-            output_columns->emplace_back(select_column_expr);
+            auto select_rowid_expr = new FunctionExpr();
+            select_rowid_expr->func_name_ = "row_id";
+            output_columns->emplace_back(select_rowid_expr);
             auto result = table->Search(search_expr, nullptr, output_columns);
             if(!result.IsOk()) {
                 std::cerr << "Error: " << result.ErrorStr() << std::endl;
@@ -170,11 +206,43 @@ int main() {
             if(result.ResultTable()->row_count() != knn_expr->topn_) {
                 std::cout << "Result row count: " << result.ResultTable()->row_count() << std::endl;
             }
+            {
+                auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
+                auto &column = *cv[0];
+                auto data = reinterpret_cast<const RowID *>(column.data());
+                auto cnt = column.Size();
+                for (size_t i = 0; i < cnt; ++i) {
+                    query_results[query_idx].emplace_back(data[i].ToUint64());
+                }
+            }
 
             delete[] (float*)(knn_expr->embedding_data_ptr_);
         }
         profiler.End();
         results.push_back(Format("Total cost= : {}", profiler.ElapsedToString()));
+        {
+            size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
+            for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
+                auto &result = query_results[query_idx];
+                auto &ground_truth_1 = ground_truth_sets_1[query_idx];
+                auto &ground_truth_10 = ground_truth_sets_10[query_idx];
+                auto &ground_truth_100 = ground_truth_sets_100[query_idx];
+                for (size_t i = 0; i < result.size(); ++i) {
+                    if (i < 1 and ground_truth_1.contains(result[i])) {
+                        ++correct_1;
+                    }
+                    if (i < 10 and ground_truth_10.contains(result[i])) {
+                        ++correct_10;
+                    }
+                    if (i < 100 and ground_truth_100.contains(result[i])) {
+                        ++correct_100;
+                    }
+                }
+            }
+            results.push_back(Format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
+            results.push_back(Format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
+            results.push_back(Format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
+        }
     } while (false);
 
     std::cout << ">>> Query Benchmark End <<<" << std::endl;
