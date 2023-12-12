@@ -123,10 +123,10 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     SharedPtr<SpecialFunction> row_function = MakeShared<SpecialFunction>("ROW_ID", DataType(LogicalType::kBigInt), 1, SpecialType::kRowID);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), row_function);
 
-    SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("CREATE_TS", DataType(LogicalType::kBigInt), 2, SpecialType::kCreateTs);
+    SharedPtr<SpecialFunction> create_ts_function = MakeShared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), create_ts_function);
 
-    SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("DELETE_TS", DataType(LogicalType::kBigInt), 3, SpecialType::kDeleteTs);
+    SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 3, SpecialType::kScore);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
 
 }

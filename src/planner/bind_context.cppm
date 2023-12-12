@@ -133,6 +133,9 @@ public:
 
     bool single_row = false;
 
+    bool allow_distance = false;
+    bool allow_score = false;
+
 public:
     void AddLeftChild(const SharedPtr<BindContext> &left_child);
 
@@ -157,6 +160,16 @@ public:
     [[nodiscard]] bool IsTableBound(const String &table_name) const;
 
     void BoundTable(const String &table_name) { bound_table_set_.insert(table_name); }
+
+    void BoundSearch(ParsedExpr *expr) {
+        if (expr == nullptr) {
+            return;
+        }
+        auto search_expr = (SearchExpr *)expr;
+
+        allow_distance = !search_expr->knn_exprs_.empty() && search_expr->fusion_expr_ == nullptr;
+        allow_score = !search_expr->match_exprs_.empty() || search_expr->fusion_expr_ != nullptr;
+    }
 
     void AddSubqueryBinding(const String &name,
                             u64 table_index,
