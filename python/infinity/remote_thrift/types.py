@@ -15,7 +15,7 @@
 import struct
 from collections import defaultdict
 from typing import Any
-import polars as pl
+# import polars as pl
 import pandas as pd
 from numpy import dtype
 
@@ -203,7 +203,7 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         column_vectors = column_field.column_vectors
 
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
-        data_series = pl.Series(data_list, dtype=logic_type_to_pl_type(column_data_type))
+        data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_series
 
-    return pl.DataFrame(data_dict)
+    return pd.DataFrame(data_dict)

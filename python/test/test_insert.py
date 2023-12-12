@@ -46,6 +46,7 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
+        db_obj.drop_table(table_name="table_2", if_exists=True)
         # infinity
         res = db_obj.create_table(
             "table_2", {"c1": "int, primary key, not null", "c2": "int, not null"}, None)

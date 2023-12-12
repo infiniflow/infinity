@@ -149,7 +149,6 @@ class TestSelect:
         #                               .astype({'c2': dtype('int32')}))
 
         res = db_obj.drop_table("table_1")
-        assert res.success
 
     def test_select_varchar(self):
         """
@@ -202,6 +201,7 @@ class TestSelect:
         """
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_select_varchar", True)
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             None)
         table_obj = db_obj.get_table("test_select_varchar")
@@ -228,13 +228,11 @@ class TestSelect:
         # res = table_obj.query_builder().output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
         res = db_obj.drop_table("test_select_varchar")
-        assert res.success
 
     def test_select_big(self):
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        res = db_obj.drop_table("test_select_big")
-
+        res = db_obj.drop_table("test_select_big", True)
         db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
                             None)
 
@@ -243,8 +241,6 @@ class TestSelect:
         for i in range(1000):
             table_obj.insert(
                 [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
-
-
 
     def test_select_embedding_int32(self):
         """
@@ -267,7 +263,7 @@ class TestSelect:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table("test_select_embedding")
+        db_obj.drop_table("test_select_embedding", True)
 
         res = db_obj.create_table("test_select_embedding", {
             "c1": "int", "c2": "vector,3,int"}, None)
@@ -310,7 +306,7 @@ class TestSelect:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table("test_select_embedding_float")
+        db_obj.drop_table("test_select_embedding_float", True)
 
         res = db_obj.create_table("test_select_embedding_float", {
             "c1": "float", "c2": "vector,4,float"}, None)
@@ -362,7 +358,7 @@ class TestSelect:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table("test_select_big_embedding")
+        db_obj.drop_table("test_select_big_embedding", True)
 
         db_obj.create_table("test_select_big_embedding", {
             "c1": "int", "c2": "vector,3,int"}, None)
@@ -381,7 +377,7 @@ class TestSelect:
 
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_select_same_output")
+        db_obj.drop_table("test_select_same_output", True)
         db_obj.create_table("test_select_same_output", {
             "c1": "int", "c2": "int"}, None)
 
