@@ -61,7 +61,9 @@ SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_conte
 
 SharedPtr<LogicalNode>
 BoundDeleteStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-    Assert<PlannerException>(table_ref != nullptr && table_ref->type_ == TableRefType::kTable, "unsupported!");
+    if (table_ref == nullptr || table_ref->type_ != TableRefType::kTable) {
+        Error<PlannerException>("unsupported!");
+    }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
 

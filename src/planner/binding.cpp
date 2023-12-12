@@ -36,7 +36,9 @@ SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
     binding->table_index_ = table_index;
 
     SizeT column_count = column_names->size();
-    Assert<PlannerException>(column_count == column_types->size(), "Make binding error: column size isn't valid.");
+    if (column_count != column_types->size()) {
+        Error<PlannerException>("Make binding error: column size isn't valid.");
+    }
     binding->column_types_ = Move(column_types);
     binding->column_names_ = Move(column_names);
 

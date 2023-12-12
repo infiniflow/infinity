@@ -83,7 +83,9 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     ptr += created_size * sizeof(CreateField);
     Memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
-    Assert<StorageException>(ptr - buf.data() == buf_len, "Failed to load block_version file: " + version_path);
+    if (ptr - buf.data() != buf_len) {
+        Error<StorageException>("Failed to load block_version file: " + version_path);
+    }
 }
 
 void BlockVersion::SaveToFile(const String &version_path) {
@@ -97,7 +99,9 @@ void BlockVersion::SaveToFile(const String &version_path) {
     ptr += created_.size() * sizeof(CreateField);
     Memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
-    Assert<StorageException>(ptr - buf.data() == exp_size, "Failed to save block_version file: " + version_path);
+    if (ptr - buf.data() != exp_size) {
+        Error<StorageException>("Failed to save block_version file: " + version_path);
+    }
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
         Error<StorageException>("Failed to open block_version file: " + version_path);
@@ -165,10 +169,11 @@ u16 BlockEntry::AppendData(BlockEntry *block_entry,
                            u16 append_rows,
                            BufferManager *) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                    block_entry->segment_entry_->segment_id_,
-                                    block_entry->block_id_));
+    if (block_entry->txn_ptr_ != nullptr && block_entry->txn_ptr_ != txn_ptr) {
+        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                        block_entry->segment_entry_->segment_id_,
+                        block_entry->block_id_));
+    }
     block_entry->txn_ptr_ = txn_ptr;
     u16 actual_copied = append_rows;
     if (block_entry->row_count_ + append_rows > block_entry->row_capacity_) {
@@ -196,10 +201,11 @@ u16 BlockEntry::AppendData(BlockEntry *block_entry,
 
 void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                    block_entry->segment_entry_->segment_id_,
-                                    block_entry->block_id_));
+    if (block_entry->txn_ptr_ != nullptr && block_entry->txn_ptr_ != txn_ptr) {
+        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                        block_entry->segment_entry_->segment_id_,
+                        block_entry->block_id_));
+    }
 
     String *table_collect_name_ptr = block_entry->segment_entry_->table_entry_->table_collection_name_.get();
     u32 segment_id = block_entry->segment_entry_->segment_id_;
@@ -218,10 +224,11 @@ void BlockEntry::DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
 void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(block_entry->txn_ptr_ == txn_ptr,
-                             Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                    block_entry->segment_entry_->segment_id_,
-                                    block_entry->block_id_));
+    if (block_entry->txn_ptr_ != txn_ptr) {
+        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                        block_entry->segment_entry_->segment_id_,
+                        block_entry->block_id_));
+    }
     block_entry->txn_ptr_ = nullptr;
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     if (block_entry->min_row_ts_ == 0) {
@@ -235,9 +242,11 @@ void BlockEntry::CommitAppend(BlockEntry *block_entry, Txn *txn_ptr) {
 
 void BlockEntry::CommitDelete(BlockEntry *block_entry, Txn *txn_ptr) {
     UniqueLock<RWMutex> lck(block_entry->rw_locker_);
-    Assert<StorageException>(
-        block_entry->txn_ptr_ == nullptr || block_entry->txn_ptr_ == txn_ptr,
-        Format("Expect txn_ptr_ not be nullptr of Segment: {}, Block: {}", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
+    if (block_entry->txn_ptr_ != nullptr && block_entry->txn_ptr_ != txn_ptr) {
+        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
+                        block_entry->segment_entry_->segment_id_,
+                        block_entry->block_id_));
+    }
     if (block_entry->txn_ptr_ == nullptr)
         return;
     block_entry->txn_ptr_ = nullptr;
@@ -265,7 +274,11 @@ void BlockEntry::FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_
 
 void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
     LOG_TRACE(Format("Segment: {}, Block: {} is being flushing", block_entry->segment_entry_->segment_id_, block_entry->block_id_));
-    Assert<StorageException>(checkpoint_ts >= block_entry->checkpoint_ts_, "BlockEntry checkpoint_ts skew!");
+    if (checkpoint_ts < block_entry->checkpoint_ts_) {
+        Error<StorageException>(Format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, block_entry->checkpoint_ts_: {}",
+                        checkpoint_ts,
+                        block_entry->checkpoint_ts_));
+    }
     int checkpoint_row_count = 0;
 
     BlockVersion checkpoint_version(block_entry->block_version_->deleted_.size());
@@ -276,7 +289,9 @@ void BlockEntry::Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts) {
             return;
 
         checkpoint_row_count = block_entry->block_version_->GetRowCount(checkpoint_ts);
-        Assert<StorageException>(checkpoint_row_count > 0, "BlockEntry is empty at checkpoint_ts!");
+        if (checkpoint_row_count == 0) {
+            Error<StorageException>("BlockEntry is empty at checkpoint_ts!");
+        }
         const Vector<TxnTimeStamp> &deleted = block_entry->block_version_->deleted_;
         if (checkpoint_row_count <= block_entry->checkpoint_row_count_) {
             // BlockEntry doesn't append rows between the previous checkpoint and checkpoint_ts.
@@ -367,22 +382,35 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, u64 block_i
 
 void BlockEntry::MergeFrom(BaseEntry &other) {
     auto block_entry2 = dynamic_cast<BlockEntry *>(&other);
-    Assert<StorageException>(block_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
-    // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(*this->base_dir_ == *block_entry2->base_dir_, "BlockEntry::MergeFrom requires base_dir_ match");
-    Assert<StorageException>(this->block_id_ == block_entry2->block_id_, "BlockEntry::MergeFrom requires block_id_ match");
-    Assert<StorageException>(this->row_capacity_ == block_entry2->row_capacity_, "BlockEntry::MergeFrom requires row_capacity_ match");
-    Assert<StorageException>(this->min_row_ts_ == block_entry2->min_row_ts_, "BlockEntry::MergeFrom requires min_row_ts_ match");
-    Assert<StorageException>(this->row_count_ <= block_entry2->row_count_,
-                             "BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
-    Assert<StorageException>(
-        this->checkpoint_ts_ <= block_entry2->checkpoint_ts_,
-        "BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
-    Assert<StorageException>(
-        this->checkpoint_row_count_ <= block_entry2->checkpoint_row_count_,
-        "BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
-    Assert<StorageException>(columns_.size() <= block_entry2->columns_.size(),
-                             "BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
+    if (block_entry2 == nullptr) {
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+    }
+    // // No locking here since only the load stage needs MergeFrom.
+    if (*this->base_dir_ != *block_entry2->base_dir_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires base_dir_ match");
+    }
+    if (this->block_id_ != block_entry2->block_id_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires block_id_ match");
+    }
+    if (this->row_capacity_ != block_entry2->row_capacity_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires row_capacity_ match");
+    }
+    if (this->min_row_ts_ != block_entry2->min_row_ts_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires min_row_ts_ match");
+    }
+    if (this->row_count_ > block_entry2->row_count_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
+    }
+    if (this->checkpoint_ts_ > block_entry2->checkpoint_ts_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
+    }
+    if (this->checkpoint_row_count_ > block_entry2->checkpoint_row_count_) {
+        Error<StorageException>("BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
+    }
+    if (columns_.size() > block_entry2->columns_.size()) {
+        Error<StorageException>("BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
+    }
+
     if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
         return;
     this->row_count_ = block_entry2->row_count_;

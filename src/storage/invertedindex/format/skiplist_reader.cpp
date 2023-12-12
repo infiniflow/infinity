@@ -19,8 +19,12 @@ SkipListReader::SkipListReader(const SkipListReader &other)
 SkipListReader::~SkipListReader() {}
 
 void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
-    Assert<StorageException>(start <= byte_slice_list->GetTotalSize(), "start <= byte_slice_list->GetTotalSize().");
-    Assert<StorageException>(end <= byte_slice_list->GetTotalSize(), "end <= byte_slice_list->GetTotalSize().");
+    if (start > byte_slice_list->GetTotalSize()) {
+        Error<StorageException>("start > byte_slice_list->GetTotalSize().");
+    }
+    if (end > byte_slice_list->GetTotalSize()) {
+        Error<StorageException>("end > byte_slice_list->GetTotalSize().");
+    }
     start_ = start;
     end_ = end;
     byte_slice_reader_.Open(const_cast<ByteSliceList *>(byte_slice_list));
@@ -28,8 +32,12 @@ void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 e
 }
 
 void SkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end) {
-    Assert<StorageException>(start <= byte_slice->size_, "start <= byte_slice->size_.");
-    Assert<StorageException>(end <= byte_slice->size_, "end <= byte_slice->size_.");
+    if (start > byte_slice->size_) {
+        Error<StorageException>("start > byte_slice->size_.");
+    }
+    if (end > byte_slice->size_) {
+        Error<StorageException>("end > byte_slice->size_.");
+    }
 
     start_ = start;
     end_ = end;

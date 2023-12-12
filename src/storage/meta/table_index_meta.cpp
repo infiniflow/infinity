@@ -329,7 +329,9 @@ void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager
 }
 
 void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
-    Assert<StorageException>(IsEqual(*this->index_name_, *other.index_name_), "TableIndexMeta::MergeFrom requires index_name_ match");
+    if (!IsEqual(*this->index_name_, *other.index_name_)) {
+        Error<StorageException>("TableIndexMeta::MergeFrom requires index_name_ match");
+    }
     MergeLists(this->entry_list_, other.entry_list_);
 }
 

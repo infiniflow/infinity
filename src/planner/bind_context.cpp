@@ -200,19 +200,25 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
 
     for (const auto &table_name2index_pair : other_ptr->table_name2table_index_) {
         const String &table_name = table_name2index_pair.first;
-        Assert<PlannerException>(!table_name2table_index_.contains(table_name), Format("{} was bound before", table_name));
+        if (table_name2table_index_.contains(table_name)) {
+            Error<PlannerException>(Format("{} was bound before", table_name));
+        }
         table_name2table_index_[table_name] = table_name2index_pair.second;
     }
 
     for (const auto &table_index2name_pair : other_ptr->table_table_index2table_name_) {
         u64 table_index = table_index2name_pair.first;
-        Assert<PlannerException>(!table_table_index2table_name_.contains(table_index), Format("Table index: {} is bound before", table_index));
+        if (table_table_index2table_name_.contains(table_index)) {
+            Error<PlannerException>(Format("Table index: {} is bound before", table_index));
+        }
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
 
     for (auto &name_binding_pair : other_ptr->binding_by_name_) {
         auto &binding_name = name_binding_pair.first;
-        Assert<PlannerException>(!binding_by_name_.contains(binding_name), Format("Table: {} was bound before", binding_name));
+        if (binding_by_name_.contains(binding_name)) {
+            Error<PlannerException>(Format("Table: {} was bound before", binding_name));
+        }
         this->binding_by_name_.emplace(name_binding_pair);
     }
 

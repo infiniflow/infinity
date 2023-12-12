@@ -32,7 +32,12 @@ public:
 public:
     explicit VectorBuffer() { GlobalResourceUsage::IncrObjectCount(); }
 
-    ~VectorBuffer() { GlobalResourceUsage::DecrObjectCount(); }
+    ~VectorBuffer() {
+        GlobalResourceUsage::DecrObjectCount();
+        // if (data_) {
+        //     delete[] data_;
+        // }
+    }
 
     void Initialize(SizeT type_size, SizeT capacity);
 
@@ -40,11 +45,15 @@ public:
 
     void Copy(ptr_t input, SizeT size);
 
-    [[nodiscard]] ptr_t GetData() const { return data_.get(); }
+    [[nodiscard]] ptr_t GetData() const { 
+        return data_.get(); 
+        // return data_;
+    }
 
 public:
     bool initialized_{false};
     UniquePtr<char[]> data_{nullptr};
+    // char *data_{};
     SizeT data_size_{0};
     SizeT capacity_{0};
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};

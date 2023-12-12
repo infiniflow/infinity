@@ -39,15 +39,11 @@ void PrintStacktrace(const String &err_msg) {
     free(stacktrace);
 }
 
-void Assert(bool is_true, const String &message, const char *file_name, u32 line) {
-    if (!(is_true)) {
-        String err_msg = message;
-        err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
-        PrintStacktrace(err_msg);
-        throw Exception(err_msg);
-    }
+void Error(const String &message, const char *file_name, u32 line) {
+    String err_msg = message;
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    PrintStacktrace(err_msg);
+    throw Exception(err_msg);
 }
-
-void Error(const String &message, const char *file_name, u32 line) { return Assert(false, message, file_name, line); }
 
 } // namespace infinity

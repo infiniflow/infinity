@@ -31,10 +31,13 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity,
 }
 
 void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
-    Assert<TypeException>(!initialized_, "Vector buffer is already initialized.");
+    if (initialized_) {
+        Error<TypeException>("Vector buffer is already initialized.");
+    }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
         data_ = MakeUnique<char[]>(data_size);
+        // data_ = new char[data_size];
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>();
@@ -51,8 +54,11 @@ void VectorBuffer::ResetToInit() {
 }
 
 void VectorBuffer::Copy(ptr_t input, SizeT size) {
-    Assert<TypeException>(data_size_ >= size, "Attempt to copy an amount of data that cannot currently be accommodated");
+    if (data_size_ < size) {
+        Error<TypeException>("Attempt to copy an amount of data that cannot currently be accommodated");
+    }
     Memcpy(data_.get(), input, size);
+    // Memcpy(data_, input, size);
 }
 
 } // namespace infinity

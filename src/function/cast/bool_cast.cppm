@@ -53,7 +53,9 @@ export struct TryCastBoolean {
 //}
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() == LogicalType::kBoolean, Format("Expect boolean type, but it is {}", source.ToString()));
+    if (source.type() != LogicalType::kBoolean) {
+        Error<TypeException>(Format("Expect boolean type, but it is {}", source.ToString()));
+    }
 
     switch (target.type()) {
         case LogicalType::kVarchar: {

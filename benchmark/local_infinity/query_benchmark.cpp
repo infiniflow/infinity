@@ -212,7 +212,7 @@ int main() {
             }
 
             if(query_idx % 1000 == 999) {
-                std::cout << Format("{}: cost {}", query_idx + 1, profiler.ElapsedToString()) << std::endl;
+                std::cout << Format("{}: cost {}", query_idx + 1, profiler.ElapsedToString(1000)) << std::endl;
             }
 
             if(result.ResultTable()->row_count() != topk) {
@@ -233,7 +233,7 @@ int main() {
             knn_expr->embedding_data_ptr_ = nullptr;
         }
         profiler.End();
-        results.push_back(Format("Total cost= : {}", profiler.ElapsedToString()));
+        results.push_back(Format("Total cost= : {}", profiler.ElapsedToString(1000)));
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
             for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {

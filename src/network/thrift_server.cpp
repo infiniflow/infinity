@@ -113,7 +113,9 @@ public:
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         CreateTableOptions create_table_opts;
-        Assert<NetworkException>(database != nullptr, "Database is null", __FILE_NAME__, __LINE__);
+        if (database == nullptr) {
+            Error<NetworkException>("Database is null", __FILE_NAME__, __LINE__);
+        }
 
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
         ProcessCommonResult(response, result);
@@ -230,7 +232,9 @@ public:
                            SizeT column_count,
                            SharedPtr<TableDef> table_def,
                            Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
-        Assert<NetworkException>(column_count == all_column_vectors.size(), "Column count not match");
+        if (column_count != all_column_vectors.size()) {
+            Error<NetworkException>("Column count not match", __FILE_NAME__, __LINE__);
+        }
         for (SizeT col_index = 0; col_index < column_count; ++col_index) {
             auto column_def = table_def->columns()[col_index];
             infinity_thrift_rpc::ColumnDef proto_column_def;
@@ -288,7 +292,9 @@ public:
             current_offset += sizeof(i32) + varchar.length_;
         }
 
-        Assert<NetworkException>(current_offset == all_size, "Bug");
+        if (current_offset != all_size) {
+            Error<NetworkException>("Bug");
+        }
 
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
     }

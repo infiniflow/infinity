@@ -70,7 +70,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr) {
-    Assert<ExecutorException>(agg_expr->arguments().size() == 1, "Aggregate function arguments error.");
+    if (agg_expr->arguments().size() != 1) {
+        Error<ExecutorException>("Aggregate function arguments error.");
+    }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(agg_expr->arguments()[0]);
@@ -100,7 +102,9 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 }
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
-    Assert<ExecutorException>(cast_expr->arguments().size() == 1, "Cast function arguments error.");
+    if (cast_expr->arguments().size() != 1) {
+        Error<ExecutorException>("Cast function arguments error.");
+    }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);

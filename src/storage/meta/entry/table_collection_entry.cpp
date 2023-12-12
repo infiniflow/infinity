@@ -179,7 +179,9 @@ void TableCollectionEntry::GetFullTextAnalyzers(TableCollectionEntry *table_entr
     BaseEntry *base_entry;
     for (auto &[_, tableIndexMeta] : table_entry->index_meta_map_) {
         if (TableIndexMeta::GetEntry(tableIndexMeta.get(), txn_id, begin_ts, base_entry).ok()) {
-            Assert<StorageException>(EntryType::kTableIndex == base_entry->entry_type_, "unexpected entry type under TableIndexMeta");
+            if (EntryType::kTableIndex != base_entry->entry_type_) {
+                Error<StorageException>("unexpected entry type under TableIndexMeta");
+            }
             TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
             irs_index_entry = table_index_entry->irs_index_entry_;
             for (SharedPtr<IndexBase> &indexBase : table_index_entry->index_def_->index_array_) {
@@ -199,7 +201,9 @@ void TableCollectionEntry::GetFullTextAnalyzers(TableCollectionEntry *table_entr
 }
 
 void TableCollectionEntry::Append(TableCollectionEntry *table_entry, Txn *txn_ptr, void *txn_store, BufferManager *buffer_mgr) {
-    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
+    if (table_entry->deleted_) {
+        Error<StorageException>("table is deleted");
+    }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     if (append_state_ptr->Finished()) {
@@ -327,7 +331,9 @@ UniquePtr<String> TableCollectionEntry::RollbackDelete(TableCollectionEntry *, T
 }
 
 UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *table_entry, Txn *txn_ptr, SharedPtr<SegmentEntry> segment) {
-    Assert<StorageException>(!table_entry->deleted_, "table is deleted");
+    if (table_entry->deleted_) {
+        Error<StorageException>("table is deleted");
+    }
     TxnTimeStamp commit_ts = txn_ptr->CommitTS();
     segment->min_row_ts_ = commit_ts;
     segment->max_row_ts_ = commit_ts;
@@ -494,11 +500,11 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
 
-    if (table_entry->deleted_)
-        Assert<StorageException>(table_entry->segment_map_.empty(), "deleted table should have no segment");
-    else
-        Assert<StorageException>(table_entry->segment_map_.empty() || table_entry->segment_map_[0].get() != nullptr,
-                                 "table segment 0 should be valid");
+    if (table_entry->deleted_ && !table_entry->segment_map_.empty()) {
+        Error<StorageException>("deleted table should have no segment");
+    } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
+        Error<StorageException>("table segment 0 should be valid");
+    }
 
     if (table_entry_json.contains("table_indexes")) {
         for (const auto &index_def_meta_json : table_entry_json["table_indexes"]) {
@@ -522,13 +528,19 @@ u64 TableCollectionEntry::GetColumnIdByName(const String &column_name) {
 
 void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     auto table_entry2 = dynamic_cast<TableCollectionEntry *>(&other);
-    Assert<StorageException>(table_entry2 != nullptr, "MergeFrom requires the same type of BaseEntry");
-    // No locking here since only the load stage needs MergeFrom.
-    Assert<StorageException>(*this->table_collection_name_ == *table_entry2->table_collection_name_,
-                             "DBEntry::MergeFrom requires table_collection_name_ match");
-    Assert<StorageException>(*this->table_entry_dir_ == *table_entry2->table_entry_dir_, "DBEntry::MergeFrom requires table_entry_dir_ match");
-    Assert<StorageException>(this->table_collection_type_ == table_entry2->table_collection_type_,
-                             "DBEntry::MergeFrom requires table_entry_dir_ match");
+    if (table_entry2 == nullptr) {
+        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+    }
+    // // No locking here since only the load stage needs MergeFrom.
+    if (*this->table_collection_name_ != *table_entry2->table_collection_name_) {
+        Error<StorageException>("DBEntry::MergeFrom requires table_collection_name_ match");
+    }
+    if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
+        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+    }
+    if (this->table_collection_type_ != table_entry2->table_collection_type_) {
+        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+    }
 
     this->next_segment_id_.store(Max(this->next_segment_id_, table_entry2->next_segment_id_));
     this->row_count_.store(Max(this->row_count_, table_entry2->row_count_));
@@ -548,7 +560,9 @@ void TableCollectionEntry::MergeFrom(BaseEntry &other) {
     }
     if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
         auto seg_it = this->segment_map_.find(max_segment_id);
-        Assert<StorageException>(seg_it != this->segment_map_.end(), Format("max_segment_id {} is invalid", max_segment_id));
+        if (seg_it == this->segment_map_.end()) {
+            Error<StorageException>(Format("max_segment_id {} is invalid", max_segment_id));
+        }
         this->unsealed_segment_ = seg_it->second.get();
     }
 

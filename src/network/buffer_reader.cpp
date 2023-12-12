@@ -130,7 +130,9 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
     }
 
     if (null_terminator == NullTerminator::kYes) {
-        Assert<NetworkException>(result.back() == NULL_END, "Last character isn't null.");
+        if (result.back() != NULL_END) {
+            Error<NetworkException>("Last character isn't null.");
+        }
         result.pop_back();
     }
 
@@ -168,7 +170,9 @@ void BufferReader::receive_more(SizeT bytes) {
         Error<ClientException>("Client close the connection.");
     }
 
-    Assert<NetworkException>(!boost_error, boost_error.message());
+    if (boost_error) {
+        Error<NetworkException>(boost_error.message());
+    }
 
     current_pos_.increment(bytes_read);
 }

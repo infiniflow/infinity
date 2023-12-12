@@ -105,7 +105,9 @@ void BufferWriter::send_value_u32(u32 host_value) {
 }
 
 void BufferWriter::flush(SizeT bytes) {
-    Assert<NetworkException>(bytes <= size(), "Can't flush more bytes than available");
+    if (bytes > size()) {
+        Error<NetworkException>("Can't flush more bytes than available");
+    }
     const auto bytes_to_send = bytes ? bytes : size();
     SizeT bytes_sent{0};
 
@@ -128,7 +130,9 @@ void BufferWriter::flush(SizeT bytes) {
         Error<NetworkException>("Write failed. Client close connection.");
     }
 
-    Assert<NetworkException>(!boost_error, boost_error.message());
+    if (boost_error) {
+        Error<NetworkException>(boost_error.message());
+    }
     start_pos_.increment(bytes_sent);
 }
 

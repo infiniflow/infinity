@@ -35,7 +35,9 @@ export struct FloatTryCastToVarlen;
 
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() != target.type(), Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+    if (source.type() == target.type()) {
+        Error<FunctionException>("Can't cast from the same type");
+    }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, TinyIntT, FloatTryCastToFixlen>);
@@ -160,8 +162,9 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const Sha
         Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
         Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer. ");
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+        }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
         target.vector_.chunk_offset_ = chunk_offset;
@@ -242,8 +245,9 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const Sh
         Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
         Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                              "Varchar column vector should use MemoryVectorBuffer. ");
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+        }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
         target.vector_.chunk_offset_ = chunk_offset;

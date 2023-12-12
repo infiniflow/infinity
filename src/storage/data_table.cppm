@@ -68,8 +68,9 @@ public:
     [[nodiscard]] SizeT DataBlockCount() const { return data_blocks_.size(); }
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
-        Assert<StorageException>(idx < data_blocks_.size(),
-                                 Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
+        if (idx >= data_blocks_.size()) {
+            Error<StorageException>(Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
+        }
         return data_blocks_[idx];
     }
 

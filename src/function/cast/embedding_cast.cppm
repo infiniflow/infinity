@@ -37,8 +37,9 @@ template <typename SourceElemType>
 BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
-    Assert<TypeException>(source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kEmbedding,
-                          Format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+    if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
+        Error<TypeException>(Format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+    }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
@@ -141,8 +142,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           VarcharT &target,
                                           const DataType &,
                                           const SharedPtr<ColumnVector> &vector_ptr) {
-    Assert<TypeException>(source_type.type() == LogicalType::kEmbedding,
-                          Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+    if (source_type.type() != LogicalType::kEmbedding) {
+        Error<TypeException>(Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+    }
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
 
@@ -157,7 +159,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         // inline varchar
         Memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
-        Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap, "Varchar column vector should use MemoryVectorBuffer.");
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+            Error<TypeException>(Format("Varchar column vector should use MemoryVectorBuffer."));
+        }
 
         // Set varchar prefix
         Memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);

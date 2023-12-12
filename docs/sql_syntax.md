@@ -54,7 +54,7 @@ DROP INDEX — remove an index
 DROP INDEX [IF EXISTS] name ON table_name;
 ```
 
-### DESCRIBE INDEX
+### DESCRIBE INDEX name
 
 #### Synopsis
 

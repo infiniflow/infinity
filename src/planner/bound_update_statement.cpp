@@ -45,7 +45,9 @@ namespace infinity {
 SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     SharedPtr<LogicalNode> current_node;
-    Assert<PlannerException>(!where_conditions_.empty(), "where_conditions_ shall not be empty");
+    if (where_conditions_.empty()) {
+        Error<PlannerException>("where_conditions_ shall not be empty");
+    }
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
     if (!where_conditions_.empty()) {
         current_node = BuildFilter(from, where_conditions_, query_context, bind_context);
@@ -62,7 +64,9 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
 
 SharedPtr<LogicalNode>
 BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-    Assert<PlannerException>(table_ref != nullptr && table_ref->type_ == TableRefType::kTable, "unsupported!");
+    if (table_ref == nullptr || table_ref->type_ != TableRefType::kTable) {
+        Error<PlannerException>("unsupported!");
+    }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
 

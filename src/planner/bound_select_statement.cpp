@@ -104,7 +104,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!order_by_expressions_.empty()) {
-            Assert<PlannerException>(order_by_expressions_.size() == order_by_types_.size(), "Unknown error on order by expression");
+            if (order_by_expressions_.size() != order_by_types_.size()) {
+                Error<PlannerException>("Unknown error on order by expression");
+            }
             SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
             sort->set_left_node(root);
             root = sort;
@@ -129,7 +131,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(search_expr_->match_exprs_.size());
         for (auto &match_expr : search_expr_->match_exprs_) {
-            Assert<PlannerException>(table_ref_ptr_->type() == TableRefType::kTable, "Not base table reference");
+            if (table_ref_ptr_->type() != TableRefType::kTable) {
+                Error<PlannerException>("Not base table reference");
+            }
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             SharedPtr<LogicalNode> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
             match_knn_nodes.push_back(matchNode);
@@ -137,7 +141,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         bind_context->GenerateTableIndex();
         for (auto &knn_expr : search_expr_->knn_exprs_) {
-            Assert<PlannerException>(table_ref_ptr_->type() == TableRefType::kTable, "Not base table reference");
+            if (table_ref_ptr_->type() != TableRefType::kTable) {
+                Error<PlannerException>("Not base table reference");
+            }
             SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
             // FIXME: need check if there is subquery inside the where conditions
             auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);

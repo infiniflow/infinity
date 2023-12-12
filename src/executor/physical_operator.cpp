@@ -45,7 +45,9 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     auto load_metas = *load_metas_.get();
     // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
-    Assert<ExecutorException>(table_ref.get() != nullptr, "TableRef not found!");
+    if (table_ref.get() == nullptr) {
+        Error<ExecutorException>("TableRef not found!");
+    }
 
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {
         auto input_block = operator_state->prev_op_state_->data_block_array_[i].get();

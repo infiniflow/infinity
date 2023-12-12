@@ -40,7 +40,9 @@ BitmaskBuffer::BitmaskBuffer() { GlobalResourceUsage::IncrObjectCount(); }
 BitmaskBuffer::~BitmaskBuffer() { GlobalResourceUsage::DecrObjectCount(); }
 
 void BitmaskBuffer::Initialize(SizeT count) {
-    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
+    if ((count & (count - 1)) != 0) {
+        Error<TypeException>("Capacity need to be N power of 2.");
+    }
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length
     data_ptr_ = MakeUnique<u64[]>(unit_count);
@@ -50,7 +52,9 @@ void BitmaskBuffer::Initialize(SizeT count) {
 }
 
 void BitmaskBuffer::Initialize(const u64 *input_ptr, SizeT count) {
-    Assert<TypeException>((count & (count - 1)) == 0, "Capacity need to be N power of 2.");
+    if ((count & (count - 1)) != 0) {
+        Error<TypeException>("Capacity need to be N power of 2.");
+    }
     count_ = count;
     SizeT unit_count = UnitCount(count); // u64 array length
     data_ptr_ = MakeUnique<u64[]>(unit_count);

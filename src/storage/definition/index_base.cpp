@@ -87,7 +87,9 @@ void IndexBase::WriteAdv(char *&ptr) const {
 
 SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
 //    char *const ptr_end = ptr + maxbytes;
-    Assert<StorageException>(maxbytes > 0, "ptr goes out of range when reading IndexBase");
+    if (maxbytes <= 0) {
+        Error<StorageException>("ptr goes out of range when reading IndexBase");
+    }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
     String file_name = ReadBufAdv<String>(ptr);
@@ -124,7 +126,9 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             Error<StorageException>("Not implemented");
         }
     }
-    Assert<StorageException>(maxbytes >= 0, "ptr goes out of range when reading IndexBase");
+    if (maxbytes < 0) {
+        Error<StorageException>("ptr goes out of range when reading IndexBase");
+    }
     return res;
 }
 

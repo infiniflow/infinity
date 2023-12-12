@@ -117,7 +117,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             Error<StorageException>(Format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
     max_bytes = ptr_end - ptr;
-    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalCmd");
+    if (max_bytes < 0) {
+        Error<StorageException>("ptr goes out of range when reading WalCmd");
+    }
     return cmd;
 }
 
@@ -346,7 +348,9 @@ void WalEntry::WriteAdv(char *&ptr) const {
 
 SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
-    Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry");
+    if (max_bytes <= 0) {
+        Error<StorageException>("ptr goes out of range when reading WalEntry");
+    }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     auto *header = (WalEntryHeader *)ptr;
     entry->size = header->size;
@@ -366,13 +370,17 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (SizeT i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
-        Assert<StorageException>(max_bytes > 0, "ptr goes out of range when reading WalEntry");
+        if (max_bytes <= 0) {
+            Error<StorageException>("ptr goes out of range when reading WalEntry");
+        }
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds.push_back(cmd);
     }
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
-    Assert<StorageException>(max_bytes >= 0, "ptr goes out of range when reading WalEntry");
+    if (max_bytes < 0) {
+        Error<StorageException>("ptr goes out of range when reading WalEntry");
+    }
     return entry;
 }
 
