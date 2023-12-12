@@ -115,10 +115,10 @@ public:
 
     void SetVectorType(ColumnVectorType vector_type) {
         if (initialized) {
-            Error<StorageException>("Column vector is initialized");
+            Error<TypeException>("Column vector is initialized");
         }
         if (vector_type == ColumnVectorType::kInvalid) {
-            Error<StorageException>("Invalid column vector type.");
+            Error<TypeException>("Invalid column vector type.");
         }
         if (vector_type_ == vector_type) {
             return;

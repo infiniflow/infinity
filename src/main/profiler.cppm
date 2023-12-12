@@ -33,9 +33,9 @@ public:
     // End the profiler
     void End();
 
-    [[nodiscard]] String ElapsedToString() const;
+    [[nodiscard]] String ElapsedToString(i64 scale = 1) const;
 
-    static String ElapsedToString(NanoSeconds duration);
+    static String ElapsedToString(NanoSeconds duration, i64 scale = 1);
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline i64 Elapsed() const {

@@ -36,8 +36,8 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
-        // data_ = MakeUnique<char[]>(data_size);
-        data_ = new char[data_size];
+        data_ = MakeUnique<char[]>(data_size);
+        // data_ = new char[data_size];
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>();
@@ -57,8 +57,8 @@ void VectorBuffer::Copy(ptr_t input, SizeT size) {
     if (data_size_ < size) {
         Error<TypeException>("Attempt to copy an amount of data that cannot currently be accommodated");
     }
-    // Memcpy(data_.get(), input, size);
-    Memcpy(data_, input, size);
+    Memcpy(data_.get(), input, size);
+    // Memcpy(data_, input, size);
 }
 
 } // namespace infinity
