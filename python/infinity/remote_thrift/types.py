@@ -170,4 +170,4 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_series
 
-    return pd.DataFrame.from_dict(data_dict, orient='columns')
+    return pd.DataFrame(data_dict)
