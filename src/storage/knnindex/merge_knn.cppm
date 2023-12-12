@@ -27,10 +27,13 @@ export module merge_knn;
 
 namespace infinity {
 
-export class MergeKnnBase {};
+export class MergeKnnBase {
+public:
+    virtual ~MergeKnnBase() = default;
+};
 
 export template <typename DataType, template <typename, typename> typename C>
-class MergeKnn : public MergeKnnBase {
+class MergeKnn final : public MergeKnnBase {
     using HeapResultHandler = NewHeapResultHandler<C<DataType, RowID>>;
     using SingleResultHandler = HeapResultHandler::HeapSingleResultHandler;
 
@@ -41,8 +44,10 @@ public:
         : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUnique<RowID[]>(topk * query_count)),
           distance_array_(MakeUnique<DataType[]>(topk * query_count)) {
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, this->distance_array_.get(), this->idx_array_.get(), topk);
-        single_result_handler_ = MakeUnique<SingleResultHandler>(*heap_result_handler_, query_count);
+        single_result_handler_ = MakeUnique<SingleResultHandler>(heap_result_handler_.get(), query_count);
     }
+
+    ~MergeKnn() final = default;
 
 public:
     void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id);

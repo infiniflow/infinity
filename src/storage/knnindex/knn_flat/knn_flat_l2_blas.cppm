@@ -47,7 +47,7 @@ public:
         distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->top_k_ * this->query_count_);
 
         heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, distance_array_.get(), id_array_->data(), this->top_k_);
-        single_result_handler_ = MakeUnique<SingleResultHandler>(*heap_result_handler_, query_count);
+        single_result_handler_ = MakeUnique<SingleResultHandler>(heap_result_handler_.get(), query_count);
     }
 
     void Begin() final {

@@ -176,7 +176,7 @@ int main() {
         }
         infinity::BaseProfiler profiler;
         profiler.Begin();
-
+        query_count = 1;
         int64_t topk = 100;
         for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
 
@@ -230,7 +230,7 @@ int main() {
             }
 
             delete[] embedding_data_ptr;
-            knn_expr->embedding_data_ptr_ = nullptr;
+//            knn_expr->embedding_data_ptr_ = nullptr;
         }
         profiler.End();
         results.push_back(Format("Total cost= : {}", profiler.ElapsedToString(1000)));
