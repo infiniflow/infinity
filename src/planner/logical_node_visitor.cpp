@@ -34,6 +34,7 @@ import logical_project;
 import logical_sort;
 import logical_insert;
 import logical_update;
+import logical_knn_scan;
 
 import aggregate_expression;
 import between_expression;
@@ -122,6 +123,13 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
             for (auto &update_column_pair : node.update_columns_) {
                 SharedPtr<BaseExpression> &expression = update_column_pair.second;
                 VisitExpression(expression);
+            }
+            break;
+        }
+        case LogicalNodeType::kKnnScan: {
+            auto &node = (LogicalKnnScan &)op;
+            if(node.filter_expression_) {
+                VisitExpression(node.filter_expression_);
             }
             break;
         }

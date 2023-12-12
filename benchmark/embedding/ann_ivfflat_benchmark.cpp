@@ -35,31 +35,33 @@ static const char *ivfflat_index_name_suffix = "/ivfflat_index.save";
 
 using namespace infinity;
 
-template<typename T>
-std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num,
-                               int &dim) {  // load data with sift10K pattern
+template <typename T>
+std::unique_ptr<T[]> load_data(const std::string &filename,
+                               size_t &num,
+                               int &dim) { // load data with sift10K pattern
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open()) {
         std::cout << "open file error" << std::endl;
         exit(-1);
     }
-    in.read((char *) &dim, 4);
+    in.read((char *)&dim, 4);
     in.seekg(0, std::ios::end);
     auto ss = in.tellg();
-    num = ((size_t) ss) / (dim + 1) / 4;
+    num = ((size_t)ss) / (dim + 1) / 4;
     auto data = std::make_unique<T[]>(num * dim);
 
     in.seekg(0, std::ios::beg);
     for (size_t i = 0; i < num; i++) {
         in.seekg(4, std::ios::cur);
-        in.read((char *) (data.get() + i * dim), dim * 4);
+        in.read((char *)(data.get() + i * dim), dim * 4);
     }
     in.close();
     return data;
 }
 
-template<typename T1, typename T2>
-void output_recall_top_k(const unsigned top_k, std::vector<std::vector<T1>> &results,
+template <typename T1, typename T2>
+void output_recall_top_k(const unsigned top_k,
+                         std::vector<std::vector<T1>> &results,
                          const std::vector<std::unordered_set<T2>> &groundtruth_1,
                          const std::vector<std::unordered_set<T2>> &groundtruth_10,
                          const std::vector<std::unordered_set<T2>> &groundtruth_100) {
@@ -82,12 +84,9 @@ void output_recall_top_k(const unsigned top_k, std::vector<std::vector<T1>> &res
             }
         }
     }
-    std::cout << "R@1:   " << std::fixed << std::setprecision(3) << float(gt_cnt_1) / float(results.size() * 1)
-              << std::endl;
-    std::cout << "R@10:  " << std::fixed << std::setprecision(3) << float(gt_cnt_10) / float(results.size() * 10)
-              << std::endl;
-    std::cout << "R@100: " << std::fixed << std::setprecision(3) << float(gt_cnt_100) / float(results.size() * 100)
-              << std::endl;
+    std::cout << "R@1:   " << std::fixed << std::setprecision(3) << float(gt_cnt_1) / float(results.size() * 1) << std::endl;
+    std::cout << "R@10:  " << std::fixed << std::setprecision(3) << float(gt_cnt_10) / float(results.size() * 10) << std::endl;
+    std::cout << "R@100: " << std::fixed << std::setprecision(3) << float(gt_cnt_100) / float(results.size() * 100) << std::endl;
 }
 
 int main() {
@@ -104,9 +103,7 @@ int main() {
     size_t n_probes_end = 10;
     size_t n_probes_step = 1;
     // let user choose to test sift1M or deep10M
-    enum test_type {
-        invalid = 0, sift1M = 1, deep10M = 2
-    };
+    enum test_type { invalid = 0, sift1M = 1, deep10M = 2 };
     std::cout << "please choose to test sift1M or deep10M, input 1 or 2" << std::endl;
     std::cout << "1. sift1M" << std::endl;
     std::cout << "2. deep10M" << std::endl;
@@ -139,7 +136,7 @@ int main() {
     }
     MetricType metric = MetricType::kInvalid;
     std::string metric_str;
-    //let user choose metric
+    // let user choose metric
     std::cout << "please choose metric, input 1 or 2" << std::endl;
     std::cout << "1. L2" << std::endl;
     std::cout << "2. IP" << std::endl;
@@ -161,9 +158,7 @@ int main() {
             return -1;
     }
     // let user choose centroids, n_probes_begin, n_probes_end, n_probes_step
-    std::cout
-            << "please input centroids, n_probes_begin, n_probes_end, n_probes_step. input 0 to use default values"
-            << std::endl;
+    std::cout << "please input centroids, n_probes_begin, n_probes_end, n_probes_step. input 0 to use default values" << std::endl;
     size_t choose_centroids = 0, choose_n_probes_begin = 0, choose_n_probes_end = 0, choose_n_probes_step = 0;
     std::cin >> choose_centroids >> choose_n_probes_begin >> choose_n_probes_end >> choose_n_probes_step;
     if (choose_centroids != 0) {
@@ -179,8 +174,8 @@ int main() {
         n_probes_step = choose_n_probes_step;
     }
     std::string build_parameter = "." + data_type + "." + metric_str + ".C." + std::to_string(centroids);
-    std::string ivfflat_index_name = std::string(homeDir) + std::string(ivfflat_index_name_prefix) + data_type +
-                                     std::string(ivfflat_index_name_suffix) + build_parameter;
+    std::string ivfflat_index_name =
+        std::string(homeDir) + std::string(ivfflat_index_name_prefix) + data_type + std::string(ivfflat_index_name_suffix) + build_parameter;
     std::cout << "data_type: " << data_type << std::endl;
     std::cout << "metric: " << metric_str << std::endl;
     std::cout << "dimension: " << dimension << std::endl;
@@ -190,7 +185,7 @@ int main() {
     std::cout << "n_probes_end: " << n_probes_end << std::endl;
     std::cout << "n_probes_step: " << n_probes_step << std::endl;
     std::cout << "ivfflat_index_name: " << ivfflat_index_name << std::endl;
-    UniquePtr <AnnIVFFlatIndexData<f32>> ann_index_data;
+    UniquePtr<AnnIVFFlatIndexData<f32>> ann_index_data;
 
     std::ifstream f(ivfflat_index_name);
     if (f.good()) {
@@ -211,7 +206,7 @@ int main() {
                 assert(dimension == dim || !"embedding dimension wrong");
                 assert(base_counts == embedding_count || !"embedding count wrong");
                 std::cout << "Load base data: " << profiler_in.ElapsedToString() << std::endl;
-                //output embedding_count, dimension
+                // output embedding_count, dimension
                 std::cout << "embedding_count: " << embedding_count << std::endl;
                 std::cout << "dimension: " << dim << std::endl;
             }
@@ -231,20 +226,20 @@ int main() {
                 input_train_ptr = input_train.get();
                 assert(dimension == dim || !"embedding dimension wrong");
                 std::cout << "Load train data: " << profiler_in.ElapsedToString() << std::endl;
-                //output embedding_count, dimension
+                // output embedding_count, dimension
                 std::cout << "train_count: " << train_count << std::endl;
                 std::cout << "dimension: " << dim << std::endl;
             }
             profiler.Begin();
             switch (metric) {
                 case MetricType::kMerticL2: {
-                    ann_index_data = AnnIVFFlatL2<f32>::CreateIndex(dimension, train_count, input_train_ptr,
-                                                                    base_counts, input_embeddings.get(), centroids);
+                    ann_index_data =
+                        AnnIVFFlatL2<f32>::CreateIndex(dimension, train_count, input_train_ptr, base_counts, input_embeddings.get(), centroids);
                     break;
                 }
                 case MetricType::kMerticInnerProduct: {
-                    ann_index_data = AnnIVFFlatIP<f32>::CreateIndex(dimension, train_count, input_train_ptr,
-                                                                    base_counts, input_embeddings.get(), centroids);
+                    ann_index_data =
+                        AnnIVFFlatIP<f32>::CreateIndex(dimension, train_count, input_train_ptr, base_counts, input_embeddings.get(), centroids);
                     break;
                 }
                 default:
@@ -252,11 +247,10 @@ int main() {
                     return -1;
             }
             profiler.End();
-            std::cout << "before clearing input vector, memory cost: "
-                      << get_current_rss() / (1024 * 1024) << " MiB" << std::endl;
+            std::cout << "before clearing input vector, memory cost: " << get_current_rss() / (1024 * 1024) << " MiB" << std::endl;
         }
-        std::cout << "Build index cost: " << profiler.ElapsedToString() << " memory cost: "
-                  << get_current_rss() / (1024 * 1024) << " MiB" << std::endl;
+        std::cout << "Build index cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() / (1024 * 1024) << " MiB"
+                  << std::endl;
         ann_index_data->SaveIndex(ivfflat_index_name, MakeUnique<LocalFileSystem>());
     }
 
@@ -272,8 +266,9 @@ int main() {
         std::cout << "Load query data: " << profiler.ElapsedToString() << std::endl;
     }
 
-    int top_k;                                           // nb of results per query in the GT
-    std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
+    int top_k; // nb of results per query in the GT
+    std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10,
+        ground_truth_sets_100; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     {
         // load ground-truth and convert int to long
         size_t nq2;
@@ -306,48 +301,32 @@ int main() {
     for (size_t n_probes = n_probes_begin; n_probes <= n_probes_end; n_probes += n_probes_step) {
         BaseProfiler profiler;
         std::chrono::duration<double> t_val = std::chrono::duration<double>::zero();
-        Vector <Vector<u32>> results;
+        Vector<Vector<u32>> results;
+        auto search_f = [&]<typename AnnIVFFlat>() {
+            AnnIVFFlat test_ivf(queries.get(), number_of_queries, top_k, dimension, EmbeddingDataType::kElemFloat);
+            test_ivf.Begin();
+            profiler.Begin();
+            auto t0 = std::chrono::high_resolution_clock::now();
+            test_ivf.Search(ann_index_data.get(), 0, n_probes);
+            t_val += std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t0);
+            profiler.End();
+            test_ivf.End();
+            auto ID = test_ivf.GetIDs();
+            results.resize(number_of_queries);
+            for (size_t i = 0; i < number_of_queries; ++i) {
+                results[i].resize(top_k);
+                for (size_t j = 0; j < top_k; ++j) {
+                    results[i][j] = ID[i * top_k + j].segment_offset_;
+                }
+            }
+        };
         switch (metric) {
             case MetricType::kMerticL2: {
-                AnnIVFFlatL2 <f32> test_ivf(queries.get(), number_of_queries, top_k, dimension,
-                                            EmbeddingDataType::kElemFloat);
-                test_ivf.Begin();
-                profiler.Begin();
-                auto t0 = std::chrono::high_resolution_clock::now();
-                test_ivf.Search(ann_index_data.get(), 0, n_probes);
-                t_val += std::chrono::duration_cast<std::chrono::duration<double>>(
-                        std::chrono::high_resolution_clock::now() - t0);
-                profiler.End();
-                test_ivf.End();
-                auto ID = test_ivf.GetIDs();
-                results.resize(number_of_queries);
-                for (size_t i = 0; i < number_of_queries; ++i) {
-                    results[i].resize(top_k);
-                    for (size_t j = 0; j < top_k; ++j) {
-                        results[i][j] = ID[i * top_k + j].segment_offset_;
-                    }
-                }
+                search_f.template operator()<AnnIVFFlatL2<f32>>();
                 break;
             }
             case MetricType::kMerticInnerProduct: {
-                AnnIVFFlatIP <f32> test_ivf(queries.get(), number_of_queries, top_k, dimension,
-                                            EmbeddingDataType::kElemFloat);
-                test_ivf.Begin();
-                profiler.Begin();
-                auto t0 = std::chrono::high_resolution_clock::now();
-                test_ivf.Search(ann_index_data.get(), 0, n_probes);
-                t_val += std::chrono::duration_cast<std::chrono::duration<double>>(
-                        std::chrono::high_resolution_clock::now() - t0);
-                profiler.End();
-                test_ivf.End();
-                auto ID = test_ivf.GetIDs();
-                results.resize(number_of_queries);
-                for (size_t i = 0; i < number_of_queries; ++i) {
-                    results[i].resize(top_k);
-                    for (size_t j = 0; j < top_k; ++j) {
-                        results[i][j] = ID[i * top_k + j].segment_offset_;
-                    }
-                }
+                search_f.template operator()<AnnIVFFlatIP<f32>>();
                 break;
             }
             default:
@@ -356,8 +335,7 @@ int main() {
         }
         std::cout << "\nn_probes = " << n_probes << ", Spend: " << profiler.ElapsedToString() << std::endl;
         std::cout << "time = " << std::fixed << std::setprecision(3) << t_val.count() << " s" << std::endl;
-        std::cout << "QPS = " << std::fixed << std::setprecision(3) << f64(number_of_queries) / t_val.count()
-                  << std::endl;
+        std::cout << "QPS = " << std::fixed << std::setprecision(3) << f64(number_of_queries) / t_val.count() << std::endl;
         output_recall_top_k(top_k, results, ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100);
     }
     return 0;

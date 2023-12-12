@@ -21,8 +21,14 @@ import global_block_id;
 import knn_distance; // delete this
 import block_index;
 import block_column_entry;
+import segment_entry;
 import merge_knn;
 import segment_column_index_entry;
+import bitmask;
+import data_block;
+import column_vector;
+import base_expression;
+import expression_state;
 
 import base_table_ref;
 
@@ -33,6 +39,7 @@ namespace infinity {
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
+                      SharedPtr<BaseExpression> filter_expression,
                       Vector<BlockColumnEntry *> block_column_entries,
                       Vector<SegmentColumnIndexEntry *> index_entries,
                       i64 topk,
@@ -41,12 +48,14 @@ public:
                       void *query_embedding,
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
-        : table_ref_(table_ref), block_column_entries_(Move(block_column_entries)), index_entries_(Move(index_entries)), topk_(topk),
-          dimension_(dimension), query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type),
-          knn_distance_type_(knn_distance_type) {}
+        : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(Move(block_column_entries)),
+          index_entries_(Move(index_entries)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
+          query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
+
+    const SharedPtr<BaseExpression> filter_expression_{};
 
     const Vector<BlockColumnEntry *> block_column_entries_{};
     const Vector<SegmentColumnIndexEntry *> index_entries_{};
@@ -79,6 +88,17 @@ public:
         return res;
     }
 
+    Vector <DataType>
+    Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
+        Vector <DataType> res(data_count);
+        for (SizeT i = 0; i < data_count; ++i) {
+            if (bitmask.IsTrue(i)) {
+                res[i] = dist_func_(query, datas + i * dim, dim);
+            }
+        }
+        return res;
+    }
+
 public:
     using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
 
@@ -104,6 +124,10 @@ public:
 
     UniquePtr<MergeKnnBase> merge_knn_base_{};
     UniquePtr<KnnDistanceBase1> knn_distance_{};
+
+    SharedPtr<ExpressionState> filter_state_{};
+    UniquePtr<DataBlock> db_for_filter_{};
+    SharedPtr<ColumnVector> bool_column_{};
 };
 
 } // namespace infinity

@@ -463,6 +463,7 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMat
     SizeT task_n = block_column_entries.size() + index_entries.size();
     KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
     auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                              knn_scan_operator->filter_expression_,
                                                               Move(block_column_entries),
                                                               Move(index_entries),
                                                               knn_expr->topn_,

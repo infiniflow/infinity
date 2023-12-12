@@ -154,6 +154,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 }
                 output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
+                ++output_row_count;
             }
             for (SizeT i = 0; i < column_n; ++i) {
                 LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
