@@ -66,6 +66,14 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->alias_,
                                                  output_types_->size() - 1);
             }
+            case SpecialType::kScore:
+            case SpecialType::kDistance: {
+                return ReferenceExpression::Make(expression->Type(),
+                                                 expression->table_name(),
+                                                 expression->column_name(),
+                                                 expression->alias_,
+                                                 output_types_->size() - 2);
+            }
             default: {
                 LOG_ERROR(Format("Unknown special function: {}", expression->Name()));
             }

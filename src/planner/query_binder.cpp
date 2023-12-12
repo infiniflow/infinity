@@ -150,6 +150,8 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // 6.1 SEARCH
     if (statement.search_expr_ != nullptr) {
+        bind_context_ptr_->BoundSearch(statement.search_expr_);
+
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> search_expr = where_binder->Bind(*statement.search_expr_, this->bind_context_ptr_.get(), 0, true);
         bound_select_statement->search_expr_ = static_pointer_cast<SearchExpression>(search_expr);

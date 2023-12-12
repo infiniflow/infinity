@@ -248,6 +248,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
                         RowID row_id(segment_entry->segment_id_, segment_offset + block_offset);
                         row_ids.push_back(row_id.ToUint64());
                     }
+                    segment_offset += DEFAULT_BLOCK_CAPACITY;
                 }
                 OneColumnIterator<float> one_column_iter(segment_entry, column_id);
                 hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
