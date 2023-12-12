@@ -92,12 +92,12 @@ void ReadDataBlock(DataBlock *output,
     output->Finalize();
 }
 
-void merge_into_bitmask(const u8 *__restrict input_bool_column,
-                        const SharedPtr<Bitmask> &input_null_mask,
-                        const SizeT count,
-                        Bitmask &bitmask,
-                        bool nullable,
-                        SizeT bitmask_offset = 0) {
+void MergeIntoBitmask(const u8 *__restrict input_bool_column,
+                      const SharedPtr<Bitmask> &input_null_mask,
+                      const SizeT count,
+                      Bitmask &bitmask,
+                      bool nullable,
+                      SizeT bitmask_offset = 0) {
     if ((!nullable) || (input_null_mask->IsAllTrue())) {
         for (SizeT idx = 0; idx < count; ++idx) {
             if (input_bool_column[idx] == 0) {
@@ -273,7 +273,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
             const auto *bool_column_ptr = (const u8 *)(bool_column->data());
             SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-            merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
+            MergeIntoBitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
             bool_column->Reset();
         }
 
@@ -321,7 +321,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
                 const auto *bool_column_ptr = (const u8 *)(bool_column->data());
                 SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-                merge_into_bitmask(bool_column_ptr, null_mask, row_count, bitmask, true, segment_row_count_real);
+                MergeIntoBitmask(bool_column_ptr, null_mask, row_count, bitmask, true, segment_row_count_real);
                 segment_row_count_real += row_count;
                 bool_column->Reset();
             }
@@ -485,8 +485,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
 
         SizeT output_block_row_id = 0;
-        SizeT output_block_idx = 0;
-        DataBlock* output_block_ptr = operator_state->data_block_array_.back().get();
+        SizeT output_block_idx = operator_state->data_block_array_.size() - 1;
+        DataBlock* output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
         for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
             DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
             RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
@@ -506,9 +506,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
                     output_block_ptr->Finalize();
-                    output_block_row_id -= 0;
-                    ++output_block_idx;
+                    --output_block_idx;
                     output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+                    output_block_row_id = 0;
                 }
 
                 SizeT column_n = base_table_ref_->column_ids_.size();
@@ -532,7 +532,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
                 output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
 
-                ++ output_block_row_id;
+                ++output_block_row_id;
             }
         }
         output_block_ptr->Finalize();

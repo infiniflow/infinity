@@ -53,8 +53,6 @@ bool QueueSourceState::GetData() {
     } else if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
         // Get an all data from this
         MarkCompletedTask(fragment_data->fragment_id_);
-    } else {
-        return false;
     }
 
     bool completed = num_tasks_.empty();
