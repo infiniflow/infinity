@@ -107,3 +107,6 @@ sift_1m
 
 # ignore all fvecs benchmark file
 test/data/benchmark/*
+
+# ignore valgrind output file
+callgrind.out.*

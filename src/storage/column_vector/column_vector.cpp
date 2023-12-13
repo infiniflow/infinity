@@ -466,8 +466,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 break;
             }
             case kMixed: {
+                // BUG1213_1: with no initialize of `this->buffer`, this will cause a segfault
+                // `VectorBuffer` should be `RAII`
+#if 0
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
+#endif
+                Error<ExecutorException>("Not implemented");
             }
             case kNull: {
                 Error<ExecutorException>("Not implemented");
