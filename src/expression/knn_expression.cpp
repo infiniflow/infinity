@@ -63,9 +63,9 @@ String KnnExpression::ToString() const {
         return alias_;
     }
 
-    String expr_str = Format("KNN({}, {}, Float32, {}, {})",
+    String expr_str = Format("KNN({}, Float32, {}, {})",
                              arguments_.at(0)->Name(),
-                             EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
+                            //  EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
                              KnnDistanceType2Str(distance_type_),
                              topn_);
 

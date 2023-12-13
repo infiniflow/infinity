@@ -185,8 +185,7 @@ public:
         return result;
     }
 
-    DistHeap SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT candidate_n,
-                         Bitmask &bitmask) const {
+    DistHeap SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT candidate_n, const Bitmask &bitmask) const {
         if (bitmask.IsAllTrue()) {
             return SearchLayer(enter_point, query, layer_idx, candidate_n);
         }
@@ -360,7 +359,7 @@ public:
     }
     void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, const Bitmask *bitmask = nullptr) const {
         auto query = data_store_.MakeQuery(q);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
@@ -379,7 +378,7 @@ public:
         return result;
     }
 
-    MaxHeap <Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, Bitmask &bitmask) const {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, const Bitmask &bitmask) const {
         auto query = data_store_.MakeQuery(q);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
@@ -389,7 +388,7 @@ public:
         while (search_result.size() > k) {
             search_result.pop();
         }
-        MaxHeap <Pair<DataType, LabelType>> result; // TODO:: reserve
+        MaxHeap<Pair<DataType, LabelType>> result; // TODO:: reserve
         while (!search_result.empty()) {
             const auto &[dist, idx] = search_result.top();
             result.emplace(dist, labels_[idx]);
