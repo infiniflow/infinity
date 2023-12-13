@@ -280,6 +280,7 @@ int _kColumnTypeValues[] = {
   ColumnType::ColumnFloat64,
   ColumnType::ColumnVarchar,
   ColumnType::ColumnEmbedding,
+  ColumnType::ColumnRowID,
   ColumnType::ColumnInvalid
 };
 const char* _kColumnTypeNames[] = {
@@ -292,9 +293,10 @@ const char* _kColumnTypeNames[] = {
   "ColumnFloat64",
   "ColumnVarchar",
   "ColumnEmbedding",
+  "ColumnRowID",
   "ColumnInvalid"
 };
-const std::map<int, const char*> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(10, _kColumnTypeValues, _kColumnTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _ColumnType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(11, _kColumnTypeValues, _kColumnTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const ColumnType::type& val) {
   std::map<int, const char*>::const_iterator it = _ColumnType_VALUES_TO_NAMES.find(val);
@@ -1815,7 +1817,7 @@ void EmbeddingData::__set_i64_array_value(const std::vector<int64_t> & val) {
 __isset.i64_array_value = true;
 }
 
-void EmbeddingData::__set_f32_array_value(const std::vector<double> & val) {
+void EmbeddingData::__set_f32_array_value(const std::vector<int32_t> & val) {
   this->f32_array_value = val;
 __isset.f32_array_value = true;
 }
@@ -1963,7 +1965,7 @@ uint32_t EmbeddingData::read(::apache::thrift::protocol::TProtocol* iprot) {
             uint32_t _i67;
             for (_i67 = 0; _i67 < _size63; ++_i67)
             {
-              xfer += iprot->readDouble(this->f32_array_value[_i67]);
+              xfer += iprot->readI32(this->f32_array_value[_i67]);
             }
             xfer += iprot->readListEnd();
           }
@@ -2077,11 +2079,11 @@ uint32_t EmbeddingData::write(::apache::thrift::protocol::TProtocol* oprot) cons
   if (this->__isset.f32_array_value) {
     xfer += oprot->writeFieldBegin("f32_array_value", ::apache::thrift::protocol::T_LIST, 6);
     {
-      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_DOUBLE, static_cast<uint32_t>(this->f32_array_value.size()));
-      std::vector<double> ::const_iterator _iter78;
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_I32, static_cast<uint32_t>(this->f32_array_value.size()));
+      std::vector<int32_t> ::const_iterator _iter78;
       for (_iter78 = this->f32_array_value.begin(); _iter78 != this->f32_array_value.end(); ++_iter78)
       {
-        xfer += oprot->writeDouble((*_iter78));
+        xfer += oprot->writeI32((*_iter78));
       }
       xfer += oprot->writeListEnd();
     }

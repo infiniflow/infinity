@@ -70,17 +70,14 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
-    std::vector<std::thread> threads;
+    std::vector<std::jthread> threads;
     threads.reserve(numThreads);
     size_t avg_cnt = (end - start) / numThreads;
     size_t extra_cnt = (end - start) % numThreads;
     for (size_t id_begin = start, threadId = 0; threadId < numThreads; ++threadId) {
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
-        threads.emplace_back([id_begin, id_end, threadId, fn]() -> void { LoopFor(id_begin, id_end, threadId, fn); });
+        threads.emplace_back([id_begin, id_end, threadId, fn] { LoopFor(id_begin, id_end, threadId, fn); });
         id_begin = id_end;
-    }
-    for (auto &t : threads) {
-        t.join();
     }
 }
 
@@ -193,11 +190,10 @@ int main() {
                         knn_expr.column_expr.__isset.column_name = true;
                         knn_expr.__isset.column_expr = true;
                         auto &q = knn_expr.embedding_data.f32_array_value;
-                        q.reserve(dimension);
+                        q.resize(dimension);
                         auto src_ptr = queries + query_idx * dimension;
-                        for (int i = 0; i < dimension; ++i) {
-                            q.push_back(src_ptr[i]);
-                        }
+                        memmove(q.data(), src_ptr, dimension * sizeof(float));
+
                         knn_expr.embedding_data.__isset.f32_array_value = true;
                         knn_expr.__isset.embedding_data = true;
                         knn_expr.embedding_data_type = ElementType::type::ElementFloat32;

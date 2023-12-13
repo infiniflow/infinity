@@ -212,7 +212,8 @@ class ColumnType(object):
     ColumnFloat64 = 6
     ColumnVarchar = 7
     ColumnEmbedding = 8
-    ColumnInvalid = 9
+    ColumnRowID = 9
+    ColumnInvalid = 10
 
     _VALUES_TO_NAMES = {
         0: "ColumnBool",
@@ -224,7 +225,8 @@ class ColumnType(object):
         6: "ColumnFloat64",
         7: "ColumnVarchar",
         8: "ColumnEmbedding",
-        9: "ColumnInvalid",
+        9: "ColumnRowID",
+        10: "ColumnInvalid",
     }
 
     _NAMES_TO_VALUES = {
@@ -237,7 +239,8 @@ class ColumnType(object):
         "ColumnFloat64": 6,
         "ColumnVarchar": 7,
         "ColumnEmbedding": 8,
-        "ColumnInvalid": 9,
+        "ColumnRowID": 9,
+        "ColumnInvalid": 10,
     }
 
 
@@ -1139,7 +1142,7 @@ class EmbeddingData(object):
                     self.f32_array_value = []
                     (_etype47, _size44) = iprot.readListBegin()
                     for _i48 in range(_size44):
-                        _elem49 = iprot.readDouble()
+                        _elem49 = iprot.readI32()
                         self.f32_array_value.append(_elem49)
                     iprot.readListEnd()
                 else:
@@ -1201,9 +1204,9 @@ class EmbeddingData(object):
             oprot.writeFieldEnd()
         if self.f32_array_value is not None:
             oprot.writeFieldBegin('f32_array_value', TType.LIST, 6)
-            oprot.writeListBegin(TType.DOUBLE, len(self.f32_array_value))
+            oprot.writeListBegin(TType.I32, len(self.f32_array_value))
             for iter61 in self.f32_array_value:
-                oprot.writeDouble(iter61)
+                oprot.writeI32(iter61)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
         if self.f64_array_value is not None:
@@ -5005,7 +5008,7 @@ EmbeddingData.thrift_spec = (
     (3, TType.LIST, 'i16_array_value', (TType.I16, None, False), None, ),  # 3
     (4, TType.LIST, 'i32_array_value', (TType.I32, None, False), None, ),  # 4
     (5, TType.LIST, 'i64_array_value', (TType.I64, None, False), None, ),  # 5
-    (6, TType.LIST, 'f32_array_value', (TType.DOUBLE, None, False), None, ),  # 6
+    (6, TType.LIST, 'f32_array_value', (TType.I32, None, False), None, ),  # 6
     (7, TType.LIST, 'f64_array_value', (TType.DOUBLE, None, False), None, ),  # 7
 )
 all_structs.append(KnnExpr)

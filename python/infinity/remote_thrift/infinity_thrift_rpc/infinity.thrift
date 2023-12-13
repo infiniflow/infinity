@@ -120,7 +120,7 @@ union EmbeddingData {
 3: list<i16> i16_array_value,
 4: list<i32> i32_array_value,
 5: list<i64> i64_array_value,
-6: list<double> f32_array_value,
+6: list<i32> f32_array_value,
 7: list<double> f64_array_value,
 }
 
@@ -202,6 +202,7 @@ ColumnFloat32,
 ColumnFloat64,
 ColumnVarchar,
 ColumnEmbedding,
+ColumnRowID,
 ColumnInvalid,
 }
 

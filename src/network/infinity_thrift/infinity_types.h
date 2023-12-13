@@ -150,8 +150,8 @@ struct ColumnType {
     ColumnFloat64 = 6,
     ColumnVarchar = 7,
     ColumnEmbedding = 8,
-    ColumnInvalid = 9,
-    ColumnRowID = 10
+    ColumnRowID = 9,
+    ColumnInvalid = 10
   };
 };
 
@@ -882,7 +882,7 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
   std::vector<int16_t>  i16_array_value;
   std::vector<int32_t>  i32_array_value;
   std::vector<int64_t>  i64_array_value;
-  std::vector<double>  f32_array_value;
+  std::vector<int32_t>  f32_array_value;
   std::vector<double>  f64_array_value;
 
   _EmbeddingData__isset __isset;
@@ -897,7 +897,7 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
 
   void __set_i64_array_value(const std::vector<int64_t> & val);
 
-  void __set_f32_array_value(const std::vector<double> & val);
+  void __set_f32_array_value(const std::vector<int32_t> & val);
 
   void __set_f64_array_value(const std::vector<double> & val);
 
