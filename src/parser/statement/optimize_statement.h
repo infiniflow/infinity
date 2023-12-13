@@ -14,43 +14,33 @@
 
 #pragma once
 
+#include "base_statement.h"
+#include "statement/extra/create_collection_info.h"
+#include "statement/extra/create_index_info.h"
+#include "statement/extra/create_schema_info.h"
+#include "statement/extra/create_table_info.h"
+#include "statement/extra/create_view_info.h"
+
 #include <string>
 
 namespace infinity {
 
-enum class StatementType {
-    kInvalidStmt, // unused
-    kSelect,
-    kCopy,
-    kInsert,
-    kUpdate,
-    kDelete,
-    kCreate,
-    kDrop,
-    kPrepare,
-    kExecute,
-    kAlter,
-    kShow,
-    kExplain,
-    kFlush,
-    kOptimize,
-    kCommand,
+enum class OptimizeType {
+    kIRS,
 };
 
-class BaseStatement {
+class OptimizeStatement : public BaseStatement {
 public:
-    explicit BaseStatement(StatementType type) : type_(type) {}
+    explicit OptimizeStatement() : BaseStatement(StatementType::kOptimize) {}
 
-    virtual ~BaseStatement() = default;
+    [[nodiscard]] std::string ToString() const final;
 
-    [[nodiscard]] virtual std::string ToString() const = 0;
+    inline OptimizeType type() const { return type_; }
 
-    [[nodiscard]] inline StatementType Type() const { return type_; }
+    OptimizeType type_;
 
-    StatementType type_{StatementType::kInvalidStmt};
-    size_t stmt_location_{0};
-    size_t stmt_length_ = {0};
-    std::string text_{};
+    std::string schema_name_{"default"};
+    std::string table_name_{};
 };
 
 } // namespace infinity
