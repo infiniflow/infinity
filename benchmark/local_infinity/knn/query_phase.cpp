@@ -103,18 +103,18 @@ double Measurement(size_t thread_num, size_t times, const std::function<void(siz
 }
 
 template <class Function>
-inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn) {
+inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     std::shared_ptr<Database> data_base = infinity->GetDatabase("default");
-    std::shared_ptr<Table> table = data_base->GetTable("knn_benchmark");
+    std::shared_ptr<Table> table = data_base->GetTable(table_name);
     for (auto id = id_begin; id < id_end; ++id) {
         fn(id, table, threadId);
     }
 }
 
 template <class Function>
-inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn) {
+inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string &table_name) {
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
@@ -124,7 +124,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     size_t extra_cnt = (end - start) % numThreads;
     for (size_t id_begin = start, threadId = 0; threadId < numThreads; ++threadId) {
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
-        threads.emplace_back([id_begin, id_end, threadId, fn]() -> void { LoopFor(id_begin, id_end, threadId, fn); });
+        threads.emplace_back([id_begin, id_end, threadId, fn, table_name]() -> void { LoopFor(id_begin, id_end, threadId, fn, table_name); });
         id_begin = id_end;
     }
     for (auto &t : threads) {
@@ -132,7 +132,15 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     }
 }
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc > 2) {
+        return 1;
+    }
+    bool sift = true;
+    if (argc == 2) {
+        sift = std::string(argv[1]) == "sift";
+    }
+
     size_t thread_num = 1;
     size_t total_times = 1;
     std::cout << "Please input thread_num, 0 means use all resources:" << std::endl;
@@ -153,15 +161,32 @@ int main() {
     do {
         std::cout << "--- Start to run search benchmark: " << std::endl;
 
-        std::string sift_query_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
-        std::string sift_groundtruth_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
-        if (!fs.Exists(sift_query_path)) {
-            std::cout << "File: " << sift_query_path << " doesn't exist" << std::endl;
+        std::string query_path = std::string(test_data_path());
+        std::string groundtruth_path = std::string(test_data_path());
+        size_t dimension = 0;
+        int64_t topk = 100;
+
+        std::string table_name;
+        if (sift) {
+            dimension = 128;
+            query_path += "/benchmark/sift_1m/sift_query.fvecs";
+            groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
+            table_name = "sift_benchmark";
+        } else {
+            dimension = 960;
+            query_path += "/benchmark/gist_1m/gist_query.fvecs";
+            groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
+            table_name = "gist_benchmark";
+        }
+        std::cout << "query from: " << query_path << std::endl;
+        std::cout << "groundtruth is: " << groundtruth_path << std::endl;
+
+        if (!fs.Exists(query_path)) {
+            std::cout << "File: " << query_path << " doesn't exist" << std::endl;
             break;
         }
 
         size_t query_count;
-        size_t dimension = 128;
         const float *queries = nullptr;
         DeferFn defer_fn([&]() {
             if(queries != nullptr) {
@@ -170,10 +195,9 @@ int main() {
         });
         {
             size_t dim = -1;
-            queries = const_cast<const float *>(fvecs_read(sift_query_path.c_str(), &dim, &query_count));
+            queries = const_cast<const float *>(fvecs_read(query_path.c_str(), &dim, &query_count));
             assert(dimension == dim || !"query vector dim isn't 128");
         }
-        int64_t topk = 100;
         std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
         {
             std::unique_ptr<int[]> gt;
@@ -181,7 +205,7 @@ int main() {
             size_t gt_top_k;
             int *gt_ = nullptr;
             {
-                gt_ = (int *)(fvecs_read(sift_groundtruth_path.c_str(), &gt_top_k, &gt_count));
+                gt_ = (int *)(fvecs_read(groundtruth_path.c_str(), &gt_top_k, &gt_count));
                 assert(gt_top_k == topk || !"gt_top_k != topk");
                 assert(gt_count == query_count || !"gt_count != query_count");
                 gt.reset(gt_);
@@ -245,7 +269,7 @@ int main() {
         };
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        ParallelFor(0, query_count, thread_num, query_function);
+        ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();
         results.push_back(Format("Total cost= : {}", profiler.ElapsedToString(1000)));
         {

@@ -20,6 +20,10 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
+import polars as pl
+import pyarrow as pa
+from pyarrow import Table
+
 from infinity.common import VEC
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
@@ -28,7 +32,8 @@ from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 
 
 class Query(ABC):
-    def __init__(self, columns: Optional[List[str]], search: Optional[SearchExpr], filter: Optional[str], limit: Optional[int], offset: Optional[int]):
+    def __init__(self, columns: Optional[List[str]], search: Optional[SearchExpr], filter: Optional[str],
+                 limit: Optional[int], offset: Optional[int]):
         self.columns = columns
         self.search = search
         self.filter = filter
@@ -45,7 +50,8 @@ class InfinityThriftQueryBuilder(ABC):
         self._limit = None
         self._offset = None
 
-    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str, topn: int) -> InfinityThriftQueryBuilder:
+    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
+            topn: int) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
         if self._search.knn_exprs is None:
@@ -146,3 +152,24 @@ class InfinityThriftQueryBuilder(ABC):
             offset=self._offset
         )
         return self._table._execute_query(query)
+
+    def to_pl(self) -> pl.DataFrame:
+        query = Query(
+            columns=self._columns,
+            search=self._search,
+            filter=self._filter,
+            limit=self._limit,
+            offset=self._offset
+        )
+        return pl.from_pandas(self._table._execute_query(query))
+
+    def to_arrow(self) -> Table:
+        query = Query(
+            columns=self._columns,
+            search=self._search,
+            filter=self._filter,
+            limit=self._limit,
+            offset=self._offset
+        )
+
+        return pa.Table.from_pandas(self._table._execute_query(query))

@@ -38,9 +38,9 @@ class TestImportBenchmark:
 
         db_obj = infinity_obj.get_database("default")
         assert db_obj
-        db_obj.drop_table("knn_benchmark_1", True)
-        db_obj.create_table("knn_benchmark_1", {"c1": "vector,128,float"}, None)
-        table_obj = db_obj.get_table("knn_benchmark_1")
+        db_obj.drop_table("knn_benchmark", True)
+        db_obj.create_table("knn_benchmark", {"col1": "vector,128,float"}, None)
+        table_obj = db_obj.get_table("knn_benchmark")
         assert table_obj
 
         test_fvecs_dir = os.getcwd() + "/sift_1m/sift/base.fvecs"
@@ -58,7 +58,7 @@ class TestImportBenchmark:
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
         res = table.create_index("hnsw_index",
-                                 [index.IndexInfo("c1",
+                                 [index.IndexInfo("col1",
                                                   index.IndexType.Hnsw,
                                                   [
                                                       index.InitParameter("M", "16"),
@@ -89,9 +89,9 @@ class TestImportBenchmark:
 
         db_obj = infinity_obj.get_database("default")
         assert db_obj
-        db_obj.drop_table("knn_benchmark_1", True)
-        db_obj.create_table("knn_benchmark_1", {"c1": "vector,128,float"}, None)
-        table_obj = db_obj.get_table("knn_benchmark_1")
+        db_obj.drop_table("knn_benchmark", True)
+        db_obj.create_table("knn_benchmark", {"col1": "vector,128,float"}, None)
+        table_obj = db_obj.get_table("knn_benchmark")
         assert table_obj
 
         test_fvecs_dir = os.getcwd() + "/sift_1m/sift/base.fvecs"
