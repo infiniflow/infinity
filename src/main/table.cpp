@@ -143,9 +143,6 @@ QueryResult Table::Update(ParsedExpr *filter, Vector<UpdateExpr *> *update_list)
 }
 
 QueryResult Table::Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
-    if(search_expr == nullptr) {
-        LOG_ERROR("Not search expression why use search?");
-    }
 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
