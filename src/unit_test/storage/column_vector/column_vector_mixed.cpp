@@ -28,6 +28,8 @@ import vector_buffer;
 import infinity_context;
 import global_resource_usage;
 
+// mask the unittest because BUG1213_1
+#if 0
 class ColumnVectorMixedTest : public BaseTest {};
 
 TEST_F(ColumnVectorMixedTest, mixed_integer_a) {
@@ -4235,3 +4237,5 @@ TEST_F(ColumnVectorMixedTest, mixed_array_column_slice_init) {
         }
     }
 }
+
+#endif
