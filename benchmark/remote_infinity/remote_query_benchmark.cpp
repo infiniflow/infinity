@@ -35,6 +35,31 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace infinity_thrift_rpc;
 
+struct InfinityClient {
+    std::shared_ptr<TTransport> socket;
+    std::shared_ptr<TTransport> transport;
+    std::shared_ptr<TProtocol> protocol;
+    std::unique_ptr<InfinityServiceClient> client;
+    int64_t session_id;
+    InfinityClient() {
+        socket.reset(new TSocket("localhost", 9080));
+        transport.reset(new TBufferedTransport(socket));
+        protocol.reset(new TBinaryProtocol(transport));
+        client = std::make_unique<InfinityServiceClient>(protocol);
+        transport->open();
+        CommonResponse response;
+        client->Connect(response);
+        session_id = response.session_id;
+    }
+    ~InfinityClient() {
+        CommonResponse ret;
+        CommonRequest req;
+        req.session_id = session_id;
+        client->Disconnect(ret, req);
+        transport->close();
+    }
+};
+
 template <typename T>
 std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
     std::ifstream in(filename, std::ios::binary);
@@ -57,16 +82,15 @@ std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &di
     return data;
 }
 
-template <class Function>
-inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn) {
+inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, auto fn) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
+    InfinityClient client;
     for (auto id = id_begin; id < id_end; ++id) {
-        fn(id, threadId);
+        fn(id, client, threadId);
     }
 }
 
-template <class Function>
-inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn) {
+inline void ParallelFor(size_t start, size_t end, size_t numThreads, auto fn) {
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
@@ -93,18 +117,6 @@ int main() {
 
     std::cout << ">>> Query Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;
-
-    std::shared_ptr<TTransport> socket(new TSocket("localhost", 9080));
-    std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-    std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-    InfinityServiceClient client(protocol);
-    int64_t session_id;
-    {
-        transport->open();
-        CommonResponse response;
-        client.Connect(response);
-        session_id = response.session_id;
-    }
 
     std::vector<std::string> results;
 
@@ -163,59 +175,57 @@ int main() {
         for (auto &v : query_results) {
             v.reserve(100);
         }
-        auto query_function = [session_id, dimension, topk, queries, &query_results, &client](size_t query_idx, size_t threadId) {
-            try {
-                SelectRequest req;
-                SelectResponse ret;
+        auto query_function = [dimension, topk, queries, &query_results](size_t query_idx, InfinityClient &client, size_t threadId) {
+            int64_t session_id = client.session_id;
+            SelectRequest req;
+            SelectResponse ret;
+            {
+                req.session_id = session_id;
+                req.__isset.session_id = true;
+                req.db_name = "default";
+                req.__isset.db_name = true;
+                req.table_name = "knn_benchmark";
+                req.__isset.table_name = true;
+                ParsedExpr expr;
                 {
-                    req.session_id = session_id;
-                    req.__isset.session_id = true;
-                    req.db_name = "default";
-                    req.__isset.db_name = true;
-                    req.table_name = "knn_benchmark";
-                    req.__isset.table_name = true;
-                    ParsedExpr expr;
-                    {
-                        expr.type.function_expr = std::make_shared<FunctionExpr>();
-                        expr.type.function_expr->function_name = "row_id";
-                        expr.type.function_expr->__isset.function_name = true;
-                        expr.type.__isset.function_expr = true;
-                        expr.__isset.type = true;
-                    }
-                    req.select_list.push_back(std::move(expr));
-                    req.__isset.select_list = true;
-                    KnnExpr knn_expr;
-                    {
-                        knn_expr.column_expr.column_name.emplace_back("col1");
-                        knn_expr.column_expr.__isset.column_name = true;
-                        knn_expr.__isset.column_expr = true;
-                        auto &q = knn_expr.embedding_data.f32_array_value;
-                        q.resize(dimension);
-                        auto src_ptr = queries + query_idx * dimension;
-                        memmove(q.data(), src_ptr, dimension * sizeof(float));
-
-                        knn_expr.embedding_data.__isset.f32_array_value = true;
-                        knn_expr.__isset.embedding_data = true;
-                        knn_expr.embedding_data_type = ElementType::type::ElementFloat32;
-                        knn_expr.__isset.embedding_data_type = true;
-                        knn_expr.distance_type = KnnDistanceType::type::L2;
-                        knn_expr.__isset.distance_type = true;
-                        knn_expr.topn = topk;
-                        knn_expr.__isset.topn = true;
-                    }
-                    req.search_expr.knn_exprs.push_back(std::move(knn_expr));
-                    req.search_expr.__isset.knn_exprs = true;
-                    req.__isset.search_expr = true;
+                    expr.type.function_expr = std::make_shared<FunctionExpr>();
+                    expr.type.function_expr->function_name = "row_id";
+                    expr.type.function_expr->__isset.function_name = true;
+                    expr.type.__isset.function_expr = true;
+                    expr.__isset.type = true;
                 }
-                client.Select(ret, req);
+                req.select_list.push_back(std::move(expr));
+                req.__isset.select_list = true;
+                KnnExpr knn_expr;
                 {
-                    auto select_result = (const infinity::RowID *)(ret.column_fields[0].column_vectors[0].data());
-                    for (int64_t i = 0; i < topk; ++i) {
-                        query_results[query_idx].push_back(select_result[i].ToUint64());
+                    knn_expr.column_expr.column_name.emplace_back("col1");
+                    knn_expr.column_expr.__isset.column_name = true;
+                    knn_expr.__isset.column_expr = true;
+                    auto &q = knn_expr.embedding_data.f32_array_value;
+                    q.reserve(dimension);
+                    auto src_ptr = queries + query_idx * dimension;
+                    for (int64_t i = 0; i < dimension; ++i) {
+                        q.push_back(src_ptr[i]);
                     }
+                    knn_expr.embedding_data.__isset.f32_array_value = true;
+                    knn_expr.__isset.embedding_data = true;
+                    knn_expr.embedding_data_type = ElementType::type::ElementFloat32;
+                    knn_expr.__isset.embedding_data_type = true;
+                    knn_expr.distance_type = KnnDistanceType::type::L2;
+                    knn_expr.__isset.distance_type = true;
+                    knn_expr.topn = topk;
+                    knn_expr.__isset.topn = true;
                 }
-            } catch (TException &tx) {
-                std::cerr << "ERROR: " << tx.what() << std::endl;
+                req.search_expr.knn_exprs.push_back(std::move(knn_expr));
+                req.search_expr.__isset.knn_exprs = true;
+                req.__isset.search_expr = true;
+            }
+            client.client->Select(ret, req);
+            {
+                auto select_result = (const infinity::RowID *)(ret.column_fields[0].column_vectors[0].data());
+                for (int64_t i = 0; i < topk; ++i) {
+                    query_results[query_idx].push_back(select_result[i].ToUint64());
+                }
             }
         };
         infinity::BaseProfiler profiler;

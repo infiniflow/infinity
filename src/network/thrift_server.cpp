@@ -924,6 +924,11 @@ private:
         } else if (embedding_data.__isset.i64_array_value) {
             return std::make_pair((void *)embedding_data.i64_array_value.data(), embedding_data.i64_array_value.size());
         } else if (embedding_data.__isset.f32_array_value) {
+            auto ptr_double = (double *)(embedding_data.f32_array_value.data());
+            auto ptr_float = (float *)(embedding_data.f32_array_value.data());
+            for (size_t i = 0; i < embedding_data.f32_array_value.size(); ++i) {
+                ptr_float[i] = float(ptr_double[i]);
+            }
             return std::make_pair((void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size());
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
