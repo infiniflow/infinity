@@ -128,7 +128,7 @@ bool Bitmask::IsAllTrue() const {
     return true;
 }
 
-bool Bitmask::IsTrue(SizeT row_index) {
+bool Bitmask::IsTrue(SizeT row_index) const {
     if (data_ptr_ == nullptr) {
         // All is true
         return true;

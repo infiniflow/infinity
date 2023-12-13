@@ -49,7 +49,7 @@ public:
 
     [[nodiscard]] bool IsAllTrue() const;
 
-    bool IsTrue(SizeT row_index);
+    bool IsTrue(SizeT row_index) const;
 
     void SetTrue(SizeT row_index);
 

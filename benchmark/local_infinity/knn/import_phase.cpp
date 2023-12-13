@@ -36,7 +36,15 @@ import query_result;
 
 using namespace infinity;
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc > 2) {
+        return 1;
+    }
+    bool sift = true;
+    if (argc == 2) {
+        sift = std::string(argv[1]) == "sift";
+    }
+
     std::string data_path = "/tmp/infinity";
 
     LocalFileSystem fs;
@@ -58,8 +66,17 @@ int main() {
         std::vector<ColumnDef *> column_defs;
 
         // init column defs
-        std::shared_ptr<DataType> col1_type =
-            std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
+        std::shared_ptr<DataType> col1_type = nullptr;
+        std::string base_path = std::string(test_data_path());
+        if (sift) {
+            col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
+            base_path += "/benchmark/sift_1m/sift_base.fvecs";
+        } else {
+            col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 960));
+            base_path += "/benchmark/gist_1m/gist_base.fvecs";
+        }
+        std::cout << "Import from: " << base_path << std::endl;
+
         std::string col1_name = "col1";
         auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
         column_defs.emplace_back(col1_def.release());
@@ -80,9 +97,8 @@ int main() {
 
         std::shared_ptr<Table> table = data_base->GetTable(table_name);
 
-        std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_base.fvecs";
-        if (!fs.Exists(sift_base_path)) {
-            std::cout << "File: " << sift_base_path << " doesn't exist" << std::endl;
+        if (!fs.Exists(base_path)) {
+            std::cout << "File: " << base_path << " doesn't exist" << std::endl;
             break;
         }
 
@@ -91,7 +107,7 @@ int main() {
 
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        QueryResult query_result = table->Import(sift_base_path, import_options);
+        QueryResult query_result = table->Import(base_path, import_options);
         std::cout << "Import data cost: " << profiler.ElapsedToString() << std::endl;
 
         auto index_info_list = new std::vector<IndexInfo *>();
@@ -114,7 +130,7 @@ int main() {
 
         query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
 
-        if(query_result.IsOk()) {
+        if (query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
             query_result = infinity->Flush();
             profiler.End();

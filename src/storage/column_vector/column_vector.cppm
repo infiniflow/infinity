@@ -381,9 +381,7 @@ inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
 
     SizeT source_end_idx = source_start_idx + count;
 
-    for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
-        ((DataT *)(dst))[dest_start_idx++] = ((const DataT *)(src))[idx];
-    }
+    std::copy(((const DataT *)(src)) + source_start_idx, ((const DataT *)(src)) + source_end_idx, ((DataT *)(dst)) + dest_start_idx);
 }
 
 template <>

@@ -132,7 +132,15 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     }
 }
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc > 2) {
+        return 1;
+    }
+    bool sift = true;
+    if (argc == 2) {
+        sift = std::string(argv[1]) == "sift";
+    }
+
     size_t thread_num = 1;
     size_t total_times = 1;
     std::cout << "Please input thread_num, 0 means use all resources:" << std::endl;
@@ -153,15 +161,29 @@ int main() {
     do {
         std::cout << "--- Start to run search benchmark: " << std::endl;
 
-        std::string sift_query_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
-        std::string sift_groundtruth_path = std::string(test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
-        if (!fs.Exists(sift_query_path)) {
-            std::cout << "File: " << sift_query_path << " doesn't exist" << std::endl;
+        std::string query_path = std::string(test_data_path());
+        std::string groundtruth_path = std::string(test_data_path());
+        size_t dimension = 0;
+        int64_t topk = 100;
+
+        if (sift) {
+            dimension = 128;
+            query_path += "/benchmark/sift_1m/sift_query.fvecs";
+            groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
+        } else {
+            dimension = 960;
+            query_path += "/benchmark/gist_1m/gist_query.fvecs";
+            groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
+        }
+        std::cout << "query from: " << query_path << std::endl;
+        std::cout << "groundtruth is: " << groundtruth_path << std::endl;
+
+        if (!fs.Exists(query_path)) {
+            std::cout << "File: " << query_path << " doesn't exist" << std::endl;
             break;
         }
 
         size_t query_count;
-        size_t dimension = 128;
         const float *queries = nullptr;
         DeferFn defer_fn([&]() {
             if(queries != nullptr) {
@@ -170,10 +192,9 @@ int main() {
         });
         {
             size_t dim = -1;
-            queries = const_cast<const float *>(fvecs_read(sift_query_path.c_str(), &dim, &query_count));
+            queries = const_cast<const float *>(fvecs_read(query_path.c_str(), &dim, &query_count));
             assert(dimension == dim || !"query vector dim isn't 128");
         }
-        int64_t topk = 100;
         std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
         {
             std::unique_ptr<int[]> gt;
@@ -181,7 +202,7 @@ int main() {
             size_t gt_top_k;
             int *gt_ = nullptr;
             {
-                gt_ = (int *)(fvecs_read(sift_groundtruth_path.c_str(), &gt_top_k, &gt_count));
+                gt_ = (int *)(fvecs_read(groundtruth_path.c_str(), &gt_top_k, &gt_count));
                 assert(gt_top_k == topk || !"gt_top_k != topk");
                 assert(gt_count == query_count || !"gt_count != query_count");
                 gt.reset(gt_);
