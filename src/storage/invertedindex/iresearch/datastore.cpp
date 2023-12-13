@@ -118,6 +118,7 @@ struct ConsolidationTask : Task {
         store_ = other.store_;
         async_ = other.async_;
         consolidation_interval_ = other.consolidation_interval_;
+        optimize_ = other.optimize_;
     }
 
     void operator()(int id);
