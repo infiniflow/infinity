@@ -60,7 +60,7 @@ class TestQueryBenchmark:
 
         p = multiprocessing.Pool(1)
         for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-            p.apply_async(work, args=(query_vec, 100, "l2", "c1", "float"))
+            p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float"))
             if idx == total_times:
                 assert idx == total_times
                 break
@@ -86,7 +86,7 @@ class TestQueryBenchmark:
 
         with ThreadPoolExecutor(max_workers=1) as executor:
             for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-                executor.submit(work, query_vec, 100, "l2", "c1", "float")
+                executor.submit(work, query_vec, 100, "l2", "col1", "float")
                 if idx == total_times:
                     assert idx == total_times
                     break
@@ -118,7 +118,7 @@ class TestQueryBenchmark:
         for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["*"])
-            query_builder.knn('c1', query_vec, 'float', 'l2', 100)
+            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
             query_builder.to_df()
             if idx == total_times:
                 assert idx == total_times
@@ -133,15 +133,13 @@ class TestQueryBenchmark:
 
     def test_one_query(self):
         conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", "knn_benchmark_1")
+        table = RemoteTable(conn, "default", "knn_benchmark")
         sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
         for query_vec in fvecs_read(sift_query_path):
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["*"])
-            query_builder.knn('c1', query_vec, 'float', 'l2', 100)
-            print(query_vec)
+            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
             print(query_builder.to_df())
-            break
 
     def test_query_2(self):
         thread_num = 1
@@ -159,6 +157,7 @@ class TestQueryBenchmark:
         for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
             infinity_obj = infinity.connect(REMOTE_HOST)
             db_obj = infinity_obj.get_database("default")
+
             assert db_obj is not None
             if idx == total_times:
                 assert idx == total_times
