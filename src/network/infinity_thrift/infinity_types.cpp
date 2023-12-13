@@ -2578,14 +2578,17 @@ SearchExpr::~SearchExpr() noexcept {
 
 void SearchExpr::__set_match_exprs(const std::vector<MatchExpr> & val) {
   this->match_exprs = val;
+__isset.match_exprs = true;
 }
 
 void SearchExpr::__set_knn_exprs(const std::vector<KnnExpr> & val) {
   this->knn_exprs = val;
+__isset.knn_exprs = true;
 }
 
 void SearchExpr::__set_fusion_expr(const FusionExpr& val) {
   this->fusion_expr = val;
+__isset.fusion_expr = true;
 }
 std::ostream& operator<<(std::ostream& out, const SearchExpr& obj)
 {
@@ -2680,34 +2683,37 @@ uint32_t SearchExpr::write(::apache::thrift::protocol::TProtocol* oprot) const {
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("SearchExpr");
 
-  xfer += oprot->writeFieldBegin("match_exprs", ::apache::thrift::protocol::T_LIST, 1);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->match_exprs.size()));
-    std::vector<MatchExpr> ::const_iterator _iter100;
-    for (_iter100 = this->match_exprs.begin(); _iter100 != this->match_exprs.end(); ++_iter100)
+  if (this->__isset.match_exprs) {
+    xfer += oprot->writeFieldBegin("match_exprs", ::apache::thrift::protocol::T_LIST, 1);
     {
-      xfer += (*_iter100).write(oprot);
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->match_exprs.size()));
+      std::vector<MatchExpr> ::const_iterator _iter100;
+      for (_iter100 = this->match_exprs.begin(); _iter100 != this->match_exprs.end(); ++_iter100)
+      {
+        xfer += (*_iter100).write(oprot);
+      }
+      xfer += oprot->writeListEnd();
     }
-    xfer += oprot->writeListEnd();
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("knn_exprs", ::apache::thrift::protocol::T_LIST, 2);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->knn_exprs.size()));
-    std::vector<KnnExpr> ::const_iterator _iter101;
-    for (_iter101 = this->knn_exprs.begin(); _iter101 != this->knn_exprs.end(); ++_iter101)
+  if (this->__isset.knn_exprs) {
+    xfer += oprot->writeFieldBegin("knn_exprs", ::apache::thrift::protocol::T_LIST, 2);
     {
-      xfer += (*_iter101).write(oprot);
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->knn_exprs.size()));
+      std::vector<KnnExpr> ::const_iterator _iter101;
+      for (_iter101 = this->knn_exprs.begin(); _iter101 != this->knn_exprs.end(); ++_iter101)
+      {
+        xfer += (*_iter101).write(oprot);
+      }
+      xfer += oprot->writeListEnd();
     }
-    xfer += oprot->writeListEnd();
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("fusion_expr", ::apache::thrift::protocol::T_STRUCT, 3);
-  xfer += this->fusion_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
+  if (this->__isset.fusion_expr) {
+    xfer += oprot->writeFieldBegin("fusion_expr", ::apache::thrift::protocol::T_STRUCT, 3);
+    xfer += this->fusion_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -2737,9 +2743,9 @@ SearchExpr& SearchExpr::operator=(const SearchExpr& other103) {
 void SearchExpr::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "SearchExpr(";
-  out << "match_exprs=" << to_string(match_exprs);
-  out << ", " << "knn_exprs=" << to_string(knn_exprs);
-  out << ", " << "fusion_expr=" << to_string(fusion_expr);
+  out << "match_exprs="; (__isset.match_exprs ? (out << to_string(match_exprs)) : (out << "<null>"));
+  out << ", " << "knn_exprs="; (__isset.knn_exprs ? (out << to_string(knn_exprs)) : (out << "<null>"));
+  out << ", " << "fusion_expr="; (__isset.fusion_expr ? (out << to_string(fusion_expr)) : (out << "<null>"));
   out << ")";
 }
 
@@ -7500,30 +7506,37 @@ void SelectRequest::__set_select_list(const std::vector<ParsedExpr> & val) {
 
 void SelectRequest::__set_search_expr(const SearchExpr& val) {
   this->search_expr = val;
+__isset.search_expr = true;
 }
 
 void SelectRequest::__set_where_expr(const ParsedExpr& val) {
   this->where_expr = val;
+__isset.where_expr = true;
 }
 
 void SelectRequest::__set_group_by_list(const std::vector<ParsedExpr> & val) {
   this->group_by_list = val;
+__isset.group_by_list = true;
 }
 
 void SelectRequest::__set_having_expr(const ParsedExpr& val) {
   this->having_expr = val;
+__isset.having_expr = true;
 }
 
 void SelectRequest::__set_limit_expr(const ParsedExpr& val) {
   this->limit_expr = val;
+__isset.limit_expr = true;
 }
 
 void SelectRequest::__set_offset_expr(const ParsedExpr& val) {
   this->offset_expr = val;
+__isset.offset_expr = true;
 }
 
 void SelectRequest::__set_order_by_list(const std::vector<OrderByExpr> & val) {
   this->order_by_list = val;
+__isset.order_by_list = true;
 }
 std::ostream& operator<<(std::ostream& out, const SelectRequest& obj)
 {
@@ -7718,50 +7731,57 @@ uint32_t SelectRequest::write(::apache::thrift::protocol::TProtocol* oprot) cons
   }
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("search_expr", ::apache::thrift::protocol::T_STRUCT, 5);
-  xfer += this->search_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("where_expr", ::apache::thrift::protocol::T_STRUCT, 6);
-  xfer += this->where_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("group_by_list", ::apache::thrift::protocol::T_LIST, 7);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->group_by_list.size()));
-    std::vector<ParsedExpr> ::const_iterator _iter260;
-    for (_iter260 = this->group_by_list.begin(); _iter260 != this->group_by_list.end(); ++_iter260)
-    {
-      xfer += (*_iter260).write(oprot);
-    }
-    xfer += oprot->writeListEnd();
+  if (this->__isset.search_expr) {
+    xfer += oprot->writeFieldBegin("search_expr", ::apache::thrift::protocol::T_STRUCT, 5);
+    xfer += this->search_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("having_expr", ::apache::thrift::protocol::T_STRUCT, 8);
-  xfer += this->having_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("limit_expr", ::apache::thrift::protocol::T_STRUCT, 9);
-  xfer += this->limit_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("offset_expr", ::apache::thrift::protocol::T_STRUCT, 10);
-  xfer += this->offset_expr.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("order_by_list", ::apache::thrift::protocol::T_LIST, 11);
-  {
-    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->order_by_list.size()));
-    std::vector<OrderByExpr> ::const_iterator _iter261;
-    for (_iter261 = this->order_by_list.begin(); _iter261 != this->order_by_list.end(); ++_iter261)
-    {
-      xfer += (*_iter261).write(oprot);
-    }
-    xfer += oprot->writeListEnd();
+  if (this->__isset.where_expr) {
+    xfer += oprot->writeFieldBegin("where_expr", ::apache::thrift::protocol::T_STRUCT, 6);
+    xfer += this->where_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
   }
-  xfer += oprot->writeFieldEnd();
-
+  if (this->__isset.group_by_list) {
+    xfer += oprot->writeFieldBegin("group_by_list", ::apache::thrift::protocol::T_LIST, 7);
+    {
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->group_by_list.size()));
+      std::vector<ParsedExpr> ::const_iterator _iter260;
+      for (_iter260 = this->group_by_list.begin(); _iter260 != this->group_by_list.end(); ++_iter260)
+      {
+        xfer += (*_iter260).write(oprot);
+      }
+      xfer += oprot->writeListEnd();
+    }
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.having_expr) {
+    xfer += oprot->writeFieldBegin("having_expr", ::apache::thrift::protocol::T_STRUCT, 8);
+    xfer += this->having_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.limit_expr) {
+    xfer += oprot->writeFieldBegin("limit_expr", ::apache::thrift::protocol::T_STRUCT, 9);
+    xfer += this->limit_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.offset_expr) {
+    xfer += oprot->writeFieldBegin("offset_expr", ::apache::thrift::protocol::T_STRUCT, 10);
+    xfer += this->offset_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.order_by_list) {
+    xfer += oprot->writeFieldBegin("order_by_list", ::apache::thrift::protocol::T_LIST, 11);
+    {
+      xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->order_by_list.size()));
+      std::vector<OrderByExpr> ::const_iterator _iter261;
+      for (_iter261 = this->order_by_list.begin(); _iter261 != this->order_by_list.end(); ++_iter261)
+      {
+        xfer += (*_iter261).write(oprot);
+      }
+      xfer += oprot->writeListEnd();
+    }
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -7819,13 +7839,13 @@ void SelectRequest::printTo(std::ostream& out) const {
   out << ", " << "db_name=" << to_string(db_name);
   out << ", " << "table_name=" << to_string(table_name);
   out << ", " << "select_list=" << to_string(select_list);
-  out << ", " << "search_expr=" << to_string(search_expr);
-  out << ", " << "where_expr=" << to_string(where_expr);
-  out << ", " << "group_by_list=" << to_string(group_by_list);
-  out << ", " << "having_expr=" << to_string(having_expr);
-  out << ", " << "limit_expr=" << to_string(limit_expr);
-  out << ", " << "offset_expr=" << to_string(offset_expr);
-  out << ", " << "order_by_list=" << to_string(order_by_list);
+  out << ", " << "search_expr="; (__isset.search_expr ? (out << to_string(search_expr)) : (out << "<null>"));
+  out << ", " << "where_expr="; (__isset.where_expr ? (out << to_string(where_expr)) : (out << "<null>"));
+  out << ", " << "group_by_list="; (__isset.group_by_list ? (out << to_string(group_by_list)) : (out << "<null>"));
+  out << ", " << "having_expr="; (__isset.having_expr ? (out << to_string(having_expr)) : (out << "<null>"));
+  out << ", " << "limit_expr="; (__isset.limit_expr ? (out << to_string(limit_expr)) : (out << "<null>"));
+  out << ", " << "offset_expr="; (__isset.offset_expr ? (out << to_string(offset_expr)) : (out << "<null>"));
+  out << ", " << "order_by_list="; (__isset.order_by_list ? (out << to_string(order_by_list)) : (out << "<null>"));
   out << ")";
 }
 
