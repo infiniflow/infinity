@@ -75,9 +75,9 @@ class TestQueryBenchmark:
         end = time.time()
         dur = end - start
         print(">>> Query Benchmark End <<<")
-        print(f"Total Times: {total_times*round}")
+        print(f"Total Times: {total_times * round}")
         print(f"Total Dur: {dur}")
-        qps = (total_times*round) / dur
+        qps = (total_times * round) / dur
         print(f"QPS: {qps}")
 
     def test_thread_pool(self):
@@ -106,7 +106,7 @@ class TestQueryBenchmark:
 
     def test_query(self):
         thread_num = 1
-        total_times = 10000
+        total_times = 1
 
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
@@ -119,12 +119,12 @@ class TestQueryBenchmark:
 
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
-
         for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
             query_builder = InfinityThriftQueryBuilder(table)
-            query_builder.output(["*"])
+            query_builder.output(["_row_id_"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            query_builder.to_df()
+            res = query_builder.to_df()
+            print(res)
             if idx == total_times:
                 assert idx == total_times
                 break
@@ -137,7 +137,7 @@ class TestQueryBenchmark:
         print(f"QPS: {qps}")
 
     def test_one_query(self):
-        total_times = 10000
+        total_times = 1
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
         sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
@@ -147,7 +147,7 @@ class TestQueryBenchmark:
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["*"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            query_builder.to_df()
+            # query_builder.to_df()
 
         end = time.time()
         dur = end - start
@@ -157,10 +157,9 @@ class TestQueryBenchmark:
         print(f"Total Dur: {dur}")
         print(f"QPS: {qps}")
 
-
     def test_query_2(self):
         thread_num = 1
-        total_times = 10000
+        total_times = 1
 
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")

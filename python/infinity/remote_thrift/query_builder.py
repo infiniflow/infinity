@@ -57,8 +57,8 @@ class InfinityThriftQueryBuilder(ABC):
         if self._search.knn_exprs is None:
             self._search.knn_exprs = list()
 
-        column_expr = ttypes.ColumnExpr()
-        column_expr.column_name.append(vector_column_name)
+        column_list=[vector_column_name]
+        column_expr = ttypes.ColumnExpr(column_name=column_list)
         column_expr.star = False
 
         if isinstance(embedding_data, list):

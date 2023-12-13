@@ -220,6 +220,18 @@ class RemoteTable(Table, ABC):
                     parsed_expr = ttypes.ParsedExpr()
                     parsed_expr.type = expr_type
                     select_list.append(parsed_expr)
+                case "_row_id_":
+                    func_expr = ttypes.FunctionExpr()
+                    func_expr.function_name = "row_id"
+                    func_expr.arguments = []
+
+                    expr_type = ttypes.ParsedExprType()
+                    expr_type.function_expr = func_expr
+
+                    parsed_expr = ttypes.ParsedExpr()
+                    parsed_expr.type = expr_type
+                    select_list.append(parsed_expr)
+
                 case _:
                     select_list.append(traverse_conditions(condition(column)))
 
