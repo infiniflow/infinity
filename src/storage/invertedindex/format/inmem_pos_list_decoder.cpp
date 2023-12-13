@@ -27,9 +27,9 @@ InMemPositionListDecoder::~InMemPositionListDecoder() {
     }
 }
 
-void InMemPositionListDecoder::Init(ttf_t total_tf, PairValueSkipListReader *skipList_reader, BufferedByteSlice *pos_list_buffer) {
+void InMemPositionListDecoder::Init(ttf_t total_tf, PairValueSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
     total_tf_ = total_tf;
-    pos_skiplist_reader_ = skipList_reader;
+    pos_skiplist_reader_ = skip_list_reader;
     pos_list_buffer_ = pos_list_buffer;
     pos_list_reader_.Open(pos_list_buffer);
     decoded_pos_count_ = 0;

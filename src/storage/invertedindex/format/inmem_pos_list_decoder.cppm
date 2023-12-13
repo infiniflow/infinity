@@ -21,7 +21,7 @@ public:
 
     ~InMemPositionListDecoder();
 
-    void Init(ttf_t total_tf, PairValueSkipListReader *skipListReader, BufferedByteSlice *pos_list_buffer);
+    void Init(ttf_t total_tf, PairValueSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer);
 
     bool SkipTo(ttf_t current_ttf, InDocPositionState *state);
 

@@ -14,7 +14,9 @@ namespace infinity {
 
 void InMemTriValueSkipListReader::Load(BufferedByteSlice *posting_buffer) {
     InitMember();
-    BufferedByteSlice *skiplist_buffer = new BufferedByteSlice(session_pool_, session_pool_);
+    BufferedByteSlice *skiplist_buffer = session_pool_ ? new (session_pool_->Allocate(sizeof(BufferedByteSlice)))
+                                                             BufferedByteSlice(session_pool_, session_pool_)
+                                                       : new BufferedByteSlice(session_pool_, session_pool_);
     posting_buffer->SnapShot(skiplist_buffer);
 
     skiplist_buffer_ = skiplist_buffer;
