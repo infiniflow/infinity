@@ -150,19 +150,27 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder(MemoryPool *session_
         const DocSkipListFormat *skiplist_format = doc_list_format_->GetDocSkipListFormat();
 
         if (skiplist_format->HasTfList()) {
-            InMemTriValueSkipListReader *in_mem_skiplist_reader = new InMemTriValueSkipListReader(session_pool);
+            InMemTriValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemTriValueSkipListReader)))
+                                                                                     InMemTriValueSkipListReader(session_pool)
+                                                                               : new InMemTriValueSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         } else {
-            InMemPairValueSkipListReader *in_mem_skiplist_reader = new InMemPairValueSkipListReader(session_pool);
+            InMemPairValueSkipListReader *in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
+                                                                                      InMemPairValueSkipListReader(session_pool)
+                                                                                : new InMemPairValueSkipListReader(session_pool);
             in_mem_skiplist_reader->Load(doc_skiplist_writer_);
             skiplist_reader = in_mem_skiplist_reader;
         }
     }
-    BufferedByteSlice *doc_list_buffer = new BufferedByteSlice(session_pool, session_pool);
+
+    BufferedByteSlice *doc_list_buffer = session_pool ? new (session_pool->Allocate(sizeof(BufferedByteSlice)))
+                                                            BufferedByteSlice(session_pool, session_pool)
+                                                      : new BufferedByteSlice(session_pool, session_pool);
     doc_list_buffer_.SnapShot(doc_list_buffer);
 
-    InMemDocListDecoder *decoder = new InMemDocListDecoder(session_pool);
+    InMemDocListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemDocListDecoder))) InMemDocListDecoder(session_pool)
+                                                : new InMemDocListDecoder(session_pool);
     decoder->Init(df, skiplist_reader, doc_list_buffer);
 
     return decoder;

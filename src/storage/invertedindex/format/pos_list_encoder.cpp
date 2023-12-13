@@ -109,7 +109,9 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     InMemPairValueSkipListReader *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_) {
         // not support tf bitmap in realtime segment
-        in_mem_skiplist_reader = new InMemPairValueSkipListReader(session_pool);
+        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
+                                                    InMemPairValueSkipListReader(session_pool)
+                                              : new InMemPairValueSkipListReader(session_pool);
         in_mem_skiplist_reader->Load(pos_skiplist_writer_);
     }
     BufferedByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(session_pool, session_pool);
