@@ -677,8 +677,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalN
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<LogicalNode> &logical_operator) const {
-    LogicalOptimize *logical_flush = (LogicalOptimize *)(logical_operator.get());
-    return MakeUnique<PhysicalOptimize>(logical_flush->node_id(), logical_operator->load_metas());
+    SharedPtr<LogicalOptimize> logical_optimize = static_pointer_cast<LogicalOptimize>(logical_operator);
+    return MakeUnique<PhysicalOptimize>(logical_optimize->node_id(),
+                                        logical_optimize->schema_name(),
+                                        logical_optimize->object_name(),
+                                        logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {

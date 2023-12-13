@@ -29,8 +29,9 @@ namespace infinity {
 
 export class PhysicalOptimize final : public PhysicalOperator {
 public:
-    explicit PhysicalOptimize(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas) {}
+    explicit PhysicalOptimize(u64 id, String db_name, String object_name, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas), db_name_(Move(db_name)),
+          object_name_(Move(object_name)) {}
 
     ~PhysicalOptimize() override = default;
 
@@ -49,6 +50,8 @@ private:
 
 private:
     OptimizeType optimize_type_{OptimizeType::kIRS};
+    String db_name_{};
+    String object_name_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
