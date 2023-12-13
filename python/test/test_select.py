@@ -388,3 +388,5 @@ class TestSelect:
         print(res)
         res = table_obj.query_builder().output(["c1", "c1"]).to_df()
         print(res)
+        res = table_obj.query_builder().output(["c1", "c2", "c1"]).to_df()
+        print(res)
