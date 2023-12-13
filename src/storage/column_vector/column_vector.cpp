@@ -466,8 +466,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 break;
             }
             case kMixed: {
+                // BUG1213_1: with no initialize of `this->buffer`, this will cause a segfault
+                // `VectorBuffer` should be `RAII`
+#if 0
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
+#endif
+                Error<ExecutorException>("Not implemented");
             }
             case kNull: {
                 Error<ExecutorException>("Not implemented");
@@ -1287,6 +1292,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
+                dst_ref.is_value_ = src_ref.is_value_;
                 dst_ref.length_ = src_ref.length_;
                 dst_ref.is_value_ = src_ref.is_value_;
                 if (src_ref.IsInlined()) {

@@ -16,6 +16,7 @@
 
 #include "parser_assert.h"
 #include <bitset>
+#include <charconv>
 #include <cstring>
 #include <sstream>
 
@@ -92,12 +93,33 @@ public:
 private:
     template <typename T>
     static inline std::string Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
-        // TODO: High-performance implementation is needed here.
-        std::stringstream ss;
+        char buf[sizeof(T) * dimension * 2];
+        std::stringstream ss(buf, std::ios::in | std::ios::out | std::ios::binary);
         for (size_t i = 0; i < dimension - 1; ++i) {
-            ss << ((T *)(embedding.ptr))[i] << ',';
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((T *)(embedding.ptr))[i]);
+            ss.write((const char *)buffer, ptr - buffer);
+            ss.put(',');
         }
-        ss << ((T *)(embedding.ptr))[dimension - 1];
+        char buffer[20];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((T *)(embedding.ptr))[dimension - 1]);
+        ss.write((const char *)buffer, ptr - buffer);
+        return ss.str();
+    }
+
+    template <>
+    static inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
+        char buf[6 * dimension * 2];
+        std::stringstream ss(buf, std::ios::in | std::ios::out | std::ios::binary);
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
+            ss.write((const char *)buffer, ptr - buffer);
+            ss.put(',');
+        }
+        char buffer[20];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
+        ss.write((const char *)buffer, ptr - buffer);
         return ss.str();
     }
 

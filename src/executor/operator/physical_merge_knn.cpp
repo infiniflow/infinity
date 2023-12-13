@@ -121,7 +121,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
                 u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
                 u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-                LOG_TRACE(Format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
+                // LOG_TRACE(Format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
@@ -160,9 +160,9 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
                 ++output_row_count;
             }
-            for (SizeT i = 0; i < column_n; ++i) {
-                LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
-            }
+            // for (SizeT i = 0; i < column_n; ++i) {
+            //  LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
+            //}
         }
 
         merge_knn_state->data_block_array_.back()->Finalize();
