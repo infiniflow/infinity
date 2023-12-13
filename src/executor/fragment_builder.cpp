@@ -105,6 +105,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kPreparedPlan:
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kFlush:
+        case PhysicalOperatorType::kOptimize:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:

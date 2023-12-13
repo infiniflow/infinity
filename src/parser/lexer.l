@@ -81,6 +81,7 @@ EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
+OPTIMIZE        { return OPTIMIZE; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }

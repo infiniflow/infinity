@@ -275,6 +275,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             }
             break;
         }
+        case PhysicalOperatorType::kOptimize: {
+            auto *output_state = static_cast<OptimizeOperatorState *>(task_operator_state);
+            if (output_state->error_message_.get() != nullptr) {
+                result_sink_state->error_message_ = Move(output_state->error_message_);
+            } else {
+                result_sink_state->result_def_ = {
+                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
+            }
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }

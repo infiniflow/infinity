@@ -275,6 +275,8 @@ void IRSDataStore::ScheduleConsolidation() {
 void IRSDataStore::ScheduleOptimize() {
     ConsolidationTask task;
     task.state_ = maintenance_state_;
+    task.async_ = async_.get();
+    task.store_ = this;
     task.optimize_ = true;
     maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
     async_->Queue<ConsolidationTask>(1, Move(task));
