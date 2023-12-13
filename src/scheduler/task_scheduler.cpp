@@ -42,6 +42,7 @@ TaskScheduler::TaskScheduler(const Config *config_ptr) { Init(config_ptr); }
 void TaskScheduler::Init(const Config *config_ptr) {
     worker_count_ = config_ptr->worker_cpu_limit();
     worker_array_.reserve(worker_count_);
+    worker_workloads_.resize(worker_count_);
     for (u64 cpu_id = 0; cpu_id < worker_count_; ++cpu_id) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
@@ -49,6 +50,7 @@ void TaskScheduler::Init(const Config *config_ptr) {
         ThreadUtil::pin(*worker_thread, cpu_id);
 
         worker_array_.emplace_back(cpu_id, Move(worker_queue), Move(worker_thread));
+        worker_workloads_[cpu_id] = 0;
     }
 
     if (worker_array_.empty()) {
@@ -75,7 +77,11 @@ void TaskScheduler::UnInit() {
     }
 }
 
-void TaskScheduler::Schedule(const Vector<FragmentTask *> &tasks) {
+void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+    if (!initialized_) {
+        Error<SchedulerException>("Scheduler isn't initialized");
+    }
+
     //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
     //    if(!children.empty()) {
     //        SchedulerError("Only support one fragment query")
@@ -86,19 +92,44 @@ void TaskScheduler::Schedule(const Vector<FragmentTask *> &tasks) {
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
+    ScheduleOneWorkerIfPossible(query_context, tasks, plan_fragment);
+}
 
-    LOG_TRACE(Format("Schedule {} tasks into scheduler", tasks.size()));
+void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
+    u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
     for (const auto &fragment_task : tasks) {
-        ScheduleTask(fragment_task);
+        ScheduleTask(fragment_task, worker_id);
     }
 }
 
-void TaskScheduler::ScheduleTask(FragmentTask *task) {
-    if (!initialized_) {
-        Error<SchedulerException>("Scheduler isn't initialized");
+void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+    // Schedule worker 1 if possible
+    u64 worker_id{};
+    u64 primary_worker_id = 0;
+    u64 primary_worker_load = worker_workloads_[1];
+    if (primary_worker_load == 0) {
+        worker_id = primary_worker_id;
+    } else {
+        worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
     }
-    u64 worker_id = task->ProposedCPUID(worker_count_);
-    worker_array_[worker_id].queue_->Enqueue(task);
+    worker_workloads_[worker_id] += tasks.size();
+    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy, primary worker load: {}",
+                     tasks.size(),
+                     query_context->query_id(),
+                     worker_id,
+                     primary_worker_load));
+    for (const auto &fragment_task : tasks) {
+        ScheduleTask(fragment_task, worker_id);
+    }
+}
+
+void TaskScheduler::ScheduleRoundRobin(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
+    for (const auto &fragment_task : tasks) {
+        u64 worker_id = ProposedWorkerID(worker_count_);
+        ScheduleTask(fragment_task, worker_id);
+    }
 }
 
 void TaskScheduler::ToReadyQueue(FragmentTask *task) {
@@ -167,6 +198,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
             if (!fragment_task->IsComplete()) {
                 ready_queue_->Enqueue(fragment_task);
             } else {
+                --worker_workloads_[worker_id];
                 fragment_task->TryCompleteFragment();
             }
         }

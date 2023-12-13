@@ -46,10 +46,20 @@ public:
 
     void UnInit();
 
-    void Schedule(const Vector<FragmentTask *> &tasks);
+    void Schedule(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
 
 private:
-    void ScheduleTask(FragmentTask *task);
+    void ScheduleOneWorkerPerQuery(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    void ScheduleRoundRobin(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+
+    inline void ScheduleTask(FragmentTask *task, u64 worker_id) {
+        worker_array_[worker_id].queue_->Enqueue(task);
+    }
+
+    inline u64 ProposedWorkerID(u64 object_id) const {
+        return (object_id) % worker_count_;
+    }
 
     void ToReadyQueue(FragmentTask *task);
 
@@ -61,6 +71,7 @@ private:
     bool initialized_{false};
 
     Vector<Worker> worker_array_{};
+    Deque<Atomic<u64>> worker_workloads_{};
 
     UniquePtr<FragmentTaskBlockQueue> ready_queue_{};
     UniquePtr<Thread> coordinator_{};

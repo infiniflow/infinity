@@ -60,6 +60,11 @@ Varchar &Varchar::operator=(const Varchar &other) {
 
 Varchar &Varchar::operator=(Varchar &&other) noexcept {
     //    LOG_TRACE("Move assignment");
+    if(this->IsValue()) {
+        // Free memory
+        Reset();
+    }
+
     this->length_ = other.length_;
     this->is_value_ = other.is_value_;
     if (other.IsInlined()) {
