@@ -8,6 +8,9 @@ add_executable(remote_query_benchmark
 
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src/network/infinity_thrift")
+target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
+target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
+
 target_link_libraries(
         remote_query_benchmark
         thrift
