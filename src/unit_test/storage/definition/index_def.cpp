@@ -130,6 +130,10 @@ TEST_F(IndexDefTest, index_def) {
 
     auto index_base_ivf = IndexIVFFlat::Make("name1", columns1, parameters1);
 
+    for(auto* init_parameter: parameters1) {
+        delete init_parameter;
+    }
+
     Vector<String> columns2{"col3"};
     Vector<InitParameter *> parameters2;
     parameters2.emplace_back(new InitParameter("metric", "l2"));
@@ -140,11 +144,19 @@ TEST_F(IndexDefTest, index_def) {
 
     auto index_base_hnsw = IndexHnsw::Make("name2", columns2, parameters2);
 
+    for(auto* init_parameter: parameters2) {
+        delete init_parameter;
+    }
+
     Vector<String> columns3{"col4", "col5"};
     Vector<InitParameter *> parameters3;
     parameters3.emplace_back(new InitParameter("analyzer", "jieba"));
 
     auto index_base_ft = IndexFullText::Make("name3", columns3, parameters3);
+
+    for(auto* init_parameter: parameters3) {
+        delete init_parameter;
+    }
 
     Vector<String> columns4{"col6", "col7"};
     Vector<InitParameter *> parameters4;
