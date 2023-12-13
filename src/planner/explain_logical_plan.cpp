@@ -30,6 +30,7 @@ import logical_drop_view;
 import logical_delete;
 import logical_update;
 import logical_flush;
+import logical_optimize;
 import logical_insert;
 import logical_project;
 import logical_filter;
@@ -165,6 +166,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kFlush: {
             Explain((LogicalFlush *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kOptimize: {
+            Explain((LogicalOptimize *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kShow: {
@@ -1598,6 +1603,25 @@ void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vecto
             break;
     }
     result->emplace_back(MakeShared<String>(flush_header_str));
+}
+
+void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String optimize_header_str;
+    if (intent_size != 0) {
+        optimize_header_str = String(intent_size - 2, ' ');
+        optimize_header_str += "-> OPTIMIZE ";
+    } else {
+        optimize_header_str = "OPTIMIZE ";
+    }
+
+    switch (optimize_node->optimize_type()) {
+        case OptimizeType::kIRS:
+            optimize_header_str += "DATA (";
+            optimize_header_str += ToStr(optimize_node->node_id());
+            optimize_header_str += ")";
+            break;
+    }
+    result->emplace_back(MakeShared<String>(optimize_header_str));
 }
 
 void ExplainLogicalPlan::Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

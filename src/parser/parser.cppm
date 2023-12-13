@@ -133,6 +133,7 @@ export using KnnDistanceType = KnnDistanceType;
 export using TableRefType = TableRefType;
 export using ExplainType = ExplainType;
 export using FlushType = FlushType;
+export using OptimizeType = OptimizeType;
 export using EmbeddingDataType = EmbeddingDataType;
 export using IndexType = IndexType;
 
@@ -180,6 +181,7 @@ export using CopyStatement = CopyStatement;
 export using PrepareStatement = PrepareStatement;
 export using ExecuteStatement = ExecuteStatement;
 export using FlushStatement = FlushStatement;
+export using OptimizeStatement = OptimizeStatement;
 export using AlterStatement = AlterStatement;
 export using ExplainStatement = ExplainStatement;
 export using CommandStatement = CommandStatement;

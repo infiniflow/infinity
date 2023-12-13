@@ -70,5 +70,6 @@ export enum class LogicalNodeType : u8 {
     kCommand,
     kPrepare,
     kFlush,
+    kOptimize,
 };
 }

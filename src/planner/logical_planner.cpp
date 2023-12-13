@@ -51,6 +51,7 @@ import logical_drop_index;
 import logical_drop_view;
 import logical_show;
 import logical_flush;
+import logical_optimize;
 import logical_export;
 import logical_import;
 import logical_explain;
@@ -100,6 +101,9 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
         }
         case StatementType::kFlush: {
             return BuildFlush(static_cast<const FlushStatement *>(statement), bind_context_ptr);
+        }
+        case StatementType::kOptimize: {
+            return BuildOptimize(static_cast<const OptimizeStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kCopy: {
             return BuildCopy(static_cast<const CopyStatement *>(statement), bind_context_ptr);
@@ -932,6 +936,18 @@ Status LogicalPlanner::BuildFlushLog(const FlushStatement *, SharedPtr<BindConte
 Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kBuffer);
     this->logical_plan_ = logical_flush;
+    return Status();
+}
+
+Status LogicalPlanner::BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    switch (statement->type()) {
+        case OptimizeType::kIRS: {
+            SharedPtr<LogicalNode> logical_optimize =
+                MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
+            this->logical_plan_ = logical_optimize;
+            break;
+        }
+    }
     return Status();
 }
 

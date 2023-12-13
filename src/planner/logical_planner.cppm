@@ -124,6 +124,9 @@ public:
 
     Status BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    // Optimize
+    Status BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Explain

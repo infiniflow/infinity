@@ -39,6 +39,7 @@ import physical_explain;
 import physical_export;
 import physical_filter;
 import physical_flush;
+import physical_optimize;
 import physical_hash;
 import physical_hash_join;
 import physical_index_join;
@@ -85,6 +86,7 @@ import logical_drop_table;
 import logical_drop_collection;
 import logical_drop_view;
 import logical_flush;
+import logical_optimize;
 import logical_insert;
 import logical_delete;
 import logical_update;
@@ -256,6 +258,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kFlush: {
             result = BuildFlush(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kOptimize: {
+            result = BuildOptimize(logical_operator);
             break;
         }
         case LogicalNodeType::kKnnScan: {
@@ -668,6 +674,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDummyScan(const SharedPtr<Logi
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalFlush *logical_flush = (LogicalFlush *)(logical_operator.get());
     return MakeUnique<PhysicalFlush>(logical_flush->flush_type(), logical_flush->node_id(), logical_operator->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalOptimize> logical_optimize = static_pointer_cast<LogicalOptimize>(logical_operator);
+    return MakeUnique<PhysicalOptimize>(logical_optimize->node_id(),
+                                        logical_optimize->schema_name(),
+                                        logical_optimize->object_name(),
+                                        logical_operator->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalNode> &logical_operator) const {

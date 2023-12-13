@@ -108,6 +108,9 @@ private:
     // Flush
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildFlush(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    // Optimize
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildOptimize(const SharedPtr<LogicalNode> &logical_operator) const;
+
     // Knn
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const;
 

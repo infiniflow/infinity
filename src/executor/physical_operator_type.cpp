@@ -110,6 +110,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Show";
         case PhysicalOperatorType::kFlush:
             return "Flush";
+        case PhysicalOperatorType::kOptimize:
+            return "Optimize";
         case PhysicalOperatorType::kSink:
             return "Sink";
         case PhysicalOperatorType::kSource:

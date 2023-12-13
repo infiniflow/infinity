@@ -192,6 +192,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kFlush:
             break;
+        case LogicalNodeType::kOptimize:
+            break;
         case LogicalNodeType::kCommand:
             break;
         case LogicalNodeType::kFusion:

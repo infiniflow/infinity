@@ -53,6 +53,7 @@ TEST_F(SQLParserTest, good_test1) {
     inputs.emplace_back("flush data;");
     inputs.emplace_back("flush log;");
     inputs.emplace_back("flush buffer;");
+    inputs.emplace_back("optimize t1;");
 
     inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'integer', 'l2') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");
     inputs.emplace_back("SELECT KNN(c1, [1, 2], 2, 'integer', 'cosine') AS distance1 FROM t1 WHERE a > 0 ORDER BY distance1 LIMIT 3;");

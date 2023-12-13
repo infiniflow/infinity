@@ -286,6 +286,11 @@ export struct FlushOperatorState : public OperatorState {
     inline explicit FlushOperatorState() : OperatorState(PhysicalOperatorType::kFlush) {}
 };
 
+// Optimize
+export struct OptimizeOperatorState : public OperatorState {
+    inline explicit OptimizeOperatorState() : OperatorState(PhysicalOperatorType::kOptimize) {}
+};
+
 // Match
 export struct MatchOperatorState : public OperatorState {
     inline explicit MatchOperatorState() : OperatorState(PhysicalOperatorType::kMatch) {}

@@ -46,6 +46,7 @@ class LogicalShow;
 class LogicalImport;
 class LogicalExport;
 class LogicalFlush;
+class LogicalOptimize;
 class LogicalMatch;
 class LogicalFusion;
 class BaseExpression;
@@ -103,6 +104,8 @@ public:
     static void Explain(const LogicalExport *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalFlush *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalOptimize *optimize_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalMatch *match_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

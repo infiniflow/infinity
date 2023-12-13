@@ -21,6 +21,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/execute_statement.h"
 #include "statement/explain_statement.h"
 #include "statement/flush_statement.h"
+#include "statement/optimize_statement.h"
 #include "statement/insert_statement.h"
 #include "statement/prepare_statement.h"
 #include "statement/select_statement.h"
@@ -111,6 +112,7 @@ struct SQL_LTYPE {
     infinity::ShowStatement*    show_stmt;
     infinity::ExplainStatement* explain_stmt;
     infinity::FlushStatement*  flush_stmt;
+    infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
@@ -354,7 +356,7 @@ struct SQL_LTYPE {
 /* SQL keywords */
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
-%token EXCEPT FLUSH USE
+%token EXCEPT FLUSH USE OPTIMIZE
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
@@ -383,6 +385,7 @@ struct SQL_LTYPE {
 %type <insert_stmt>       insert_statement
 %type <explain_stmt>      explain_statement
 %type <flush_stmt>        flush_statement
+%type <optimize_stmt>     optimize_statement
 %type <command_stmt>      command_statement
 
 %type <stmt_array>        statement_list
@@ -487,6 +490,7 @@ statement : create_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
 | explain_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
+| optimize_statement { $$ = $1; }
 | command_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
@@ -498,6 +502,7 @@ explainable_statement : create_statement { $$ = $1; }
 | update_statement { $$ = $1; }
 | insert_statement { $$ = $1; }
 | flush_statement { $$ = $1; }
+| optimize_statement { $$ = $1; }
 | command_statement { $$ = $1; }
 
 /*
@@ -1560,6 +1565,21 @@ flush_statement: FLUSH DATA {
 | FLUSH BUFFER {
     $$ = new infinity::FlushStatement();
     $$->type_ = infinity::FlushType::kBuffer;
+};
+
+/*
+ * OPTIMIZE STATEMENT
+ */
+optimize_statement: OPTIMIZE table_name {
+    $$ = new infinity::OptimizeStatement();
+    $$->type_ = infinity::OptimizeType::kIRS;
+    if($2->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
+    }
+    $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
+    delete $2;
 };
 
 /*

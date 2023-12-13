@@ -191,6 +191,9 @@ UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
         case PhysicalOperatorType::kFlush: {
             return MakeTaskStateTemplate<FlushOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kOptimize: {
+            return MakeTaskStateTemplate<OptimizeOperatorState>(physical_ops[operator_id]);
+        }
         case PhysicalOperatorType::kCreateTable: {
             return MakeTaskStateTemplate<CreateTableOperatorState>(physical_ops[operator_id]);
         }
@@ -654,6 +657,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kExplain:
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kMatch:
+        case PhysicalOperatorType::kOptimize:
         case PhysicalOperatorType::kFlush:  {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
@@ -847,6 +851,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kDropCollection:
         case PhysicalOperatorType::kDropDatabase:
         case PhysicalOperatorType::kDropView:
+        case PhysicalOperatorType::kOptimize:
         case PhysicalOperatorType::kFlush: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
