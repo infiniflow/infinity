@@ -10,7 +10,8 @@ dependencies = [
     "pandas",
     "numpy",
     "pyarrow",
-    "openpyxl"
+    "openpyxl",
+    "polars"
 ]
 description = "infinity"
 readme = "README.md"
