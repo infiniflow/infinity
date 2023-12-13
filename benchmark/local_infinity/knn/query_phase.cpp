@@ -18,9 +18,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <sys/stat.h>
 #include <thread>
-#include <unistd.h>
 #include <unordered_set>
 
 import compilation_config;
@@ -28,78 +26,35 @@ import compilation_config;
 import infinity;
 import database;
 import table;
-
 import parser;
 import profiler;
 import local_file_system;
 import third_party;
-import defer_op;
-
 import query_options;
 import query_result;
 
 using namespace infinity;
 
-constexpr uint64_t second_unit = 1000 * 1000 * 1000;
-
-float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out) {
-    FILE *f = fopen(fname, "r");
-    if (!f) {
-        fprintf(stderr, "could not open %s\n", fname);
-        perror("");
-        abort();
+template <typename T>
+std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
+    std::ifstream in(filename, std::ios::binary);
+    if (!in.is_open()) {
+        std::cout << "open file error" << std::endl;
+        exit(-1);
     }
-    int d;
-    fread(&d, 1, sizeof(int), f);
-    assert((d > 0 && d < 1000000) || !"unreasonable dimension");
-    fseek(f, 0, SEEK_SET);
-    struct stat st;
-    fstat(fileno(f), &st);
-    size_t sz = st.st_size;
-    assert(sz % ((d + 1) * 4) == 0 || !"weird file size");
-    size_t n = sz / ((d + 1) * 4);
+    in.read((char *)&dim, 4);
+    in.seekg(0, std::ios::end);
+    auto ss = in.tellg();
+    num = ((size_t)ss) / (dim + 1) / 4;
+    auto data = std::make_unique_for_overwrite<T[]>(num * dim);
 
-    *d_out = d;
-    *n_out = n;
-    float *x = new float[n * (d + 1)];
-    size_t nr = fread(x, sizeof(float), n * (d + 1), f);
-    assert(nr == n * (d + 1) || !"could not read whole file");
-
-    // shift array to remove row headers
-    for (size_t i = 0; i < n; i++)
-        memmove(x + i * d, x + 1 + i * (d + 1), d * sizeof(*x));
-
-    fclose(f);
-    return x;
-}
-
-double Measurement(size_t thread_num, size_t times, const std::function<void(size_t, std::shared_ptr<Infinity>, std::thread::id)> &closure) {
-    infinity::BaseProfiler profiler;
-    std::vector<std::thread> threads;
-    threads.reserve(thread_num);
-
-    assert(times % thread_num == 0);
-
-    size_t shared_size = times / thread_num;
-    for (size_t i = 0; i < thread_num; ++i) {
-        threads.emplace_back([=]() {
-            std::thread::id thread_id = std::this_thread::get_id();
-            std::cout << ">>> Thread ID: " << thread_id << " <<<" << std::endl;
-            for (size_t j = 0; j < shared_size; ++j) {
-                std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-                closure(i * shared_size + j, infinity, thread_id);
-                infinity->LocalDisconnect();
-            }
-        });
+    in.seekg(0, std::ios::beg);
+    for (size_t i = 0; i < num; i++) {
+        in.seekg(4, std::ios::cur);
+        in.read((char *)(data.get() + i * dim), dim * 4);
     }
-
-    profiler.Begin();
-    for (auto &thread : threads) {
-        thread.join();
-    }
-    profiler.End();
-
-    return static_cast<double>(profiler.Elapsed()) / second_unit;
+    in.close();
+    return data;
 }
 
 template <class Function>
@@ -118,17 +73,14 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
-    std::vector<std::thread> threads;
+    std::vector<std::jthread> threads;
     threads.reserve(numThreads);
     size_t avg_cnt = (end - start) / numThreads;
     size_t extra_cnt = (end - start) % numThreads;
     for (size_t id_begin = start, threadId = 0; threadId < numThreads; ++threadId) {
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
-        threads.emplace_back([id_begin, id_end, threadId, fn, table_name]() -> void { LoopFor(id_begin, id_end, threadId, fn, table_name); });
+        threads.emplace_back([id_begin, id_end, threadId, fn, table_name] { LoopFor(id_begin, id_end, threadId, fn, table_name); });
         id_begin = id_end;
-    }
-    for (auto &t : threads) {
-        t.join();
     }
 }
 
@@ -158,76 +110,72 @@ int main(int argc, char **argv) {
 
     std::vector<std::string> results;
 
-    do {
-        std::cout << "--- Start to run search benchmark: " << std::endl;
+    std::string query_path = std::string(test_data_path());
+    std::string groundtruth_path = std::string(test_data_path());
+    size_t dimension = 0;
+    int64_t topk = 100;
 
-        std::string query_path = std::string(test_data_path());
-        std::string groundtruth_path = std::string(test_data_path());
-        size_t dimension = 0;
-        int64_t topk = 100;
+    std::string table_name;
+    if (sift) {
+        dimension = 128;
+        query_path += "/benchmark/sift_1m/sift_query.fvecs";
+        groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
+        table_name = "sift_benchmark";
+    } else {
+        dimension = 960;
+        query_path += "/benchmark/gist_1m/gist_query.fvecs";
+        groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
+        table_name = "gist_benchmark";
+    }
+    std::cout << "query from: " << query_path << std::endl;
+    std::cout << "groundtruth is: " << groundtruth_path << std::endl;
 
-        std::string table_name;
-        if (sift) {
-            dimension = 128;
-            query_path += "/benchmark/sift_1m/sift_query.fvecs";
-            groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
-            table_name = "sift_benchmark";
-        } else {
-            dimension = 960;
-            query_path += "/benchmark/gist_1m/gist_query.fvecs";
-            groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
-            table_name = "gist_benchmark";
-        }
-        std::cout << "query from: " << query_path << std::endl;
-        std::cout << "groundtruth is: " << groundtruth_path << std::endl;
-
-        if (!fs.Exists(query_path)) {
-            std::cout << "File: " << query_path << " doesn't exist" << std::endl;
-            break;
-        }
-
-        size_t query_count;
-        const float *queries = nullptr;
-        DeferFn defer_fn([&]() {
-            if(queries != nullptr) {
-                delete[] queries;
-            }
-        });
+    if (!fs.Exists(query_path)) {
+        std::cerr << "File: " << query_path << " doesn't exist" << std::endl;
+        exit(-1);
+    }
+    if (!fs.Exists(groundtruth_path)) {
+        std::cerr << "File: " << groundtruth_path << " doesn't exist" << std::endl;
+        exit(-1);
+    }
+    std::unique_ptr<float[]> queries_ptr;
+    size_t query_count;
+    {
+        int dim = -1;
+        queries_ptr = load_data<float>(query_path, query_count, dim);
+        assert(dimension == dim || !"query vector dim isn't 128");
+    }
+    auto queries = queries_ptr.get();
+    std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
+    {
+        std::unique_ptr<int[]> gt;
+        size_t gt_count;
+        int gt_top_k;
         {
-            size_t dim = -1;
-            queries = const_cast<const float *>(fvecs_read(query_path.c_str(), &dim, &query_count));
-            assert(dimension == dim || !"query vector dim isn't 128");
+            gt = load_data<int>(groundtruth_path, gt_count, gt_top_k);
+            assert(gt_top_k == topk || !"gt_top_k != topk");
+            assert(gt_count == query_count || !"gt_count != query_count");
         }
-        std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;
-        {
-            std::unique_ptr<int[]> gt;
-            size_t gt_count;
-            size_t gt_top_k;
-            int *gt_ = nullptr;
-            {
-                gt_ = (int *)(fvecs_read(groundtruth_path.c_str(), &gt_top_k, &gt_count));
-                assert(gt_top_k == topk || !"gt_top_k != topk");
-                assert(gt_count == query_count || !"gt_count != query_count");
-                gt.reset(gt_);
-            }
-            ground_truth_sets_1.resize(gt_count);
-            ground_truth_sets_10.resize(gt_count);
-            ground_truth_sets_100.resize(gt_count);
-            for (size_t i = 0; i < gt_count; ++i) {
-                for (int j = 0; j < gt_top_k; ++j) {
-                    auto x = gt_[i * gt_top_k + j];
-                    if (j < 1) {
-                        ground_truth_sets_1[i].insert(x);
-                    }
-                    if (j < 10) {
-                        ground_truth_sets_10[i].insert(x);
-                    }
-                    if (j < 100) {
-                        ground_truth_sets_100[i].insert(x);
-                    }
+        ground_truth_sets_1.resize(gt_count);
+        ground_truth_sets_10.resize(gt_count);
+        ground_truth_sets_100.resize(gt_count);
+        for (size_t i = 0; i < gt_count; ++i) {
+            for (int j = 0; j < gt_top_k; ++j) {
+                auto x = gt[i * gt_top_k + j];
+                if (j < 1) {
+                    ground_truth_sets_1[i].insert(x);
+                }
+                if (j < 10) {
+                    ground_truth_sets_10[i].insert(x);
+                }
+                if (j < 100) {
+                    ground_truth_sets_100[i].insert(x);
                 }
             }
         }
+    }
+    do {
+        std::cout << "--- Start to run search benchmark: " << std::endl;
         std::vector<std::vector<uint64_t>> query_results(query_count);
         for (auto &v : query_results) {
             v.reserve(100);
@@ -238,12 +186,12 @@ int main(int argc, char **argv) {
             knn_expr->distance_type_ = KnnDistanceType::kL2;
             knn_expr->topn_ = topk;
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
-            float* embedding_data_ptr = new float[dimension];
+            auto embedding_data_ptr = new float[dimension];
             knn_expr->embedding_data_ptr_ = embedding_data_ptr;
-            char* src_ptr = (char*)queries + query_idx * dimension * sizeof(float);
+            auto src_ptr = queries + query_idx * dimension;
             memmove(knn_expr->embedding_data_ptr_, src_ptr, dimension * sizeof(float));
 
-            ColumnExpr* column_expr = new ColumnExpr();
+            ColumnExpr *column_expr = new ColumnExpr();
             column_expr->names_.emplace_back("col1");
             knn_expr->column_expr_ = column_expr;
             std::vector<ParsedExpr *> *exprs = new std::vector<ParsedExpr *>();
@@ -271,7 +219,7 @@ int main(int argc, char **argv) {
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();
-        results.push_back(Format("Total cost= : {}", profiler.ElapsedToString(1000)));
+        results.push_back(Format("Total cost : {}", profiler.ElapsedToString(1000)));
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
             for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {

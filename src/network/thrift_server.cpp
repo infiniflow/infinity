@@ -306,6 +306,17 @@ public:
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
     }
 
+    void handleRowIDType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
+                         SizeT row_count,
+                         SizeT col_index,
+                         const std::shared_ptr<ColumnVector> &column_vector) {
+        auto size = column_vector->data_type()->Size() * row_count;
+        String dst;
+        dst.resize(size);
+        Memcpy(dst.data(), column_vector->data(), size);
+        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+    }
+
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
         ++count_;
         auto start1 = std::chrono::steady_clock::now();
@@ -422,6 +433,10 @@ public:
                         }
                         case LogicalType::kEmbedding: {
                             handleEmbeddingType(all_column_vectors, row_count, col_index, column_vector);
+                            break;
+                        }
+                        case LogicalType::kRowID: {
+                            handleRowIDType(all_column_vectors, row_count, col_index, column_vector);
                             break;
                         }
                         default:
@@ -909,6 +924,11 @@ private:
         } else if (embedding_data.__isset.i64_array_value) {
             return std::make_pair((void *)embedding_data.i64_array_value.data(), embedding_data.i64_array_value.size());
         } else if (embedding_data.__isset.f32_array_value) {
+            auto ptr_double = (double *)(embedding_data.f32_array_value.data());
+            auto ptr_float = (float *)(embedding_data.f32_array_value.data());
+            for (size_t i = 0; i < embedding_data.f32_array_value.size(); ++i) {
+                ptr_float[i] = float(ptr_double[i]);
+            }
             return std::make_pair((void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size());
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
@@ -944,6 +964,8 @@ private:
                 return infinity_thrift_rpc::ColumnType::ColumnVarchar;
             case LogicalType::kEmbedding:
                 return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
+            case LogicalType::kRowID:
+                return infinity_thrift_rpc::ColumnType::ColumnRowID;
             default:
                 Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
         }
