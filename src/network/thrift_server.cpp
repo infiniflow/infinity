@@ -30,6 +30,8 @@
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
 
+#include <mutex>
+#include <shared_mutex>
 
 import infinity;
 import stl;
@@ -64,9 +66,8 @@ public:
             response.error_msg = "Connect failed";
             LOG_ERROR(Format("THRIFT ERROR: Connect failed"));
         } else {
-            infinity_session_map_mutex_.lock();
+            std::unique_lock<RWMutex>(infinity_session_map_mutex_);
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
-            infinity_session_map_mutex_.unlock();
             response.session_id = infinity->GetSessionId();
             response.success = true;
         }
@@ -81,9 +82,8 @@ public:
         } else {
             auto session_id = infinity->GetSessionId();
             infinity->RemoteDisconnect();
-            infinity_session_map_mutex_.lock();
+            std::unique_lock<RWMutex>(infinity_session_map_mutex_);
             infinity_session_map_.erase(session_id);
-            infinity_session_map_mutex_.unlock();
             LOG_TRACE(Format("THRIFT : Disconnect success"));
             response.success = true;
         }
@@ -640,7 +640,7 @@ public:
     }
 
 private:
-    Mutex infinity_session_map_mutex_{};
+    RWMutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 
     SizeT count_ = 0;
@@ -651,7 +651,7 @@ private:
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+        std::shared_lock<RWMutex>(infinity_session_map_mutex_);
         if (infinity_session_map_.count(session_id) > 0) {
             return infinity_session_map_[session_id];
         } else {
