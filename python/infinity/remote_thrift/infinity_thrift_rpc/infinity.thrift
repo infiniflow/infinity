@@ -144,9 +144,9 @@ struct FusionExpr {
 }
 
 struct SearchExpr {
-	1: list<MatchExpr> match_exprs,
-	2: list<KnnExpr> knn_exprs,
-	3: FusionExpr fusion_expr,
+	1: optional list<MatchExpr> match_exprs,
+	2: optional list<KnnExpr> knn_exprs,
+	3: optional FusionExpr fusion_expr,
 }
 
 struct ConstantExpr {
@@ -202,6 +202,7 @@ ColumnFloat32,
 ColumnFloat64,
 ColumnVarchar,
 ColumnEmbedding,
+ColumnRowID,
 ColumnInvalid,
 }
 
@@ -387,13 +388,13 @@ struct SelectRequest {
 2:  string db_name,
 3:  string table_name,
 4:  list<ParsedExpr> select_list = [],
-5:  SearchExpr search_expr,
-6:  ParsedExpr where_expr,
-7:  list<ParsedExpr> group_by_list = [],
-8:  ParsedExpr having_expr,
-9:  ParsedExpr limit_expr,
-10:  ParsedExpr offset_expr,
-11:  list<OrderByExpr> order_by_list = [],
+5:  optional SearchExpr search_expr,
+6:  optional ParsedExpr where_expr,
+7:  optional list<ParsedExpr> group_by_list = [],
+8:  optional ParsedExpr having_expr,
+9:  optional ParsedExpr limit_expr,
+10:  optional ParsedExpr offset_expr,
+11:  optional list<OrderByExpr> order_by_list = [],
 }
 
 struct SelectResponse {
