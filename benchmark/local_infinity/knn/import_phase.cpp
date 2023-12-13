@@ -68,12 +68,15 @@ int main(int argc, char **argv) {
         // init column defs
         std::shared_ptr<DataType> col1_type = nullptr;
         std::string base_path = std::string(test_data_path());
+        std::string table_name;
         if (sift) {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
             base_path += "/benchmark/sift_1m/sift_base.fvecs";
+            table_name = "sift_benchmark";
         } else {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 960));
             base_path += "/benchmark/gist_1m/gist_base.fvecs";
+            table_name = "gist_benchmark";
         }
         std::cout << "Import from: " << base_path << std::endl;
 
@@ -82,7 +85,6 @@ int main(int argc, char **argv) {
         column_defs.emplace_back(col1_def.release());
 
         std::string db_name = "default";
-        std::string table_name = "knn_benchmark";
         std::string index_name = "hnsw_index";
 
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
