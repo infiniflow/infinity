@@ -107,7 +107,7 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
     // Schedule worker 1 if possible
     u64 worker_id{};
     u64 primary_worker_id = 0;
-    u64 primary_worker_load = worker_workloads_[1];
+    u64 primary_worker_load = worker_workloads_[primary_worker_id];
     if (primary_worker_load == 0) {
         worker_id = primary_worker_id;
     } else {
