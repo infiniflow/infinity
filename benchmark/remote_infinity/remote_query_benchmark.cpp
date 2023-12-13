@@ -184,7 +184,7 @@ int main() {
                 req.__isset.session_id = true;
                 req.db_name = "default";
                 req.__isset.db_name = true;
-                req.table_name = "knn_benchmark";
+                req.table_name = "sift_benchmark";
                 req.__isset.table_name = true;
                 ParsedExpr expr;
                 {
