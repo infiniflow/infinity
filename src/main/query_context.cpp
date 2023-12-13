@@ -146,7 +146,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kTaskBuild);
 
         StartProfile(QueryPhase::kExecution);
-        scheduler_->Schedule(tasks);
+        scheduler_->Schedule(this, tasks, plan_fragment.get());
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = unoptimized_plan->operator_type();
         StopProfile(QueryPhase::kExecution);
