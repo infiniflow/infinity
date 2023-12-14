@@ -115,7 +115,7 @@ def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth
                 correct_100 += 1.0
 
     recall_1 = correct_1 / (len(query_results) * 1)
-    recall_10 = correct_10 /(len(query_results) * 10)
+    recall_10 = correct_10 / (len(query_results) * 10)
     recall_100 = correct_100 / (len(query_results) * 100)
     return recall_1, recall_10, recall_100
 
@@ -220,7 +220,7 @@ class TestQueryBenchmark:
 
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
-        start = time.time()
+
 
         sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
         if not os.path.exists(sift_query_path):
@@ -229,20 +229,28 @@ class TestQueryBenchmark:
 
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
-        querys = fvecs_read_all(sift_query_path)
-        query_results = [[] for _ in range(len(querys))]
-        for idx, query_vec in enumerate(querys):
+        queries = fvecs_read_all(sift_query_path)
+        query_results = [[] for _ in range(len(queries))]
+
+        dur = 0.0
+        for idx, query_vec in enumerate(queries):
+
+            start = time.time()
+
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
             res = query_builder.to_df()
+            end = time.time()
+
+            diff = end - start
+            dur += diff
+
             res_list = res["ROW_ID"].to_list()
             # print(len(res_list))
 
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
-
-
 
         end = time.time()
 
@@ -255,7 +263,6 @@ class TestQueryBenchmark:
         print("recall_10: ", recall_10)
         print("recall_100: ", recall_100)
 
-        dur = end - start
         print(">>> Query Benchmark End <<<")
         qps = total_times / dur
         print(f"Total Times: {total_times}")
