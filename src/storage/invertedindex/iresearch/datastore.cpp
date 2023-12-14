@@ -130,12 +130,13 @@ struct ConsolidationTask : Task {
 
 void ConsolidationTask::operator()(int id) {
     LOG_INFO(Format("ConsolidationTask id {}", id));
-    if (true == state_->cancel_.load(MemoryOrderRelease))
+    if ((true == state_->cancel_.load(MemoryOrderRelease)) && (false == optimize_))
         return;
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
 
     if (optimize_) {
+        LOG_INFO(Format("ConsolidationTask optimize {}", id));
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
         store_->GetWriter()->Commit();
     } else {
