@@ -15,6 +15,7 @@ import multiprocessing
 import os
 import struct
 import time
+import polars as pl
 from concurrent.futures import ThreadPoolExecutor
 
 import infinity
@@ -36,13 +37,42 @@ def fvecs_read(filename):
             except struct.error:
                 break
 
+def fvecs_read_all(filename):
+    vectors = []
+    with open(filename, 'rb') as f:
+        while True:
+            try:
+                dims = struct.unpack('i', f.read(4))[0]
+                vec = struct.unpack('{}f'.format(dims), f.read(4 * dims))
+                assert dims == len(vec)
+                vectors.append(list(vec))
+            except struct.error:
+                break
+    return vectors
+
+
+def test_read_all():
+    sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+    vectors = fvecs_read_all(sift_query_path)
+    print(len(vectors))
+    print(pl.DataFrame(vectors))
+
+
+def test_read():
+    sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+    for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
+        print(pl.DataFrame([query_vec]))
+        if idx == 10:
+            assert idx == 10
+            break
+
 
 @trace_unhandled_exceptions
 def work(query_vec, topk, metric_type, column_name, data_type):
     conn = ThriftInfinityClient(REMOTE_HOST)
     table = RemoteTable(conn, "default", "knn_benchmark")
     query_builder = InfinityThriftQueryBuilder(table)
-    query_builder.output(["*"])
+    query_builder.output(["_row_id_"])
     query_builder.knn(column_name, query_vec, data_type, metric_type, topk)
     query_builder.to_df()
 
@@ -106,7 +136,7 @@ class TestQueryBenchmark:
 
     def test_query(self):
         thread_num = 1
-        total_times = 1
+        total_times = 10000
 
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
@@ -119,7 +149,7 @@ class TestQueryBenchmark:
 
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
-        for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
+        for idx, query_vec in enumerate(fvecs_read_all(sift_query_path)):
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id_"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
