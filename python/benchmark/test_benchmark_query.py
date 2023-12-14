@@ -252,7 +252,6 @@ class TestQueryBenchmark:
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-        end = time.time()
 
         read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
