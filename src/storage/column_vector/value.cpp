@@ -266,7 +266,7 @@ Value Value::MakeEmbedding(EmbeddingDataType type, SizeT dimension) {
 
 Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> embedding_info) {
     Value value(LogicalType::kEmbedding, Move(embedding_info));
-    value.value_.embedding = EmbeddingT(static_cast<char *>(ptr));
+    value.value_.embedding = EmbeddingT(static_cast<char *>(ptr), false);
     value.is_null_ = false;
     return value;
 }

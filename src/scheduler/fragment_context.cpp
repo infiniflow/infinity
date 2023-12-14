@@ -75,7 +75,7 @@ UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_sc
     return operator_state;
 }
 
-UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, FragmentTask *task, ParallelMaterializedFragmentCtx *fragment_ctx) {
+UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, FragmentTask *task, FragmentContext *fragment_ctx) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kKnnScan) {
         Error<SchedulerException>("Expect knn scan source state");
@@ -83,7 +83,25 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 
     UniquePtr<OperatorState> operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
-    knn_scan_op_state_ptr->knn_scan_function_data1_ = MakeUnique<KnnScanFunctionData1>(fragment_ctx->shared_data_, task->TaskID());
+
+    switch (fragment_ctx->ContextType()) {
+        case FragmentType::kSerialMaterialize: {
+            SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
+            knn_scan_op_state_ptr->knn_scan_function_data_ =
+                MakeUnique<KnnScanFunctionData>(serial_materialize_fragment_ctx->shared_data_.get(), task->TaskID());
+            break;
+        }
+        case FragmentType::kParallelMaterialize: {
+            ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
+            knn_scan_op_state_ptr->knn_scan_function_data_ =
+                MakeUnique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->shared_data_.get(), task->TaskID());
+            break;
+        }
+        default: {
+            Error<SchedulerException>("Invalid fragment type.");
+        }
+    }
+
     return operator_state;
 }
 
@@ -101,10 +119,8 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
     return operator_state;
 }
 
-UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
-                                       const Vector<PhysicalOperator *> &physical_ops,
-                                       FragmentTask *task,
-                                       FragmentContext *fragment_ctx) {
+UniquePtr<OperatorState>
+MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops, FragmentTask *task, FragmentContext *fragment_ctx) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
             Error<SchedulerException>("Invalid physical operator type");
@@ -123,8 +139,7 @@ UniquePtr<OperatorState> MakeTaskState(SizeT operator_id,
         }
         case PhysicalOperatorType::kKnnScan: {
             auto physical_knn_scan = static_cast<PhysicalKnnScan *>(physical_ops[operator_id]);
-            auto knn_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-            return MakeKnnScanState(physical_knn_scan, task, knn_fragment_ctx);
+            return MakeKnnScanState(physical_knn_scan, task, fragment_ctx);
         }
         case PhysicalOperatorType::kAggregate: {
             return MakeTaskStateTemplate<AggregateOperatorState>(physical_ops[operator_id]);
@@ -361,7 +376,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             FragmentTask *task = tasks[task_id].get();
 
             // build the input and output state of each opeartor
-             UniquePtr<OperatorState> operator_state = MakeTaskState(operator_id, fragment_operators, task, fragment_context.get());
+            UniquePtr<OperatorState> operator_state = MakeTaskState(operator_id, fragment_operators, task, fragment_context.get());
 
             // Connect the input, output state. Connect fragment to its parent if needed
             if (operator_id == operator_count - 1) {
@@ -425,7 +440,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             }
         }
         default: {
-            for (const auto & task_id : tasks) {
+            for (const auto &task_id : tasks) {
                 FragmentTask *task = task_id.get();
                 auto &first_operator_state = *task->operator_states_.back();
                 SetTaskState(first_operator_state, fragment_operators.back(), fragment_ptr->Children());
@@ -461,22 +476,44 @@ PhysicalSink *FragmentContext::GetSinkOperator() const { return fragment_ptr_->G
 
 PhysicalSource *FragmentContext::GetSourceOperator() const { return fragment_ptr_->GetSourceNode(); }
 
-SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, ParallelMaterializedFragmentCtx *fragment_context, QueryContext *query_context) {
-    auto [block_column_entries, index_entries] = knn_scan_operator->PlanWithIndex(query_context);
-    SizeT task_n = block_column_entries.size() + index_entries.size();
-    KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
-    auto knn_scan_shared_data = MakeShared<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                              knn_scan_operator->filter_expression_,
-                                                              Move(block_column_entries),
-                                                              Move(index_entries),
-                                                              knn_expr->topn_,
-                                                              knn_expr->dimension_,
-                                                              1,
-                                                              knn_expr->query_embedding_.ptr,
-                                                              knn_expr->embedding_data_type_,
-                                                              knn_expr->distance_type_);
+SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentContext *fragment_context, QueryContext *query_context) {
 
-    fragment_context->shared_data_ = knn_scan_shared_data;
+    SizeT task_n = knn_scan_operator->TaskCount();
+    KnnExpression *knn_expr = knn_scan_operator->knn_expression_.get();
+    switch (fragment_context->ContextType()) {
+        case FragmentType::kSerialMaterialize: {
+            SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
+            serial_materialize_fragment_ctx->shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                                                          knn_scan_operator->filter_expression_,
+                                                                                          Move(knn_scan_operator->block_column_entries_),
+                                                                                          Move(knn_scan_operator->index_entries_),
+                                                                                          knn_expr->topn_,
+                                                                                          knn_expr->dimension_,
+                                                                                          1,
+                                                                                          knn_expr->query_embedding_.ptr,
+                                                                                          knn_expr->embedding_data_type_,
+                                                                                          knn_expr->distance_type_);
+            break;
+        }
+        case FragmentType::kParallelMaterialize: {
+            ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
+            parallel_materialize_fragment_ctx->shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                                                                            knn_scan_operator->filter_expression_,
+                                                                                            Move(knn_scan_operator->block_column_entries_),
+                                                                                            Move(knn_scan_operator->index_entries_),
+                                                                                            knn_expr->topn_,
+                                                                                            knn_expr->dimension_,
+                                                                                            1,
+                                                                                            knn_expr->query_embedding_.ptr,
+                                                                                            knn_expr->embedding_data_type_,
+                                                                                            knn_expr->distance_type_);
+            break;
+        }
+        default: {
+            Error<SchedulerException>("Invalid fragment type.");
+        }
+    }
+
     return task_n;
 }
 
@@ -495,10 +532,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kKnnScan: {
             auto *knn_scan_operator = static_cast<PhysicalKnnScan *>(first_operator);
-            auto fragment_context = static_cast<ParallelMaterializedFragmentCtx *>(this);
-
-            SizeT task_n = InitKnnScanFragmentContext(knn_scan_operator, fragment_context, query_context_);
-
+            SizeT task_n = InitKnnScanFragmentContext(knn_scan_operator, this, query_context_);
             parallel_count = Min(parallel_count, (i64)task_n);
             if (parallel_count == 0) {
                 parallel_count = 1;
@@ -622,9 +656,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kParallelStream) {
+            if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(first_operator->operator_type())));
+                    Format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
@@ -658,7 +692,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kFlush:  {
+        case PhysicalOperatorType::kFlush: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -709,7 +743,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn:  {
+        case PhysicalOperatorType::kMergeKnn: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -747,9 +781,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             break;
         }
         case PhysicalOperatorType::kKnnScan: {
-            if (fragment_type_ == FragmentType::kSerialMaterialize) {
+            if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized/stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                    Format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
 
             if (tasks_.size() != parallel_count) {
@@ -900,11 +934,11 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
-            for(auto& data_block: materialize_sink_state->data_block_array_) {
+            for (auto &data_block : materialize_sink_state->data_block_array_) {
                 result_table->UpdateRowCount(data_block->row_count());
                 result_table->data_blocks_.emplace_back(Move(data_block));
             }
-//            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
+            //            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {

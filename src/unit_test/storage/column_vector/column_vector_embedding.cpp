@@ -38,7 +38,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+//    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);

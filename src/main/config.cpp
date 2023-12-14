@@ -100,7 +100,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 default_log_file_rotate_count = 10;
 
     // Set the log level before performance test of DB
-    LogLevel default_log_level = LogLevel::kTrace;
+    LogLevel default_log_level = LogLevel::kWarning;
 
     // Default storage config
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");

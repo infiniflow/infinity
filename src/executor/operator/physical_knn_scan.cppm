@@ -69,7 +69,11 @@ public:
 
     SizeT BlockEntryCount() const;
 
-    Pair<Vector<BlockColumnEntry *>, Vector<SegmentColumnIndexEntry *>> PlanWithIndex(QueryContext *query_context);
+    void PlanWithIndex(QueryContext *query_context);
+
+    inline SizeT TaskCount() const {
+        return block_column_entries_->size() + index_entries_->size();
+    }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -85,6 +89,9 @@ public:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     u64 knn_table_index_{};
+
+    UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
+    UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
 
 private:
     template <typename DataType, template <typename, typename> typename C>
