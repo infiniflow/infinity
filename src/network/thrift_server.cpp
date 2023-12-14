@@ -224,10 +224,10 @@ public:
         response.__set_can_skip(false);
     }
 
-    void handeleColumnDefs(infinity_thrift_rpc::SelectResponse &response,
-                           SizeT column_count,
-                           SharedPtr<TableDef> table_def,
-                           Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
+    void HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
+                         SizeT column_count,
+                         SharedPtr<TableDef> table_def,
+                         Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
         if (column_count != all_column_vectors.size()) {
             Error<NetworkException>("Column count not match", __FILE_NAME__, __LINE__);
         }
@@ -236,28 +236,25 @@ public:
             infinity_thrift_rpc::ColumnDef proto_column_def;
             proto_column_def.__set_id(column_def->id());
             proto_column_def.__set_name(column_def->name());
+
             infinity_thrift_rpc::DataType proto_data_type;
             proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
-            all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_def->type()));
+
             response.column_defs.emplace_back(proto_column_def);
         }
     }
 
-    static void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                                  SizeT row_count,
-                                  SizeT col_index,
-                                  const std::shared_ptr<ColumnVector> &column_vector) {
+    static void
+    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(Move(dst));
     }
 
-    void handleVarcharType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                           SizeT row_count,
-                           SizeT col_index,
-                           const std::shared_ptr<ColumnVector> &column_vector) {
+    void
+    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
 
         String dst;
         SizeT total_varchar_data_size = 0;
@@ -292,44 +289,42 @@ public:
             Error<NetworkException>("Bug");
         }
 
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
-    void handleEmbeddingType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                             SizeT row_count,
-                             SizeT col_index,
-                             const std::shared_ptr<ColumnVector> &column_vector) {
+    void
+    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
-    void handleRowIDType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                         SizeT row_count,
-                         SizeT col_index,
-                         const std::shared_ptr<ColumnVector> &column_vector) {
+    void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
-        ++count_;
-        auto start1 = std::chrono::steady_clock::now();
+        // ++count_;
+        // auto start1 = std::chrono::steady_clock::now();
 
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
-        auto end1 = std::chrono::steady_clock::now();
-
-        phase_1_duration_ += end1 - start1;
-
-        auto start2 = std::chrono::steady_clock::now();
+        // auto end1 = std::chrono::steady_clock::now();
+        //
+        // phase_1_duration_ += end1 - start1;
+        //
+        // auto start2 = std::chrono::steady_clock::now();
 
         // select list
         if (request.__isset.select_list == false) {
@@ -388,34 +383,35 @@ public:
             limit = GetParsedExprFromProto(request.limit_expr);
         }
 
-        auto end2 = std::chrono::steady_clock::now();
-        phase_2_duration_ += end2 - start2;
-
-        auto start3 = std::chrono::steady_clock::now();
+        // auto end2 = std::chrono::steady_clock::now();
+        // phase_2_duration_ += end2 - start2;
+        //
+        // auto start3 = std::chrono::steady_clock::now();
 
         const QueryResult result = table->Search(search_expr, filter, output_columns);
 
-        auto end3 = std::chrono::steady_clock::now();
-
-        phase_3_duration_ += end3 - start3;
-
-        auto start4 = std::chrono::steady_clock::now();
+        // auto end3 = std::chrono::steady_clock::now();
+        //
+        // phase_3_duration_ += end3 - start3;
+        //
+        // auto start4 = std::chrono::steady_clock::now();
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
             auto column_count = result.result_table_->ColumnCount();
             Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors = response.column_fields;
-            for (all_column_vectors.reserve(column_count); all_column_vectors.size() < column_count; all_column_vectors.emplace_back()) {
-            }
+
+            all_column_vectors.resize(column_count);
 
             for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 auto data_block = result.result_table_->GetDataBlockById(block_idx);
                 auto row_count = data_block->row_count();
 
                 for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-                    auto column_vector = data_block->column_vectors[col_index];
-                    all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-                    switch (column_vector->data_type()->type()) {
+                    auto &result_column_vector = data_block->column_vectors[col_index];
+                    infinity_thrift_rpc::ColumnField &output_column_field = all_column_vectors[col_index];
+                    output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
+                    switch (result_column_vector->data_type()->type()) {
                         case LogicalType::kBoolean:
                         case LogicalType::kTinyInt:
                         case LogicalType::kSmallInt:
@@ -424,19 +420,19 @@ public:
                         case LogicalType::kHugeInt:
                         case LogicalType::kFloat:
                         case LogicalType::kDouble: {
-                            handleLogicalType(all_column_vectors, row_count, col_index, column_vector);
+                            HandlePodType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kVarchar: {
-                            handleVarcharType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleVarcharType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kEmbedding: {
-                            handleEmbeddingType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleEmbeddingType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kRowID: {
-                            handleRowIDType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleRowIDType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         default:
@@ -445,7 +441,7 @@ public:
                 }
             }
 
-            handeleColumnDefs(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
+            HandleColumnDef(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
             response.__set_success(true);
         } else {
             response.__set_success(false);
@@ -453,26 +449,28 @@ public:
             LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
 
-        auto end4 = std::chrono::steady_clock::now();
-        phase_4_duration_ += end4 - start4;
-
-        if (count_ % 10000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  seconds",
-                             phase_1_duration_.count(),
-                             phase_2_duration_.count(),
-                             phase_3_duration_.count(),
-                             phase_4_duration_.count()));
-            phase_1_duration_ = std::chrono::duration<double>();
-            phase_2_duration_ = std::chrono::duration<double>();
-            phase_3_duration_ = std::chrono::duration<double>();
-            phase_4_duration_ = std::chrono::duration<double>();
-        } else if (count_ % 1000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  seconds",
-                             phase_1_duration_.count(),
-                             phase_2_duration_.count(),
-                             phase_3_duration_.count(),
-                             phase_4_duration_.count()));
-        }
+        // auto end4 = std::chrono::steady_clock::now();
+        // phase_4_duration_ += end4 - start4;
+        //
+        // if (count_ % 10000 == 0) {
+        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //                      phase_1_duration_.count(),
+        //                      phase_2_duration_.count(),
+        //                      phase_3_duration_.count(),
+        //                      phase_4_duration_.count(),
+        //                      (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
+        //     phase_1_duration_ = std::chrono::duration<double>();
+        //     phase_2_duration_ = std::chrono::duration<double>();
+        //     phase_3_duration_ = std::chrono::duration<double>();
+        //     phase_4_duration_ = std::chrono::duration<double>();
+        // } else if (count_ % 1000 == 0) {
+        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //                      phase_1_duration_.count(),
+        //                      phase_2_duration_.count(),
+        //                      phase_3_duration_.count(),
+        //                      phase_4_duration_.count(),
+        //                      (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
+        // }
     }
 
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
@@ -655,11 +653,11 @@ private:
     Mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 
-    SizeT count_ = 0;
-    std::chrono::duration<double> phase_1_duration_{};
-    std::chrono::duration<double> phase_2_duration_{};
-    std::chrono::duration<double> phase_3_duration_{};
-    std::chrono::duration<double> phase_4_duration_{};
+    // SizeT count_ = 0;
+    // std::chrono::duration<double> phase_1_duration_{};
+    // std::chrono::duration<double> phase_2_duration_{};
+    // std::chrono::duration<double> phase_3_duration_{};
+    // std::chrono::duration<double> phase_4_duration_{};
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
