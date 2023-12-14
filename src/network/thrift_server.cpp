@@ -461,21 +461,23 @@ public:
         phase_4_duration_ += end4 - start4;
 
         if (count_ % 10000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  seconds",
+            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
                              phase_1_duration_.count(),
                              phase_2_duration_.count(),
                              phase_3_duration_.count(),
-                             phase_4_duration_.count()));
+                             phase_4_duration_.count(),
+                             (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
             phase_1_duration_ = std::chrono::duration<double>();
             phase_2_duration_ = std::chrono::duration<double>();
             phase_3_duration_ = std::chrono::duration<double>();
             phase_4_duration_ = std::chrono::duration<double>();
         } else if (count_ % 1000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  seconds",
+            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
                              phase_1_duration_.count(),
                              phase_2_duration_.count(),
                              phase_3_duration_.count(),
-                             phase_4_duration_.count()));
+                             phase_4_duration_.count(),
+                             (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
         }
     }
 
