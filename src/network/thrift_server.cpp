@@ -224,10 +224,10 @@ public:
         response.__set_can_skip(false);
     }
 
-    void handeleColumnDefs(infinity_thrift_rpc::SelectResponse &response,
-                           SizeT column_count,
-                           SharedPtr<TableDef> table_def,
-                           Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
+    void HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
+                         SizeT column_count,
+                         SharedPtr<TableDef> table_def,
+                         Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
         if (column_count != all_column_vectors.size()) {
             Error<NetworkException>("Column count not match", __FILE_NAME__, __LINE__);
         }
@@ -244,21 +244,17 @@ public:
         }
     }
 
-    static void handleLogicalType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                                  SizeT row_count,
-                                  SizeT col_index,
-                                  const std::shared_ptr<ColumnVector> &column_vector) {
+    static void
+    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(Move(dst));
     }
 
-    void handleVarcharType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                           SizeT row_count,
-                           SizeT col_index,
-                           const std::shared_ptr<ColumnVector> &column_vector) {
+    void
+    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
 
         String dst;
         SizeT total_varchar_data_size = 0;
@@ -293,32 +289,27 @@ public:
             Error<NetworkException>("Bug");
         }
 
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
-        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
-    void handleEmbeddingType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                             SizeT row_count,
-                             SizeT col_index,
-                             const std::shared_ptr<ColumnVector> &column_vector) {
+    void
+    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
-        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
-    void handleRowIDType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
-                         SizeT row_count,
-                         SizeT col_index,
-                         const std::shared_ptr<ColumnVector> &column_vector) {
+    void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
-        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
@@ -417,9 +408,10 @@ public:
                 auto row_count = data_block->row_count();
 
                 for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-                    auto column_vector = data_block->column_vectors[col_index];
-                    all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-                    switch (column_vector->data_type()->type()) {
+                    auto &result_column_vector = data_block->column_vectors[col_index];
+                    infinity_thrift_rpc::ColumnField &output_column_field = all_column_vectors[col_index];
+                    output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
+                    switch (result_column_vector->data_type()->type()) {
                         case LogicalType::kBoolean:
                         case LogicalType::kTinyInt:
                         case LogicalType::kSmallInt:
@@ -428,19 +420,19 @@ public:
                         case LogicalType::kHugeInt:
                         case LogicalType::kFloat:
                         case LogicalType::kDouble: {
-                            handleLogicalType(all_column_vectors, row_count, col_index, column_vector);
+                            HandlePodType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kVarchar: {
-                            handleVarcharType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleVarcharType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kEmbedding: {
-                            handleEmbeddingType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleEmbeddingType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         case LogicalType::kRowID: {
-                            handleRowIDType(all_column_vectors, row_count, col_index, column_vector);
+                            HandleRowIDType(output_column_field, row_count, result_column_vector);
                             break;
                         }
                         default:
@@ -449,7 +441,7 @@ public:
                 }
             }
 
-            handeleColumnDefs(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
+            HandleColumnDef(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
             response.__set_success(true);
         } else {
             response.__set_success(false);

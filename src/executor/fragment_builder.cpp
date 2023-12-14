@@ -21,6 +21,7 @@ import physical_operator_type;
 import physical_sink;
 import physical_source;
 import physical_explain;
+import physical_knn_scan;
 
 import infinity_exception;
 import parser;
@@ -220,7 +221,12 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(Format("{} shouldn't have child.", phys_op->GetName()));
             }
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            PhysicalKnnScan* knn_scan = static_cast<PhysicalKnnScan*>(phys_op);
+            if(knn_scan->TaskCount() == 1) {
+                current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            } else {
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            }
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kTable, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
             return;

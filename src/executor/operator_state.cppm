@@ -83,7 +83,7 @@ export struct KnnScanOperatorState : public OperatorState {
     inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 
 //    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
-    UniquePtr<KnnScanFunctionData1> knn_scan_function_data1_{};
+    UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
 // Merge Knn

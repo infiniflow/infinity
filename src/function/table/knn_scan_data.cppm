@@ -40,8 +40,8 @@ export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
                       SharedPtr<BaseExpression> filter_expression,
-                      Vector<BlockColumnEntry *> block_column_entries,
-                      Vector<SegmentColumnIndexEntry *> index_entries,
+                      UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
+                      UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries,
                       i64 topk,
                       i64 dimension,
                       i64 query_embedding_count,
@@ -57,8 +57,8 @@ public:
 
     const SharedPtr<BaseExpression> filter_expression_{};
 
-    const Vector<BlockColumnEntry *> block_column_entries_{};
-    const Vector<SegmentColumnIndexEntry *> index_entries_{};
+    const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
+    const UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
 
     const i64 topk_;
     const i64 dimension_;
@@ -110,16 +110,18 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type);
 
 //-------------------------------------------------------------------
 
-export class KnnScanFunctionData1 : public TableFunctionData {
+export class KnnScanFunctionData final : public TableFunctionData {
 public:
-    KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data, u32 current_parallel_idx);
+    KnnScanFunctionData(KnnScanSharedData* shared_data, u32 current_parallel_idx);
+
+    ~KnnScanFunctionData() final = default;
 
 private:
     template <typename DataType>
     void Init();
 
 public:
-    const SharedPtr<KnnScanSharedData> shared_data_;
+    KnnScanSharedData* shared_data_;
     const u32 task_id_;
 
     UniquePtr<MergeKnnBase> merge_knn_base_{};

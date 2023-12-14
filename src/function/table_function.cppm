@@ -29,6 +29,8 @@ class QueryContext;
 //class DataBlock;
 
 export class TableFunctionData : public FunctionData {
+public:
+    ~TableFunctionData() override = default;
 };
 
 export using TableFunctionType = StdFunction<void(QueryContext *query_context, TableFunctionData *data, DataBlock &output)>;
