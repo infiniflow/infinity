@@ -96,9 +96,9 @@ def calculate_recall(ground_truth_sets, result_sets):
 
 
 def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
-    correct_1 = 0
-    correct_10 = 0
-    correct_100 = 0
+    correct_1 = 0.0
+    correct_10 = 0.0
+    correct_100 = 0.0
 
     for query_idx in range(len(query_results)):
         result = query_results[query_idx]
@@ -108,15 +108,15 @@ def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth
 
         for i in range(len(result)):
             if i < 1 and result[i] in ground_truth_1:
-                correct_1 += 1
+                correct_1 += 1.0
             if i < 10 and result[i] in ground_truth_10:
-                correct_10 += 1
+                correct_10 += 1.0
             if i < 100 and result[i] in ground_truth_100:
-                correct_100 += 1
+                correct_100 += 1.0
 
-    recall_1 = correct_1 // len(query_results) * 1
-    recall_10 = correct_10 // len(query_results) * 10
-    recall_100 = correct_100 // len(query_results) * 100
+    recall_1 = correct_1 / (len(query_results) * 1)
+    recall_10 = correct_10 /(len(query_results) * 10)
+    recall_100 = correct_100 / (len(query_results) * 100)
     return recall_1, recall_10, recall_100
 
 
@@ -216,7 +216,7 @@ class TestQueryBenchmark:
 
     def test_query(self):
         thread_num = 1
-        total_times = 1
+        total_times = 10000
 
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
@@ -242,11 +242,7 @@ class TestQueryBenchmark:
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-            # print(query_results)
 
-            if idx == total_times:
-                assert idx == total_times
-                break
 
         end = time.time()
 
