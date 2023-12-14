@@ -7,3 +7,4 @@ pandas~=2.1.1
 openpyxl
 numpy~=1.26.0
 polars~=0.19.0
+pyarrow
