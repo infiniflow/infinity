@@ -41,8 +41,8 @@ public:
                             SharedPtr<Vector<String>> names,
                             SharedPtr<Vector<SharedPtr<DataType>>> types,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id, load_metas), type_(source_type), output_names_(Move(names)),
-          output_types_(Move(types)) {}
+        : PhysicalOperator(PhysicalOperatorType::kSource, nullptr, nullptr, id, load_metas), output_names_(Move(names)), output_types_(Move(types)),
+          type_(source_type) {}
 
     ~PhysicalSource() override = default;
 

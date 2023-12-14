@@ -521,7 +521,7 @@ i64 WalManager::ReplayWalFile() {
     std::reverse(replay_entries.begin(), replay_entries.end());
     i64 system_start_ts = 0;
     i64 last_txn_id = 0;
-    i64 replay_count = 0;
+    SizeT replay_count = 0;
     for (; replay_count < replay_entries.size(); ++replay_count) {
         if (replay_entries[replay_count]->commit_ts > max_commit_ts) {
             break;

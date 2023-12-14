@@ -87,13 +87,13 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     query_context_ptr->logical_planner()->Build(statement, bind_context);
     query_context_ptr->set_max_node_id(bind_context->GetNewLogicalNodeId());
 
-    SharedPtr<LogicalNode> unoptimized_plan = query_context_ptr->logical_planner()->LogicalPlan();
+    SharedPtr<LogicalNode> logical_plan = query_context_ptr->logical_planner()->LogicalPlan();
 
     // Apply optimized rule to the logical plan
-    SharedPtr<LogicalNode> optimized_plan = query_context_ptr->optimizer()->optimize(unoptimized_plan);
+    query_context_ptr->optimizer()->optimize(logical_plan);
 
     // Build physical plan
-    SharedPtr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(optimized_plan);
+    SharedPtr<PhysicalOperator> physical_plan = query_context_ptr->physical_planner()->BuildPhysicalOperator(logical_plan);
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
@@ -108,7 +108,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     // Initialize query result
     QueryResult query_result;
     query_result.result_table_ = plan_fragment->GetResult();
-    query_result.root_operator_type_ = unoptimized_plan->operator_type();
+    query_result.root_operator_type_ = logical_plan->operator_type();
 
     parsed_result->Reset();
     query_context_ptr->CommitTxn();

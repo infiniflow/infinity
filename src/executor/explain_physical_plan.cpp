@@ -1286,7 +1286,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             break;
         }
         case CopyFileType::kJSON: {
-            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: JSON");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kJSONL: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: JSONL");
             result->emplace_back(file_type);
             break;
         }
@@ -1343,7 +1348,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
             break;
         }
         case CopyFileType::kJSON: {
-            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSV");
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: JSON");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kJSONL: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: JSONL");
             result->emplace_back(file_type);
             break;
         }

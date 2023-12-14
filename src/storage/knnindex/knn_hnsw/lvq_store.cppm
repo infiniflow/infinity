@@ -13,7 +13,6 @@
 // limitations under the License.
 
 module;
-#include <cassert>
 #include <cmath>
 #include <new>
 #include <type_traits>
@@ -23,6 +22,7 @@ import stl;
 import hnsw_common;
 import file_system;
 import plain_store;
+import infinity_exception;
 
 export module lvq_store;
 
@@ -202,7 +202,9 @@ private:
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                assert(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>());
+                if(!(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>())) {
+                    Error<StorageException>("CompressVec error");
+                }
                 compress[j] = c;
             }
         }
@@ -280,7 +282,9 @@ public:
     }
 
     StoreType GetVec(SizeT vec_i) const {
-        assert(vec_i < meta_.cur_vec_num()); // must call compress before get vec
+        if(vec_i >= meta_.cur_vec_num()) {
+            Error<StorageException>("Get Vec error");
+        }
         return GetLVQData(vec_i);
     }
 
@@ -302,7 +306,9 @@ public:
         // query_iter is empty here. Should implement better
         DenseVectorIter<DataType> empty_iter(nullptr, dim(), 0);
         SizeT ret = MergeCompress(empty_iter, 0);
-        assert(ret != DataStoreMeta::ERR_IDX);
+        if(ret == DataStoreMeta::ERR_IDX) {
+            Error<StorageException>("Compress error");
+        }
     }
 };
 

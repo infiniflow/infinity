@@ -41,6 +41,8 @@ public:
     explicit KnnDistanceBase(KnnDistanceAlgoType type, EmbeddingDataType elem_type, u64 query_count, u64 dimension, u64 topk)
         : query_count_(query_count), dimension_(dimension), top_k_(topk), algo_type_(type), elem_type_(elem_type) {}
 
+    virtual ~KnnDistanceBase() = default;
+
     [[nodiscard]] inline KnnDistanceAlgoType algo_type() const { return algo_type_; };
 
     [[nodiscard]] inline EmbeddingDataType elem_type() const { return elem_type_; };
@@ -67,6 +69,8 @@ class KnnDistance : public KnnDistanceBase {
 public:
     explicit KnnDistance(KnnDistanceAlgoType type, EmbeddingDataType elem_type, u64 query_count, u64 dimension, u64 topk)
         : KnnDistanceBase(type, elem_type, query_count, dimension, topk) {}
+
+    virtual ~KnnDistance() = default;
 
     virtual void Begin() = 0;
 

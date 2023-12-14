@@ -38,9 +38,9 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          u64 table_index,
                                          u64 id,
                                          SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-      output_names_(Move(output_names)), output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index),
-      table_def_ptr_(Move(table_def_ptr)) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateTable, nullptr, nullptr, id, load_metas), table_def_ptr_(Move(table_def_ptr)),
+      schema_name_(Move(schema_name)), table_index_(table_index), conflict_type_(conflict_type), output_names_(Move(output_names)),
+      output_types_(Move(output_types)) {}
 
 PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          UniquePtr<PhysicalOperator> input,
@@ -51,7 +51,7 @@ PhysicalCreateTable::PhysicalCreateTable(SharedPtr<String> schema_name,
                                          u64 id,
                                          SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kCreateTable, Move(input), nullptr, id, load_metas), schema_name_(Move(schema_name)),
-      output_names_(Move(output_names)), output_types_(Move(output_types)), conflict_type_(conflict_type), table_index_(table_index) {}
+      table_index_(table_index), conflict_type_(conflict_type), output_names_(Move(output_names)), output_types_(Move(output_types)) {}
 
 void PhysicalCreateTable::Init() {}
 

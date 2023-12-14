@@ -556,6 +556,11 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kJSONL: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
+            result->emplace_back(file_type);
+            break;
+        }
     }
 }
 } // namespace infinity

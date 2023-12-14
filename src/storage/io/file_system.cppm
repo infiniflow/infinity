@@ -78,6 +78,9 @@ public:
 
     virtual Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) = 0;
 
+    inline FileSystemType file_system_type() const {
+        return file_system_type_;
+    }
 private:
     FileSystemType file_system_type_{FileSystemType::kPosix};
 };

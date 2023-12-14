@@ -52,6 +52,10 @@ String LogicalImport::ToString(i64 &space) const {
             ss << "(JSON) ";
             break;
         }
+        case CopyFileType::kJSONL: {
+            ss << "(JSONL) ";
+            break;
+        }
         case CopyFileType::kFVECS: {
             ss << "(FVECS) ";
             break;

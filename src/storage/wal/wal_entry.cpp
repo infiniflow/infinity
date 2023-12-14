@@ -368,7 +368,7 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     }
     ptr += sizeof(WalEntryHeader);
     i32 cnt = ReadBufAdv<i32>(ptr);
-    for (SizeT i = 0; i < cnt; i++) {
+    for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
             Error<StorageException>("ptr goes out of range when reading WalEntry");

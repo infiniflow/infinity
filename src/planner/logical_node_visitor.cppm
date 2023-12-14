@@ -38,6 +38,8 @@ export class LogicalNodeVisitor {
 public:
     virtual void VisitNode(LogicalNode &op) = 0;
 
+    virtual ~LogicalNodeVisitor() = default;
+
     void VisitNodeChildren(LogicalNode &op);
 
     void VisitNodeExpression(LogicalNode &op);

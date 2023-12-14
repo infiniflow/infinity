@@ -42,7 +42,7 @@ public:
     // called by BufferMgr::Get or BufferMgr::Allocate
     explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker);
 
-    ~BufferObj();
+    virtual ~BufferObj();
 
     BufferObj(const BufferObj &) = delete;
     BufferObj &operator=(const BufferObj &) = delete;

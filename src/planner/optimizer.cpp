@@ -22,20 +22,21 @@ import column_pruner;
 import lazy_load;
 import parser;
 import explain_logical_plan;
+import optimizer_rule;
 
 module optimizer;
 
 namespace infinity {
 
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
-    AddRule(MakeShared<ColumnPruner>());
-    AddRule(MakeShared<LazyLoad>());
-    AddRule(MakeShared<ColumnRemapper>());
+    AddRule(MakeUnique<ColumnPruner>());
+    AddRule(MakeUnique<LazyLoad>());
+    AddRule(MakeUnique<ColumnRemapper>());
 }
 
-void Optimizer::AddRule(SharedPtr<OptimizerRule> rule) { rules_.emplace_back(Move(rule)); }
+void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(Move(rule)); }
 
-SharedPtr<LogicalNode> Optimizer::optimize(const SharedPtr<LogicalNode> &unoptimized_plan) {
+void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan) {
     SizeT rule_count = rules_.size();
     for (SizeT idx = 0; idx < rule_count; ++idx) {
         const auto &rule = rules_[idx];
@@ -51,7 +52,7 @@ SharedPtr<LogicalNode> Optimizer::optimize(const SharedPtr<LogicalNode> &unoptim
         }
     }
 
-    return unoptimized_plan;
+    return;
 }
 
 } // namespace infinity
