@@ -380,7 +380,8 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // we have already used all space of the segment
     if (SegmentEntry::Room(segment_entry.get()) <= 0) {
         SaveSegmentData(txn_store, segment_entry);
-        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table, txn->TxnID(), txn->GetBufferMgr());
+        u64 segment_id = TableCollectionEntry::GetNextSegmentID(parser_context->table_collection_entry_);
+        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table, segment_id, txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
 
