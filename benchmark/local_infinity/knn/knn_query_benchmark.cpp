@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
             }
             delete[] embedding_data_ptr;
         };
-        infinity::BaseProfiler profiler;
+        BaseProfiler profiler;
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();
