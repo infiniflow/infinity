@@ -22,6 +22,7 @@ namespace infinity {
 enum class CopyFileType {
     kCSV,
     kJSON,
+    kJSONL,
     kFVECS,
 };
 

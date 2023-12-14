@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cassert>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -36,13 +37,13 @@ import query_result;
 
 using namespace infinity;
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
     if (argc > 2) {
         return 1;
     }
     bool sift = true;
     if (argc == 2) {
-        sift = std::string(argv[1]) == "sift";
+        sift = strcmp(argv[1], "sift") == 0;
     }
 
     std::string data_path = "/tmp/infinity";
@@ -144,7 +145,7 @@ int main(int argc, char **argv) {
         }
     } while (false);
 
-    std::cout << ">>> Import Benchmark End <<<" << std::endl;
+    std::cout << ">>> Knn Import Benchmark End <<<" << std::endl;
     for (const auto &item : results) {
         std::cout << item << std::endl;
     }
