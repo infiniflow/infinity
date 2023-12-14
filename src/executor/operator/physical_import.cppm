@@ -25,11 +25,12 @@ import txn;
 import txn_store;
 import table_collection_entry;
 import segment_entry;
+import block_entry;
+import block_column_entry;
 import zsv;
 import load_meta;
 
 export module physical_import;
-
 
 namespace infinity {
 
@@ -39,7 +40,7 @@ namespace infinity {
 // class ImportInputState;
 // class ImportOutputState;
 
-export class ParserContext {
+class ZxvParserCtx {
 public:
     ZsvParser parser_;
     SizeT row_count_{};
@@ -50,14 +51,20 @@ public:
     const char delimiter_{};
 
 public:
-    ParserContext(TableCollectionEntry *table_collection_entry, Txn *txn, SharedPtr<SegmentEntry> &segment_entry, char delimiter)
+    ZxvParserCtx(TableCollectionEntry *table_collection_entry, Txn *txn, SharedPtr<SegmentEntry> &segment_entry, char delimiter)
         : row_count_(0), err_msg_(nullptr), table_collection_entry_(table_collection_entry), txn_(txn), segment_entry_(segment_entry),
           delimiter_(delimiter) {}
 };
 
 export class PhysicalImport : public PhysicalOperator {
 public:
-    explicit PhysicalImport(u64 id, TableCollectionEntry *table_collection_entry, String file_path, bool header, char delimiter, CopyFileType type, SharedPtr<Vector<LoadMeta>> load_metas)
+    explicit PhysicalImport(u64 id,
+                            TableCollectionEntry *table_collection_entry,
+                            String file_path,
+                            bool header,
+                            char delimiter,
+                            CopyFileType type,
+                            SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_collection_entry_(table_collection_entry),
           file_type_(type), file_path_(Move(file_path)), header_(header), delimiter_(delimiter) {}
 
@@ -71,13 +78,15 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    void ImportFVECS(QueryContext *query_context, ImportOperatorState* import_op_state);
+    void ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     /// for push based execution
-    void ImportCSV(QueryContext *query_context, ImportOperatorState* import_op_state);
+    void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     /// for push based execution
-    void ImportJSON(QueryContext *query_context, ImportOperatorState* import_op_state);
+    void ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     inline const TableCollectionEntry *table_collection_entry() const { return table_collection_entry_; }
 
@@ -95,6 +104,8 @@ private:
     static void CSVHeaderHandler(void *);
 
     static void CSVRowHandler(void *);
+
+    void JSONLRowHandler(const Json &line_json, BlockEntry *block_entry);
 
 private:
     SharedPtr<Vector<String>> output_names_{};
