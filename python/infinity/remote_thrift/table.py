@@ -207,7 +207,7 @@ class RemoteTable(Table, ABC):
                     expr_type = ttypes.ParsedExprType(column_expr=column_expr)
                     parsed_expr = ttypes.ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
-                case "_row_id_":
+                case "_row_id":
                     func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
                     expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                     parsed_expr = ttypes.ParsedExpr(type=expr_type)
