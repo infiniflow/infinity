@@ -322,18 +322,18 @@ public:
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
-        ++count_;
-        auto start1 = std::chrono::steady_clock::now();
+        // ++count_;
+        // auto start1 = std::chrono::steady_clock::now();
 
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
-        auto end1 = std::chrono::steady_clock::now();
-
-        phase_1_duration_ += end1 - start1;
-
-        auto start2 = std::chrono::steady_clock::now();
+        // auto end1 = std::chrono::steady_clock::now();
+        //
+        // phase_1_duration_ += end1 - start1;
+        //
+        // auto start2 = std::chrono::steady_clock::now();
 
         // select list
         if (request.__isset.select_list == false) {
@@ -392,18 +392,18 @@ public:
             limit = GetParsedExprFromProto(request.limit_expr);
         }
 
-        auto end2 = std::chrono::steady_clock::now();
-        phase_2_duration_ += end2 - start2;
-
-        auto start3 = std::chrono::steady_clock::now();
+        // auto end2 = std::chrono::steady_clock::now();
+        // phase_2_duration_ += end2 - start2;
+        //
+        // auto start3 = std::chrono::steady_clock::now();
 
         const QueryResult result = table->Search(search_expr, filter, output_columns);
 
-        auto end3 = std::chrono::steady_clock::now();
-
-        phase_3_duration_ += end3 - start3;
-
-        auto start4 = std::chrono::steady_clock::now();
+        // auto end3 = std::chrono::steady_clock::now();
+        //
+        // phase_3_duration_ += end3 - start3;
+        //
+        // auto start4 = std::chrono::steady_clock::now();
 
         if (result.IsOk()) {
             auto data_block_count = result.result_table_->DataBlockCount();
@@ -457,28 +457,28 @@ public:
             LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
         }
 
-        auto end4 = std::chrono::steady_clock::now();
-        phase_4_duration_ += end4 - start4;
-
-        if (count_ % 10000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
-                             phase_1_duration_.count(),
-                             phase_2_duration_.count(),
-                             phase_3_duration_.count(),
-                             phase_4_duration_.count(),
-                             (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
-            phase_1_duration_ = std::chrono::duration<double>();
-            phase_2_duration_ = std::chrono::duration<double>();
-            phase_3_duration_ = std::chrono::duration<double>();
-            phase_4_duration_ = std::chrono::duration<double>();
-        } else if (count_ % 1000 == 0) {
-            LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
-                             phase_1_duration_.count(),
-                             phase_2_duration_.count(),
-                             phase_3_duration_.count(),
-                             phase_4_duration_.count(),
-                             (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
-        }
+        // auto end4 = std::chrono::steady_clock::now();
+        // phase_4_duration_ += end4 - start4;
+        //
+        // if (count_ % 10000 == 0) {
+        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //                      phase_1_duration_.count(),
+        //                      phase_2_duration_.count(),
+        //                      phase_3_duration_.count(),
+        //                      phase_4_duration_.count(),
+        //                      (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
+        //     phase_1_duration_ = std::chrono::duration<double>();
+        //     phase_2_duration_ = std::chrono::duration<double>();
+        //     phase_3_duration_ = std::chrono::duration<double>();
+        //     phase_4_duration_ = std::chrono::duration<double>();
+        // } else if (count_ % 1000 == 0) {
+        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //                      phase_1_duration_.count(),
+        //                      phase_2_duration_.count(),
+        //                      phase_3_duration_.count(),
+        //                      phase_4_duration_.count(),
+        //                      (phase_1_duration_ + phase_2_duration_ + phase_3_duration_ + phase_4_duration_).count()));
+        // }
     }
 
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
@@ -661,11 +661,11 @@ private:
     Mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 
-    SizeT count_ = 0;
-    std::chrono::duration<double> phase_1_duration_{};
-    std::chrono::duration<double> phase_2_duration_{};
-    std::chrono::duration<double> phase_3_duration_{};
-    std::chrono::duration<double> phase_4_duration_{};
+    // SizeT count_ = 0;
+    // std::chrono::duration<double> phase_1_duration_{};
+    // std::chrono::duration<double> phase_2_duration_{};
+    // std::chrono::duration<double> phase_3_duration_{};
+    // std::chrono::duration<double> phase_4_duration_{};
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
