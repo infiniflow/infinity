@@ -240,7 +240,7 @@ class TestQueryBenchmark:
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            res = query_builder.to_df()
+            res = query_builder.to_result()
             end = time.time()
 
             diff = end - start

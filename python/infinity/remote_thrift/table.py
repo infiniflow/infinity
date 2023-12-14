@@ -13,9 +13,8 @@
 # limitations under the License.
 import os
 from abc import ABC
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Any
 
-import pandas as pd
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -197,7 +196,7 @@ class RemoteTable(Table, ABC):
     def query_builder(self) -> InfinityThriftQueryBuilder:
         return InfinityThriftQueryBuilder(table=self)
 
-    def _execute_query(self, query: Query) -> pd.DataFrame:
+    def _execute_query(self, query: Query) -> tuple[dict[str, list[Any, Any]], dict[str, Any]]:
         # process select_list
         select_list: List[ttypes.ParsedExpr] = []
         for column in query.columns:

@@ -14,9 +14,8 @@
 
 from __future__ import annotations
 
-import copy
 from abc import ABC
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import numpy as np
 import pandas as pd
@@ -27,6 +26,7 @@ from pyarrow import Table
 from infinity.common import VEC
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
+from infinity.remote_thrift.types import logic_type_to_dtype
 
 '''FIXME: How to disable validation of only the search field?'''
 
@@ -57,7 +57,7 @@ class InfinityThriftQueryBuilder(ABC):
         if self._search.knn_exprs is None:
             self._search.knn_exprs = list()
 
-        column_expr = ttypes.ColumnExpr(column_name=[vector_column_name],star=False)
+        column_expr = ttypes.ColumnExpr(column_name=[vector_column_name], star=False)
 
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
@@ -141,7 +141,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._columns = columns
         return self
 
-    def to_df(self) -> pd.DataFrame:
+    def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         query = Query(
             columns=self._columns,
             search=self._search,
@@ -150,6 +150,21 @@ class InfinityThriftQueryBuilder(ABC):
             offset=self._offset
         )
         return self._table._execute_query(query)
+
+    def to_df(self) -> pd.DataFrame:
+        query = Query(
+            columns=self._columns,
+            search=self._search,
+            filter=self._filter,
+            limit=self._limit,
+            offset=self._offset
+        )
+        data_dict, data_type_dict = self._table._execute_query(query)
+        for k, v in data_dict.items():
+            data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
+            data_dict[k] = data_series
+
+        return pd.DataFrame(data_dict)
 
     def to_pl(self) -> pl.DataFrame:
         query = Query(
