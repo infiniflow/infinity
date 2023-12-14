@@ -53,8 +53,6 @@ import infinity_exception;
 import table_collection_entry;
 import segment_entry;
 import zsv;
-#include "statement/statement_common.h"
-#include "type/info/embedding_info.h"
 
 module physical_import;
 
@@ -79,13 +77,17 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportJSON(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kJSONL: {
+            ImportJSONL(query_context, import_op_state);
+            break;
+        }
         case CopyFileType::kFVECS: {
             ImportFVECS(query_context, import_op_state);
             break;
         }
     }
     import_op_state->SetComplete();
-    Txn* txn = query_context->GetTxn();
+    Txn *txn = query_context->GetTxn();
     txn->BeginTS();
     return true;
 }
@@ -156,7 +158,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
             segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
             if (segment_id == 60) {
-//                int a = 1;
+                //                int a = 1;
             }
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
@@ -192,7 +194,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
 
-    auto parser_context = MakeUnique<ParserContext>(table_collection_entry_, txn, segment_entry, delimiter_);
+    auto parser_context = MakeUnique<ZxvParserCtx>(table_collection_entry_, txn, segment_entry, delimiter_);
 
     auto opts = MakeUnique<ZsvOpts>();
     if (header_) {
@@ -234,10 +236,63 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     import_op_state->result_msg_ = Move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {}
+void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    LocalFileSystem fs;
+    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    DeferFn file_defer([&]() { fs.Close(*file_handler); });
+
+    SizeT file_size = fs.GetFileSize(*file_handler);
+    String jsonl_str(file_size + 1, 0);
+    SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
+    if (read_n != file_size) {
+        Error<ExecutorException>(Format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+    }
+
+    Txn *txn = query_context->GetTxn();
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_collection_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), txn->GetBufferMgr());
+
+    SizeT start_pos = 0;
+    while (true) {
+        SizeT end_pos = jsonl_str.find('\n', start_pos);
+        StringView json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
+        start_pos = end_pos + 1;
+        Json line_json = Json::parse(json_sv);
+
+        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+            SaveSegmentData(txn_store, segment_entry);
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), txn->GetBufferMgr());
+        }
+        BlockEntry *block_entry = segment_entry->block_entries_.back().get();
+        if (BlockEntry::Room(block_entry) <= 0) {
+            segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
+                                                                              segment_entry->block_entries_.size(),
+                                                                              0,
+                                                                              segment_entry->column_count_,
+                                                                              txn->GetBufferMgr()));
+            block_entry = segment_entry->block_entries_.back().get();
+        }
+
+        JSONLRowHandler(line_json, block_entry);
+        ++block_entry->row_count_;
+        ++segment_entry->row_count_;
+        ++table_collection_entry_->row_count_;
+        if (end_pos == String::npos) {
+            break;
+        }
+    }
+    if (segment_entry->row_count_ > 0) {
+        SaveSegmentData(txn_store, segment_entry);
+    }
+
+    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_collection_entry_->row_count_));
+    import_op_state->result_msg_ = Move(result_msg);
+}
+
+void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) { Error<NotImplementException>("Import JSON is not implemented yet."); }
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
-    ParserContext *parser_context = static_cast<ParserContext *>(context);
+    ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);
     ZsvParser &parser = parser_context->parser_;
     SizeT csv_column_count = parser.CellCount();
 
@@ -306,7 +361,6 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
 }
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    const char_t *tmp_buffer = str_view.data();
     auto varchar_ptr = MakeUnique<VarcharT>();
     varchar_ptr->InitAsValue(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
@@ -316,7 +370,7 @@ void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &st
 } // namespace
 
 void PhysicalImport::CSVRowHandler(void *context) {
-    ParserContext *parser_context = static_cast<ParserContext *>(context);
+    ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);
     auto *table = parser_context->table_collection_entry_;
     SizeT column_count = parser_context->parser_.CellCount();
     auto *txn = parser_context->txn_;
@@ -338,7 +392,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     }
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
-    if(column_count != last_block_entry->columns_.size()) {
+    if (column_count != last_block_entry->columns_.size()) {
         UniquePtr<String> err_msg =
             MakeUnique<String>(Format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
         LOG_ERROR(*err_msg);
@@ -356,6 +410,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         auto column_type = block_column_entry->column_type_.get();
         // FIXME: Variable length types cannot use type inference addresses
         SizeT dst_offset = write_row * column_type->Size();
+
         if (column_type->type() == kVarchar) {
             AppendVarcharData(block_column_entry, str_view, dst_offset);
         } else if (column_type->type() == kEmbedding) {
@@ -442,6 +497,109 @@ void PhysicalImport::CSVRowHandler(void *context) {
     ++segment_entry->row_count_;
     ++parser_context->row_count_;
 }
+
+template <typename T>
+void AppendEmbeddingJsonl(BlockColumnEntry *block_column_entry, const Vector<T> &embedding, SizeT dst_offset, SizeT dim) {
+    if (embedding.size() != dim) {
+        Error<ExecutorException>("Embedding data size neq dimension.");
+    }
+    BlockColumnEntry::AppendRaw(block_column_entry,
+                                dst_offset,
+                                reinterpret_cast<const_ptr_t>(embedding.data()),
+                                embedding.size() * sizeof(T),
+                                nullptr);
+}
+
+void PhysicalImport::JSONLRowHandler(const Json &line_json, BlockEntry *block_entry) {
+    SizeT column_n = table_collection_entry_->columns_.size();
+    SizeT row_cnt = block_entry->row_count_;
+    for (SizeT i = 0; i < column_n; ++i) {
+        ColumnDef *column_def = table_collection_entry_->columns_[i].get();
+        auto block_column_entry = block_entry->columns_[i].get();
+
+        auto column_type = block_column_entry->column_type_.get();
+        SizeT dst_offset = row_cnt * column_type->Size();
+        switch (column_type->type()) {
+            case LogicalType::kVarchar: {
+                AppendVarcharData(block_column_entry, line_json[column_def->name_].get<StringView>(), dst_offset);
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+                SizeT dim = embedding_info->Dimension();
+                switch (embedding_info->Type()) {
+                    case kElemInt8: {
+                        AppendEmbeddingJsonl<i8>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    case kElemInt16: {
+                        AppendEmbeddingJsonl<i16>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    case kElemInt32: {
+                        AppendEmbeddingJsonl<i32>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    case kElemInt64: {
+                        AppendEmbeddingJsonl<i64>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    case kElemFloat: {
+                        AppendEmbeddingJsonl<float>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    case kElemDouble: {
+                        AppendEmbeddingJsonl<double>(block_column_entry, line_json[column_def->name_], dst_offset, dim);
+                        break;
+                    }
+                    default: {
+                        Error<NotImplementException>("Embedding type not implemented.");
+                    }
+                }
+                break;
+            }
+            case LogicalType::kBoolean: {
+                bool v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(bool), nullptr);
+                break;
+            }
+            case LogicalType::kTinyInt: {
+                i8 v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i8), nullptr);
+                break;
+            }
+            case LogicalType::kSmallInt: {
+                i16 v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i16), nullptr);
+                break;
+            }
+            case LogicalType::kInteger: {
+                i32 v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i32), nullptr);
+                break;
+            }
+            case LogicalType::kBigInt: {
+                i64 v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i64), nullptr);
+                break;
+            }
+            case LogicalType::kFloat: {
+                float v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(float), nullptr);
+                break;
+            }
+            case LogicalType::kDouble: {
+                double v = line_json[column_def->name_];
+                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(double), nullptr);
+                break;
+            }
+            default: {
+                Error<NotImplementException>("Type not implemented.");
+            }
+        }
+    }
+}
+
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
     Vector<u16> block_row_counts;
 

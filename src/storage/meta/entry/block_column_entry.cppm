@@ -56,7 +56,7 @@ public:
     static void
     Append(BlockColumnEntry *column_entry, u16 column_entry_offset, ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows);
 
-    static void AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
+    static void AppendRaw(BlockColumnEntry *block_column_entry, SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 

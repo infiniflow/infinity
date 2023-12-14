@@ -97,7 +97,7 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
 
 void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry,
                                  SizeT dst_offset,
-                                 ptr_t src_p,
+                                 const_ptr_t src_p,
                                  SizeT data_size,
                                  SharedPtr<VectorBuffer> vector_buffer) {
     BufferHandle buffer_handle = block_column_entry->buffer_->Load();
@@ -118,7 +118,7 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry,
         }
         case kVarchar: {
             auto inline_p = reinterpret_cast<VarcharLayout *>(dst_p);
-            auto src_ptr = reinterpret_cast<VarcharT *>(src_p);
+            auto src_ptr = reinterpret_cast<const VarcharT *>(src_p);
             SizeT row_n = data_size / sizeof(VarcharT);
             for (SizeT row_idx = 0; row_idx < row_n; row_idx++) {
                 auto varchar_type = src_ptr + row_idx;
