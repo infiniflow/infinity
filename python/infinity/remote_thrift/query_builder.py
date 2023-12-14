@@ -57,9 +57,7 @@ class InfinityThriftQueryBuilder(ABC):
         if self._search.knn_exprs is None:
             self._search.knn_exprs = list()
 
-        column_list=[vector_column_name]
-        column_expr = ttypes.ColumnExpr(column_name=column_list)
-        column_expr.star = False
+        column_expr = ttypes.ColumnExpr(column_name=[vector_column_name],star=False)
 
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
@@ -100,7 +98,7 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.InnerProduct
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.Hamming
-        knn_expr = KnnExpr(column_expr=copy.deepcopy(column_expr), embedding_data=data, embedding_data_type=elem_type,
+        knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn)
         # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)

@@ -236,9 +236,10 @@ public:
             infinity_thrift_rpc::ColumnDef proto_column_def;
             proto_column_def.__set_id(column_def->id());
             proto_column_def.__set_name(column_def->name());
+
             infinity_thrift_rpc::DataType proto_data_type;
             proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
-            all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_def->type()));
+
             response.column_defs.emplace_back(proto_column_def);
         }
     }
@@ -293,6 +294,7 @@ public:
         }
 
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
     void handleEmbeddingType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
@@ -304,6 +306,7 @@ public:
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
     void handleRowIDType(Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors,
@@ -315,6 +318,7 @@ public:
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
         all_column_vectors.at(col_index).column_vectors.emplace_back(Move(dst));
+        all_column_vectors.at(col_index).__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
@@ -405,8 +409,8 @@ public:
             auto data_block_count = result.result_table_->DataBlockCount();
             auto column_count = result.result_table_->ColumnCount();
             Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors = response.column_fields;
-            for (all_column_vectors.reserve(column_count); all_column_vectors.size() < column_count; all_column_vectors.emplace_back()) {
-            }
+
+            all_column_vectors.resize(column_count);
 
             for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
                 auto data_block = result.result_table_->GetDataBlockById(block_idx);

@@ -40,11 +40,10 @@ class RemoteTable(Table, ABC):
         index_info_list_to_use: list[ttypes.IndexInfo] = []
 
         for index_info in index_infos:
-            index_info_to_use = ttypes.IndexInfo()
-            index_info_to_use.column_name = index_info.column_name.strip()
-            index_info_to_use.index_type = index_info.index_type.to_ttype()
-            index_info_to_use.index_param_list = [
-                init_param.to_ttype() for init_param in index_info.params]
+            index_info_to_use = ttypes.IndexInfo(column_name=index_info.column_name.strip(),
+                                                 index_type=index_info.index_type.to_ttype(),
+                                                 index_param_list=[init_param.to_ttype() for init_param in
+                                                                   index_info.params])
 
             index_info_list_to_use.append(index_info_to_use)
 
@@ -68,34 +67,35 @@ class RemoteTable(Table, ABC):
             column_names = list(row.keys())
             parse_exprs = []
             for column_name, value in row.items():
-                constant_expression = ttypes.ConstantExpr()
+                constant_expression = None
                 if isinstance(value, str):
-                    constant_expression.literal_type = ttypes.LiteralType.String
-                    constant_expression.str_value = value
+                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
+                                                              str_value=value)
+
                 elif isinstance(value, int):
-                    constant_expression.literal_type = ttypes.LiteralType.Int64
-                    constant_expression.i64_value = value
+                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
+                                                              i64_value=value)
+
                 elif isinstance(value, float):
-                    constant_expression.literal_type = ttypes.LiteralType.Double
-                    constant_expression.f64_value = value
+                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
+                                                              f64_value=value)
                 elif isinstance(value, list):
                     if isinstance(value[0], int):
-                        constant_expression.literal_type = ttypes.LiteralType.IntegerArray
-                        constant_expression.i64_array_value = value
+                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                                  i64_array_value=value)
                     elif isinstance(value[0], float):
-                        constant_expression.literal_type = ttypes.LiteralType.DoubleArray
-                        constant_expression.f64_array_value = value
+                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                                  f64_array_value=value)
                 else:
                     raise Exception("Invalid constant expression")
-                paser_expr_type = ttypes.ParsedExprType()
-                paser_expr_type.constant_expr = constant_expression
 
-                paser_expr = ttypes.ParsedExpr()
-                paser_expr.type = paser_expr_type
+                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                paser_expr = ttypes.ParsedExpr(type=expr_type)
+
                 parse_exprs.append(paser_expr)
-            f = ttypes.Field()
-            f.parse_exprs = parse_exprs
-            fields.append(f)
+
+            field = ttypes.Field(parse_exprs=parse_exprs)
+            fields.append(field)
 
         return self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                  fields=fields)
@@ -172,28 +172,21 @@ class RemoteTable(Table, ABC):
                     for column_name, value in row.items():
 
                         if isinstance(value, str):
-                            constant_expression = ttypes.ConstantExpr()
-                            constant_expression.literal_type = ttypes.LiteralType.String
-                            constant_expression.str_value = value
+                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
+                                                                      str_value=value)
                         elif isinstance(value, int):
-                            constant_expression = ttypes.ConstantExpr()
-                            constant_expression.literal_type = ttypes.LiteralType.Int64
-                            constant_expression.i64_value = value
+                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
+                                                                      i64_value=value)
                         elif isinstance(value, float):
-                            constant_expression = ttypes.ConstantExpr()
-                            constant_expression.literal_type = ttypes.LiteralType.Double
-                            constant_expression.f64_value = value
+                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
+                                                                      f64_value=value)
                         else:
                             raise Exception("Invalid constant expression")
 
-                        paser_expr_type = ttypes.ParsedExprType()
-                        paser_expr_type.constant_expr = constant_expression
-                        paser_expr = ttypes.ParsedExpr()
-                        paser_expr.type = paser_expr_type
+                        expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                        paser_expr = ttypes.ParsedExpr(type=expr_type)
+                        update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
 
-                        update_expr = ttypes.UpdateExpr()
-                        update_expr.column_name = column_name
-                        update_expr.value = paser_expr
                         update_expr_array.append(update_expr)
 
         return self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
@@ -210,26 +203,14 @@ class RemoteTable(Table, ABC):
         for column in query.columns:
             match column:
                 case "*":
-                    column_expr = ttypes.ColumnExpr()
-                    column_expr.star = True
-                    column_expr.column_name.clear()
-
-                    expr_type = ttypes.ParsedExprType()
-                    expr_type.column_expr = column_expr
-
-                    parsed_expr = ttypes.ParsedExpr()
-                    parsed_expr.type = expr_type
+                    column_expr = ttypes.ColumnExpr(star=True, column_name=[])
+                    expr_type = ttypes.ParsedExprType(column_expr=column_expr)
+                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
                 case "_row_id_":
-                    func_expr = ttypes.FunctionExpr()
-                    func_expr.function_name = "row_id"
-                    func_expr.arguments = []
-
-                    expr_type = ttypes.ParsedExprType()
-                    expr_type.function_expr = func_expr
-
-                    parsed_expr = ttypes.ParsedExpr()
-                    parsed_expr.type = expr_type
+                    func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
+                    expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
 
                 case _:
@@ -247,26 +228,18 @@ class RemoteTable(Table, ABC):
             case None:
                 limit_expr = None
             case _:
-                constant_exp = ttypes.ConstantExpr()
-                constant_exp.literal_type = ttypes.LiteralType.Int64
-                constant_exp.i64_value = query.limit
-                paser_expr_type = ttypes.ParsedExprType()
-                paser_expr_type.constant_expr = constant_exp
-                limit_expr = ttypes.ParsedExpr()
-                limit_expr.type = paser_expr_type
+                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.limit)
+                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
+                limit_expr = ttypes.ParsedExpr(type=expr_type)
 
         # process offset_expr
         match query.offset:
             case None:
                 offset_expr = None
             case _:
-                constant_exp = ttypes.ConstantExpr()
-                constant_exp.literal_type = ttypes.LiteralType.Int64
-                paser_expr_type = ttypes.ParsedExprType()
-                paser_expr_type.constant_expr = constant_exp
-                offset_expr = ttypes.ParsedExpr()
-                offset_expr.type = paser_expr_type
-                offset_expr.i64_value = query.offset
+                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.offset)
+                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
+                offset_expr = ttypes.ParsedExpr(type=expr_type)
 
         # execute the query
         res = self._conn.select(db_name=self._db_name,
