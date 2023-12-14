@@ -43,8 +43,8 @@ public:
                                Vector<SharedPtr<BaseExpression>> aggregates,
                                u64 aggregate_index,
                                SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id, load_metas), groups_(Move(groups)), groupby_index_(groupby_index),
-          aggregates_(Move(aggregates)), aggregate_index_(aggregate_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id, load_metas), groups_(Move(groups)), aggregates_(Move(aggregates)),
+          groupby_index_(groupby_index), aggregate_index_(aggregate_index) {}
 
     ~PhysicalAggregate() override = default;
 

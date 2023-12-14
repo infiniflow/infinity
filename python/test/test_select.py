@@ -390,3 +390,22 @@ class TestSelect:
         print(res)
         res = table_obj.query_builder().output(["c1", "c2", "c1"]).to_df()
         print(res)
+
+    def test_empty_table(self):
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_empty_table", True)
+        db_obj.create_table("test_empty_table", {
+            "c1": "int", "c2": "int"}, None)
+
+        table_obj = db_obj.get_table("test_empty_table")
+        print()
+        res = table_obj.query_builder().output(["c1", "c2"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': ()}).astype(
+            {'c1': dtype('int32'), 'c2': dtype('int32')}))
+        res = table_obj.query_builder().output(["c1", "c1"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c1_2': ()}).astype(
+            {'c1': dtype('int32'), 'c1_2': dtype('int32')}))
+        res = table_obj.query_builder().output(["c1", "c2", "c1"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
+            {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))

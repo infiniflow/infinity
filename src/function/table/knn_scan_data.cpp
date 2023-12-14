@@ -62,7 +62,7 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 // --------------------------------------------
 
-KnnScanFunctionData1::KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_data, u32 current_parallel_idx)
+KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 current_parallel_idx)
     : shared_data_(shared_data), task_id_(current_parallel_idx) {
     switch (shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
@@ -76,7 +76,7 @@ KnnScanFunctionData1::KnnScanFunctionData1(SharedPtr<KnnScanSharedData> shared_d
 }
 
 template <typename DataType>
-void KnnScanFunctionData1::Init() {
+void KnnScanFunctionData::Init() {
     switch (shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
             throw ExecutorException("Invalid Knn distance type");

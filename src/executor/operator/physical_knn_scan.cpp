@@ -147,8 +147,8 @@ void PhysicalKnnScan::Init() {}
 
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
-    auto elem_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->elem_type_;
-    auto dist_type = knn_scan_operator_state->knn_scan_function_data1_->shared_data_->knn_distance_type_;
+    auto elem_type = knn_scan_operator_state->knn_scan_function_data_->shared_data_->elem_type_;
+    auto dist_type = knn_scan_operator_state->knn_scan_function_data_->shared_data_->knn_distance_type_;
     switch (elem_type) {
         case kElemFloat: {
             switch (dist_type) {
@@ -183,8 +183,7 @@ BlockIndex *PhysicalKnnScan::GetBlockIndex() const { return base_table_ref_->blo
 
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
-Pair<Vector<BlockColumnEntry *>, Vector<SegmentColumnIndexEntry *>>
-PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
+void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
@@ -192,8 +191,8 @@ PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return ba
     ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
     SizeT knn_column_id = column_expr->binding().column_idx;
 
-    Vector<BlockColumnEntry *> block_column_entries;
-    Vector<SegmentColumnIndexEntry *> index_entries;
+    block_column_entries_ = MakeUnique<Vector<BlockColumnEntry *>>();
+    index_entries_ = MakeUnique<Vector<SegmentColumnIndexEntry *>>();
 
     TableCollectionEntry *table_entry = base_table_ref_->table_entry_ptr_;
     HashMap<u32, Vector<SegmentColumnIndexEntry *>> index_entry_map;
@@ -224,36 +223,35 @@ PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return ba
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     for (SegmentEntry *segment_entry : block_index->segments_) {
         if (auto iter = index_entry_map.find(segment_entry->segment_id_); iter != index_entry_map.end()) {
-            index_entries.emplace_back(iter->second[0]);
+            index_entries_->emplace_back(iter->second[0]);
         } else {
             for (auto &block_entry : segment_entry->block_entries_) {
                 BlockColumnEntry *block_column_entry = block_entry->columns_[knn_column_id].get();
-                block_column_entries.emplace_back(block_column_entry);
+                block_column_entries_->emplace_back(block_column_entry);
             }
         }
     }
-    LOG_TRACE(Format("KnnScan: brute force task: {}, index task: {}", block_column_entries.size(), index_entries.size()));
-    return {block_column_entries, index_entries};
+    LOG_TRACE(Format("KnnScan: brute force task: {}, index task: {}", block_column_entries_->size(), index_entries_->size()));
 }
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
-    auto knn_scan_function_data = operator_state->knn_scan_function_data1_.get();
-    auto knn_scan_shared_data = knn_scan_function_data->shared_data_.get();
+    auto knn_scan_function_data = operator_state->knn_scan_function_data_.get();
+    auto knn_scan_shared_data = knn_scan_function_data->shared_data_;
 
     auto dist_func = static_cast<KnnDistance1<DataType> *>(knn_scan_function_data->knn_distance_.get());
     auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
     auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
 
-    SizeT index_task_n = knn_scan_shared_data->index_entries_.size();
-    SizeT brute_task_n = knn_scan_shared_data->block_column_entries_.size();
+    SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
+    SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
 
     if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
         LOG_TRACE(Format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
-        BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_[block_column_idx];
+        BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
         const BlockEntry *block_entry = block_column_entry->block_entry_;
         const auto row_count = block_entry->row_count_;
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -291,7 +289,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
-        SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_[index_idx];
+        SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
         auto segment_id = segment_column_index_entry->segment_id_;
@@ -332,7 +330,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                                 segment_row_count));
             }
         }
-        //bool use_bitmask = !bitmask.IsAllTrue();
+        // bool use_bitmask = !bitmask.IsAllTrue();
 
         switch (segment_column_index_entry->column_index_entry_->index_base_->index_type_) {
             case IndexType::kIVFFlat: {
@@ -383,8 +381,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
                             static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        MaxHeap <Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_,
-                                                                              bitmask);
+                        MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_, bitmask);
                         if (result_n < 0) {
                             result_n = heap.size();
                         } else if (result_n != heap.size()) {
@@ -486,7 +483,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
         SizeT output_block_row_id = 0;
         SizeT output_block_idx = operator_state->data_block_array_.size() - 1;
-        DataBlock* output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+        DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
         for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
             DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
             RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);

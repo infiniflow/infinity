@@ -93,17 +93,11 @@ public:
 private:
     template <typename T>
     static inline std::string Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
-        char buf[sizeof(T) * dimension * 2];
-        std::stringstream ss(buf, std::ios::in | std::ios::out | std::ios::binary);
+        std::stringstream ss;
         for (size_t i = 0; i < dimension - 1; ++i) {
-            char buffer[20];
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((T *)(embedding.ptr))[i]);
-            ss.write((const char *)buffer, ptr - buffer);
-            ss.put(',');
+            ss << ((T *)(embedding.ptr))[i] << ',';
         }
-        char buffer[20];
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((T *)(embedding.ptr))[dimension - 1]);
-        ss.write((const char *)buffer, ptr - buffer);
+        ss << ((T *)(embedding.ptr))[dimension - 1];
         return ss.str();
     }
 
@@ -137,7 +131,7 @@ private:
     }
 
 public:
-    inline explicit EmbeddingType(char *&&from_ptr) : ptr(from_ptr), new_allocated_(false) { from_ptr = nullptr; }
+    inline explicit EmbeddingType(char *&&from_ptr, bool new_alllocated) : ptr(from_ptr), new_allocated_(new_alllocated) { from_ptr = nullptr; }
 
     inline EmbeddingType(EmbeddingDataType type, size_t dimension) : new_allocated_(true) {
         size_t mem_size = EmbeddingSize(type, dimension);

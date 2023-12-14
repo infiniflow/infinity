@@ -437,7 +437,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     arguments.emplace_back(expr_ptr);
 
     // Create query embedding
-    EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_);
+    EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
     const_cast<KnnExpr &>(parsed_knn_expr).embedding_data_ptr_ = nullptr;
 
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
