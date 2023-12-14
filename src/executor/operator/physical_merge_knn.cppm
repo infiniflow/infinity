@@ -40,8 +40,8 @@ public:
                               SharedPtr<KnnExpression> knn_expr,
                               u64 knn_table_index,
                               SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id, load_metas), table_ref_(table_ref),
-          output_names_(Move(output_names)), output_types_(Move(output_types)), knn_expression_(Move(knn_expr)), knn_table_index_(knn_table_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id, load_metas), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), knn_table_index_(knn_table_index), knn_expression_(Move(knn_expr)), table_ref_(table_ref) {}
 
     ~PhysicalMergeKnn() override = default;
 

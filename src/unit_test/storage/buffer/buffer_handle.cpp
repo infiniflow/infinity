@@ -78,7 +78,7 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle1 = buf1->Load();
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
-        for (int i = 0; i < write_size; ++i) {
+        for (size_t i = 0; i < write_size; ++i) {
             data[i] = i;
         }
     }
@@ -90,7 +90,7 @@ TEST_F(BufferHandleTest, test1) {
     {
         auto buf_handle1 = buf1->Load();
         auto data = static_cast<const int *>(buf_handle1.GetData());
-        for (int i = 0; i < write_size; ++i) {
+        for (size_t i = 0; i < write_size; ++i) {
             EXPECT_EQ(data[i], i);
         }
 
@@ -107,7 +107,7 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle1 = buf1->Load();
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
-        for (int i = 0; i < write_size; ++i) {
+        for (size_t i = 0; i < write_size; ++i) {
             EXPECT_EQ(data[i], i);
             data[i] = 2 * i;
         }
@@ -121,7 +121,7 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle1 = buf1->Load();
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
-        for (int i = 0; i < write_size; ++i) {
+        for (size_t i = 0; i < write_size; ++i) {
             EXPECT_EQ(data[i], 2 * i);
         }
     }

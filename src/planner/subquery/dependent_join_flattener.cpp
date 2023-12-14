@@ -316,7 +316,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
         Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }
 
-    NewCatalog *catalog = query_context_->storage()->catalog();
+//    NewCatalog *catalog = query_context_->storage()->catalog();
 
     SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(table_binding_ptr->table_collection_entry_ptr_,
                                                                       column_ids,

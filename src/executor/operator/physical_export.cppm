@@ -36,8 +36,8 @@ public:
                             char delimiter,
                             CopyFileType type,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-          table_name_(Move(table_name)), file_path_(Move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
+        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), file_type_(type), file_path_(Move(file_path)),
+          table_name_(Move(table_name)), schema_name_(Move(schema_name)), header_(header), delimiter_(delimiter) {}
 
     ~PhysicalExport() override = default;
 

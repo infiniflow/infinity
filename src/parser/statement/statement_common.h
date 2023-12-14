@@ -34,6 +34,8 @@ inline std::shared_ptr<std::string> copy_file_to_str(CopyFileType copy_file_type
             return std::make_shared<std::string>("JSON");
         case CopyFileType::kFVECS:
             return std::make_shared<std::string>("FVECS");
+        case CopyFileType::kJSONL:
+            return std::make_shared<std::string>("JSONL");
     }
 }
 

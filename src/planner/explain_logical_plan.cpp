@@ -1502,6 +1502,11 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kJSONL: {
+            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSONL", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: FVECS", String(intent_size, ' ')));
             result->emplace_back(file_type);
@@ -1561,6 +1566,11 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSON", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kJSONL: {
+            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSONL", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }

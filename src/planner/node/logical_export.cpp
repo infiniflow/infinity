@@ -54,6 +54,10 @@ String LogicalExport::ToString(i64 &space) const {
             ss << "(FVECS) ";
             break;
         }
+        case CopyFileType::kJSONL: {
+            ss << "(JSONL) ";
+            break;
+        }
     }
     ss << "to " << schema_name_ << '.' << table_name_;
 

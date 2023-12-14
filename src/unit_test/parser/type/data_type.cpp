@@ -155,7 +155,6 @@ TEST_F(DataTypeTest, ReadWrite) {
 
     for (SizeT i = 0; i < data_types.size(); i++) {
         SharedPtr<DataType> &data_type = data_types[i];
-        const SharedPtr<TypeInfo> &ti = data_type->type_info();
         int32_t exp_size = data_type->GetSizeInBytes();
         Vector<char> buf(exp_size);
         char *buf_beg = buf.data();

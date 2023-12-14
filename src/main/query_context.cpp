@@ -121,17 +121,17 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        SharedPtr<LogicalNode> unoptimized_plan = logical_planner_->LogicalPlan();
+        SharedPtr<LogicalNode> logical_plan = logical_planner_->LogicalPlan();
         StopProfile(QueryPhase::kLogicalPlan);
 
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
-        SharedPtr<LogicalNode> optimized_plan = optimizer_->optimize(unoptimized_plan);
+        optimizer_->optimize(logical_plan);
         StopProfile(QueryPhase::kOptimizer);
 
         // Build physical plan
         StartProfile(QueryPhase::kPhysicalPlan);
-        UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(optimized_plan);
+        UniquePtr<PhysicalOperator> physical_plan = physical_planner_->BuildPhysicalOperator(logical_plan);
         StopProfile(QueryPhase::kPhysicalPlan);
 
         StartProfile(QueryPhase::kPipelineBuild);
@@ -148,7 +148,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kExecution);
         scheduler_->Schedule(this, tasks, plan_fragment.get());
         query_result.result_table_ = plan_fragment->GetResult();
-        query_result.root_operator_type_ = unoptimized_plan->operator_type();
+        query_result.root_operator_type_ = logical_plan->operator_type();
         StopProfile(QueryPhase::kExecution);
 
         StartProfile(QueryPhase::kCommit);

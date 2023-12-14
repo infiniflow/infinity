@@ -15,12 +15,12 @@
 module;
 
 import stl;
+import optimizer_rule;
 
 export module optimizer;
 
 namespace infinity {
 
-class OptimizerRule;
 class LogicalNode;
 class QueryContext;
 
@@ -28,14 +28,14 @@ export class Optimizer {
 public:
     explicit Optimizer(QueryContext *query_context_ptr);
 
-    void AddRule(SharedPtr<OptimizerRule> rule);
+    void AddRule(UniquePtr<OptimizerRule> rule);
 
-    SharedPtr<LogicalNode> optimize(const SharedPtr<LogicalNode> &unoptimized_plan);
+    void optimize(SharedPtr<LogicalNode> &unoptimized_plan);
 
 public:
     QueryContext *query_context_ptr_{};
 
-    Vector<SharedPtr<OptimizerRule>> rules_{};
+    Vector<UniquePtr<OptimizerRule>> rules_{};
 };
 
 } // namespace infinity

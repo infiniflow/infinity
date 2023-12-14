@@ -29,6 +29,7 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr_{};
 
     virtual SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) = 0;
+    virtual ~BoundStatement() = default;
 };
 
 } // namespace infinity

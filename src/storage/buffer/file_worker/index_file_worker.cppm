@@ -24,6 +24,8 @@ export module index_file_worker;
 namespace infinity {
 
 export struct CreateIndexParam {
+    virtual ~CreateIndexParam() = default;
+
     const IndexBase *index_base_{};
     const ColumnDef *column_def_{};
 

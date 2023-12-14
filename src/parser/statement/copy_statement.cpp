@@ -40,6 +40,10 @@ std::string CopyStatement::ToString() const {
             file_format = "FVECS";
             break;
         }
+        case CopyFileType::kJSONL: {
+            file_format = "JSONL";
+            break;
+        }
     }
 
     ss << "COPY: " << schema_name_ << "." << table_name_ << copy_direction << file_path_ << " WITH " << file_format << " delimiter: " << delimiter_;
