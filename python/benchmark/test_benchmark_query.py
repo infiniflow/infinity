@@ -15,8 +15,9 @@ import multiprocessing
 import os
 import struct
 import time
-import polars as pl
 from concurrent.futures import ThreadPoolExecutor
+
+import polars as pl
 
 import infinity
 from benchmark.test_benchmark import trace_unhandled_exceptions
@@ -36,6 +37,7 @@ def fvecs_read(filename):
                 yield list(vec)
             except struct.error:
                 break
+
 
 def fvecs_read_all(filename):
     vectors = []
@@ -149,7 +151,8 @@ class TestQueryBenchmark:
 
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "knn_benchmark")
-        for idx, query_vec in enumerate(fvecs_read_all(sift_query_path)):
+        querys = fvecs_read_all(sift_query_path)
+        for idx, query_vec in enumerate(querys):
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id_"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
