@@ -55,6 +55,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     // Get tables from catalog
     auto txn = query_context->GetTxn();
     u64 txn_id = txn->TxnID();
+    LOG_INFO(Format("OptimizeIndex {} {}", db_name_, object_name_));
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     auto [base_table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
@@ -75,6 +76,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
         irs_index_entry = table_index_entry->irs_index_entry_;
     }
     if (irs_index_entry.get()) {
+        LOG_INFO(Format("ScheduleOptimize"));
         irs_index_entry->irs_index_->ScheduleOptimize();
     }
     LOG_TRACE("Optimize index");

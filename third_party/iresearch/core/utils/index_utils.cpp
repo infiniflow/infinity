@@ -200,6 +200,13 @@ ConsolidationPolicy MakePolicy(const ConsolidateCount& options) {
               [](const SubReader*& a, const SubReader*& b) {
                 return a->Meta().base_doc < b->Meta().base_doc;
               });
+    std::cout << "candidates segments: " << std::endl;
+    for (auto &segment : candidates) {
+        auto &meta = segment->Meta();
+        std::cout << "seg " << meta.name << " base " << meta.base_doc << " num_doc " << meta.docs_count << " ";
+    }
+    std::cout << std::endl;
+
   };
 }
 
