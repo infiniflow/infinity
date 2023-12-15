@@ -6,6 +6,16 @@ pg_port                 = 15432
 http_port               = 8088
 sdk_port                = 23817
 
+[system]
+# 0 means use all cpus
+worker_cpu_limit        = 4
+# 0 means use all memory
+total_memory_size       = "8GB"
+# memory limit per query
+query_memory_limit      = 0
+# query cpu limit per query
+query_cpu_limit         = "4MB"
+
 [profiler]
 enable                  = false
 profile_record_capacity = 100
@@ -36,4 +46,4 @@ delta_checkpoint_interval_wal_bytes      = 1000000000
 wal_file_size_threshold            = "1GB"
 
 [resource]
-dict_dir                = "/tmp/infinity/resource"
+dictionary_dir                = "/tmp/infinity/resource"

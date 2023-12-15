@@ -25,6 +25,7 @@ import compilation_config;
 import default_values;
 import logger;
 import local_file_system;
+import utility;
 
 namespace infinity {
 
@@ -100,7 +101,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 default_log_file_rotate_count = 10;
 
     // Set the log level before performance test of DB
-    LogLevel default_log_level = LogLevel::kWarning;
+    LogLevel default_log_level = LogLevel::kTrace;
 
     // Default storage config
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
@@ -124,7 +125,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        Printf("No config file is given, use default configs.");
+        Printf("No config file is given, use default configs.\n");
 
         // General
         {
@@ -220,24 +221,54 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             auto system_config = config["system"];
             system_option_.worker_cpu_limit = system_config["worker_cpu_limit"].value_or(default_total_cpu_number);
-
-            String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
-            result = ParseByteSize(total_memory_size_str, system_option_.total_memory_size);
-            if (result.get() != nullptr) {
-                return result;
+            if(system_option_.worker_cpu_limit == 0) {
+                system_option_.worker_cpu_limit = default_total_cpu_number;
             }
+
+            if(system_config["total_memory_size"].as_integer() != 0) {
+                i64 total_memory_size_int = system_config["total_memory_size"].value_or(default_total_memory_size);
+                if(total_memory_size_int <= 0) {
+                    system_option_.total_memory_size = default_total_memory_size;
+                } else {
+                    system_option_.total_memory_size = total_memory_size_int;
+                }
+            } else {
+                String total_memory_size_str = system_config["total_memory_size"].value_or("8GB");
+                result = ParseByteSize(total_memory_size_str, system_option_.total_memory_size);
+                if (result.get() != nullptr) {
+                    return result;
+                }
+            }
+
             if (system_option_.total_memory_size > default_total_memory_size) {
                 system_option_.total_memory_size = default_total_memory_size;
             }
 
             system_option_.query_cpu_limit = system_config["query_cpu_limit"].value_or(default_query_cpu_limit);
-            system_option_.query_memory_limit = system_config["query_memory_limit"].value_or(default_query_memory_limit);
-
-            String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
-            result = ParseByteSize(query_memory_limit_str, system_option_.query_memory_limit);
-            if (result.get() != nullptr) {
-                return result;
+            if(system_option_.query_cpu_limit == 0) {
+                system_option_.query_cpu_limit = default_query_cpu_limit;
             }
+
+            system_option_.query_memory_limit = system_config["query_memory_limit"].value_or(default_query_memory_limit);
+            if(system_option_.query_memory_limit == 0) {
+                system_option_.query_memory_limit = default_query_memory_limit;
+            }
+
+            if(system_config["query_memory_limit"].as_integer() != 0) {
+                i64 query_memory_size_int = system_config["query_memory_limit"].value_or(default_query_memory_limit);
+                if(query_memory_size_int <= 0) {
+                    system_option_.query_memory_limit = default_query_memory_limit;
+                } else {
+                    system_option_.query_memory_limit = query_memory_size_int;
+                }
+            } else {
+                String query_memory_limit_str = system_config["query_memory_limit"].value_or("4MB");
+                result = ParseByteSize(query_memory_limit_str, system_option_.query_memory_limit);
+                if (result.get() != nullptr) {
+                    return result;
+                }
+            }
+
             if (system_option_.query_memory_limit > default_query_memory_limit) {
                 system_option_.query_memory_limit = default_query_memory_limit;
             }
@@ -340,7 +371,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Resource
         {
             auto resource_config = config["resource"];
-            system_option_.resource_dict_path_ = resource_config["dict_dir"].value_or(default_resource_dict_path);
+            system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
         }
     }
 
@@ -356,9 +387,9 @@ void Config::PrintAll() const {
 
     // System
     Printf(" - worker_cpu_limit: {}\n", system_option_.worker_cpu_limit);
-    Printf(" - total_memory_size: {}\n", system_option_.total_memory_size);
+    Printf(" - total_memory_size: {}\n", Utility::FormatByteSize(system_option_.total_memory_size));
     Printf(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
-    Printf(" - query_memory_limit: {}\n", system_option_.query_memory_limit);
+    Printf(" - query_memory_limit: {}\n", Utility::FormatByteSize(system_option_.query_memory_limit));
 
     // Profiler
     Printf(" - enable_profiler: {}\n", system_option_.enable_profiler);
@@ -373,7 +404,7 @@ void Config::PrintAll() const {
     // Log
     Printf(" - log_file_path: {}\n", system_option_.log_file_path->c_str());
     Printf(" - log_to_stdout: {}\n", system_option_.log_to_stdout);
-    Printf(" - log_max_size: {}\n", system_option_.log_max_size);
+    Printf(" - log_max_size: {}\n", Utility::FormatByteSize(system_option_.log_max_size));
     Printf(" - log_file_rotate_count: {}\n", system_option_.log_file_rotate_count);
     Printf(" - log_level: {}\n", LogLevel2Str(system_option_.log_level));
 
@@ -383,7 +414,7 @@ void Config::PrintAll() const {
     Printf(" - default_row_size: {}\n", system_option_.default_row_size);
 
     // Buffer
-    Printf(" - buffer_pool_size: {}\n", system_option_.buffer_pool_size);
+    Printf(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
     Printf(" - temp_dir: {}\n", system_option_.temp_dir->c_str());
 
     // Wal
@@ -394,7 +425,7 @@ void Config::PrintAll() const {
     Printf(" - wal_size_threshold: {}\n", system_option_.wal_size_threshold_);
 
     // Resource
-    Printf(" - dict_dir: {}\n", system_option_.resource_dict_path_.c_str());
+    Printf(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
 }
 
 } // namespace infinity

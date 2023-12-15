@@ -20,6 +20,7 @@ import logger;
 import blocking_queue;
 import infinity_exception;
 import wal_manager;
+import third_party;
 
 namespace infinity {
 
@@ -39,7 +40,8 @@ void BGTaskProcessor::Stop() {
     LOG_INFO("Shutdown the background processor.");
 }
 
-void BGTaskProcessor::Submit(UniquePtr<BGTask> bg_task) { task_queue_.Enqueue(Move(bg_task)); }
+void BGTaskProcessor::Submit(UniquePtr<BGTask> bg_task) {
+    task_queue_.Enqueue(Move(bg_task)); }
 
 void BGTaskProcessor::Process() {
     UniquePtr<BGTask> bg_task{nullptr};

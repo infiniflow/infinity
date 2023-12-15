@@ -24,14 +24,14 @@ export module index_full_text;
 
 namespace infinity {
 
-export class IndexFullText : public IndexBase {
+export class IndexFullText final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
     IndexFullText(String file_name, Vector<String> column_names, String analyzer)
         : IndexBase(file_name, IndexType::kIRSFullText, Move(column_names)), analyzer_(Move(analyzer)) {}
 
-    ~IndexFullText() = default;
+    ~IndexFullText() final = default;
 
     bool operator==(const IndexFullText &other) const;
 

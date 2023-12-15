@@ -29,7 +29,8 @@ export enum class BGTaskType {
 };
 
 export struct BGTask {
-    BGTask(BGTaskType type, bool async): type_(type), async_(async) {}
+    BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
+    virtual ~BGTask() = default;
     BGTaskType type_{BGTaskType::kInvalid};
     bool async_{false};
 
@@ -38,7 +39,7 @@ export struct BGTask {
     CondVar cv_{};
 
     void Wait() {
-        if(async_) {
+        if (async_) {
             return;
         }
         UniqueLock<Mutex> locker(mutex_);
@@ -46,29 +47,41 @@ export struct BGTask {
     }
 
     void Complete() {
-        if(async_) {
+        if (async_) {
             return;
         }
         UniqueLock<Mutex> locker(mutex_);
         complete_ = true;
         cv_.notify_one();
     }
+
+    virtual String ToString() const = 0;
 };
 
-export struct StopProcessorTask: public BGTask {
-    StopProcessorTask(): BGTask(BGTaskType::kStopProcessor, false) {}
+export struct StopProcessorTask final : public BGTask {
+    StopProcessorTask() : BGTask(BGTaskType::kStopProcessor, false) {}
+
+    ~StopProcessorTask() = default;
+
+    String ToString() const final { return "Stop Task"; }
 };
 
-export struct TryCheckpointTask: public BGTask {
-    explicit
-    TryCheckpointTask(bool async): BGTask(BGTaskType::kTryCheckpoint, async) {}
+export struct TryCheckpointTask final : public BGTask {
+    explicit TryCheckpointTask(bool async) : BGTask(BGTaskType::kTryCheckpoint, async) {}
+
+    ~TryCheckpointTask() = default;
+
+    String ToString() const final { return "Checkpoint Task"; }
 };
 
-export struct ForceCheckpointTask: public BGTask {
-    explicit
-    ForceCheckpointTask(Txn* txn): BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
+export struct ForceCheckpointTask final : public BGTask {
+    explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
 
-    Txn* txn_{};
+    ~ForceCheckpointTask() = default;
+
+    String ToString() const final { return "Force Checkpoint Task"; }
+
+    Txn *txn_{};
 };
 
-}
+} // namespace infinity

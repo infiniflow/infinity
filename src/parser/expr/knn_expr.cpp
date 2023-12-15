@@ -23,6 +23,15 @@ KnnExpr::~KnnExpr() {
         column_expr_ = nullptr;
     }
 
+    if(opt_params_ != nullptr) {
+        for(auto* param_ptr: *opt_params_) {
+            delete param_ptr;
+            param_ptr = nullptr;
+        }
+        delete opt_params_;
+        opt_params_ = nullptr;
+    }
+
     if (!own_memory_) {
         return;
     }

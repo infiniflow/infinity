@@ -43,11 +43,12 @@ void TaskScheduler::Init(const Config *config_ptr) {
     worker_count_ = config_ptr->worker_cpu_limit();
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
+    u64 cpu_count = Thread::hardware_concurrency();
     for (u64 cpu_id = 0; cpu_id < worker_count_; ++cpu_id) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
         // Pin the thread to specific cpu
-        ThreadUtil::pin(*worker_thread, cpu_id);
+        ThreadUtil::pin(*worker_thread, cpu_id % cpu_count);
 
         worker_array_.emplace_back(cpu_id, Move(worker_queue), Move(worker_thread));
         worker_workloads_[cpu_id] = 0;
@@ -104,23 +105,34 @@ void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const
 }
 
 void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    // Schedule worker 1 if possible
-    u64 worker_id{};
-    u64 primary_worker_id = 0;
-    u64 primary_worker_load = worker_workloads_[primary_worker_id];
-    if (primary_worker_load == 0) {
-        worker_id = primary_worker_id;
-    } else {
-        worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
+    // Schedule worker 0 if possible
+    u64 scheduled_worker = u64_max;
+    u64 min_load_worker{0};
+    u64 min_work_load{u64_max};
+    for(u64 proposed_worker = 0; proposed_worker < worker_count_; ++ proposed_worker) {
+        u64 current_work_load = worker_workloads_[proposed_worker];
+        if(current_work_load < 1) {
+            scheduled_worker = proposed_worker;
+            break;
+        } else {
+            if(current_work_load < min_work_load) {
+                min_load_worker = proposed_worker;
+                min_work_load = current_work_load;
+            }
+        }
     }
-    worker_workloads_[worker_id] += tasks.size();
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy, primary worker load: {}",
+
+    if(scheduled_worker == u64_max) {
+        scheduled_worker = min_load_worker;
+    }
+
+    worker_workloads_[scheduled_worker] += tasks.size();
+    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
                      tasks.size(),
                      query_context->query_id(),
-                     worker_id,
-                     primary_worker_load));
+                     scheduled_worker));
     for (const auto &fragment_task : tasks) {
-        ScheduleTask(fragment_task, worker_id);
+        ScheduleTask(fragment_task, scheduled_worker);
     }
 }
 

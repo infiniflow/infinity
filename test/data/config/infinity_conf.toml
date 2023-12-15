@@ -38,4 +38,4 @@ buffer_pool_size        = "3GB"
 temp_dir                = "/tmp"
 
 [resource]
-dict_dir                = "/tmp/infinity/resource"
+dictionary_dir                = "/tmp/infinity/resource"

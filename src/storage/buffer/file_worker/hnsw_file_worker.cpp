@@ -26,6 +26,7 @@ import dist_func_ip;
 import lvq_store;
 import plain_store;
 import third_party;
+import logger;
 
 module hnsw_file_worker;
 
@@ -109,7 +110,7 @@ void HnswFileWorker::AllocateInMemory() {
 
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("Bug. Data is not allocated.");
+        Error<StorageException>("FreeInMemory: Data is not allocated.");
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
     auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
@@ -168,7 +169,7 @@ void HnswFileWorker::FreeInMemory() {
 
 void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
     if (!data_) {
-        Error<StorageException>("Bug.");
+        Error<StorageException>("WriteToFileImpl: Data is not allocated.");
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
     auto SaveData = [&](auto *hnsw_index) { hnsw_index->Save(*file_handler_); };

@@ -34,7 +34,7 @@ export String HnswEncodeTypeToString(HnswEncodeType encode_type);
 
 export HnswEncodeType StringToHnswEncodeType(const String &str);
 
-export class IndexHnsw : public IndexBase {
+export class IndexHnsw final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
@@ -48,7 +48,7 @@ public:
         : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
           ef_construction_(ef_construction), ef_(ef) {}
 
-    ~IndexHnsw() = default;
+    ~IndexHnsw() final = default;
 
     bool operator==(const IndexHnsw &other) const;
 
