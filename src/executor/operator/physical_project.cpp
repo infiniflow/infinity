@@ -46,7 +46,7 @@ void PhysicalProject::Init() {
     //    outputs_[output_table_index_] = DataTable::Make(table_def, TableType::kIntermediate);
 }
 
-bool PhysicalProject::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState* prev_op_state = operator_state->prev_op_state_;
     auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
 

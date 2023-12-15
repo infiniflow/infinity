@@ -110,9 +110,8 @@ TEST_F(UuidCastTest, uuid_cast1) {
             String uuid_str(uuid.body, 16);
 
             Value vx = col_target->GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-            EXPECT_FALSE(vx.is_null());
-            EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), uuid_str.c_str());
+            const String &s2 = vx.GetString();
+            EXPECT_EQ(s2, s);
         }
     }
 }

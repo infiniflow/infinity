@@ -28,8 +28,6 @@ public:
 
     explicit UuidType(const char *input) { Set(input); }
 
-    inline ~UuidType() { Reset(); }
-
     UuidType(const UuidType &other);
 
     UuidType(UuidType &&other) noexcept;

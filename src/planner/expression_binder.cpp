@@ -208,24 +208,11 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kIntegerArray: {
-            // cannot transfer ownership from vector to a raw pointer, copy data here.
-            // return value must call `Reset` to release the memory.
-            SizeT dim = expr.long_array_.size();
-
-            auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemInt64, dim);
-
-            Value value = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-            Copy(expr.long_array_.begin(), expr.long_array_.end(), (int64_t *)(value.value_.embedding.ptr));
+            Value value = Value::MakeEmbedding(expr.long_array_);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDoubleArray: {
-            // same problem as above
-            SizeT dim = expr.double_array_.size();
-
-            auto embedding_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemDouble, dim);
-
-            Value value = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-            Copy(expr.double_array_.begin(), expr.double_array_.end(), (double *)(value.value_.embedding.ptr));
+            Value value = Value::MakeEmbedding(expr.double_array_);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kNull: {
@@ -438,7 +425,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Create query embedding
     EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
-    const_cast<KnnExpr &>(parsed_knn_expr).embedding_data_ptr_ = nullptr;
 
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
                                                                         parsed_knn_expr.dimension_,

@@ -273,34 +273,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
     }
 }
 
-void SetMergeKnnState(MergeKnnOperatorState &operator_state,
-                      const PhysicalMergeKnn *physical_merge_knn,
-                      const Vector<UniquePtr<PlanFragment>> &children_fragment) {
-    if (children_fragment.size() != 1) {
-        Error<SchedulerException>("Merge Knn child number must 1");
-    }
-    auto child_fragment = children_fragment[0]->GetContext();
-    if (child_fragment->GetOperators().back()->operator_type() != PhysicalOperatorType::kKnnScan) {
-        Error<SchedulerException>("Merge Knn child must be KnnScan");
-    }
-}
-
-// Set the state after child is finished.
-void SetTaskState(OperatorState &operator_state, const PhysicalOperator *physical_op, const Vector<UniquePtr<PlanFragment>> &children_context) {
-    switch (physical_op->operator_type()) {
-        case PhysicalOperatorType::kMergeKnn: {
-            const auto physical_merge_knn = static_cast<const PhysicalMergeKnn *>(physical_op);
-            auto &merge_knn_input = static_cast<MergeKnnOperatorState &>(operator_state);
-            SetMergeKnnState(merge_knn_input, physical_merge_knn, children_context);
-            break;
-        }
-        // TODO: add other operator like kMergeAgg
-        default: {
-            break;
-        }
-    }
-}
-
 void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr) {
     if (fragment_ptr->GetContext() == nullptr) {
         return;
@@ -439,13 +411,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
                 break;
             }
         }
-        default: {
-            for (const auto &task_id : tasks) {
-                FragmentTask *task = task_id.get();
-                auto &first_operator_state = *task->operator_states_.back();
-                SetTaskState(first_operator_state, fragment_operators.back(), fragment_ptr->Children());
-            }
-        }
+        default:
     }
 
     for (const auto &task : tasks) {
