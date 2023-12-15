@@ -54,6 +54,26 @@ def read_groundtruth(filename):
 
     print("len(vectors): ", len(vectors))
 
+    gt_count = len(vectors)
+    gt_top_k = len(vectors[0])
+
+    ground_truth_sets_1 = [set() for _ in range(gt_count)]
+    ground_truth_sets_10 = [set() for _ in range(gt_count)]
+    ground_truth_sets_100 = [set() for _ in range(gt_count)]
+
+    for i in range(gt_count):
+        for j in range(gt_top_k):
+            x = vectors[i][j]
+            if j < 1:
+                ground_truth_sets_1[i].add(x)
+            if j < 10:
+                ground_truth_sets_10[i].add(x)
+            if j < 100:
+                ground_truth_sets_100[i].add(x)
+
+    return ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100
+
+
 
 def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
     correct_1 = 0.0

@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 import polars as pl
 
 from benchmark.test_benchmark import trace_unhandled_exceptions
+from benchmark.test_benchmark_import import find_path
 from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
@@ -156,15 +157,6 @@ def work(query_vec, topk, metric_type, column_name, data_type):
     query_builder.to_result()
 
 
-def find_path():
-    path = os.getcwd()
-    while True:
-        if os.path.exists(path + "/sift_1m"):
-            break
-        path = os.path.dirname(path)
-    return path + "/sift_1m"
-
-
 class TestQueryBenchmark:
 
     def test_process_pool(self):
@@ -273,4 +265,3 @@ class TestQueryBenchmark:
         print(f"Total Times: {total_times}")
         print(f"Total Dur: {dur}")
         print(f"QPS: {qps}")
-
