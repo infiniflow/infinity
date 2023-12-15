@@ -75,7 +75,16 @@ std::string KnnExpr::ToString() const {
 
     std::string expr_str =
         fmt::format("KNN({}, {}, {}, Float32, {})", column_expr_->ToString(), "xxxxxx", dimension_, KnnDistanceType2Str(distance_type_));
-
+    if (!opt_params_->empty()) {
+        expr_str += '(';
+        for (size_t i = 0; i < opt_params_->size(); ++i) {
+            expr_str += fmt::format("{}={}", (*opt_params_)[i]->param_name_, (*opt_params_)[i]->param_value_);
+            if (i != opt_params_->size() - 1) {
+                expr_str += ", ";
+            }
+        }
+        expr_str += ')';
+    }
     return expr_str;
 }
 

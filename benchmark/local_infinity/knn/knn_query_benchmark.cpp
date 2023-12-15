@@ -84,14 +84,16 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     }
 }
 
-int main(int argc, char **argv) {
-    if (argc > 2) {
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
         return 1;
     }
     bool sift = true;
-    if (argc == 2) {
-        sift = std::string(argv[1]) == "sift";
+    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
+        return 1;
     }
+    sift = strcmp(argv[1], "sift") == 0;
+    size_t ef = std::stoull(argv[2]);
 
     size_t thread_num = 1;
     size_t total_times = 1;
@@ -180,11 +182,13 @@ int main(int argc, char **argv) {
         for (auto &v : query_results) {
             v.reserve(100);
         }
-        auto query_function = [dimension, topk, queries, &query_results](size_t query_idx, std::shared_ptr<Table> &table, size_t threadId) {
+        auto query_function = [&](size_t query_idx, std::shared_ptr<Table> &table, size_t threadId) {
             KnnExpr *knn_expr = new KnnExpr();
             knn_expr->dimension_ = dimension;
             knn_expr->distance_type_ = KnnDistanceType::kL2;
             knn_expr->topn_ = topk;
+            knn_expr->init_parameters_ = new std::vector<InitParameter>();
+            knn_expr->init_parameters_->push_back(new InitParameter("ef", std::to_string(ef)));
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             auto embedding_data_ptr = new float[dimension];
             knn_expr->embedding_data_ptr_ = embedding_data_ptr;
@@ -215,7 +219,7 @@ int main(int argc, char **argv) {
             }
             delete[] embedding_data_ptr;
         };
-        infinity::BaseProfiler profiler;
+        BaseProfiler profiler;
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();

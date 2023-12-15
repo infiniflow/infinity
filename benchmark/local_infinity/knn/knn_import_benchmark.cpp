@@ -38,13 +38,14 @@ import query_result;
 using namespace infinity;
 
 int main(int argc, char *argv[]) {
-    if (argc > 2) {
+    if (argc != 2) {
         return 1;
     }
     bool sift = true;
-    if (argc == 2) {
-        sift = strcmp(argv[1], "sift") == 0;
+    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
+        return 1;
     }
+    sift = strcmp(argv[1], "sift") == 0;
 
     std::string data_path = "/tmp/infinity";
 

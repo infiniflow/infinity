@@ -41,7 +41,7 @@ CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construct
 # the query will return row 4 from block 1, 2 and 3
 # select with 2 index segment
 query I
-SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8
@@ -54,7 +54,7 @@ COPY test_knn_hnsw_l2 FROM '/tmp/infinity/test_data/embedding_float_dim4.csv' WI
 # the query will return row 4 from block 1, 2 and 3
 # select with 2 index segment and 1 non-index segment
 query I
-SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH KNN(c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
 ----
 8
 8

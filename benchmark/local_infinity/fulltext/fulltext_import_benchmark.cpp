@@ -31,7 +31,7 @@ using namespace infinity;
 
 int main() {
     std::string import_from = test_data_path();
-    import_from += "/benchmark/wiki.txt";
+    import_from += "/benchmark/dbpedia-entity/corpus.jsonl";
 
     LocalFileSystem fs;
     if (!fs.Exists(import_from)) {
@@ -42,21 +42,21 @@ int main() {
     std::vector<std::unique_ptr<ColumnDef>> column_definations;
     std::vector<ColumnDef *> column_defs;
     {
-        std::string col1_name = "doctitle";
+        std::string col1_name = "_id";
         auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto col1_def = std::make_unique<ColumnDef>(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
         column_definations.push_back(std::move(col1_def));
         column_defs.push_back(column_definations.back().get());
     }
     {
-        std::string col2_name = "docdate";
+        std::string col2_name = "title";
         auto col2_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto col2_def = std::make_unique<ColumnDef>(0, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
         column_definations.push_back(std::move(col2_def));
         column_defs.push_back(column_definations.back().get());
     }
     {
-        std::string col3_name = "body";
+        std::string col3_name = "text";
         auto col3_type = std::make_shared<DataType>(LogicalType::kVarchar);
         auto col3_def = std::make_unique<ColumnDef>(0, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
         column_definations.push_back(std::move(col3_def));
@@ -64,8 +64,12 @@ int main() {
     }
 
     std::string db_name = "default";
-    std::string table_name = "fulltext_benchmark";
-    std::string index_name = "fulltext_index";
+    std::string table_name = "ft_dbpedia_benchmark";
+    std::string index_name = "ft_dbpedia_index";
+
+    std::string data_path = "/tmp/infinity";
+
+    Infinity::LocalInit(data_path);
 
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     CreateDatabaseOptions create_db_options;
@@ -82,8 +86,7 @@ int main() {
     profiler.Begin();
     std::shared_ptr<Table> table = data_base->GetTable(table_name);
     ImportOptions import_options;
-    import_options.copy_file_type_ = CopyFileType::kCSV;
-    import_options.delimiter_ = '\t';
+    import_options.copy_file_type_ = CopyFileType::kJSONL;
     table->Import(import_from, std::move(import_options));
     std::cout << "Import data cost: " << profiler.ElapsedToString();
 
@@ -92,7 +95,7 @@ int main() {
     {
         auto index_info = new IndexInfo();
         index_info->index_type_ = IndexType::kIRSFullText;
-        index_info->column_name_ = "body";
+        index_info->column_name_ = "text";
 
         {
             auto index_param_list = new std::vector<InitParameter *>();
@@ -101,20 +104,7 @@ int main() {
         }
         index_info_list->push_back(index_info);
     }
-    {
-        auto index_info = new IndexInfo();
-        index_info->index_type_ = IndexType::kIRSFullText;
-        index_info->column_name_ = "doctitle";
 
-        index_info_list->push_back(index_info);
-    }
-    {
-        auto index_info = new IndexInfo();
-        index_info->index_type_ = IndexType::kIRSFullText;
-        index_info->column_name_ = "docdate";
-
-        index_info_list->push_back(index_info);
-    }
     auto r = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
     if (!r.IsOk()) {
         std::cout << "Create index failed: " << r.ToString() << std::endl;
@@ -123,7 +113,5 @@ int main() {
     std::cout << "Create index cost: " << profiler.ElapsedToString();
     profiler.End();
 
-    Infinity::LocalUnInit();
-    std::cout << ">>> Fulltext Import Benchmark End <<<" << std::endl;
     Infinity::LocalUnInit();
 }
