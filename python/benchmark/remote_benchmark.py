@@ -197,7 +197,6 @@ def one_thread(rounds, path):
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-            break
 
         ground_truth_path = path + "/sift_groundtruth.ivecs"
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
@@ -245,14 +244,14 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=16,
+        default=1,
         dest="threads",
     )
     parser.add_argument(
         "-r",
         "--rounds",
         type=int,
-        default=3,
+        default=1,
         dest="rounds",
     )
 
