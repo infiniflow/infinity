@@ -130,7 +130,7 @@ struct KnnExpr {
 3: ElementType embedding_data_type,
 4: KnnDistanceType distance_type,
 5: i64 topn,
-6: InitParameter opt_params,
+6: list<InitParameter> opt_params = [],
 }
 
 struct MatchExpr {
