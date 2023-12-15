@@ -221,6 +221,57 @@ class TestQueryBenchmark:
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
 
+        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+        if not os.path.exists(sift_query_path):
+            print(f"File: {sift_query_path} doesn't exist")
+            return
+
+        conn = ThriftInfinityClient(REMOTE_HOST)
+        table = RemoteTable(conn, "default", "knn_benchmark")
+        queries = fvecs_read_all(sift_query_path)
+        query_results = [[] for _ in range(len(queries))]
+
+        dur = 0.0
+        for idx, query_vec in enumerate(queries):
+
+            start = time.time()
+
+            query_builder = InfinityThriftQueryBuilder(table)
+            query_builder.output(["_row_id"])
+            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
+            res, _ = query_builder.to_result()
+            end = time.time()
+
+            diff = end - start
+            dur += diff
+
+            res_list = res["ROW_ID"]
+            # print(len(res_list))
+
+            for i in range(len(res_list)):
+                query_results[idx].append(res_list[i][1])
+
+        read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
+        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
+
+        recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
+                                                               ground_truth_sets_100, query_results)
+        print("recall_1: ", recall_1)
+        print("recall_10: ", recall_10)
+        print("recall_100: ", recall_100)
+
+        print(">>> Query Benchmark End <<<")
+        qps = total_times / dur
+        print(f"Total Times: {total_times}")
+        print(f"Total Dur: {dur}")
+        print(f"QPS: {qps}")
+
+    def test_one_query(self):
+        thread_num = 1
+        total_times = 10000
+
+        print(">>> Query Benchmark Start <<<")
+        print(f"Thread Num: {thread_num}, Times: {total_times}")
 
         sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
         if not os.path.exists(sift_query_path):
@@ -240,18 +291,19 @@ class TestQueryBenchmark:
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
             query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            res = query_builder.to_result()
+            res, _ = query_builder.to_result()
             end = time.time()
 
             diff = end - start
             dur += diff
 
-            res_list = res["ROW_ID"].to_list()
+            res_list = res["ROW_ID"]
             # print(len(res_list))
 
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
+            break
 
         read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
@@ -262,27 +314,6 @@ class TestQueryBenchmark:
         print("recall_10: ", recall_10)
         print("recall_100: ", recall_100)
 
-        print(">>> Query Benchmark End <<<")
-        qps = total_times / dur
-        print(f"Total Times: {total_times}")
-        print(f"Total Dur: {dur}")
-        print(f"QPS: {qps}")
-
-    def test_one_query(self):
-        total_times = 1
-        conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", "knn_benchmark")
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
-
-        start = time.time()
-        for query_vec in fvecs_read(sift_query_path):
-            query_builder = InfinityThriftQueryBuilder(table)
-            query_builder.output(["*"])
-            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            # query_builder.to_df()
-
-        end = time.time()
-        dur = end - start
         print(">>> Query Benchmark End <<<")
         qps = total_times / dur
         print(f"Total Times: {total_times}")
