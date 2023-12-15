@@ -55,9 +55,9 @@ void DBServer::Run() {
     CreateConnection();
 
     if (config_path_) {
-        Printf("Startup database server, at: {} and port: {}, config: {}\n", listen_address_ref, pg_port, *config_path_);
+        Printf("Start up database server, at: {} and port: {}, config: {}\n", listen_address_ref, pg_port, *config_path_);
     } else {
-        Printf("Startup database server, at: {} and port: {}\n", listen_address_ref, pg_port);
+        Printf("Start up database server, at: {} and port: {}\n", listen_address_ref, pg_port);
     }
 
     InfinityContext::instance().config()->PrintAll();

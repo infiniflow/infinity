@@ -34,7 +34,7 @@ export String HnswEncodeTypeToString(HnswEncodeType encode_type);
 
 export HnswEncodeType StringToHnswEncodeType(const String &str);
 
-export class IndexHnsw : public IndexBase {
+export class IndexHnsw final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 

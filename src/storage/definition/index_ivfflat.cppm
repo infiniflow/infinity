@@ -23,7 +23,7 @@ import third_party;
 export module index_ivfflat;
 
 namespace infinity {
-export class IndexIVFFlat : public IndexBase {
+export class IndexIVFFlat final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
