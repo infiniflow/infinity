@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace infinity {
 
@@ -59,5 +60,10 @@ struct IfNotExistsInfo {
     bool exists_{false};
     bool if_not_exists_{false};
     std::string info_{};
+};
+
+struct OptionalWithInfo {
+    bool with_{false};
+    std::vector<InitParameter *> *init_parameters_{};
 };
 } // namespace infinity

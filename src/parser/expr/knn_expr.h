@@ -15,8 +15,9 @@
 #pragma once
 
 #include "expr.h"
+#include "statement/statement_common.h"
 #include "type/complex/embedding_type.h"
-
+#include <vector>
 namespace infinity {
 
 enum class KnnDistanceType {
@@ -44,7 +45,8 @@ public:
     int64_t dimension_{};
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
-    int64_t topn_{100};
+    int64_t topn_{};
+    std::vector<InitParameter *> *opt_params_{};
 };
 
 } // namespace infinity

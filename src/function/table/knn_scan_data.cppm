@@ -42,6 +42,7 @@ public:
                       SharedPtr<BaseExpression> filter_expression,
                       UniquePtr<Vector<BlockColumnEntry *>> block_column_entries,
                       UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries,
+                      Vector<InitParameter> opt_params,
                       i64 topk,
                       i64 dimension,
                       i64 query_embedding_count,
@@ -49,8 +50,8 @@ public:
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
         : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(Move(block_column_entries)),
-          index_entries_(Move(index_entries)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
-          query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
+          index_entries_(Move(index_entries)), opt_params_(Move(opt_params)), topk_(topk), dimension_(dimension),
+          query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
@@ -60,6 +61,7 @@ public:
     const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
     const UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
 
+    const Vector<InitParameter> opt_params_{};
     const i64 topk_;
     const i64 dimension_;
     const u64 query_count_;

@@ -377,6 +377,13 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
                     Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
 
+                    for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
+                        if (opt_param.param_name_ == "ef") {
+                            u64 ef = std::stoull(opt_param.param_value_);
+                            index->SetEf(ef);
+                        }
+                    }
+
                     i64 result_n = -1;
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
@@ -417,12 +424,13 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
                                 using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
-                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                // Fixme: const_cast here. may have bug.
+                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
                                 using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
-                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             default: {
@@ -435,12 +443,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
                                 using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
-                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
                                 using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
-                                KnnScan(static_cast<const Hnsw *>(index_handle.GetData()));
+                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             default: {

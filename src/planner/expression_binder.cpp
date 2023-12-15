@@ -431,7 +431,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
                                                                         parsed_knn_expr.distance_type_,
                                                                         Move(query_embedding),
                                                                         arguments,
-                                                                        parsed_knn_expr.topn_);
+                                                                        parsed_knn_expr.topn_,
+                                                                        parsed_knn_expr.opt_params_);
 
     return bound_knn_expr;
 }
