@@ -141,9 +141,8 @@ TEST_F(BlobCastTest, blob_cast1) {
             }
             check_value[blob_len - 1] = 0;
             Value vx = col_target->GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-            EXPECT_FALSE(vx.is_null());
-            EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_value.c_str());
+            const String &s2 = vs.GetString();
+            EXPECT_EQ(s2, check_value);
         }
     }
 }

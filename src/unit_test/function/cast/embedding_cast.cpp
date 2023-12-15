@@ -38,45 +38,6 @@ import bound_cast_func;
 
 class EmbeddingCastTest : public BaseTest {};
 
-// TEST_F(EmbeddingCastTest, uuid_cast0) {
-//     using namespace infinity;
-//
-//     // Try to cast uuid type to wrong type.
-//     {
-//         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-//         DataType source_data_type(LogicalType::kEmbedding, embedding_info);
-//
-//         EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
-//         for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
-//             ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
-//         }
-//
-//         TinyIntT target;
-//         DataType target_data_type(LogicalType::kTinyInt);
-//         EXPECT_THROW(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, nullptr), FunctionException);
-//     }
-//     {
-//         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);
-//         DataType source_data_type(LogicalType::kEmbedding, embedding_info);
-//
-//         EmbeddingT source = EmbeddingType(EmbeddingDataType::kElemFloat, 16);
-//         for(i64 j = 0; j < embedding_info->Dimension(); ++ j) {
-//             ((float*)(source.ptr))[j] = static_cast<float>(j) + 0.5f;
-//         }
-//
-//         VarcharT target;
-//
-//         DataType target_data_type(LogicalType::kVarchar);
-//
-//         ColumnVector col_varchar(target_data_type);
-//         col_varchar.Initialize();
-//
-//         EXPECT_TRUE(EmbeddingTryCastToVarlen::Run(source, source_data_type, target, target_data_type, &col_varchar));
-//
-//         target.Reset(false);
-//     }
-// }
-
 TEST_F(EmbeddingCastTest, embedding_cast1) {
     using namespace infinity;
 
@@ -91,34 +52,25 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
     auto col_source = MakeShared<ColumnVector>(source_type);
     col_source->Initialize();
+    Vector<float> data(embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
         for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
-            ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+            data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
+        Value v = Value::MakeEmbedding(data);
         col_source->AppendValue(v);
-        v.value_.embedding.Reset();
     }
 
     for (i64 i = 0; i < 1; ++i) {
-        Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
         for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
-            ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+            data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
-
+        Value v = Value::MakeEmbedding(data);
         Value vx = col_source->GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
-        EXPECT_EQ(vx.type().type_info()->type(), TypeInfoType::kEmbedding);
-        EXPECT_EQ(vx.type().type_info()->Size(), 64);
-
-        for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
-            EXPECT_FLOAT_EQ(((float *)(vx.value_.embedding.ptr))[j], ((float *)(v.value_.embedding.ptr))[j]);
-        }
-
-        v.value_.embedding.Reset();
+        EXPECT_EQ(v == vx, true);
     }
 
-    // cast uuid column vector to varchar column vector
+    // cast embedding float column vector to embedding double column vector
     {
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, 16);
         SharedPtr<DataType> target_type = MakeShared<DataType>(LogicalType::kEmbedding, embedding_info);
@@ -131,18 +83,14 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
         CastParameters cast_parameters;
         EXPECT_TRUE(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters));
 
+        Vector<double> data2(embedding_info->Dimension());
         for (i64 i = 0; i < 1; ++i) {
-            Value v = Value::MakeEmbedding(embedding_info->Type(), embedding_info->Dimension());
-            for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
-                ((float *)(v.value_.embedding.ptr))[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
+            for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
+                data2[j] = double(static_cast<float>(i) + static_cast<float>(j) + 0.5f);
             }
-            String source_str = EmbeddingT::Embedding2String(v.value_.embedding, embedding_info->Type(), embedding_info->Dimension());
-            v.value_.embedding.Reset();
-
+            Value v = Value::MakeEmbedding(data2);
             Value vx = col_target->GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kEmbedding);
-            EXPECT_FALSE(vx.is_null());
-            // EXPECT_STREQ(vx.value_.embedding.ToString().c_str(), source_str.c_str());
+            EXPECT_EQ(v == vx, true);
         }
     }
 }

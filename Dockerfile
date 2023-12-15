@@ -5,7 +5,7 @@ RUN apt update
 
 # Clang 17+ is required for C++20 modules. GCC is not supported.
 RUN apt install -y clang-*-17
-RUN ln -s /usr/bin/clang-scan-deps-17 /usr/bin/clang-scan-deps && ln -s /usr/bin/clang-format-17 /usr/bin/clang-format && ln -s /usr/bin/clang-tidy-17 /usr/bin/clang-tidy
+RUN ln -s /usr/bin/clang-scan-deps-17 /usr/bin/clang-scan-deps && ln -s /usr/bin/clang-format-17 /usr/bin/clang-format && ln -s /usr/bin/clang-tidy-17 /usr/bin/clang-tidy && ln -s /usr/bin/llvm-symbolizer-17 /usr/bin/llvm-symbolizer
 
 ENV CC=/usr/bin/clang-17
 ENV CXX=/usr/bin/clang++-17

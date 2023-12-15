@@ -267,13 +267,11 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kTinyInt);
-            i64 check_value = static_cast<i64>(i);
-            if (check_value >= std::numeric_limits<i8>::min() && check_value <= std::numeric_limits<i8>::max()) {
-                EXPECT_FALSE(vx.is_null());
-                EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(check_value));
-            } else {
-                EXPECT_TRUE(vx.is_null());
+            i32 check_value = 0;
+            if (i >= std::numeric_limits<i8>::min() && i <= std::numeric_limits<i8>::max()) {
+                check_value = static_cast<i32>(i);
             }
+            EXPECT_EQ(vx.value_.tiny_int, static_cast<TinyIntT>(check_value));
         }
     }
 
@@ -292,7 +290,10 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             Value vx = col_target->GetValue(i);
             EXPECT_EQ(vx.type().type(), LogicalType::kSmallInt);
-            i64 check_value = static_cast<i64>(i);
+            i32 check_value = 0;
+            if (i >= std::numeric_limits<i16>::min() && i <= std::numeric_limits<i16>::max()) {
+                check_value = static_cast<i32>(i);
+            }
             EXPECT_EQ(vx.value_.small_int, static_cast<SmallIntT>(check_value));
         }
     }
@@ -404,12 +405,11 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         // Not all values are cast, then it's false.
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-            Value vx = col_target->GetValue(i);
-            EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
             i64 check_value = static_cast<i64>(i);
-            EXPECT_FALSE(vx.is_null());
             String check_str(ToStr(check_value));
-            EXPECT_STREQ(vx.value_.varchar.ToString().c_str(), check_str.c_str());
+            Value vx = col_target->GetValue(i);
+            const String &s2 = vx.GetVarchar();
+            EXPECT_STREQ(s2.c_str(), check_str.c_str());
         }
     }
 

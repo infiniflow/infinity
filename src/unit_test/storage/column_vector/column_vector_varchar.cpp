@@ -59,15 +59,8 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -84,19 +77,11 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
+        String s = "hello" + ToStr(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
-        String s = "hello" + ToStr(i);
-
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     column_vector.Reset();
@@ -132,15 +117,8 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         column_vector.AppendByPtr((ptr_t)(&varchar_value));
 
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -153,15 +131,8 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValue(0);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();
     }
 }
@@ -194,37 +165,19 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     for (i64 i = 0; i < 1; ++i) {
         String s = "hello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hello" + ToStr(i);
-
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     column_vector.Reset();
@@ -256,21 +209,12 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < 1; ++i) {
         String s = "hello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
@@ -284,26 +228,15 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hello" + ToStr(i);
-
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     Selection input_select;
@@ -317,19 +250,10 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        Value vx = target_column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hello" + ToStr(2 * i);
-
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = target_column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 }
 
@@ -342,26 +266,15 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hello" + ToStr(i);
-
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     ColumnVector target_column_vector(data_type);
@@ -374,19 +287,11 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        Value vx = target_column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hello" + ToStr(src_idx);
 
-        EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = target_column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 }
 
@@ -416,20 +321,11 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hellohellohello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -446,19 +342,10 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hellohellohello" + ToStr(i);
-
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     column_vector.Reset();
@@ -495,16 +382,8 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         column_vector.AppendByPtr((ptr_t)(&varchar_value));
 
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -517,31 +396,19 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValue(0);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();
     }
 }
 
 TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
-
     using namespace infinity;
-
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
-
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
-
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
@@ -558,37 +425,19 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     for (i64 i = 0; i < 1; ++i) {
         String s = "hellohellohello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
     for (i64 i = 0; i < 1; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "hellohellohello" + ToStr(i);
-
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     column_vector.Reset();
@@ -620,21 +469,12 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < 1; ++i) {
         String s = "hellohellohello" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         EXPECT_THROW(column_vector.AppendValue(v), StorageException);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 }
@@ -665,25 +505,11 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        if (s.length() <= VARCHAR_INLINE_LEN) {
-            EXPECT_TRUE(vx.value_.varchar.IsInlined());
-        } else {
-            EXPECT_FALSE(vx.value_.varchar.IsInlined());
-        }
-
-        if (vx.value_.varchar.IsInlined()) {
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
@@ -700,20 +526,10 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
         String s = "Professional" + ToStr(i);
-
-        if (s.length() <= VARCHAR_INLINE_LEN) {
-            EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            EXPECT_FALSE(vx.value_.varchar.IsInlined());
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        Value vx = column_vector.GetValue(i);
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
     }
 
     column_vector.Reset();
@@ -745,44 +561,24 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + ToStr(i);
-        VarcharT varchar_value;
-        varchar_value.InitAsValue(s);
-        Value v = Value::MakeVarchar(varchar_value);
+        Value v = Value::MakeVarchar(s);
         column_vector.AppendValue(v);
         Value vx = column_vector.GetValue(i);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-
-        if (s.length() <= VARCHAR_INLINE_LEN) {
-            EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            EXPECT_FALSE(vx.value_.varchar.IsInlined());
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
     }
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "Professional" + ToStr(i);
-
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.SetValue(0, column_vector.GetValue(i));
         column_constant.Finalize(1);
 
         Value vx = column_constant.GetValue(0);
-        EXPECT_EQ(vx.type().type(), LogicalType::kVarchar);
-        if (s.length() <= VARCHAR_INLINE_LEN) {
-            EXPECT_TRUE(vx.value_.varchar.IsInlined());
-            String prefix = String(vx.value_.varchar.short_.data_, vx.value_.varchar.length_);
-            EXPECT_STREQ(prefix.c_str(), s.c_str());
-        } else {
-            EXPECT_FALSE(vx.value_.varchar.IsInlined());
-            String whole_str = String(vx.value_.varchar.value_.ptr_, vx.value_.varchar.length_);
-            EXPECT_STREQ(whole_str.c_str(), s.c_str());
-        }
+        const String &s2 = vx.GetVarchar();
+        EXPECT_STREQ(s.c_str(), s2.c_str());
         column_constant.Reset();
     }
 }

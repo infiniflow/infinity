@@ -33,10 +33,9 @@ namespace infinity {
 
 void PhysicalSink::Init() {}
 
-bool PhysicalSink::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
+bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 
-bool PhysicalSink::Execute(QueryContext *query_context, SinkState *sink_state) {
-
+bool PhysicalSink::Execute(QueryContext *, SinkState *sink_state) {
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
             Error<ExecutorException>("Invalid sinker type");

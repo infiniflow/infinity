@@ -17,12 +17,53 @@
 #include "parser_assert.h"
 #include <bitset>
 #include <charconv>
+#include <cstdint>
 #include <cstring>
 #include <sstream>
 
 namespace infinity {
 
 enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, kElemInt64, kElemFloat, kElemDouble, kElemInvalid };
+
+template <typename T>
+inline EmbeddingDataType ToEmbeddingDataType() {
+    return EmbeddingDataType::kElemInvalid;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<bool>() {
+    return EmbeddingDataType::kElemBit;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<int8_t>() {
+    return EmbeddingDataType::kElemInt8;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<int16_t>() {
+    return EmbeddingDataType::kElemInt16;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<int32_t>() {
+    return EmbeddingDataType::kElemInt32;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<int64_t>() {
+    return EmbeddingDataType::kElemInt64;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<float>() {
+    return EmbeddingDataType::kElemFloat;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<double>() {
+    return EmbeddingDataType::kElemDouble;
+}
 
 struct EmbeddingType {
 public:
@@ -102,7 +143,7 @@ private:
     }
 
     template <>
-    static inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
+    inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
         char buf[6 * dimension * 2];
         std::stringstream ss(buf, std::ios::in | std::ios::out | std::ios::binary);
         for (size_t i = 0; i < dimension - 1; ++i) {
