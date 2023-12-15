@@ -152,37 +152,16 @@ class InfinityThriftQueryBuilder(ABC):
         return self._table._execute_query(query)
 
     def to_df(self) -> pd.DataFrame:
-        query = Query(
-            columns=self._columns,
-            search=self._search,
-            filter=self._filter,
-            limit=self._limit,
-            offset=self._offset
-        )
-        data_dict, data_type_dict = self._table._execute_query(query)
+        df_dict = {}
+        data_dict, data_type_dict = self.to_result()
         for k, v in data_dict.items():
             data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
-            data_dict[k] = data_series
+            df_dict[k] = data_series
 
-        return pd.DataFrame(data_dict)
+        return pd.DataFrame(df_dict)
 
     def to_pl(self) -> pl.DataFrame:
-        query = Query(
-            columns=self._columns,
-            search=self._search,
-            filter=self._filter,
-            limit=self._limit,
-            offset=self._offset
-        )
-        return pl.from_pandas(self._table._execute_query(query))
+        return pl.from_pandas(self.to_df())
 
     def to_arrow(self) -> Table:
-        query = Query(
-            columns=self._columns,
-            search=self._search,
-            filter=self._filter,
-            limit=self._limit,
-            offset=self._offset
-        )
-
-        return pa.Table.from_pandas(self._table._execute_query(query))
+        return pa.Table.from_pandas(self.to_df())
