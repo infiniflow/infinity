@@ -24,7 +24,7 @@ import logger;
 
 import infinity_exception;
 import merge_knn_data;
-import faiss;
+import knn_result_handler;
 import merge_knn;
 import block_index;
 import column_buffer;

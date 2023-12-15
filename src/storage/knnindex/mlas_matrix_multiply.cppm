@@ -15,7 +15,7 @@
 module;
 #include "../third_party/mlas/inc/mlas.h"
 
-export module use_mlas;
+export module mlas_matrix_multiply;
 
 namespace infinity {
 export void matrixA_multiply_transpose_matrixB_output_to_C(const float *x, const float *y, size_t nx, size_t ny, size_t dimension, float *output) {

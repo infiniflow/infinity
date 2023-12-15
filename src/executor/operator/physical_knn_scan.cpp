@@ -44,7 +44,7 @@ import column_expression;
 import index_base;
 import buffer_manager;
 import merge_knn;
-import faiss;
+import knn_result_handler;
 import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
@@ -338,11 +338,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
                 auto IVFFlatScan = [&]<typename AnnIVFFlatType>() {
-                    AnnIVFFlatType ann_ivfflat_query{query,
+                    AnnIVFFlatType ann_ivfflat_query(query,
                                                      knn_scan_shared_data->query_count_,
                                                      knn_scan_shared_data->topk_,
                                                      knn_scan_shared_data->dimension_,
-                                                     knn_scan_shared_data->elem_type_};
+                                                     knn_scan_shared_data->elem_type_);
                     ann_ivfflat_query.Begin();
                     ann_ivfflat_query.Search(index, segment_id, n_probes, bitmask);
                     ann_ivfflat_query.End();

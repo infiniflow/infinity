@@ -24,33 +24,43 @@ import annivfflat_index_data;
 import kmeans_partition;
 import vector_distance;
 import search_top_k;
-import heap_twin_operation;
+import knn_result_handler;
 import bitmask;
 
 export module ann_ivf_flat;
 
 namespace infinity {
 
-export template <typename DistType>
-class AnnIVFFlatL2 final : public KnnDistance<DistType> {
-public:
-    explicit AnnIVFFlatL2(const DistType *queries, u64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, top_k), queries_(queries) {
+template <typename Compare, MetricType metric, KnnDistanceAlgoType algo>
+class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
+    using DistType = typename Compare::DistanceType;
+    using ResultHandler = HeapResultHandler<Compare>;
+    static inline DistType Distance(const DistType *x, const DistType *y, u32 dimension) {
+        if constexpr (metric == MetricType::kMerticL2) {
+            return L2Distance<DistType>(x, y, dimension);
+        } else if constexpr (metric == MetricType::kMerticInnerProduct) {
+            return IPDistance<DistType>(x, y, dimension);
+        } else {
+            Error<ExecutorException>("Metric type is invalid");
+        }
+    }
 
-        id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, InvalidValue());
-        heap_twin_max_multiple_ =
-            MakeUnique<heap_twin_multiple<std::greater<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
+public:
+    explicit AnnIVFFlat(const DistType *queries, u64 query_count, u32 top_k, u32 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(algo, elem_data_type, query_count, dimension, top_k), queries_(queries) {
+        id_array_ = MakeUniqueForOverwrite<RowID[]>(top_k * query_count);
+        distance_array_ = MakeUniqueForOverwrite<DistType[]>(top_k * query_count);
+        result_handler_ = MakeUnique<ResultHandler>(query_count, top_k, distance_array_.get(), id_array_.get());
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
-        return AnnIVFFlatL2<DistType>::CreateIndex(dimension, vector_count, vectors_ptr, vector_count, vectors_ptr, partition_num);
+        return AnnIVFFlat<Compare, metric, algo>::CreateIndex(dimension, vector_count, vectors_ptr, vector_count, vectors_ptr, partition_num);
     }
 
     static UniquePtr<AnnIVFFlatIndexData<DistType>>
     CreateIndex(u32 dimension, u32 train_count, const DistType *train_ptr, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
-        auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticL2, dimension, partition_num);
-        k_means_partition_only_centroids<f32>(MetricType::kMerticL2, dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
+        auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(metric, dimension, partition_num);
+        k_means_partition_only_centroids<f32>(metric, dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
         add_data_to_partition(dimension, vector_count, vectors_ptr, index_data.get());
         return index_data;
     }
@@ -59,8 +69,7 @@ public:
         if (begin_ || this->query_count_ == 0) {
             return;
         }
-        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, InvalidValue());
-
+        result_handler_->Begin();
         begin_ = true;
     }
 
@@ -70,11 +79,11 @@ public:
 
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
-        if (base_ivf->metric_ != MetricType::kMerticL2) {
+        if (base_ivf->metric_ != metric) {
             Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin");
+            Error<ExecutorException>("IVFFlat isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -82,34 +91,34 @@ public:
         }
         this->total_base_count_ += base_ivf->data_num_;
         if (n_probes == 1) {
-            Vector<u32> assign_centroid_ids(this->query_count_);
+            auto assign_centroid_ids = MakeUniqueForOverwrite<u32[]>(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
                                                this->query_count_,
                                                this->queries_,
                                                base_ivf->partition_num_,
                                                base_ivf->centroids_.data(),
-                                               assign_centroid_ids.data());
+                                               assign_centroid_ids.get());
             for (u64 i = 0; i < this->query_count_; i++) {
                 u32 selected_centroid = assign_centroid_ids[i];
                 u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                 const DistType *x_i = this->queries_ + i * this->dimension_;
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                    DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    heap_twin_max_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
+                    DistType distance = Distance(x_i, y_j, this->dimension_);
+                    result_handler_->AddResult(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
                 }
             }
         } else {
-            Vector<DistType> centroid_dists(n_probes * this->query_count_);
-            Vector<u32> centroid_ids(n_probes * this->query_count_);
+            auto centroid_dists = MakeUniqueForOverwrite<DistType[]>(n_probes * this->query_count_);
+            auto centroid_ids = MakeUniqueForOverwrite<u32[]>(n_probes * this->query_count_);
             search_top_k_with_dis(n_probes,
                                   this->dimension_,
                                   this->query_count_,
                                   queries_,
                                   base_ivf->partition_num_,
                                   base_ivf->centroids_.data(),
-                                  centroid_ids.data(),
-                                  centroid_dists.data(),
+                                  centroid_ids.get(),
+                                  centroid_dists.get(),
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
@@ -118,8 +127,8 @@ public:
                     const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                     for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                        DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                        heap_twin_max_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
+                        DistType distance = Distance(x_i, y_j, this->dimension_);
+                        result_handler_->AddResult(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
                     }
                 }
             }
@@ -132,11 +141,11 @@ public:
             return;
         }
         // check metric type
-        if (base_ivf->metric_ != MetricType::kMerticL2) {
+        if (base_ivf->metric_ != metric) {
             Error<ExecutorException>("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlatL2 isn't begin");
+            Error<ExecutorException>("IVFFlat isn't begin");
         }
         n_probes = Min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -144,13 +153,13 @@ public:
         }
         this->total_base_count_ += base_ivf->data_num_;
         if (n_probes == 1) {
-            Vector<u32> assign_centroid_ids(this->query_count_);
+            auto assign_centroid_ids = MakeUniqueForOverwrite<u32[]>(this->query_count_);
             search_top_1_without_dis<DistType>(this->dimension_,
                                                this->query_count_,
                                                this->queries_,
                                                base_ivf->partition_num_,
                                                base_ivf->centroids_.data(),
-                                               assign_centroid_ids.data());
+                                               assign_centroid_ids.get());
             for (u64 i = 0; i < this->query_count_; i++) {
                 u32 selected_centroid = assign_centroid_ids[i];
                 u32 contain_nums = base_ivf->ids_[selected_centroid].size();
@@ -159,22 +168,22 @@ public:
                 for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     auto segment_offset = base_ivf->ids_[selected_centroid][j];
                     if (bitmask.IsTrue(segment_offset)) {
-                        DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                        heap_twin_max_multiple_->add(i, distance, RowID(segment_id, segment_offset));
+                        DistType distance = Distance(x_i, y_j, this->dimension_);
+                        result_handler_->AddResult(i, distance, RowID(segment_id, segment_offset));
                     }
                 }
             }
         } else {
-            Vector<DistType> centroid_dists(n_probes * this->query_count_);
-            Vector<u32> centroid_ids(n_probes * this->query_count_);
+            auto centroid_dists = MakeUniqueForOverwrite<DistType[]>(n_probes * this->query_count_);
+            auto centroid_ids = MakeUniqueForOverwrite<u32[]>(n_probes * this->query_count_);
             search_top_k_with_dis(n_probes,
                                   this->dimension_,
                                   this->query_count_,
                                   queries_,
                                   base_ivf->partition_num_,
                                   base_ivf->centroids_.data(),
-                                  centroid_ids.data(),
-                                  centroid_dists.data(),
+                                  centroid_ids.get(),
+                                  centroid_dists.get(),
                                   false);
             for (u64 i = 0; i < this->query_count_; i++) {
                 const DistType *x_i = queries_ + i * this->dimension_;
@@ -185,8 +194,8 @@ public:
                     for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                         auto segment_offset = base_ivf->ids_[selected_centroid][j];
                         if (bitmask.IsTrue(segment_offset)) {
-                            DistType distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                            heap_twin_max_multiple_->add(i, distance, RowID(segment_id, segment_offset));
+                            DistType distance = Distance(x_i, y_j, this->dimension_);
+                            result_handler_->AddResult(i, distance, RowID(segment_id, segment_offset));
                         }
                     }
                 }
@@ -198,251 +207,46 @@ public:
         if (!begin_) {
             return;
         }
-
-        heap_twin_max_multiple_->sort();
-
+        result_handler_->End();
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_->data(); }
+    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_.get(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
+    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_.get(); }
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return distance_array_->data() + idx * this->top_k_;
+        return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return id_array_->data() + idx * this->top_k_;
+        return id_array_.get() + idx * this->top_k_;
     }
 
-    [[nodiscard]] static constexpr DistType InvalidValue() { return std::numeric_limits<DistType>::max(); }
+    [[nodiscard]] static constexpr DistType InvalidValue() { return Compare::InitialValue(); }
 
-    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) { return a < b; }
+    [[nodiscard]] static bool CompareDist(const DistType &a, const DistType &b) { return Compare::Compare(b, a); }
 
 private:
-    UniquePtr<Vector<RowID>> id_array_{};
-    UniquePtr<Vector<DistType>> distance_array_{};
+    UniquePtr<RowID[]> id_array_{};
+    UniquePtr<DistType[]> distance_array_{};
 
-    UniquePtr<heap_twin_multiple<std::greater<DistType>, DistType, RowID>> heap_twin_max_multiple_{};
+    UniquePtr<ResultHandler> result_handler_{};
 
     const DistType *queries_{};
     bool begin_{false};
 };
 
 export template <typename DistType>
-class AnnIVFFlatIP final : public KnnDistance<DistType> {
-public:
-    explicit AnnIVFFlatIP(const DistType *queries, u64 query_count, i64 top_k, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, top_k), queries_(queries) {
+using AnnIVFFlatL2 = AnnIVFFlat<CompareMax<DistType, RowID>, MetricType::kMerticL2, KnnDistanceAlgoType::kKnnFlatL2>;
 
-        id_array_ = MakeUnique<Vector<RowID>>(this->top_k_ * this->query_count_, RowID());
-        distance_array_ = MakeUnique<Vector<DistType>>(this->top_k_ * this->query_count_, InvalidValue());
-        heap_twin_min_multiple_ =
-            MakeUnique<heap_twin_multiple<std::less<DistType>, DistType, RowID>>(query_count, top_k, distance_array_->data(), id_array_->data());
-    }
-
-    static UniquePtr<AnnIVFFlatIndexData<DistType>> CreateIndex(u32 dimension, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
-        return AnnIVFFlatIP<DistType>::CreateIndex(dimension, vector_count, vectors_ptr, vector_count, vectors_ptr, partition_num);
-    }
-
-    static UniquePtr<AnnIVFFlatIndexData<DistType>>
-    CreateIndex(u32 dimension, u32 train_count, const DistType *train_ptr, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
-        auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(MetricType::kMerticInnerProduct, dimension, partition_num);
-        k_means_partition_only_centroids<f32>(MetricType::kMerticInnerProduct,
-                                              dimension,
-                                              train_count,
-                                              train_ptr,
-                                              index_data->centroids_.data(),
-                                              partition_num);
-        add_data_to_partition(dimension, vector_count, vectors_ptr, index_data.get());
-        return index_data;
-    }
-
-    void Begin() final {
-        if (begin_ || this->query_count_ == 0) {
-            return;
-        }
-        std::fill_n(distance_array_->data(), this->top_k_ * this->query_count_, InvalidValue());
-
-        begin_ = true;
-    }
-
-    void Search(const DistType *, u16, u32, u16) final { Error<ExecutorException>("Unsupported search function"); }
-
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final { Error<ExecutorException>("Unsupported search function"); }
-
-    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
-        // check metric type
-        if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
-            Error<ExecutorException>("Metric type is invalid");
-        }
-        if (!begin_) {
-            Error<ExecutorException>("IVFFlatIP isn't begin");
-        }
-        n_probes = Min(n_probes, base_ivf->partition_num_);
-        if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
-            return;
-        }
-        this->total_base_count_ += base_ivf->data_num_;
-        if (n_probes == 1) {
-            Vector<u32> assign_centroid_ids(this->query_count_);
-            search_top_1_without_dis<DistType>(this->dimension_,
-                                               this->query_count_,
-                                               this->queries_,
-                                               base_ivf->partition_num_,
-                                               base_ivf->centroids_.data(),
-                                               assign_centroid_ids.data());
-            for (u64 i = 0; i < this->query_count_; i++) {
-                u32 selected_centroid = assign_centroid_ids[i];
-                u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                const DistType *x_i = this->queries_ + i * this->dimension_;
-                const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                    DistType distance = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                    heap_twin_min_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
-                }
-            }
-        } else {
-            Vector<DistType> centroid_dists(n_probes * this->query_count_);
-            Vector<u32> centroid_ids(n_probes * this->query_count_);
-            search_top_k_with_dis(n_probes,
-                                  this->dimension_,
-                                  this->query_count_,
-                                  queries_,
-                                  base_ivf->partition_num_,
-                                  base_ivf->centroids_.data(),
-                                  centroid_ids.data(),
-                                  centroid_dists.data(),
-                                  false);
-            for (u64 i = 0; i < this->query_count_; i++) {
-                const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
-                    const u32 selected_centroid = centroid_ids[k + i * n_probes];
-                    const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                    const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                    for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                        DistType distance = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                        heap_twin_min_multiple_->add(i, distance, RowID(segment_id, base_ivf->ids_[selected_centroid][j]));
-                    }
-                }
-            }
-        }
-    }
-
-    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
-        if (bitmask.IsAllTrue()) {
-            Search(base_ivf, segment_id, n_probes);
-            return;
-        }
-        // check metric type
-        if (base_ivf->metric_ != MetricType::kMerticInnerProduct) {
-            Error<ExecutorException>("Metric type is invalid");
-        }
-        if (!begin_) {
-            Error<ExecutorException>("IVFFlatIP isn't begin");
-        }
-        n_probes = Min(n_probes, base_ivf->partition_num_);
-        if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
-            return;
-        }
-        this->total_base_count_ += base_ivf->data_num_;
-        if (n_probes == 1) {
-            Vector<u32> assign_centroid_ids(this->query_count_);
-            search_top_1_without_dis<DistType>(this->dimension_,
-                                               this->query_count_,
-                                               this->queries_,
-                                               base_ivf->partition_num_,
-                                               base_ivf->centroids_.data(),
-                                               assign_centroid_ids.data());
-            for (u64 i = 0; i < this->query_count_; i++) {
-                u32 selected_centroid = assign_centroid_ids[i];
-                u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                const DistType *x_i = this->queries_ + i * this->dimension_;
-                const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                    auto segment_offset = base_ivf->ids_[selected_centroid][j];
-                    if (bitmask.IsTrue(segment_offset)) {
-                        DistType distance = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                        heap_twin_min_multiple_->add(i, distance, RowID(segment_id, segment_offset));
-                    }
-                }
-            }
-        } else {
-            Vector<DistType> centroid_dists(n_probes * this->query_count_);
-            Vector<u32> centroid_ids(n_probes * this->query_count_);
-            search_top_k_with_dis(n_probes,
-                                  this->dimension_,
-                                  this->query_count_,
-                                  queries_,
-                                  base_ivf->partition_num_,
-                                  base_ivf->centroids_.data(),
-                                  centroid_ids.data(),
-                                  centroid_dists.data(),
-                                  false);
-            for (u64 i = 0; i < this->query_count_; i++) {
-                const DistType *x_i = queries_ + i * this->dimension_;
-                for (u32 k = 0; k < n_probes && centroid_dists[k + i * n_probes] != InvalidValue(); ++k) {
-                    const u32 selected_centroid = centroid_ids[k + i * n_probes];
-                    const u32 contain_nums = base_ivf->ids_[selected_centroid].size();
-                    const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
-                    for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
-                        auto segment_offset = base_ivf->ids_[selected_centroid][j];
-                        if (bitmask.IsTrue(segment_offset)) {
-                            DistType distance = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                            heap_twin_min_multiple_->add(i, distance, RowID(segment_id, segment_offset));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    void End() final {
-        if (!begin_)
-            return;
-
-        heap_twin_min_multiple_->sort();
-
-        begin_ = false;
-    }
-
-    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_->data(); }
-
-    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_->data(); }
-
-    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
-        if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
-        }
-        return distance_array_->data() + idx * this->top_k_;
-    }
-
-    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
-        if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
-        }
-        return id_array_->data() + idx * this->top_k_;
-    }
-
-    [[nodiscard]] static constexpr DistType InvalidValue() { return std::numeric_limits<DistType>::lowest(); }
-
-    [[nodiscard]] inline static bool CompareDist(const DistType &a, const DistType &b) { return a > b; }
-
-private:
-    UniquePtr<Vector<RowID>> id_array_{};
-    UniquePtr<Vector<DistType>> distance_array_{};
-
-    UniquePtr<heap_twin_multiple<std::less<DistType>, DistType, RowID>> heap_twin_min_multiple_{};
-
-    const DistType *queries_{};
-    bool begin_{false};
-};
+export template <typename DistType>
+using AnnIVFFlatIP = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMerticInnerProduct, KnnDistanceAlgoType::kKnnFlatIp>;
 
 }; // namespace infinity

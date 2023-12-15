@@ -19,7 +19,6 @@ import parser;
 import knn_result_handler;
 
 import infinity_exception;
-import faiss;
 import bitmask;
 import default_values;
 
@@ -34,17 +33,14 @@ public:
 
 export template <typename DataType, template <typename, typename> typename C>
 class MergeKnn final : public MergeKnnBase {
-    using HeapResultHandler = NewHeapResultHandler<C<DataType, RowID>>;
-    using SingleResultHandler = HeapResultHandler::HeapSingleResultHandler;
-
+    using ResultHandler = HeapResultHandler<C<DataType, RowID>>;
     using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
 
 public:
     explicit MergeKnn(u64 query_count, u64 topk)
-        : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUnique<RowID[]>(topk * query_count)),
-          distance_array_(MakeUnique<DataType[]>(topk * query_count)) {
-        heap_result_handler_ = MakeUnique<HeapResultHandler>(query_count, this->distance_array_.get(), this->idx_array_.get(), topk);
-        single_result_handler_ = MakeUnique<SingleResultHandler>(heap_result_handler_.get(), query_count);
+        : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUniqueForOverwrite<RowID[]>(topk * query_count)),
+          distance_array_(MakeUniqueForOverwrite<DataType[]>(topk * query_count)) {
+        result_handler_ = MakeUnique<ResultHandler>(query_count, topk, this->distance_array_.get(), this->idx_array_.get());
     }
 
     ~MergeKnn() final = default;
@@ -79,18 +75,11 @@ private:
     UniquePtr<DataType[]> distance_array_{};
 
 private:
-    UniquePtr<HeapResultHandler> heap_result_handler_{};
-    UniquePtr<SingleResultHandler> single_result_handler_{};
+    UniquePtr<ResultHandler> result_handler_{};
 };
 
 template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *query,
-                                   const DataType *data,
-                                   u32 dim,
-                                   DistFunc dist_f,
-                                   u16 row_cnt,
-                                   u32 segment_id,
-                                   u16 block_id) {
+void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id) {
     this->total_count_ += row_cnt;
     u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
     for (u64 i = 0; i < this->query_count_; ++i) {
@@ -98,7 +87,7 @@ void MergeKnn<DataType, C>::Search(const DataType *query,
         const DataType *y_j = data;
         for (u16 j = 0; j < row_cnt; ++j, y_j += dim) {
             auto dist = dist_f(x_i, y_j, dim);
-            single_result_handler_->add_result(dist, RowID(segment_id, segment_offset_start + j), i);
+            result_handler_->AddResult(i, dist, RowID(segment_id, segment_offset_start + j));
         }
     }
 }
@@ -126,7 +115,7 @@ void MergeKnn<DataType, C>::Search(const DataType *query,
                     ++this->total_count_;
                 }
                 auto dist = dist_f(x_i, y_j, dim);
-                single_result_handler_->add_result(dist, RowID(segment_id, segment_offset_start + j), i);
+                result_handler_->AddResult(i, dist, RowID(segment_id, segment_offset_start + j));
             }
         }
     }
@@ -139,7 +128,7 @@ void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u
         const DataType *d = dist + i * topk_;
         const RowID *r = row_ids + i * topk_;
         for (u16 j = 0; j < count; j++) {
-            single_result_handler_->add_result(d[j], r[j], i);
+            result_handler_->AddResult(i, d[j], r[j]);
         }
     }
 }
@@ -149,9 +138,7 @@ void MergeKnn<DataType, C>::Begin() {
     if (this->begin_ || this->query_count_ == 0) {
         return;
     }
-    for (SizeT i = 0; i < this->query_count_; i++) {
-        single_result_handler_->begin(i);
-    }
+    result_handler_->Begin();
     this->begin_ = true;
 }
 
@@ -160,21 +147,19 @@ void MergeKnn<DataType, C>::End() {
     if (!this->begin_)
         return;
 
-    for (u64 i = 0; i < this->query_count_; ++i) {
-        single_result_handler_->end(i);
-    }
+    result_handler_->End();
 
     this->begin_ = false;
 }
 
 template <typename DataType, template <typename, typename> typename C>
 DataType *MergeKnn<DataType, C>::GetDistances() const {
-    return heap_result_handler_->heap_dis_tab;
+    return distance_array_.get();
 }
 
 template <typename DataType, template <typename, typename> typename C>
 RowID *MergeKnn<DataType, C>::GetIDs() const {
-    return heap_result_handler_->heap_ids_tab;
+    return idx_array_.get();
 }
 
 template <typename DataType, template <typename, typename> typename C>
@@ -182,7 +167,7 @@ DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         Error<ExecutorException>("Query index exceeds the limit");
     }
-    return heap_result_handler_->heap_dis_tab + idx * this->topk_;
+    return distance_array_.get() + idx * this->topk_;
 }
 
 template <typename DataType, template <typename, typename> typename C>
@@ -190,7 +175,7 @@ RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         Error<ExecutorException>("Query index exceeds the limit");
     }
-    return heap_result_handler_->heap_ids_tab + idx * this->topk_;
+    return idx_array_.get() + idx * this->topk_;
 }
 
 template class MergeKnn<f32, CompareMax>;
