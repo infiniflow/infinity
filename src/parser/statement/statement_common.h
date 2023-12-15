@@ -61,9 +61,4 @@ struct IfNotExistsInfo {
     bool if_not_exists_{false};
     std::string info_{};
 };
-
-struct OptionalWithInfo {
-    bool with_{false};
-    std::vector<InitParameter *> *init_parameters_{};
-};
 } // namespace infinity

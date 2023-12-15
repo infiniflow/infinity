@@ -365,9 +365,7 @@ union SQLSTYPE
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-    infinity::OptionalWithInfo*   optional_with_info_t;
-
-#line 371 "parser.h"
+#line 369 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;
