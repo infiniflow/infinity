@@ -18,7 +18,8 @@ module;
 #include <immintrin.h>
 #include <limits>
 import stl;
-import use_mlas;
+import knn_result_handler;
+import mlas_matrix_multiply;
 import vector_distance;
 import heap_twin_operation;
 
@@ -42,16 +43,16 @@ void search_top_k_with_sgemm(u32 k,
         return;
     UniquePtr<f32[]> distances_holder;
     if (distances == nullptr) {
-        distances_holder = MakeUnique<f32[]>(nx * k);
+        distances_holder = MakeUniqueForOverwrite<f32[]>(nx * k);
         distances = distances_holder.get();
     }
-    heap_twin_multiple<std::greater<f32>, f32, ID> heap(nx, k, distances, labels);
-    std::fill_n(distances, nx * k, std::numeric_limits<f32>::max());
-    Vector<f32> square_x(nx);
-    Vector<f32> square_y(ny);
-    Vector<f32> x_y_inner_product_buffer(block_size_x * block_size_y);
-    L2NormsSquares(square_x.data(), x, dimension, nx);
-    L2NormsSquares(square_y.data(), y, dimension, ny);
+    heap_twin_multiple<CompareMax<f32, ID>> heap(nx, k, distances, labels);
+    heap.initialize();
+    auto square_x = MakeUniqueForOverwrite<f32[]>(nx);
+    auto square_y = MakeUniqueForOverwrite<f32[]>(ny);
+    auto x_y_inner_product_buffer = MakeUniqueForOverwrite<f32[]>(block_size_x * block_size_y);
+    L2NormsSquares(square_x.get(), x, dimension, nx);
+    L2NormsSquares(square_y.get(), y, dimension, ny);
     for (u32 x_part_begin = 0; x_part_begin < nx; x_part_begin += block_size_x) {
         u32 x_part_end = std::min(nx, x_part_begin + block_size_x);
         for (u32 y_part_begin = 0; y_part_begin < ny; y_part_begin += block_size_y) {
@@ -63,10 +64,10 @@ void search_top_k_with_sgemm(u32 k,
                                                            x_part_size,
                                                            y_part_size,
                                                            dimension,
-                                                           x_y_inner_product_buffer.data());
+                                                           x_y_inner_product_buffer.get());
             for (u32 i = 0; i < x_part_size; ++i) {
                 u32 x_id = i + x_part_begin;
-                float *ip_line = x_y_inner_product_buffer.data() + i * y_part_size;
+                float *ip_line = x_y_inner_product_buffer.get() + i * y_part_size;
 
                 _mm_prefetch(ip_line, _MM_HINT_NTA);
                 _mm_prefetch(ip_line + 16, _MM_HINT_NTA);
@@ -84,8 +85,8 @@ void search_top_k_with_sgemm(u32 k,
                     _mm_prefetch(ip_line + 32, _MM_HINT_NTA);
                     _mm_prefetch(ip_line + 48, _MM_HINT_NTA);
 
-                    const __m256 y_norm_0 = _mm256_loadu_ps(square_y.data() + j_id + 0);
-                    const __m256 y_norm_1 = _mm256_loadu_ps(square_y.data() + j_id + 8);
+                    const __m256 y_norm_0 = _mm256_loadu_ps(square_y.get() + j_id + 0);
+                    const __m256 y_norm_1 = _mm256_loadu_ps(square_y.get() + j_id + 8);
 
                     const __m256 ip_0 = _mm256_loadu_ps(ip_line + 0);
                     const __m256 ip_1 = _mm256_loadu_ps(ip_line + 8);
