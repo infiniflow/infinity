@@ -1742,7 +1742,7 @@ operand: '(' expr ')' {
 | query_expr
 | fusion_expr
 
-knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' {
+knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
     $$ = knn_expr;
 
@@ -1890,6 +1890,7 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
         YYERROR;
     }
     knn_expr->topn_ = $11;
+    knn_expr->opt_params_ = $13;
 }
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
@@ -2573,7 +2574,6 @@ if_not_exists_info : if_not_exists IDENTIFIER {
     $$ = new infinity::IfNotExistsInfo();
 }
 
-// TODO shenyushi -1: Can no parameter be represented as this?
 with_index_param_list : WITH '(' index_param_list ')' {
     $$ = std::move($3);
 }

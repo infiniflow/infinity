@@ -255,16 +255,24 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     SizeT start_pos = 0;
     while (true) {
         SizeT end_pos = jsonl_str.find('\n', start_pos);
+        if (end_pos == String::npos) {
+            end_pos = file_size;
+        }
+        if (end_pos == start_pos) {
+            break;
+        }
         StringView json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
         start_pos = end_pos + 1;
         Json line_json = Json::parse(json_sv);
 
         if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+            LOG_INFO(Format("Segment {} saved", segment_entry->segment_id_));
             SaveSegmentData(txn_store, segment_entry);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), txn->GetBufferMgr());
         }
         BlockEntry *block_entry = segment_entry->block_entries_.back().get();
         if (BlockEntry::Room(block_entry) <= 0) {
+            LOG_INFO(Format("Block {} saved", block_entry->block_id_));
             segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
                                                                               segment_entry->block_entries_.size(),
                                                                               0,
@@ -277,9 +285,6 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         ++block_entry->row_count_;
         ++segment_entry->row_count_;
         ++table_collection_entry_->row_count_;
-        if (end_pos == String::npos) {
-            break;
-        }
     }
     if (segment_entry->row_count_ > 0) {
         SaveSegmentData(txn_store, segment_entry);

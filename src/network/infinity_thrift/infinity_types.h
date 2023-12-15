@@ -200,6 +200,8 @@ class ColumnExpr;
 
 class EmbeddingData;
 
+class InitParameter;
+
 class KnnExpr;
 
 class MatchExpr;
@@ -247,8 +249,6 @@ class DescribeTableRequest;
 class DescribeTableResponse;
 
 class GetTableRequest;
-
-class InitParameter;
 
 class IndexInfo;
 
@@ -949,13 +949,64 @@ void swap(EmbeddingData &a, EmbeddingData &b);
 
 std::ostream& operator<<(std::ostream& out, const EmbeddingData& obj);
 
+typedef struct _InitParameter__isset {
+  _InitParameter__isset() : param_name(false), param_value(false) {}
+  bool param_name :1;
+  bool param_value :1;
+} _InitParameter__isset;
+
+class InitParameter : public virtual ::apache::thrift::TBase {
+ public:
+
+  InitParameter(const InitParameter&);
+  InitParameter& operator=(const InitParameter&);
+  InitParameter() noexcept
+                : param_name(),
+                  param_value() {
+  }
+
+  virtual ~InitParameter() noexcept;
+  std::string param_name;
+  std::string param_value;
+
+  _InitParameter__isset __isset;
+
+  void __set_param_name(const std::string& val);
+
+  void __set_param_value(const std::string& val);
+
+  bool operator == (const InitParameter & rhs) const
+  {
+    if (!(param_name == rhs.param_name))
+      return false;
+    if (!(param_value == rhs.param_value))
+      return false;
+    return true;
+  }
+  bool operator != (const InitParameter &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InitParameter & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(InitParameter &a, InitParameter &b);
+
+std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
+
 typedef struct _KnnExpr__isset {
-  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false) {}
+  _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true) {}
   bool column_expr :1;
   bool embedding_data :1;
   bool embedding_data_type :1;
   bool distance_type :1;
   bool topn :1;
+  bool opt_params :1;
 } _KnnExpr__isset;
 
 class KnnExpr : public virtual ::apache::thrift::TBase {
@@ -967,6 +1018,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
           : embedding_data_type(static_cast<ElementType::type>(0)),
             distance_type(static_cast<KnnDistanceType::type>(0)),
             topn(0) {
+
   }
 
   virtual ~KnnExpr() noexcept;
@@ -983,6 +1035,7 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
    */
   KnnDistanceType::type distance_type;
   int64_t topn;
+  std::vector<InitParameter>  opt_params;
 
   _KnnExpr__isset __isset;
 
@@ -996,6 +1049,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
 
   void __set_topn(const int64_t val);
 
+  void __set_opt_params(const std::vector<InitParameter> & val);
+
   bool operator == (const KnnExpr & rhs) const
   {
     if (!(column_expr == rhs.column_expr))
@@ -1007,6 +1062,8 @@ class KnnExpr : public virtual ::apache::thrift::TBase {
     if (!(distance_type == rhs.distance_type))
       return false;
     if (!(topn == rhs.topn))
+      return false;
+    if (!(opt_params == rhs.opt_params))
       return false;
     return true;
   }
@@ -2322,56 +2379,6 @@ class GetTableRequest : public virtual ::apache::thrift::TBase {
 void swap(GetTableRequest &a, GetTableRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const GetTableRequest& obj);
-
-typedef struct _InitParameter__isset {
-  _InitParameter__isset() : param_name(false), param_value(false) {}
-  bool param_name :1;
-  bool param_value :1;
-} _InitParameter__isset;
-
-class InitParameter : public virtual ::apache::thrift::TBase {
- public:
-
-  InitParameter(const InitParameter&);
-  InitParameter& operator=(const InitParameter&);
-  InitParameter() noexcept
-                : param_name(),
-                  param_value() {
-  }
-
-  virtual ~InitParameter() noexcept;
-  std::string param_name;
-  std::string param_value;
-
-  _InitParameter__isset __isset;
-
-  void __set_param_name(const std::string& val);
-
-  void __set_param_value(const std::string& val);
-
-  bool operator == (const InitParameter & rhs) const
-  {
-    if (!(param_name == rhs.param_name))
-      return false;
-    if (!(param_value == rhs.param_value))
-      return false;
-    return true;
-  }
-  bool operator != (const InitParameter &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const InitParameter & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(InitParameter &a, InitParameter &b);
-
-std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
 typedef struct _IndexInfo__isset {
   _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true) {}
