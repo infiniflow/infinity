@@ -19,7 +19,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 
-import infinity
 from benchmark.test_benchmark import trace_unhandled_exceptions
 from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
@@ -150,11 +149,20 @@ def test_read_groundtruth():
 @trace_unhandled_exceptions
 def work(query_vec, topk, metric_type, column_name, data_type):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", "knn_benchmark")
+    table = RemoteTable(conn, "default", "sift_benchmark")
     query_builder = InfinityThriftQueryBuilder(table)
-    query_builder.output(["_row_id_"])
+    query_builder.output(["_row_id"])
     query_builder.knn(column_name, query_vec, data_type, metric_type, topk)
-    query_builder.to_df()
+    query_builder.to_result()
+
+
+def find_path():
+    path = os.getcwd()
+    while True:
+        if os.path.exists(path + "/sift_1m"):
+            break
+        path = os.path.dirname(path)
+    return path + "/sift_1m"
 
 
 class TestQueryBenchmark:
@@ -163,10 +171,10 @@ class TestQueryBenchmark:
         round = 1
         total_times = 10000
         client_num = 25
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+        sift_query_path = find_path() + "/sift_query.fvecs"
         if not os.path.exists(sift_query_path):
             print(f"File: {sift_query_path} doesn't exist")
-            return
+            raise Exception(f"File: {sift_query_path} doesn't exist")
 
         start = time.time()
 
@@ -192,7 +200,7 @@ class TestQueryBenchmark:
 
     def test_thread_pool(self):
         total_times = 10000
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+        sift_query_path = find_path() + "/sift_1m/sift_query.fvecs"
         if not os.path.exists(sift_query_path):
             print(f"File: {sift_query_path} doesn't exist")
             return
@@ -221,13 +229,13 @@ class TestQueryBenchmark:
         print(">>> Query Benchmark Start <<<")
         print(f"Thread Num: {thread_num}, Times: {total_times}")
 
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
+        sift_query_path = find_path() + "/sift_query.fvecs"
         if not os.path.exists(sift_query_path):
             print(f"File: {sift_query_path} doesn't exist")
             return
 
         conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", "knn_benchmark")
+        table = RemoteTable(conn, "default", "sift_benchmark")
         queries = fvecs_read_all(sift_query_path)
         query_results = [[] for _ in range(len(queries))]
 
@@ -251,7 +259,7 @@ class TestQueryBenchmark:
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-        read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
+        read_groundtruth_path = os.getcwd() + "/sift_1m/sift_groundtruth.ivecs"
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
 
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
@@ -266,85 +274,3 @@ class TestQueryBenchmark:
         print(f"Total Dur: {dur}")
         print(f"QPS: {qps}")
 
-    def test_one_query(self):
-        thread_num = 1
-        total_times = 10000
-
-        print(">>> Query Benchmark Start <<<")
-        print(f"Thread Num: {thread_num}, Times: {total_times}")
-
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
-        if not os.path.exists(sift_query_path):
-            print(f"File: {sift_query_path} doesn't exist")
-            return
-
-        conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", "knn_benchmark")
-        queries = fvecs_read_all(sift_query_path)
-        query_results = [[] for _ in range(len(queries))]
-
-        dur = 0.0
-        for idx, query_vec in enumerate(queries):
-
-            start = time.time()
-
-            query_builder = InfinityThriftQueryBuilder(table)
-            query_builder.output(["_row_id"])
-            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
-            res, _ = query_builder.to_result()
-            end = time.time()
-
-            diff = end - start
-            dur += diff
-
-            res_list = res["ROW_ID"]
-            # print(len(res_list))
-
-            for i in range(len(res_list)):
-                query_results[idx].append(res_list[i][1])
-
-            break
-
-        read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
-        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
-
-        recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
-                                                               ground_truth_sets_100, query_results)
-        print("recall_1: ", recall_1)
-        print("recall_10: ", recall_10)
-        print("recall_100: ", recall_100)
-
-        print(">>> Query Benchmark End <<<")
-        qps = total_times / dur
-        print(f"Total Times: {total_times}")
-        print(f"Total Dur: {dur}")
-        print(f"QPS: {qps}")
-
-    def test_query_2(self):
-        thread_num = 1
-        total_times = 1
-
-        print(">>> Query Benchmark Start <<<")
-        print(f"Thread Num: {thread_num}, Times: {total_times}")
-        start = time.time()
-
-        sift_query_path = os.getcwd() + "/sift_1m/sift/query.fvecs"
-        if not os.path.exists(sift_query_path):
-            print(f"File: {sift_query_path} doesn't exist")
-            return
-
-        for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-            infinity_obj = infinity.connect(REMOTE_HOST)
-            db_obj = infinity_obj.get_database("default")
-
-            assert db_obj is not None
-            if idx == total_times:
-                assert idx == total_times
-                break
-        end = time.time()
-        dur = end - start
-        print(">>> Query Benchmark End <<<")
-        qps = total_times / dur
-        print(f"Total Times: {total_times}")
-        print(f"Total Dur: {dur}")
-        print(f"QPS: {qps}")
