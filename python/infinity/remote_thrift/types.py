@@ -14,9 +14,8 @@
 
 import struct
 from collections import defaultdict
-from typing import Any
+from typing import Any, Tuple, Dict, List
 
-import pandas as pd
 import polars as pl
 from numpy import dtype
 
@@ -200,8 +199,9 @@ def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> tty
     raise KeyError(f"column name {column_name} not found in column defs")
 
 
-def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
+def build_result(res: ttypes.SelectResponse) -> tuple[dict[str, list[Any]], dict[str, Any]]:
     data_dict = {}
+    data_type_dict = {}
     column_counter = defaultdict(int)
     for column_def, column_field in zip(res.column_defs, res.column_fields):
         original_column_name = column_def.name
@@ -215,7 +215,8 @@ def build_result(res: ttypes.SelectResponse) -> pd.DataFrame:
         column_vectors = column_field.column_vectors
 
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
-        data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
-        data_dict[column_name] = data_series
+        # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
+        data_dict[column_name] = data_list
+        data_type_dict[column_name] = column_data_type
 
-    return pd.DataFrame(data_dict)
+    return data_dict, data_type_dict

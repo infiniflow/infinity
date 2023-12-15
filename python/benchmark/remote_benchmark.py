@@ -4,39 +4,26 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import argparse
+import functools
 import multiprocessing
 import os
 import struct
 import time
-from concurrent.futures import ThreadPoolExecutor
+import traceback
 
-import polars as pl
-
-from benchmark.test_benchmark import trace_unhandled_exceptions
-from benchmark.test_benchmark_import import find_path
 from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
-
-
-def fvecs_read(filename):
-    with open(filename, 'rb') as f:
-        while True:
-            try:
-                dims = struct.unpack('i', f.read(4))[0]
-                vec = struct.unpack('{}f'.format(dims), f.read(4 * dims))
-                assert dims == len(vec)
-                yield list(vec)
-            except struct.error:
-                break
 
 
 def fvecs_read_all(filename):
@@ -87,13 +74,6 @@ def read_groundtruth(filename):
     return ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100
 
 
-def calculate_recall(ground_truth_sets, result_sets):
-    recall = 0.0
-    for i in range(len(ground_truth_sets)):
-        if ground_truth_sets[i] in result_sets:
-            recall += 1
-    return recall / len(result_sets) * len(ground_truth_sets)
-
 
 def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
     correct_1 = 0.0
@@ -120,31 +100,16 @@ def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth
     return recall_1, recall_10, recall_100
 
 
-def test_read_all():
-    sift_query_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
-    vectors = fvecs_read_all(sift_query_path)
-    print(len(vectors))
-    print(pl.DataFrame(vectors))
+def trace_unhandled_exceptions(func):
+    @functools.wraps(func)
+    def wrapped_func(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except:
+            print('Exception in ' + func.__name__)
+            traceback.print_exc()
 
-
-def test_read():
-    sift_query_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
-    for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-        print(pl.DataFrame([query_vec]))
-        if idx == 10:
-            assert idx == 10
-            break
-
-
-def test_read_groundtruth():
-    read_groundtruth_path = os.getcwd() + "/sift_1m/sift/l2_groundtruth.ivecs"
-    ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
-    print(len(ground_truth_sets_1))
-    print(len(ground_truth_sets_10))
-    print(len(ground_truth_sets_100))
-    print(len(ground_truth_sets_1[0]))
-    print(len(ground_truth_sets_10[0]))
-    print(len(ground_truth_sets_100[0]))
+    return wrapped_func
 
 
 @trace_unhandled_exceptions
@@ -157,74 +122,55 @@ def work(query_vec, topk, metric_type, column_name, data_type):
     query_builder.to_result()
 
 
-class TestQueryBenchmark:
+def fvecs_read(filename):
+    with open(filename, 'rb') as f:
+        while True:
+            try:
+                dims = struct.unpack('i', f.read(4))[0]
+                vec = struct.unpack('{}f'.format(dims), f.read(4 * dims))
+                assert dims == len(vec)
+                yield list(vec)
+            except struct.error:
+                break
 
-    def test_process_pool(self):
-        round = 1
-        total_times = 10000
-        client_num = 25
-        sift_query_path = find_path() + "/sift_query.fvecs"
-        if not os.path.exists(sift_query_path):
-            print(f"File: {sift_query_path} doesn't exist")
-            raise Exception(f"File: {sift_query_path} doesn't exist")
 
+def process_pool(threads, rounds, path):
+    sift_query_path = path + "/sift_query.fvecs"
+    if not os.path.exists(sift_query_path):
+        print(f"File: {sift_query_path} doesn't exist")
+        raise Exception(f"File: {sift_query_path} doesn't exist")
+
+    results = []
+
+    for i in range(rounds):
         start = time.time()
-
-        p = multiprocessing.Pool(client_num)
-
-        for i in range(round):
-            for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-                p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float"))
-                if idx == total_times:
-                    assert idx == total_times
-                    break
-
+        p = multiprocessing.Pool(threads)
+        for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
+            p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float"))
         p.close()
         p.join()
 
         end = time.time()
         dur = end - start
-        print(">>> Query Benchmark End <<<")
-        print(f"Total Times: {total_times * round}")
-        print(f"Total Dur: {dur}")
-        qps = (total_times * round) / dur
-        print(f"QPS: {qps}")
+        results.append(f"Round {i + 1}:")
+        results.append(f"Total Dur: {dur}")
+        qps = 10000 / dur
+        results.append(f"QPS: {qps}")
 
-    def test_thread_pool(self):
-        total_times = 10000
-        sift_query_path = find_path() + "/sift_1m/sift_query.fvecs"
-        if not os.path.exists(sift_query_path):
-            print(f"File: {sift_query_path} doesn't exist")
-            return
+    for result in results:
+        print(result)
 
+
+def one_thread(rounds, path):
+    sift_query_path = path + "/sift_query.fvecs"
+    if not os.path.exists(sift_query_path):
+        print(f"File: {sift_query_path} doesn't exist")
+        raise Exception(f"File: {sift_query_path} doesn't exist")
+
+    results = []
+
+    for i in range(rounds):
         start = time.time()
-
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-                executor.submit(work, query_vec, 100, "l2", "col1", "float")
-                if idx == total_times:
-                    assert idx == total_times
-                    break
-
-        end = time.time()
-        dur = end - start
-        print(">>> Query Benchmark End <<<")
-        print(f"Total Times: {total_times}")
-        print(f"Total Dur: {dur}")
-        qps = total_times / dur
-        print(f"QPS: {qps}")
-
-    def test_query(self):
-        thread_num = 1
-        total_times = 10000
-
-        print(">>> Query Benchmark Start <<<")
-        print(f"Thread Num: {thread_num}, Times: {total_times}")
-
-        sift_query_path = find_path() + "/sift_query.fvecs"
-        if not os.path.exists(sift_query_path):
-            print(f"File: {sift_query_path} doesn't exist")
-            return
 
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", "sift_benchmark")
@@ -251,17 +197,64 @@ class TestQueryBenchmark:
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-        read_groundtruth_path = os.getcwd() + "/sift_1m/sift_groundtruth.ivecs"
-        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(read_groundtruth_path)
+
+        ground_truth_path = path + "/sift_groundtruth.ivecs"
+        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
                                                                ground_truth_sets_100, query_results)
-        print("recall_1: ", recall_1)
-        print("recall_10: ", recall_10)
-        print("recall_100: ", recall_100)
+        results.append(f"Round {i + 1}:")
+        results.append(f"recall_1: {recall_1}")
+        results.append(f"recall_10: {recall_10}")
+        results.append(f"recall_100: {recall_100}")
+        results.append(f"Total Dur: {dur}")
+        qps = 10000 / dur
+        results.append(f"QPS: {qps}")
 
-        print(">>> Query Benchmark End <<<")
-        qps = total_times / dur
-        print(f"Total Times: {total_times}")
-        print(f"Total Dur: {dur}")
-        print(f"QPS: {qps}")
+    for result in results:
+        print(result)
+
+
+def benchmark(threads, rounds, path):
+    if threads > 1:
+        print(f"Multi-threads: {threads}")
+        print(f"Rounds: {rounds}")
+        process_pool(threads, rounds, path)
+
+    else:
+        print(f"Single-thread")
+        print(f"Rounds: {rounds}")
+        one_thread(rounds, path)
+
+
+if __name__ == '__main__':
+    current_path = os.getcwd()
+    parent_path = os.path.dirname(current_path)
+    parent_path = os.path.dirname(parent_path)
+
+    print(f"Current Path: {current_path}")
+    print(f"Parent Path: {parent_path}")
+
+    data_dir = parent_path + "/test/data/benchmark/sift_1m"
+    print(f"Data Dir: {data_dir}")
+
+    parser = argparse.ArgumentParser(description="Benchmark Infinity")
+
+    parser.add_argument(
+        "-t",
+        "--threads",
+        type=int,
+        default=1,
+        dest="threads",
+    )
+    parser.add_argument(
+        "-r",
+        "--rounds",
+        type=int,
+        default=1,
+        dest="rounds",
+    )
+
+    args = parser.parse_args()
+
+    benchmark(args.threads, args.rounds, path=data_dir)

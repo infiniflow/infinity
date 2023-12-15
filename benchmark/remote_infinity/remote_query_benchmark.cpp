@@ -232,11 +232,13 @@ int main() {
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function);
         profiler.End();
+
         results.push_back(infinity::Format("Total cost: {}", profiler.ElapsedToString(1000)));
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
             for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
                 auto &result = query_results[query_idx];
+
                 auto &ground_truth_1 = ground_truth_sets_1[query_idx];
                 auto &ground_truth_10 = ground_truth_sets_10[query_idx];
                 auto &ground_truth_100 = ground_truth_sets_100[query_idx];
