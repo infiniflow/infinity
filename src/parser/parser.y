@@ -163,8 +163,6 @@ struct SQL_LTYPE {
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
-
-    infinity::OptionalWithInfo*   optional_with_info_t;
 }
 
 %destructor {
@@ -200,13 +198,6 @@ struct SQL_LTYPE {
         delete ($$);
     }
 } <if_not_exists_info_t>
-
-%destructor {
-    fprintf(stderr, "destroy optional with info\n");
-    if (($$) != nullptr) {
-        delete ($$);
-    }
-} <optional_with_info_t>
 
 %destructor {
     fprintf(stderr, "destroy table element array\n");
@@ -448,8 +439,6 @@ struct SQL_LTYPE {
 
 /* %type <if_exists_info_t> if_exists_info */
 %type <if_not_exists_info_t> if_not_exists_info 
-
-%type <optional_with_info_t> optional_with_info
 
 /*
  * Operator precedence, low to high
@@ -1753,7 +1742,7 @@ operand: '(' expr ')' {
 | query_expr
 | fusion_expr
 
-knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' optional_with_info {
+knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     infinity::KnnExpr* knn_expr = new infinity::KnnExpr();
     $$ = knn_expr;
 
@@ -1901,9 +1890,7 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
         YYERROR;
     }
     knn_expr->topn_ = $11;
-    if ($13->with_) {
-        knn_expr->opt_params_ = $13->init_parameters_;
-    }
+    knn_expr->opt_params_ = $13;
 }
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
@@ -2585,15 +2572,6 @@ if_not_exists_info : if_not_exists IDENTIFIER {
 }
 | {
     $$ = new infinity::IfNotExistsInfo();
-}
-
-optional_with_info : with_index_param_list {
-    $$ = new infinity::OptionalWithInfo();
-    $$->with_ = true;
-    $$->init_parameters_ = $1;
-}
-| {
-    $$ = new infinity::OptionalWithInfo();
 }
 
 with_index_param_list : WITH '(' index_param_list ')' {

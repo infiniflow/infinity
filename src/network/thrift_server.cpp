@@ -831,12 +831,19 @@ private:
     }
 
     static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
-        auto knn_expr = new KnnExpr();
+        auto knn_expr = new KnnExpr(false);
         knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
         std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
         knn_expr->topn_ = expr.topn;
+        knn_expr->opt_params_ = new Vector<InitParameter *>();
+        for (auto &param : expr.opt_params) {
+            auto init_parameter = new InitParameter();
+            init_parameter->param_name_ = param.param_name;
+            init_parameter->param_value_ = param.param_value;
+            knn_expr->opt_params_->emplace_back(init_parameter);
+        }
         return knn_expr;
     }
 

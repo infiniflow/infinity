@@ -124,6 +124,11 @@ union EmbeddingData {
 7: list<double> f64_array_value,
 }
 
+struct InitParameter {
+1: string param_name,
+2: string param_value,
+}
+
 struct KnnExpr {
 1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
@@ -288,11 +293,6 @@ struct GetTableRequest {
 1: string db_name,
 2: string table_name,
 3: i64 session_id,
-}
-
-struct InitParameter {
-1: string param_name,
-2: string param_value,
 }
 
 enum IndexType {

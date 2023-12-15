@@ -30,7 +30,7 @@ enum class KnnDistanceType {
 
 class KnnExpr : public ParsedExpr {
 public:
-    explicit KnnExpr() : ParsedExpr(ParsedExprType::kKnn) {}
+    explicit KnnExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kKnn), own_memory_(own_memory) {}
 
     ~KnnExpr() override;
 
@@ -40,6 +40,8 @@ public:
     static std::string KnnDistanceType2Str(KnnDistanceType knn_distance_type);
 
 public:
+    const bool own_memory_;
+
     ParsedExpr *column_expr_{};
     void *embedding_data_ptr_{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
     int64_t dimension_{};

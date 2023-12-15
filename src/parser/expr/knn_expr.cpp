@@ -23,6 +23,9 @@ KnnExpr::~KnnExpr() {
         column_expr_ = nullptr;
     }
 
+    if (!own_memory_) {
+        return;
+    }
     if (embedding_data_ptr_ != nullptr) {
         switch (embedding_data_type_) {
             case EmbeddingDataType::kElemDouble: {
