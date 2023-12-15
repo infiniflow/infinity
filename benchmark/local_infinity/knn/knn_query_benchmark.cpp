@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
                     query_results[query_idx].emplace_back(data[i].ToUint64());
                 }
             }
-            delete[] embedding_data_ptr;
+//            delete[] embedding_data_ptr;
         };
         BaseProfiler profiler;
         profiler.Begin();
