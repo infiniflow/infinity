@@ -48,7 +48,7 @@ public:
         : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
           ef_construction_(ef_construction), ef_(ef) {}
 
-    ~IndexHnsw() = default;
+    ~IndexHnsw() final = default;
 
     bool operator==(const IndexHnsw &other) const;
 
