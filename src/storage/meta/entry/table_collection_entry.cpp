@@ -500,8 +500,10 @@ TableCollectionEntry::Deserialize(const Json &table_entry_json, TableCollectionM
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
     table_entry->deleted_ = deleted;
 
-    if (table_entry->deleted_ && !table_entry->segment_map_.empty()) {
-        Error<StorageException>("deleted table should have no segment");
+    if (table_entry->deleted_) {
+        if (!table_entry->segment_map_.empty()) {
+            Error<StorageException>("deleted table should have no segment");
+        }
     } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
         Error<StorageException>("table segment 0 should be valid");
     }
