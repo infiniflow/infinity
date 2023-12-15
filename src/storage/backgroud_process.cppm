@@ -30,12 +30,12 @@ public:
     void Stop();
 
 public:
-    void Submit(UniquePtr<BGTask> bg_task);
+    void Submit(SharedPtr<BGTask> bg_task);
 
 private:
     void Process();
 
-    BlockingQueue<UniquePtr<BGTask>> task_queue_;
+    BlockingQueue<SharedPtr<BGTask>> task_queue_;
     Thread processor_thread_{};
 
     WalManager* wal_manager_{};

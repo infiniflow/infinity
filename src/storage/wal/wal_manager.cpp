@@ -265,7 +265,7 @@ void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
     while (running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        storage_->bg_processor()->Submit(MakeUnique<TryCheckpointTask>(true));
+        storage_->bg_processor()->Submit(MakeShared<TryCheckpointTask>(true));
     }
 }
 
