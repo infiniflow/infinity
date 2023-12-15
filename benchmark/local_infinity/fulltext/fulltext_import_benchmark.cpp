@@ -39,28 +39,24 @@ int main() {
         return 1;
     }
 
-    std::vector<std::unique_ptr<ColumnDef>> column_definations;
     std::vector<ColumnDef *> column_defs;
     {
         std::string col1_name = "_id";
         auto col1_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col1_def = std::make_unique<ColumnDef>(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
-        column_definations.push_back(std::move(col1_def));
-        column_defs.push_back(column_definations.back().get());
+        auto col1_def = new ColumnDef(0, col1_type, std::move(col1_name), std::unordered_set<ConstraintType>());
+        column_defs.push_back(col1_def);
     }
     {
         std::string col2_name = "title";
         auto col2_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col2_def = std::make_unique<ColumnDef>(0, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
-        column_definations.push_back(std::move(col2_def));
-        column_defs.push_back(column_definations.back().get());
+        auto col2_def = new ColumnDef(0, col2_type, std::move(col2_name), std::unordered_set<ConstraintType>());
+        column_defs.push_back(col2_def);
     }
     {
         std::string col3_name = "text";
         auto col3_type = std::make_shared<DataType>(LogicalType::kVarchar);
-        auto col3_def = std::make_unique<ColumnDef>(0, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
-        column_definations.push_back(std::move(col3_def));
-        column_defs.push_back(column_definations.back().get());
+        auto col3_def = new ColumnDef(0, col3_type, std::move(col3_name), std::unordered_set<ConstraintType>());
+        column_defs.push_back(col3_def);
     }
 
     std::string db_name = "default";
