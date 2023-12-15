@@ -187,8 +187,8 @@ int main(int argc, char *argv[]) {
             knn_expr->dimension_ = dimension;
             knn_expr->distance_type_ = KnnDistanceType::kL2;
             knn_expr->topn_ = topk;
-            knn_expr->init_parameters_ = new std::vector<InitParameter>();
-            knn_expr->init_parameters_->push_back(new InitParameter("ef", std::to_string(ef)));
+            knn_expr->opt_params_ = new std::vector<InitParameter *>();
+            knn_expr->opt_params_->push_back(new InitParameter("ef", std::to_string(ef)));
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             auto embedding_data_ptr = new float[dimension];
             knn_expr->embedding_data_ptr_ = embedding_data_ptr;
