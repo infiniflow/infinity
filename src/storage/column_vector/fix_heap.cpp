@@ -31,16 +31,14 @@ Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
         Error<ExecutorException>(Format("Attempt to allocate memory with size: {} as the string heap", nbytes));
     }
 
-    u64 start_chunk_id = INITIAL_VECTOR_CHUNK_ID;
-    u64 start_chunk_offset = INVALID_CHUNK_OFFSET;
-
     SizeT rest_nbytes = nbytes;
+    u64 start_chunk_id = current_chunk_idx_;
+    u64 start_chunk_offset = current_chunk_offset_;
 
-    if (current_chunk_idx_ == INITIAL_VECTOR_CHUNK_ID) {
-        // First chunk
-        start_chunk_id = 0;
-        start_chunk_offset = 0;
-
+    if (chunks_.empty())
+        chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+    if (current_chunk_offset_ + nbytes > current_chunk_size_) {
+        rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
         while (rest_nbytes > current_chunk_size_) {
             chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
             rest_nbytes -= current_chunk_size_;
@@ -52,32 +50,10 @@ Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
 
         current_chunk_offset_ = rest_nbytes;
         current_chunk_idx_ = chunks_.size() - 1;
-
         return {start_chunk_id, start_chunk_offset};
     } else {
-        // Not first chunk
-        start_chunk_id = current_chunk_idx_;
-        start_chunk_offset = current_chunk_offset_;
-
-        // current_chunk_size_ == MAX_VECTOR_CHUNK_SIZE
-        if (current_chunk_offset_ + nbytes > current_chunk_size_) {
-            rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
-            while (rest_nbytes > current_chunk_size_) {
-                chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-                rest_nbytes -= current_chunk_size_;
-            }
-
-            if (rest_nbytes >= 0) {
-                chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
-            }
-
-            current_chunk_offset_ = rest_nbytes;
-            current_chunk_idx_ = chunks_.size() - 1;
-            return {start_chunk_id, start_chunk_offset};
-        } else {
-            current_chunk_offset_ += nbytes;
-            return {start_chunk_id, start_chunk_offset};
-        }
+        current_chunk_offset_ += nbytes;
+        return {start_chunk_id, start_chunk_offset};
     }
 }
 
@@ -107,7 +83,7 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
 }
 
 // return value: start chunk id & chunk offset
-Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
+Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager *src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
     auto [chunk_id, chunk_offset] = Allocate(nbytes);
     u64 start_chunk_id = chunk_id;
     u64 start_chunk_offset = chunk_offset;
@@ -117,14 +93,14 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, 
         SizeT src_chunk_remain_size = src_heap_mgr->current_chunk_size() - src_chunk_offset;
 
         SizeT copy_size{0};
-        if(nbytes > src_chunk_remain_size) {
+        if (nbytes > src_chunk_remain_size) {
             // not all data will be copied in this chunk
             copy_size = Min(current_chunk_remain_size, src_chunk_remain_size);
         } else {
             copy_size = Min(current_chunk_remain_size, nbytes);
         }
 
-        char* src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;
+        char *src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;
 
         Memcpy(start_ptr, src_ptr, copy_size);
 
@@ -153,7 +129,6 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager* src_heap_mgr, 
 // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
 // the size of data.
 void FixHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {
-//    u64 current_chunk_remain_size = current_chunk_size_ - chunk_offset;
     while (nbytes > 0) {
         char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
