@@ -1,6 +1,6 @@
 FROM ubuntu:23.10
 
-RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list
 RUN apt update
 
 # Clang 17+ is required for C++20 modules. GCC is not supported.
@@ -11,7 +11,7 @@ ENV CC=/usr/bin/clang-17
 ENV CXX=/usr/bin/clang++-17
 
 # tools
-RUN apt install -y wget curl emacs-nox git build-essential ninja-build bison flex python3-numpy postgresql-client
+RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison flex thrift-compiler postgresql-client python3-full tree
 
 # rust, refers to https://rsproxy.cn/
 ENV RUSTUP_DIST_SERVER="https://rsproxy.cn"
@@ -32,21 +32,20 @@ RUN mkdir -vp $HOME/.cargo && echo "[source.crates-io]" >> $HOME/.cargo/config \
 # sqllogictest
 RUN cargo install sqllogictest-bin
 
-
 # CMake 3.28+ is requrired for C++20 modules.
 # download https://github.com/Kitware/CMake/releases/download/v3.28.0/cmake-3.28.0-linux-x86_64.tar.gz
 COPY cmake-3.28.0-linux-x86_64.tar.gz .
 RUN tar xzf cmake-3.28.0-linux-x86_64.tar.gz && cp -rf cmake-3.28.0-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.0-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.0-linux-x86_64
 
-# iresearch requires lz4
-# git clone https://github.com/lz4/lz4.git && tar czvf lz4.tgz lz4
-COPY lz4.tgz .
-RUN tar xzf lz4.tgz && cd lz4 && make && make install && rm -fr lz4
-ENV LZ4_ROOT=/usr/local
-
 # build dependencies
-RUN apt install -y libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev libevent-dev libthrift-dev
+RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libthrift-dev
 
-RUN apt install -y thrift-compiler python3-pytest python3-venv
+# Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
+RUN python3 -m venv /usr/local/venv
+ENV PATH="/usr/local/venv/bin:$PATH"
+
+# infinity python SDK dependencies
+COPY python/requirements.txt .
+RUN pip3 install --no-input -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple/ --trusted-host pypi.tuna.tsinghua.edu.cn
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
