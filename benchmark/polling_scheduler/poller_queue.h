@@ -10,7 +10,7 @@
 
 namespace infinity {
 
-class Task;
+struct Task;
 
 class PollerQueue {
 public:
