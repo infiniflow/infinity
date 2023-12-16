@@ -1567,34 +1567,27 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         (*this->data_type_).operator!=(*other.data_type_) || this->data_type_size_ != other.data_type_size_ ||
         this->vector_type_ != other.vector_type_ || this->tail_index_ != other.tail_index_ || *this->nulls_ptr_ != *other.nulls_ptr_)
         return false;
-    switch (data_type_->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-//        case kBitmap:
-        case kUuid:
-        case kEmbedding: {
-            return 0 == Memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
+    if (data_type_->type() == kVarchar) {
+        for (SizeT i = 0; i < this->tail_index_; i++) {
+            const Varchar *lhs = reinterpret_cast<const Varchar *>(this->data_ptr_ + i * this->data_type_size_);
+            const Varchar *rhs = reinterpret_cast<const Varchar *>(other.data_ptr_ + i * this->data_type_size_);
+            if (lhs->length_ != rhs->length_) {
+                return false;
+            }
+            if (lhs->IsInlined()) {
+                if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
+                    return false;
+            } else {
+                Vector<char> lhs_str(lhs->length_);
+                Vector<char> rhs_str(rhs->length_);
+                this->buffer_->fix_heap_mgr_->ReadFromHeap(lhs_str.data(), lhs->vector_.chunk_id_, lhs->vector_.chunk_offset_, lhs->length_);
+                other.buffer_->fix_heap_mgr_->ReadFromHeap(rhs_str.data(), rhs->vector_.chunk_id_, rhs->vector_.chunk_offset_, rhs->length_);
+                if (0 != memcmp(lhs_str.data(), rhs_str.data(), lhs->length_))
+                    return false;
+            }
         }
-        default: {
-            Error<NotImplementException>(Format("Not supported data_type {}", int(data_type_->type())));
-        }
+    } else {
+        return 0 == Memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
     }
     return true;
 }
@@ -1607,37 +1600,9 @@ i32 ColumnVector::GetSizeInBytes() const {
         Error<StorageException>(Format("Not supported vector_type {}", int(vector_type_)));
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
-    switch (data_type_->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-//        case kBitmap:
-        case kUuid:
-        case kRowID:
-        case kVarchar:
-        case kEmbedding: {
-            size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
-            break;
-        }
-        default:
-            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
+    size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
+    if (data_type_->type() == kVarchar) {
+        size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
     }
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
@@ -1652,39 +1617,16 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
-    switch (data_type_->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-//        case kBitmap:
-        case kUuid:
-        case kVarchar:
-        case kEmbedding: {
-            WriteBufAdv<i32>(ptr, tail_index_);
-            Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
-            ptr += this->tail_index_ * this->data_type_size_;
-            break;
-        }
-        default: {
-            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type_->ToString()));
-        }
+    // write fixed part
+    WriteBufAdv<i32>(ptr, tail_index_);
+    Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
+    ptr += this->tail_index_ * this->data_type_size_;
+    // write variable part
+    if (data_type_->type() == kVarchar) {
+        i32 heap_len = buffer_->fix_heap_mgr_->total_size();
+        WriteBufAdv<i32>(ptr, heap_len);
+        buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
+        ptr += heap_len;
     }
     this->nulls_ptr_->WriteAdv(ptr);
     return;
@@ -1696,42 +1638,19 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     ColumnVectorType vector_type = ReadBufAdv<ColumnVectorType>(ptr);
     SharedPtr<ColumnVector> column_vector = ColumnVector::Make(data_type);
     column_vector->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
-    switch (data_type->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
-//        case kBitmap:
-        case kUuid:
-        case kVarchar:
-        case kEmbedding: {
-            i32 tail_index = ReadBufAdv<i32>(ptr);
-            column_vector->tail_index_ = tail_index;
-            i32 data_type_size = data_type->Size();
-            Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
-            ptr += tail_index * data_type_size;
-            break;
-        }
-        default: {
-            // TODO: add support for kPath, kPolygon, kArray, kBlob, kMix etc.
-            Error<NotImplementException>(Format("Not supported data_type {}", data_type->ToString()));
-        }
+    // read fixed part
+    i32 tail_index = ReadBufAdv<i32>(ptr);
+    column_vector->tail_index_ = tail_index;
+    i32 data_type_size = data_type->Size();
+    Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
+    ptr += tail_index * data_type_size;
+    // read variable part
+    if (data_type->type() == kVarchar) {
+        i32 heap_len = ReadBufAdv<i32>(ptr);
+        column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
+        ptr += heap_len;
     }
+
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
         Error<StorageException>("ptr goes out of range when reading ColumnVector");

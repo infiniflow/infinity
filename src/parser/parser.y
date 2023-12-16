@@ -1760,6 +1760,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
     } else if(strcmp($9, "hamming") == 0) {
         knn_expr->distance_type_ = infinity::KnnDistanceType::kHamming;
     } else {
+        for (auto* param_ptr: *$13) {
+            delete param_ptr;
+        }
+        delete $13;
         free($7);
         free($9);
         delete $5;
@@ -1850,6 +1854,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
                     } else if($5->long_array_[i * 8 + bit_idx] == 0) {
                         embedding_unit <<= 0;
                     } else {
+                        for (auto* param_ptr: *$13) {
+                            delete param_ptr;
+                        }
+                        delete $13;
                         free($7);
                         free($9);
                         delete $5;
@@ -1864,6 +1872,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
             free($9);
             delete $5;
         } else {
+            for (auto* param_ptr: *$13) {
+                delete param_ptr;
+            }
+            delete $13;
             free($7);
             free($9);
             delete $5;
@@ -1882,6 +1894,10 @@ knn_expr : KNN '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' 
         free($9);
         delete $5;
     } else {
+        for (auto* param_ptr: *$13) {
+            delete param_ptr;
+        }
+        delete $13;
         free($7);
         free($9);
         delete $5;

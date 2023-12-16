@@ -20,7 +20,6 @@ import logger;
 import blocking_queue;
 import infinity_exception;
 import wal_manager;
-import third_party;
 
 namespace infinity {
 
@@ -32,22 +31,19 @@ void BGTaskProcessor::Start() {
 }
 
 void BGTaskProcessor::Stop() {
-    UniquePtr<StopProcessorTask> stop_task = MakeUnique<StopProcessorTask>();
-    StopProcessorTask* stop_task_ptr = stop_task.get();
-    task_queue_.Enqueue(Move(stop_task));
-    stop_task_ptr->Wait();
+    SharedPtr<StopProcessorTask> stop_task = MakeShared<StopProcessorTask>();
+    task_queue_.Enqueue(stop_task);
+    stop_task->Wait();
     processor_thread_.join();
     LOG_INFO("Shutdown the background processor.");
 }
 
-void BGTaskProcessor::Submit(UniquePtr<BGTask> bg_task) {
-    task_queue_.Enqueue(Move(bg_task)); }
+void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(Move(bg_task)); }
 
 void BGTaskProcessor::Process() {
-    UniquePtr<BGTask> bg_task{nullptr};
     bool running{true};
     while (running) {
-        bg_task = task_queue_.DequeueReturn();
+        SharedPtr<BGTask> bg_task = task_queue_.DequeueReturn();
 
         switch (bg_task->type_) {
             case BGTaskType::kTryCheckpoint: {

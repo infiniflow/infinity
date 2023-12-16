@@ -157,9 +157,6 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
             SaveSegmentData(txn_store, segment_entry);
 
             segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-            if (segment_id == 60) {
-                //                int a = 1;
-            }
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
             last_block_entry = segment_entry->block_entries_.back().get();
@@ -250,7 +247,8 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
 
     Txn *txn = query_context->GetTxn();
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), txn->GetBufferMgr());
+    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
 
     SizeT start_pos = 0;
     while (true) {
@@ -268,7 +266,8 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         if (SegmentEntry::Room(segment_entry.get()) <= 0) {
             LOG_INFO(Format("Segment {} saved", segment_entry->segment_id_));
             SaveSegmentData(txn_store, segment_entry);
-            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, txn->TxnID(), txn->GetBufferMgr());
+            u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
         }
         BlockEntry *block_entry = segment_entry->block_entries_.back().get();
         if (BlockEntry::Room(block_entry) <= 0) {

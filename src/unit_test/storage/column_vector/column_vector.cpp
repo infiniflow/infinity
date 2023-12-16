@@ -36,8 +36,53 @@ TEST_F(ColumnVectorTest, ReadWrite) {
     {
         SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kBoolean));
         column->Initialize();
-        for (i64 i = 0; i < vector_size; ++i) {
+        for (SizeT i = 0; i < vector_size; ++i) {
             Value v = Value::MakeBool(bool(i % 2));
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kTinyInt));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeTinyInt(i8(i));
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kSmallInt));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeSmallInt(i16(i));
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kInteger));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeInt(i32(i));
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kBigInt));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeBigInt(i64(i));
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kHugeInt));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeHugeInt(HugeIntT(i, i));
             column->AppendValue(v);
         }
         columns.push_back(column);
@@ -45,17 +90,26 @@ TEST_F(ColumnVectorTest, ReadWrite) {
     {
         SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
         column->Initialize();
-        for (i64 i = 0; i < vector_size; ++i) {
-            Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeFloat(float(i) + 0.5f);
             column->AppendValue(v);
         }
         columns.push_back(column);
     }
     {
-        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kFloat));
-        column->Initialize(ColumnVectorType::kConstant);
-        for (i64 i = 0; i < 1; ++i) {
-            Value v = Value::MakeFloat(static_cast<FloatT>(i) + 0.5f);
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kDouble));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeDouble(double(i) + 0.5f);
+            column->AppendValue(v);
+        }
+        columns.push_back(column);
+    }
+    {
+        SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+        column->Initialize();
+        for (SizeT i = 0; i < vector_size; ++i) {
+            Value v = Value::MakeVarchar(String(i, 'a' + i % 26));
             column->AppendValue(v);
         }
         columns.push_back(column);
@@ -66,7 +120,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
          {
             SharedPtr<ColumnVector> column =
                 ColumnVector::Make(MakeShared<DataType>(LogicalType::kBitmap,
-       BitmapInfo::Make(1024))); column->Initialize(); for (i64 i = 0; i <
+       BitmapInfo::Make(1024))); column->Initialize(); for (SizeT i = 0; i <
        vector_size; ++i) { BitmapT bitmap; bitmap.Initialize(i + 10); for (i64 j
        = 0; j <= i; ++j) { if (j % 2 == 0) { bitmap.SetBit(j, true); } else {
                         bitmap.SetBit(j, false);
@@ -78,7 +132,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
             columns.push_back(column);
         }
      */
-    for (int i = 0; i < columns.size(); i++) {
+    for (SizeT i = 0; i < columns.size(); i++) {
         int32_t exp_size = columns[i]->GetSizeInBytes();
         int32_t act_size;
         Vector<char> buf(exp_size);

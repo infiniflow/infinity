@@ -52,10 +52,9 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
 
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
-    UniquePtr<ForceCheckpointTask> force_ckp_task = MakeUnique<ForceCheckpointTask>(query_context->GetTxn());
-    ForceCheckpointTask* force_ckp_task_ptr = force_ckp_task.get();
-    query_context->storage()->bg_processor()->Submit(Move(force_ckp_task));
-    force_ckp_task_ptr->Wait();
+    SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn());
+    query_context->storage()->bg_processor()->Submit(force_ckp_task);
+    force_ckp_task->Wait();
     LOG_TRACE("Flushed data");
 }
 
