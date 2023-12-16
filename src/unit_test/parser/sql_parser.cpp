@@ -128,7 +128,6 @@ TEST_F(SQLParserTest, good_test2) {
 //                           "                 s path, "
 //                           "                 t polygon, "
                            "                 u circle, "
-                           "                 v char(10), "
                            "                 w varchar, "
                            "                 x decimal, "
                            "                 y decimal(10), "
@@ -154,7 +153,7 @@ TEST_F(SQLParserTest, good_test2) {
             auto *create_table_info = (CreateTableInfo *)(create_statement->create_info_.get());
             EXPECT_EQ(create_table_info->schema_name_, String("default"));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
-            EXPECT_EQ(create_table_info->column_defs_.size(), 28);
+            EXPECT_EQ(create_table_info->column_defs_.size(), 27);
 
             u64 column_id = 0;
             {
@@ -350,14 +349,6 @@ TEST_F(SQLParserTest, good_test2) {
                 auto &column_def = create_table_info->column_defs_[column_id++];
                 EXPECT_EQ(column_def->name_, "u");
                 DataType column_type(LogicalType::kCircle, nullptr);
-                EXPECT_EQ(*column_def->column_type_, column_type);
-                EXPECT_EQ(column_def->constraints_.size(), 0);
-            }
-
-            {
-                auto &column_def = create_table_info->column_defs_[column_id++];
-                EXPECT_EQ(column_def->name_, "v");
-                DataType column_type(LogicalType::kVarchar);
                 EXPECT_EQ(*column_def->column_type_, column_type);
                 EXPECT_EQ(column_def->constraints_.size(), 0);
             }

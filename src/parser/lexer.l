@@ -47,7 +47,6 @@ BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
-CHAR            { return CHAR; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 CONFIGS         { return CONFIGS; }
