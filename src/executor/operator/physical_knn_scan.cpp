@@ -391,7 +391,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_, bitmask);
                         if (result_n < 0) {
                             result_n = heap.size();
-                        } else if (result_n != heap.size()) {
+                        } else if (result_n != (i64)heap.size()) {
                             throw ExecutorException("Bug");
                         }
                         u64 id = 0;
@@ -471,7 +471,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
         LOG_TRACE(Format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
         // all task Complete
-        SizeT column_n = knn_scan_shared_data->table_ref_->column_ids_.size();
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
         merge_heap->End();

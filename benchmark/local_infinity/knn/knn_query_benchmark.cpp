@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
     {
         int dim = -1;
         queries_ptr = load_data<float>(query_path, query_count, dim);
-        assert(dimension == dim || !"query vector dim isn't 128");
+        assert((int)dimension == dim || !"query vector dim isn't 128");
     }
     auto queries = queries_ptr.get();
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100;

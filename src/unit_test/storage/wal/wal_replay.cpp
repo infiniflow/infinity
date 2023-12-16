@@ -530,8 +530,6 @@ TEST_F(WalReplayTest, WalReplayImport) {
             TableCollectionEntry *table_collection_entry = nullptr;
             auto table_collection_entry_result = txn4->GetTableEntry("default", "tbl1", table_collection_entry);
             EXPECT_NE(table_collection_entry, nullptr);
-            const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry)->db_name_;
-            const String &table_name = *table_collection_entry->table_collection_name_;
             u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry);
             EXPECT_EQ(segment_id, 0);
             auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry, segment_id, buffer_manager);

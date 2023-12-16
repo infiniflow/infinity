@@ -109,7 +109,7 @@ public:
                             (queries_ + i0 * this->dimension_, base + j0 * this->dimension_, nxi, nyi, di,
                              ip_block_.get());
                 }
-                for (i64 i = i0; i < i1; i++) {
+                for (SizeT i = i0; i < i1; i++) {
                     DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
                     for (SizeT j = j0; j < j1; j++) {
@@ -168,7 +168,7 @@ public:
                             (queries_ + i0 * this->dimension_, base + j0 * this->dimension_, nxi, nyi, di,
                              ip_block_.get());
                 }
-                for (i64 i = i0; i < i1; i++) {
+                for (SizeT i = i0; i < i1; i++) {
                     DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
                     for (SizeT j = j0; j < j1; j++) {
@@ -199,9 +199,6 @@ public:
 
         // block sizes
         const SizeT bs_x = faiss_distance_compute_blas_query_bs;
-        const SizeT bs_y = faiss_distance_compute_blas_database_bs;
-        // const SizeT bs_x = 16, bs_y = 16;
-
         for (SizeT i0 = 0; i0 < this->query_count_; i0 += bs_x) {
             SizeT i1 = i0 + bs_x;
             if (i1 > this->query_count_)

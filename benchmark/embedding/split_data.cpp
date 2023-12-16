@@ -23,15 +23,13 @@ float *fvecs_read(const char *fname, size_t *d_out, size_t *n_out);
 int *ivecs_read(const char *fname, size_t *d_out, size_t *n_out);
 
 int main() {
-    size_t d, k, n_probes = 10, n_centroids;
-    size_t nt;
+    size_t d, k, nt;
     float *xt = fvecs_read(sift1m_train, &d, &nt);
     std::unique_ptr<float> xt_destructor(xt);
     size_t nb, d2;
     float *xb = fvecs_read(sift1m_base, &d2, &nb);
     std::unique_ptr<float> xb_destructor(xb);
     assert(d == d2 || !"dataset does not have same dimension as train set");
-    n_centroids = (size_t)sqrt(nb);
     size_t nq, d3;
     float *xq = fvecs_read(sift1m_query, &d3, &nq);
     std::unique_ptr<float> xq_destructor(xq);
@@ -42,7 +40,6 @@ int main() {
     assert(nq2 == nq || !"incorrect nb of ground truth entries");
     size_t split_size = nb / 5;
     if constexpr (check_split_file) {
-        size_t pos = 0;
         size_t nb_1, d_1;
         float *xb_1 = fvecs_read(sift1m_base_split_1, &d_1, &nb_1);
         std::unique_ptr<float> xb_1_destructor(xb_1);

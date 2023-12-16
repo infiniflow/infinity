@@ -414,7 +414,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         Error<PlannerException>("Expect the column search is an embedding column");
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
-        if (embedding_info->Dimension() != parsed_knn_expr.dimension_) {
+        if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
             Error<PlannerException>(Format("Query embedding with dimension: {} which doesn't not matched with {}",
                                            parsed_knn_expr.dimension_,
                                            embedding_info->Dimension()));

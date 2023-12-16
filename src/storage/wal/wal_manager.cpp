@@ -273,14 +273,14 @@ void WalManager::CheckpointTimer() {
 void WalManager::Checkpoint() {
 
     auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
-    int64_t now = seconds_since_epoch.count();
+    i64 now = seconds_since_epoch.count();
     auto [max_commit_ts, wal_size] = GetWalState();
     bool is_full_checkpoint = false;
     //        bool is_delta_checkpoint = false;
-    if (now - full_ckp_when_ > full_checkpoint_interval_sec_ && wal_size != full_ckp_wal_size_) {
+    if (now - full_ckp_when_ > i64(full_checkpoint_interval_sec_) && wal_size != full_ckp_wal_size_) {
         is_full_checkpoint = true;
-    } else if ((now - delta_ckp_when_ > delta_checkpoint_interval_sec_ && wal_size != delta_ckp_wal_size_) ||
-               wal_size - delta_ckp_wal_size_ > delta_checkpoint_interval_wal_bytes_) {
+    } else if ((now - delta_ckp_when_ > i64(delta_checkpoint_interval_sec_) && wal_size != delta_ckp_wal_size_) ||
+               wal_size - delta_ckp_wal_size_ > i64(delta_checkpoint_interval_wal_bytes_)) {
         //            is_delta_checkpoint = true;
     } else {
         return;
@@ -563,7 +563,7 @@ void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
         for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
             if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
                 auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
-                if (std::stoll(suffix) < full_ckp_ts) {
+                if (std::stoll(suffix) < i64(full_ckp_ts)) {
                     std::filesystem::remove(entry.path());
                     LOG_TRACE(Format("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str()));
                 }

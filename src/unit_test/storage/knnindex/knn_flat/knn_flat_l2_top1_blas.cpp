@@ -31,7 +31,6 @@ TEST_F(KnnFlatL2Top1BlasTest, test1) {
     using namespace infinity;
 
     i64 dimension = 4;
-    i64 top_k = 4;
     i64 base_embedding_count = 4;
     UniquePtr<f32[]> base_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension * base_embedding_count);
     UniquePtr<f32[]> query_embedding = MakeUnique<f32[]>(sizeof(f32) * dimension);

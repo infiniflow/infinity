@@ -114,7 +114,7 @@ SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr
     i64 select_idx = expr.integer_value_;
 
     Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
-    if (select_idx > expr_array.size() or select_idx < 1) {
+    if (select_idx > (i64)expr_array.size() or select_idx < 1) {
         Error<PlannerException>(Format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
     }
 

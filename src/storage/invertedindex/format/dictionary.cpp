@@ -371,6 +371,7 @@ DictionaryWriter::DictionaryWriter(FileWriter &writer) { impl_ = new DictionaryW
 DictionaryWriter::~DictionaryWriter() { delete impl_; }
 
 void DictionaryWriterImpl::WriteBlock(size_t prefix, size_t begin, size_t end, uint8_t meta, uint16_t label) {
+#if 0
     for (; begin < end; ++begin) {
         auto &e = stack_[begin];
         const bytes_view data = e.data();
@@ -382,6 +383,7 @@ void DictionaryWriterImpl::WriteBlock(size_t prefix, size_t begin, size_t end, u
             //
         }
     }
+#endif
 }
 
 void DictionaryWriterImpl::WriteBlocks(size_t prefix, size_t count) {
@@ -1355,7 +1357,7 @@ bool AutomatonTermIterator<FST>::Next() {
 
             // seek to the term with the specified state was called from
             // term_iterator::seek(bytes_view, const attribute&),
-            const SeekResult res = SeekGE(value_);
+            SeekGE(value_);
         }
     }
 

@@ -81,7 +81,7 @@ public:
 
     std::istream &Read(std::istream &strm) {
         // TODO replace istream with byteslicereader
-        std::uint32_t size;
+        std::uint32_t size = 0;
         {
             // auto it = irs::irstd::make_istream_iterator(strm);
             // size = irs::vread<uint32_t>(it);

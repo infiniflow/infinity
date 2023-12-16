@@ -368,7 +368,6 @@ public:
                 ent->type = WALType::INSERT_TUPLE;
                 ent->txn_id = txn->txn_id;
                 ent->checksum = 0;
-                infinity::CRC32IEEE crc32;
                 // CRC32IEEE is equivalent to boost::crc_32_type on
                 // little-endian machine.
                 ent->checksum = infinity::CRC32IEEE::makeCRC(
@@ -405,7 +404,7 @@ main(int argc, char* argv[]) {
     std::vector<std::unique_ptr<std::thread>> m_threads;
     // All threads from the pool will be used to call the corresponding
     // asynchronous operation completion callbacks.
-    for(std::size_t i = 0; i < ioc_threads; i++) {
+    for (int i = 0; i < ioc_threads; i++) {
         std::unique_ptr<std::thread> th(new std::thread([&ioc]() {
             while(!ioc.stopped()) {
                 // Process asynchronous operations till all are completed.
@@ -418,7 +417,7 @@ main(int argc, char* argv[]) {
     }
 
     std::vector<Session*> sesses;
-    for(std::size_t i = 0; i != sessions; i++) {
+    for (int i = 0; i != sessions; i++) {
         Session* sess = new Session(i);
         sesses.emplace_back(sess);
         sess->Start();
@@ -428,12 +427,12 @@ main(int argc, char* argv[]) {
 
     // Stop generating transactions. This allows the I/O threads to exit the
     // event loop when there are no more pending asynchronous operations.
-    for(std::size_t i = 0; i != sessions; ++i) {
+    for (int i = 0; i != sessions; ++i) {
         sesses[i]->Stop();
         delete sesses[i];
     }
     // Waiting for the I/O threads to exit.
-    for(std::size_t i = 0; i < ioc_threads; i++) {
+    for (int i = 0; i < ioc_threads; i++) {
         m_threads[i]->join();
     }
 

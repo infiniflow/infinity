@@ -75,7 +75,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
         // kFreed, kEphemeral -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
     }
@@ -126,7 +126,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
         // kFreed, kPersistent -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -139,7 +139,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
         // kUnloaded, kPersistent -> kLoaded, kEphemeral
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
@@ -152,7 +152,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
     }
 
     {
@@ -165,7 +165,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
     }
     { auto handle2 = buf2->Load(); }
     {
@@ -177,7 +177,7 @@ TEST_F(BufferObjTest, test1) {
     }
     {
         auto handle1 = buf1->Load();
-        auto data1 = handle1.GetDataMut();
+        __attribute__((unused)) auto data1 = handle1.GetDataMut();
     }
     { auto handle2 = buf2->Load(); }
     { auto handle1 = buf1->Load(); }

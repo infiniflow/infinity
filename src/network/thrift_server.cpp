@@ -206,7 +206,7 @@ public:
             // Check file exist
             if (fs.Exists(path.c_str())) {
                 auto exist_file_size = LocalFileSystem::GetFileSizeByPath(path.c_str());
-                if (exist_file_size != request.total_size) {
+                if ((i64)exist_file_size != request.total_size) {
                     LOG_TRACE(Format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
                     fs.DeleteFile(path.c_str());
                 } else {
@@ -285,7 +285,7 @@ public:
             current_offset += sizeof(i32) + varchar.length_;
         }
 
-        if (current_offset != all_size) {
+        if (current_offset != (i32)all_size) {
             Error<NetworkException>("Bug");
         }
 
@@ -649,6 +649,7 @@ private:
         } else {
             Error<NetworkException>("session id not found");
         }
+        return nullptr;
     }
 
     static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {
@@ -705,6 +706,7 @@ private:
             default:
                 Error<TypeException>("Invalid data type");
         }
+        return nullptr;
     }
 
     static ConstraintType GetConstraintTypeFromProto(infinity_thrift_rpc::Constraint::type constraint) {
@@ -754,6 +756,7 @@ private:
             default:
                 Error<TypeException>("Invalid index type");
         }
+        return IndexType::kInvalid;
     }
 
     static ConstantExpr *GetConstantFromProto(const infinity_thrift_rpc::ConstantExpr &expr) {
@@ -884,6 +887,7 @@ private:
         } else {
             Error<TypeException>("Invalid parsed expression type");
         }
+        return nullptr;
     }
 
     static KnnDistanceType GetDistanceTypeFormProto(const infinity_thrift_rpc::KnnDistanceType::type &type) {
@@ -922,6 +926,7 @@ private:
         } else {
             Error<TypeException>("Invalid embedding data type");
         }
+        return std::make_pair(nullptr, 0);
     }
 
     static UpdateExpr *GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
@@ -956,6 +961,7 @@ private:
             default:
                 Error<TypeException>("Invalid data type");
         }
+        return infinity_thrift_rpc::ColumnType::ColumnInvalid;
     }
 
     UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
@@ -1016,10 +1022,12 @@ private:
                 data_type_proto->__set_physical_type(physical_type);
                 return data_type_proto;
             }
+            case LogicalType::kInvalid:
             default: {
                 Error<TypeException>("Invalid data type");
             }
         }
+        return nullptr;
     }
 
     infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingInfo &embedding_info) {
@@ -1042,6 +1050,7 @@ private:
                 Error<TypeException>("Invalid embedding element data type");
             }
         }
+        return infinity_thrift_rpc::ElementType::ElementFloat32;
     }
 };
 

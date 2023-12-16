@@ -272,11 +272,11 @@ public:
                 candidates.pop();
             }
         } else {
-            while (!candidates.empty() && result_size < M) {
+            while (!candidates.empty() && SizeT(result_size) < M) {
                 const auto &[minus_c_dist, c_idx] = candidates.top();
                 StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;
-                for (SizeT i = 0; i < result_size; ++i) {
+                for (SizeT i = 0; i < SizeT(result_size); ++i) {
                     VertexType r_idx = result_p[i];
                     DataType cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_);
                     if (cr_dist < -minus_c_dist) {
@@ -299,7 +299,7 @@ public:
             auto [n_neighbors_p, n_neighbor_size_p] = graph_store_.GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
             SizeT Mmax = layer_idx == 0 ? Mmax0_ : Mmax_;
-            if (n_neighbor_size < Mmax) {
+            if (n_neighbor_size < VertexListSize(Mmax)) {
                 *(n_neighbors_p + n_neighbor_size) = vertex_i;
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;

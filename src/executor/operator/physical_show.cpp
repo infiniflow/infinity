@@ -1321,7 +1321,6 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             continue;
         }
         auto table_index_entry = static_cast<TableIndexEntry *>(base_entry);
-        auto index_def = table_index_entry->index_def_.get();
 
         for (const auto &column_index_entry_pair : table_index_entry->column_index_map_) {
             u64 index_column_id = column_index_entry_pair.first;

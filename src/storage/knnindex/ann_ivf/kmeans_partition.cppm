@@ -80,7 +80,6 @@ void k_means_partition_only_centroids(MetricType metric,
                                       u32 min_points_per_centroid = 32,
                                       u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
-    constexpr bool b_debug_info = false;
     if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
         Error<ExecutorException>("metric type not implemented");
         return;
@@ -238,7 +237,6 @@ void k_means_partition_only_centroids(MetricType metric,
         // TODO: When to split? How?
         //  Now sort the centroids by the number of vectors in each partition.
         //  For every vacant partition, split the partition with the most vectors.
-        u32 iter_split = 0;
         {
             for (u32 i = 0; i < partition_num; ++i) {
                 if (partition_element_count[i] == 0) {
@@ -252,7 +250,6 @@ void k_means_partition_only_centroids(MetricType metric,
                         }
                     }
                     // split the partition
-                    ++iter_split;
                     partition_element_count[i] = max_partition_element_count / 2;
                     partition_element_count[max_partition_id] -= partition_element_count[i];
                     // copy the centroid vector

@@ -451,8 +451,7 @@ const ViewSegment &ViewSnapshot::GetSegment(SizeT i) noexcept { return segments_
 
 enum class ExecutionMode { kAll, kStrictTop, kTop };
 
-int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, ScoredIds &sorted) {
-    ExecutionMode mode{ExecutionMode::kTop};
+int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, ScoredIds &sorted) {
     irs::WandContext wand{.index = 0, .strict = false};
 
     String scorer(DEFAULT_SCORER);
@@ -469,7 +468,6 @@ int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, Sco
         LOG_ERROR(Format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
         return -1;
     }
-    auto *score = scr.get();
 
     const IRSDirectoryReader &reader = GetDirectoryReader();
     LOG_INFO(Format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
@@ -485,7 +483,6 @@ int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, Sco
         topn = StrToInt(it->second);
     }
 
-    SizeT doc_count(0);
     sorted.reserve(topn);
     for (auto left = topn; auto &segment : reader) {
         auto docs = filter->execute(irs::ExecutionContext{.segment = segment, .scorers = order, .wand = wand});
@@ -505,7 +502,6 @@ int IRSDataStore::Search(IrsFilter* flt, const Map<String, String> &options, Sco
         }
 
         for (float_t score_value; docs->next();) {
-            ++doc_count;
             (*score)(&score_value);
             if (left) {
                 sorted.emplace_back(score_value, doc->value);

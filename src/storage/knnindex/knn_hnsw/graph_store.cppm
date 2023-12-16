@@ -143,7 +143,7 @@ public:
 
     ~GraphStore() {
         if (graph_) {
-            for (VertexType vertex_i = loaded_vertex_n_; vertex_i < max_vertex_num_; ++vertex_i) {
+            for (VertexType vertex_i = loaded_vertex_n_; vertex_i < VertexType(max_vertex_num_); ++vertex_i) {
                 delete[] GetLevel0(vertex_i).GetLayers().first;
             }
             operator delete[](graph_, std::align_val_t(8));
@@ -240,7 +240,7 @@ public:
 
     // check invariant of graph
     void CheckGraph(VertexType cur_vertex_n, SizeT Mmax0, SizeT Mmax) const {
-        assert(cur_vertex_n <= max_vertex_num_);
+        assert(cur_vertex_n <= VertexType(max_vertex_num_));
         int max_layer = -1;
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             VertexL0 vertex = GetLevel0(vertex_i);
@@ -248,7 +248,7 @@ public:
             max_layer = Max(cur_max_layer, max_layer);
             assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
             auto [neighbors, neighbor_n] = vertex.GetNeighbors();
-            assert(neighbor_n <= Mmax0);
+            assert(neighbor_n <= int(Mmax0));
             for (int i = 0; i < neighbor_n; ++i) {
                 VertexType neighbor_idx = neighbors[i];
                 assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
@@ -256,7 +256,7 @@ public:
             }
             for (int layer_i = 1; layer_i <= cur_max_layer; ++layer_i) {
                 auto [neighbors, neighbor_n] = GetLevelX(vertex, layer_i).GetNeighbors();
-                assert(neighbor_n <= Mmax);
+                assert(neighbor_n <= int(Mmax));
                 for (int i = 0; i < neighbor_n; ++i) {
                     VertexType neighbor_idx = neighbors[i];
                     assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
