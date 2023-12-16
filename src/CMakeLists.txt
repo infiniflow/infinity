@@ -171,6 +171,9 @@ target_sources(infinity_core
         ${executor_cppm}
 )
 
+
+add_dependencies(infinity_core thrift thriftnb)
+
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
@@ -223,7 +226,6 @@ target_link_libraries(infinity
         atomic.a
         event.a
 #        profiler
-
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
