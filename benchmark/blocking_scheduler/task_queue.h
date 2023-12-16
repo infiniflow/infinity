@@ -8,7 +8,7 @@
 
 namespace infinity {
 
-class Task;
+struct Task;
 
 struct BlockingQueue {
     void

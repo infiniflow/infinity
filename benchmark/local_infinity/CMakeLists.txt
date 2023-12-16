@@ -12,8 +12,8 @@ target_link_libraries(
     onnxruntime_mlas
     zsv_parser
     iresearch
-    lz4
-    atomic
+    lz4.a
+    atomic.a
 )
 
 # ########################################
@@ -32,8 +32,8 @@ target_link_libraries(
     onnxruntime_mlas
     zsv_parser
     iresearch
-    lz4
-    atomic
+    lz4.a
+    atomic.a
 )
 
 # query benchmark
@@ -50,8 +50,8 @@ target_link_libraries(
     onnxruntime_mlas
     zsv_parser
     iresearch
-    lz4
-    atomic
+    lz4.a
+    atomic.a
 )
 
 # ########################################
@@ -70,8 +70,8 @@ target_link_libraries(
     onnxruntime_mlas
     zsv_parser
     iresearch
-    lz4
-    atomic
+    lz4.a
+    atomic.a
 )
 
 # query benchmark
@@ -88,6 +88,6 @@ target_link_libraries(
     onnxruntime_mlas
     zsv_parser
     iresearch
-    lz4
-    atomic
+    lz4.a
+    atomic.a
 )

@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <iostream>
+#include <cassert>
 #include <cstdio>
 #include <exception>
-#include <cassert>
+#include <iostream>
 
-#include "task.h"
 #include "operator.h"
+#include "task.h"
 
 namespace infinity {
 #if 0
@@ -55,39 +55,24 @@ private:
     uint64_t pipeline_id_{};
 };
 #endif
-enum class FragmentType {
-    kParallel,
-    kSerial,
-    kInvalid
-};
+enum class FragmentType { kParallel, kSerial, kInvalid };
 
 class Fragment {
 public:
-    inline explicit
-    Fragment(uint64_t id, FragmentType type) : id_(id), fragment_type_(type) {}
+    inline explicit Fragment(uint64_t id, FragmentType type) : id_(id), fragment_type_(type) {}
 
-    std::vector<std::shared_ptr<Task>>
-    BuildTask(uint64_t parallel_size);
+    std::vector<std::shared_ptr<Task>> BuildTask(uint64_t parallel_size);
 
-    inline void
-    AddOperator(std::unique_ptr<Operator> op) {
-        operators_.emplace_back(std::move(op));
-    }
+    inline void AddOperator(std::unique_ptr<Operator> op) { operators_.emplace_back(std::move(op)); }
 
-    inline void
-    SetChild(std::unique_ptr<Fragment> child) {
-        child_ = std::move(child);
-    }
+    inline void SetChild(std::unique_ptr<Fragment> child) { child_ = std::move(child); }
 
-    inline void
-    AddSource(std::unique_ptr<Source> op) {
-        source_ = std::move(op);
-    }
+    inline void AddSource(std::unique_ptr<Source> op) { source_ = std::move(op); }
 
-    inline void
-    AddSink(std::unique_ptr<Sink> op) {
-        sink_ = std::move(op);
-    }
+    inline void AddSink(std::unique_ptr<Sink> op) { sink_ = std::move(op); }
+
+    inline uint64_t id() const { return id_; }
+
 private:
     uint64_t id_{};
     FragmentType fragment_type_{FragmentType::kInvalid};
@@ -97,4 +82,4 @@ private:
     std::unique_ptr<Fragment> child_{};
 };
 
-}
+} // namespace infinity
