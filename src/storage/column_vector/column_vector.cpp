@@ -1647,8 +1647,10 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     // read variable part
     if (data_type->type() == kVarchar) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
-        column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
-        ptr += heap_len;
+        if(heap_len > 0) {
+            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
+            ptr += heap_len;
+        }
     }
 
     maxbytes = ptr_end - ptr;
