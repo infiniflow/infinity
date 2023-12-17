@@ -171,6 +171,9 @@ target_sources(infinity_core
         ${executor_cppm}
 )
 
+
+add_dependencies(infinity_core thrift thriftnb)
+
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
@@ -216,14 +219,15 @@ target_link_libraries(infinity
         openfst
 #        iresearch
 
-        thrift
-        thriftnb
+        thrift.a
+        thriftnb.a
         iresearch
-        lz4
-        atomic
+        lz4.a
+        atomic.a
+        event.a
 #        profiler
-
 )
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -336,11 +340,13 @@ target_link_libraries(unit_test
         newpfor
         openfst
         iresearch
-        lz4
-        atomic
+        lz4.a
+        atomic.a
 #        profiler
-        thrift
+        thrift.a
 )
+
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 target_sources(unit_test
         PRIVATE

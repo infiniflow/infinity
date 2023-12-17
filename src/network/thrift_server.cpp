@@ -110,7 +110,7 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         CreateTableOptions create_table_opts;
         if (database == nullptr) {
-            Error<NetworkException>("Database is null", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("Database is null");
         }
 
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
@@ -175,7 +175,7 @@ public:
             case infinity_thrift_rpc::CopyFileType::FVECS:
                 return CopyFileType::kFVECS;
             default:
-                Error<NetworkException>("Not implemented copy file type", __FILE_NAME__, __LINE__);
+                Error<NetworkException>("Not implemented copy file type");
         }
     }
 
@@ -229,7 +229,7 @@ public:
                          SharedPtr<TableDef> table_def,
                          Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
         if (column_count != all_column_vectors.size()) {
-            Error<NetworkException>("Column count not match", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("Column count not match");
         }
         for (SizeT col_index = 0; col_index < column_count; ++col_index) {
             auto column_def = table_def->columns()[col_index];
@@ -328,7 +328,7 @@ public:
 
         // select list
         if (request.__isset.select_list == false) {
-            Error<NetworkException>("Select list is empty", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("Select list is empty");
         }
 
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
@@ -378,10 +378,10 @@ public:
         // offset = new ParsedExpr();
 
         // limit
-        ParsedExpr *limit = nullptr;
-        if (request.__isset.limit_expr == true) {
-            limit = GetParsedExprFromProto(request.limit_expr);
-        }
+//        ParsedExpr *limit = nullptr;
+//        if (request.__isset.limit_expr == true) {
+//            limit = GetParsedExprFromProto(request.limit_expr);
+//        }
 
         // auto end2 = std::chrono::steady_clock::now();
         // phase_2_duration_ += end2 - start2;
@@ -436,7 +436,7 @@ public:
                             break;
                         }
                         default:
-                            Error<NetworkException>("Not implemented data type", __FILE_NAME__, __LINE__);
+                            Error<NetworkException>("Not implemented data type");
                     }
                 }
             }
@@ -647,7 +647,7 @@ private:
         if (infinity_session_map_.count(session_id) > 0) {
             return infinity_session_map_[session_id];
         } else {
-            Error<NetworkException>("session id not found", __FILE_NAME__, __LINE__);
+            Error<NetworkException>("session id not found");
         }
     }
 
@@ -703,7 +703,7 @@ private:
             case infinity_thrift_rpc::LogicType::Varchar:
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
             default:
-                Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid data type");
         }
     }
 
@@ -718,7 +718,7 @@ private:
             case infinity_thrift_rpc::Constraint::Unique:
                 return ConstraintType::kUnique;
             default:
-                Error<TypeException>("Invalid constraint type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid constraint type");
         }
     }
 
@@ -739,7 +739,7 @@ private:
             case infinity_thrift_rpc::ElementType::ElementFloat64:
                 return EmbeddingDataType::kElemDouble;
             default:
-                Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid embedding data type");
         }
     }
 
@@ -752,7 +752,7 @@ private:
             case infinity_thrift_rpc::IndexType::IRSFullText:
                 return IndexType::kIRSFullText;
             default:
-                Error<TypeException>("Invalid index type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid index type");
         }
     }
 
@@ -799,7 +799,7 @@ private:
                 return parsed_expr;
             }
             default: {
-                Error<TypeException>("Invalid constant type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid constant type");
             }
         }
     }
@@ -882,7 +882,7 @@ private:
             auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
             return parsed_expr;
         } else {
-            Error<TypeException>("Invalid parsed expression type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Invalid parsed expression type");
         }
     }
 
@@ -897,7 +897,7 @@ private:
             case infinity_thrift_rpc::KnnDistanceType::Hamming:
                 return KnnDistanceType::kHamming;
             default:
-                Error<TypeException>("Invalid distance type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid distance type");
         }
     }
 
@@ -920,7 +920,7 @@ private:
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
-            Error<TypeException>("Invalid embedding data type", __FILE_NAME__, __LINE__);
+            Error<TypeException>("Invalid embedding data type");
         }
     }
 
@@ -954,49 +954,49 @@ private:
             case LogicalType::kRowID:
                 return infinity_thrift_rpc::ColumnType::ColumnRowID;
             default:
-                Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
+                Error<TypeException>("Invalid data type");
         }
     }
 
-    infinity_thrift_rpc::DataType *DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
+    UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
         switch (data_type->type()) {
             case LogicalType::kBoolean: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Boolean);
                 return data_type_proto;
             }
             case LogicalType::kTinyInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::TinyInt);
                 return data_type_proto;
             }
             case LogicalType::kSmallInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::SmallInt);
                 return data_type_proto;
             }
             case LogicalType::kInteger: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Integer);
                 return data_type_proto;
             }
             case LogicalType::kBigInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::BigInt);
                 return data_type_proto;
             }
             case LogicalType::kFloat: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Float);
                 return data_type_proto;
             }
             case LogicalType::kDouble: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Double);
                 return data_type_proto;
             }
             case LogicalType::kVarchar: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 infinity_thrift_rpc::VarcharType varchar_type;
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Varchar);
                 infinity_thrift_rpc::PhysicalType physical_type;
@@ -1005,7 +1005,7 @@ private:
                 return data_type_proto;
             }
             case LogicalType::kEmbedding: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 infinity_thrift_rpc::EmbeddingType embedding_type;
                 auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
                 embedding_type.__set_dimension(embedding_info->Dimension());
@@ -1016,27 +1016,31 @@ private:
                 data_type_proto->__set_physical_type(physical_type);
                 return data_type_proto;
             }
-            default:
-                Error<TypeException>("Invalid data type", __FILE_NAME__, __LINE__);
+            default: {
+                Error<TypeException>("Invalid data type");
+            }
         }
     }
 
     infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingInfo &embedding_info) {
         switch (embedding_info.Type()) {
-            case kElemBit:
+            case EmbeddingDataType::kElemBit:
                 return infinity_thrift_rpc::ElementType::ElementBit;
-            case kElemInt8:
+            case EmbeddingDataType::kElemInt8:
                 return infinity_thrift_rpc::ElementType::ElementInt8;
-            case kElemInt16:
+            case EmbeddingDataType::kElemInt16:
                 return infinity_thrift_rpc::ElementType::ElementInt16;
-            case kElemInt32:
+            case EmbeddingDataType::kElemInt32:
                 return infinity_thrift_rpc::ElementType::ElementInt32;
-            case kElemInt64:
+            case EmbeddingDataType::kElemInt64:
                 return infinity_thrift_rpc::ElementType::ElementInt64;
-            case kElemFloat:
+            case EmbeddingDataType::kElemFloat:
                 return infinity_thrift_rpc::ElementType::ElementFloat32;
-            case kElemDouble:
+            case EmbeddingDataType::kElemDouble:
                 return infinity_thrift_rpc::ElementType::ElementFloat64;
+            case EmbeddingDataType::kElemInvalid: {
+                Error<TypeException>("Invalid embedding element data type");
+            }
         }
     }
 };

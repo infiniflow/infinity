@@ -39,6 +39,7 @@ using namespace infinity;
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
+        std::cout << "import sift or gist" << std::endl;
         return 1;
     }
     bool sift = true;

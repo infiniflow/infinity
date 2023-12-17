@@ -4,7 +4,7 @@ add_executable(asio_wal
 )
 
 target_link_libraries(asio_wal
-        uring
+        uring.a
         spdlog
 )
 

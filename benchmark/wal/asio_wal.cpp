@@ -393,8 +393,8 @@ main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::int32_t sessions = std::atoi(argv[1]);
-    std::int32_t ioc_threads = std::atoi(argv[2]);
+    std::size_t sessions = std::atoi(argv[1]);
+    std::size_t ioc_threads = std::atoi(argv[2]);
     std::string wal_path(argv[3]);
 
     initializeLogger();

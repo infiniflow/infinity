@@ -122,8 +122,8 @@ int main() {
         assert(top_k >= test_top || !"dataset does not provide enough ground truth data");
 
         ground_truth_sets.resize(number_of_queries);
-        for (int i = 0; i < number_of_queries; ++i) {
-            for (int j = 0; j < test_top; ++j) {
+        for (size_t i = 0; i < number_of_queries; ++i) {
+            for (size_t j = 0; j < test_top; ++j) {
                 ground_truth_sets[i].insert(gt_int[i * top_k + j]);
             }
         }
@@ -142,7 +142,7 @@ int main() {
             std::atomic_int idx(0);
             std::vector<std::thread> threads;
             profiler.Begin();
-            for (int i = 0; i < thread_n; ++i) {
+            for (int j = 0; j < thread_n; ++j) {
                 threads.emplace_back([&]() {
                     while (true) {
                         int cur_idx = idx.fetch_add(1);
@@ -160,8 +160,8 @@ int main() {
             }
             profiler.End();
             if (i == 0) {
-                for (int idx = 0; idx < number_of_queries; ++idx) {
-                    auto &result = results[idx];
+                for (size_t query_idx = 0; query_idx < number_of_queries; ++query_idx) {
+                    auto &result = results[query_idx];
                     while (!result.empty()) {
                         if (ground_truth_sets[idx].contains(result.top().second)) {
                             ++correct;

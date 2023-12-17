@@ -86,6 +86,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
+        std::cout << "query gist/sift ef=?" << std::endl;
         return 1;
     }
     bool sift = true;

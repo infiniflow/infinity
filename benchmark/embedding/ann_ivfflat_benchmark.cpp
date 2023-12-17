@@ -38,7 +38,7 @@ using namespace infinity;
 template <typename T>
 std::unique_ptr<T[]> load_data(const std::string &filename,
                                size_t &num,
-                               int &dim) { // load data with sift10K pattern
+                               size_t &dim) { // load data with sift10K pattern
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open()) {
         std::cout << "open file error" << std::endl;
@@ -198,7 +198,7 @@ int main() {
             size_t embedding_count;
             std::unique_ptr<f32[]> input_embeddings;
             {
-                int dim;
+                size_t dim;
                 BaseProfiler profiler_in;
                 profiler_in.Begin();
                 input_embeddings = load_data<f32>(base_file, embedding_count, dim);
@@ -218,7 +218,7 @@ int main() {
                 input_train_ptr = input_embeddings.get();
                 std::cout << "Use base data as train data" << std::endl;
             } else {
-                int dim;
+                size_t dim;
                 BaseProfiler profiler_in;
                 profiler_in.Begin();
                 input_train = load_data<f32>(train_file, train_count, dim);
@@ -257,7 +257,7 @@ int main() {
     size_t number_of_queries;
     std::unique_ptr<f32[]> queries;
     {
-        int dim;
+        size_t dim;
         BaseProfiler profiler;
         profiler.Begin();
         queries = load_data<f32>(query_file, number_of_queries, dim);
@@ -266,7 +266,7 @@ int main() {
         std::cout << "Load query data: " << profiler.ElapsedToString() << std::endl;
     }
 
-    int top_k; // nb of results per query in the GT
+    size_t top_k{}; // nb of results per query in the GT
     std::vector<std::unordered_set<int>> ground_truth_sets_1, ground_truth_sets_10,
         ground_truth_sets_100; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
     {
@@ -282,7 +282,7 @@ int main() {
         ground_truth_sets_10.resize(number_of_queries);
         ground_truth_sets_100.resize(number_of_queries);
         for (size_t i = 0; i < number_of_queries; ++i) {
-            for (int j = 0; j < top_k; ++j) {
+            for (size_t j = 0; j < top_k; ++j) {
                 auto gt = gt_int[i * top_k + j];
                 if (j < 1) {
                     ground_truth_sets_1[i].insert(gt);

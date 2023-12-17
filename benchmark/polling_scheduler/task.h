@@ -15,7 +15,7 @@
 
 namespace infinity {
 
-class Task;
+struct Task;
 
 class NewScheduler {
 public:
