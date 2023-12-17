@@ -958,45 +958,45 @@ private:
         }
     }
 
-    infinity_thrift_rpc::DataType *DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
+    UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const SharedPtr<DataType> &data_type) {
         switch (data_type->type()) {
             case LogicalType::kBoolean: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Boolean);
                 return data_type_proto;
             }
             case LogicalType::kTinyInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::TinyInt);
                 return data_type_proto;
             }
             case LogicalType::kSmallInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::SmallInt);
                 return data_type_proto;
             }
             case LogicalType::kInteger: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Integer);
                 return data_type_proto;
             }
             case LogicalType::kBigInt: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::BigInt);
                 return data_type_proto;
             }
             case LogicalType::kFloat: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Float);
                 return data_type_proto;
             }
             case LogicalType::kDouble: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Double);
                 return data_type_proto;
             }
             case LogicalType::kVarchar: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 infinity_thrift_rpc::VarcharType varchar_type;
                 data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Varchar);
                 infinity_thrift_rpc::PhysicalType physical_type;
@@ -1005,7 +1005,7 @@ private:
                 return data_type_proto;
             }
             case LogicalType::kEmbedding: {
-                auto *data_type_proto = new infinity_thrift_rpc::DataType();
+                auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
                 infinity_thrift_rpc::EmbeddingType embedding_type;
                 auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
                 embedding_type.__set_dimension(embedding_info->Dimension());
