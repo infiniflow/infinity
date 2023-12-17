@@ -747,7 +747,8 @@ String Value::ToString() const {
             return value_info_->Get<StringValueInfo>().GetString();
         }
         default: {
-            Error<NotImplementException>(Format("Value::ToString() not inplemented for type {}", type_.ToString()));
+            Error<NotImplementException>(Format("Value::ToString() not implemented for type {}", type_.ToString()));
+            return {};
         }
     }
 }
