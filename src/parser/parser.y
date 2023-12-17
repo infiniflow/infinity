@@ -852,6 +852,28 @@ delete_statement : DELETE FROM table_name where_clause {
  * INSERT STATEMENT
  */
 insert_statement: INSERT INTO table_name optional_identifier_array VALUES expr_array_list {
+    bool is_error{false};
+    for (auto expr_array : *$6) {
+        for (auto expr : *expr_array) {
+            if(expr->type_ != infinity::ParsedExprType::kConstant) {
+                yyerror(&yyloc, scanner, result, ("Value list has non-constant expression: " + expr->ToString()).c_str());
+                is_error = true;
+            }
+        }
+    }
+    if(is_error) {
+        for (auto expr_array : *$6) {
+            for (auto expr : *expr_array) {
+                delete expr;
+            }
+            delete (expr_array);
+        }
+        delete $6;
+        delete $3;
+        delete $4;
+        YYERROR;
+    }
+
     $$ = new infinity::InsertStatement();
     if($3->schema_name_ptr_ != nullptr) {
         $$->schema_name_ = $3->schema_name_ptr_;
