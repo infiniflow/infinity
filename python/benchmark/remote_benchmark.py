@@ -225,14 +225,14 @@ def benchmark(threads, rounds, data_set, path):
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, path, ground_truth_path)
+            one_thread(rounds, path, ground_truth_path, "sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path)
+            process_pool(threads, rounds, query_path, "gist_benchmark")
 
         else:
             print(f"Single-thread")
@@ -254,7 +254,7 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=1,
+        default=16,
         dest="threads",
     )
     parser.add_argument(
@@ -268,7 +268,7 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='sift_1m',  # gist_1m
+        default='gist_1m',  # gist_1m
         dest="data_set",
     )
 
