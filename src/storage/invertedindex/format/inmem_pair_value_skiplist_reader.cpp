@@ -42,7 +42,6 @@ void InMemPairValueSkipListReader::Load(BufferedByteSlice *posting_buffer) {
 
 Pair<int, bool> InMemPairValueSkipListReader::LoadBuffer() {
     SizeT key_num = 0;
-    SizeT flush_count = skiplist_buffer_->GetTotalCount();
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
     if (!skiplist_reader_.Decode(key_buffer_, decode_count, key_num)) {
         return MakePair(0, false);

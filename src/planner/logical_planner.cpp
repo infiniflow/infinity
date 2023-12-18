@@ -731,7 +731,6 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
-            BaseEntry *base_table_entry{nullptr};
             auto [base_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =

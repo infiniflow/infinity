@@ -32,7 +32,7 @@ TEST_F(ColumnVectorTest, ReadWrite) {
     using namespace infinity;
 
     Vector<SharedPtr<ColumnVector>> columns;
-    int vector_size = DEFAULT_VECTOR_SIZE / 3;
+    SizeT vector_size = DEFAULT_VECTOR_SIZE / 3;
     {
         SharedPtr<ColumnVector> column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kBoolean));
         column->Initialize();

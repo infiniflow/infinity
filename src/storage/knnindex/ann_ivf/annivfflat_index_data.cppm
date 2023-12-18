@@ -68,7 +68,7 @@ struct AnnIVFFlatIndexData {
     }
 
     void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
-        if (dimension != dimension_) {
+        if (dimension != i32(dimension_)) {
             Error<StorageException>("Dimension not match");
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {

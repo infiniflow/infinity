@@ -116,7 +116,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     if (nbytes != sizeof(dimension)) {
         Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes));
     }
-    if (embedding_info->Dimension() != dimension) {
+    if ((int)embedding_info->Dimension() != dimension) {
         Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);

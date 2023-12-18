@@ -292,7 +292,6 @@ TEST_F(ColumnVectorRowTest, row_column_slice_init) {
     EXPECT_EQ(count, DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < count; ++i) {
-        i64 src_idx = start_idx + i;
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kRowID);
         EXPECT_EQ(vx.value_.row.segment_id_, static_cast<u32>(i));

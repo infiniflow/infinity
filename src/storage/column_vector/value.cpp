@@ -751,6 +751,7 @@ String Value::ToString() const {
             return {};
         }
     }
+    return "";
 }
 
 } // namespace infinity

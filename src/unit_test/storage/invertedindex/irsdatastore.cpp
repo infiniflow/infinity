@@ -50,7 +50,7 @@ using ScoredIds = Vector<ScoredId>;
 static const String DEFAULT_SCORER("bm25");
 static const String DEFAULT_SCORER_ARG("");
 static const SizeT DEFAULT_TOPN(100);
-constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
+// constexpr SizeT DEFAULT_COMMIT_INTERVAL = 10000;
 
 class IRSDataStore {
 public:
@@ -155,7 +155,6 @@ void IRSDataStore::Commit() {
 enum class ExecutionMode { kAll, kStrictTop, kTop };
 
 int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, ScoredIds &sorted) {
-    ExecutionMode mode{ExecutionMode::kTop};
     irs::WandContext wand{.index = 0, .strict = false};
 
     String scorer(DEFAULT_SCORER);
@@ -171,7 +170,6 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
     if (!scr) {
         return -1;
     }
-    auto *score = scr.get();
 
     const IRSDirectoryReader &reader = GetDirectoryReader();
     irs::Scorers order = irs::Scorers::Prepare(scr.get());
@@ -186,7 +184,6 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
         topn = StrToInt(it->second);
     }
 
-    SizeT doc_count(0);
     sorted.reserve(topn);
     for (auto left = topn; auto &segment : reader) {
         auto docs = filter->execute(irs::ExecutionContext{.segment = segment, .scorers = order, .wand = wand});
@@ -206,7 +203,6 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
         }
 
         for (float_t score_value; docs->next();) {
-            ++doc_count;
             (*score)(&score_value);
             if (left) {
                 sorted.emplace_back(score_value, doc->value);
@@ -256,13 +252,8 @@ static irs::bstring toBstring(const std::string &str) {
 
 TEST_F(IRSDatastoreTest, test1) {
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
-    constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};
-
     static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
-    static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
-
     IRSDataStore datastore("wiki", "./");
-
     UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
     {
         auto ctx = datastore.index_writer_->GetBatch();
@@ -327,5 +318,6 @@ TEST_F(IRSDatastoreTest, test1) {
     SearchOptions search_ops("");
     ScoredIds result;
     auto rc = datastore.Search(flt.get(), search_ops.options_, result);
+    ASSERT_TRUE(rc == 0);
     ASSERT_TRUE(result.size() == 100);
 }

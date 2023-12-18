@@ -67,7 +67,7 @@ SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &i
     SizeT end_row_id = 0;
 
     if (offset == 0) {
-        if (limit >= input_table->row_count()) {
+        if (limit >= (i64)input_table->row_count()) {
             return input_table;
         } else {
             start_block = 0;
@@ -76,7 +76,7 @@ SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &i
             i64 total_row_count = limit;
             for (SizeT block_id = 0; block_id < block_count; ++block_id) {
                 SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-                if (total_row_count > block_row_count) {
+                if (total_row_count > (i64)block_row_count) {
                     total_row_count -= block_row_count;
                 } else {
                     end_block = block_id;
@@ -91,9 +91,9 @@ SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &i
         SizeT rest_row_count = 0;
         for (SizeT block_id = 0; block_id < block_count; ++block_id) {
             SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-            if (total_row_count >= block_row_count) {
+            if (total_row_count >= (i64)block_row_count) {
                 total_row_count -= block_row_count;
-            } else if (total_row_count < block_row_count) {
+            } else {
                 start_block = block_id;
                 start_row_id = total_row_count;
                 rest_row_count = block_row_count - total_row_count;
@@ -102,14 +102,14 @@ SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &i
         }
 
         total_row_count = limit;
-        if (total_row_count <= rest_row_count) {
+        if (total_row_count <= (i64)rest_row_count) {
             end_block = start_block;
             end_row_id = total_row_count;
         } else {
             total_row_count -= rest_row_count;
             for (SizeT block_id = start_block + 1; block_id < block_count; ++block_id) {
                 SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-                if (total_row_count > block_row_count) {
+                if (total_row_count > (i64)block_row_count) {
                     total_row_count -= block_row_count;
                 } else {
                     end_block = block_id;

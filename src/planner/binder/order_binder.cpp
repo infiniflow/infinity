@@ -63,7 +63,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         ConstantExpr &const_expr = (ConstantExpr &)expr;
         if (const_expr.literal_type_ == LiteralType::kInteger) {
             column_id = const_expr.integer_value_;
-            if (column_id >= bind_context_ptr->project_exprs_.size()) {
+            if (column_id >= (i64)bind_context_ptr->project_exprs_.size()) {
                 Error<PlannerException>("Order by are going to use nonexistent column from select list.");
             }
             --column_id;

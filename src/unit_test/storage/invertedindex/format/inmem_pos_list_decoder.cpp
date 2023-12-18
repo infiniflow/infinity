@@ -22,7 +22,6 @@ public:
 
 protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {
-        bool hasPayload = flag;
         PositionListFormatOption option(flag);
 
         PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);
@@ -84,7 +83,6 @@ protected:
     }
 
     void InnerTestSkipAndLocateAndDecode(optionflag_t flag, ttf_t ttf, bool need_flush) {
-        bool hasPayload = flag & of_position_payload;
         PositionListFormatOption option(flag);
 
         PositionListEncoder pos_list_encoder(option, &byte_slice_pool_, &buffer_pool_);

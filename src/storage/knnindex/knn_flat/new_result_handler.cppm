@@ -117,7 +117,7 @@ struct NewHeapResultHandler : public ResultHandler {
 
     /// add results for query i0..i1 and j0..j1
     void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id, u32 segment_offset_start) {
-        for (i64 i = i_start; i < i_end; i++) {
+        for (SizeT i = i_start; i < i_end; i++) {
             T *heap_dis = heap_dis_tab + i * k;
             TI *heap_ids = heap_ids_tab + i * k;
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
@@ -134,7 +134,7 @@ struct NewHeapResultHandler : public ResultHandler {
 
     void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id,
                      u32 segment_offset_start, Bitmask &bitmask) {
-        for (i64 i = i_start; i < i_end; i++) {
+        for (SizeT i = i_start; i < i_end; i++) {
             T *heap_dis = heap_dis_tab + i * k;
             TI *heap_ids = heap_ids_tab + i * k;
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
@@ -381,7 +381,7 @@ struct SingleBestResultHandler : public ResultHandler {
 
     /// add results for query i0..i1 and j0..j1
     void add_results(SizeT i_start, SizeT i_end, SizeT j0, SizeT j1, const T *dis_tab, u32 segment_id, u32 segment_offset_start) {
-        for (i64 i = i_start; i < i_end; i++) {
+        for (SizeT i = i_start; i < i_end; i++) {
             const T *dis_tab_i = dis_tab + (j1 - j0) * (i - i_start) - j0;
 
             auto &min_distance = this->dis_tab[i];

@@ -85,10 +85,10 @@ private:
         unsigned int position_in_queue_; // start with 1
     };
 
+    unsigned int buffer_size_;
     BufferList *head_of_queue_; // the first array that contains data for the thread that takes elements from the queue (for the single consumer)
     std::atomic<BufferList *>
-        tail_of_queue_ alignas(CACHE_LINE_SIZE); // the beginning of the last array which we insert elements into (for the producers)
-    unsigned int buffer_size_;
+        tail_of_queue_ alignas(CACHE_LINE_SIZE);               // the beginning of the last array which we insert elements into (for the producers)
     std::atomic<uint_fast64_t> tail_ alignas(CACHE_LINE_SIZE); // we need a global tail so the queue will be wait free - if not the queue is look free
 
 public:
@@ -145,7 +145,7 @@ public:
                             BufferList *scanhead_of_queue = head_of_queue_;
                             for (unsigned int scanhead = scanhead_of_queue->head_;
                                  (scanhead_of_queue != temphead_of_queue ||
-                                  scanhead < (temphead - 1) && n->is_set_.load(std::memory_order_acquire) == 0);
+                                  (scanhead < (temphead - 1) && n->is_set_.load(std::memory_order_acquire) == 0));
                                  scanhead++) {
                                 if (scanhead >= buffer_size_) { // we reach the end of the buffer -move to the next_
                                     scanhead_of_queue = scanhead_of_queue->next_.load(std::memory_order_acquire);

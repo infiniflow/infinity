@@ -58,10 +58,7 @@ TEST_F(DistFuncTest2, test2) {
     lvq_store.AddVec(vecs1.get(), vec_n);
 
     for (size_t i = 0; i < vec_n; ++i) {
-        const float *v1 = vecs1.get() + i * dim;
         const float *v2 = vecs2.get() + i * dim;
-
-        float dist_true = F32IPTest(v1, v2, dim);
 
         auto query = lvq_store.MakeQuery(v2);
         LVQ8Data lvq1 = query;
@@ -85,7 +82,6 @@ TEST_F(DistFuncTest2, test2) {
 
         float dist2 = F32IPTest(qv1, qv2, dim);
 
-        // std::cout << dist1 << "\t" << dist2 << "\t" << dist_true << std::endl;
         float err = std::abs((dist1 - dist2) / dist1);
         EXPECT_LT(err, 1e-5);
         // EXPECT_EQ(dist1, dist2);

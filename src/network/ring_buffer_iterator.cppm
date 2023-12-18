@@ -25,6 +25,8 @@ export class RingBufferIterator {
 public:
     explicit RingBufferIterator(Array<char, PG_MSG_BUFFER_SIZE> &data, SizeT position = 0) : data_(data), position_(position) {}
 
+    RingBufferIterator(const RingBufferIterator &other) : data_(other.data_), position_(other.position_) {}
+
     RingBufferIterator &operator=(const RingBufferIterator &other) {
         //        Assert<NetworkException>(&data_ == &other.data_, "The two iterators are from different arrays");
         position_ = other.position_;

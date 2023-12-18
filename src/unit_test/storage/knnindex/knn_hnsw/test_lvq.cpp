@@ -135,7 +135,6 @@ TEST_F(HnswLVQTest, test1) {
         }
         fs.CreateDirectory(file_dir_);
 
-        size_t idx = 0;
         {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
@@ -143,7 +142,6 @@ TEST_F(HnswLVQTest, test1) {
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
             EXPECT_NE(ret, LVQ8Store::ERR_IDX);
-            idx += vec_n_ / 2;
 
             lvq_store.Save(*file_handler);
         }

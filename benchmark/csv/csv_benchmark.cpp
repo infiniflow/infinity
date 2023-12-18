@@ -71,7 +71,7 @@ main() -> int {
      */
     struct zsv_opts opts = {0};
     opts.row_handler = my_row_handler;
-    struct my_data data = {0};
+    struct my_data data = {0, 0};
     opts.ctx = &data;
     opts.stream = f;
     opts.delimiter = ',';

@@ -54,9 +54,9 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
 
-    Vector<float> data(embedding_info->Dimension());
+    Vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -79,7 +79,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -114,7 +114,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         column_vector.AppendByPtr((const_ptr_t)data.data());
@@ -126,7 +126,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -168,9 +168,9 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
 
-    Vector<float> data(embedding_info->Dimension());
+    Vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < 1; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -210,7 +210,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < 1; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -230,9 +230,9 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    Vector<float> data(embedding_info->Dimension());
+    Vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -240,7 +240,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -259,7 +259,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(2 * i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -276,9 +276,9 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    Vector<float> data(embedding_info->Dimension());
+    Vector<float> data((i64)embedding_info->Dimension());
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -286,7 +286,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(i) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);
@@ -304,7 +304,7 @@ TEST_F(ColumnVectorEmbeddingTest, embedding_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        for (i64 j = 0; j < embedding_info->Dimension(); ++j) {
+        for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             data[j] = static_cast<float>(src_idx) + static_cast<float>(j) + 0.5f;
         }
         Value v = Value::MakeEmbedding(data);

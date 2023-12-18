@@ -54,6 +54,7 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             Error<NotImplementException>("Not support source state type");
         }
     }
+    return true;
 }
 
 bool PhysicalSource::ReadyToExec(SourceState *source_state) {

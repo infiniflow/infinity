@@ -89,7 +89,6 @@ TEST_F(MaxFunctionTest, max_func) {
         DataBlock data_block;
         data_block.Init(column_types);
 
-        double sum = 0;
         for (SizeT i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
         }
