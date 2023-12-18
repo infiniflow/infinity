@@ -7,28 +7,28 @@ DROP TABLE IF EXISTS products;
 
 # Parse only support
 statement ok
-CREATE TABLE products (product_no integer, price integer);
+CREATE TABLE products (product_no integer, price integer, description varchar);
 
 # insert data
 query I
-INSERT INTO products VALUES (1, 2);
+INSERT INTO products VALUES (1, 2, 'a');
 ----
 
 query II
 SELECT * FROM products;
 ----
-1 2
+1 2 a
 
 query I
-INSERT INTO products VALUES (3, 4), (5, 6);
+INSERT INTO products VALUES (3, 4, 'abcdef'), (5, 6, 'abcdefghijklmnopqrstuvwxyz');
 ----
 
 query II rowsort
 SELECT * FROM products;
 ----
-1 2
-3 4
-5 6
+1 2 a
+3 4 abcdef
+5 6 abcdefghijklmnopqrstuvwxyz
 
 # Clean up
 statement ok
