@@ -10,7 +10,7 @@ from infinity.remote_thrift.table import RemoteTable
 
 def import_data(path):
     if os.path.exists(path + "/sift_base.fvecs"):
-        import_sift_1m(path + "/sift_base.sift")
+        import_sift_1m(path + "/sift_base.fvecs")
     elif os.path.exists(path + "/gist_base.fvecs"):
         import_gist_1m(path + "/gist_base.fvecs")
     else:
