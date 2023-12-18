@@ -138,7 +138,7 @@ int main() {
         knn_hnsw->SetEf(ef);
         int correct = 0;
         int sum_time = 0;
-        for (size_t i = 0; i < round; ++i) {
+        for (int i = 0; i < round; ++i) {
             std::atomic_int idx(0);
             std::vector<std::thread> threads;
             profiler.Begin();
@@ -146,7 +146,7 @@ int main() {
                 threads.emplace_back([&]() {
                     while (true) {
                         int cur_idx = idx.fetch_add(1);
-                        if (cur_idx >= number_of_queries) {
+                        if (cur_idx >= (int)number_of_queries) {
                             break;
                         }
                         const float *query = queries + cur_idx * dimension;

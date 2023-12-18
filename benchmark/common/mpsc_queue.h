@@ -97,7 +97,7 @@ public:
         head_of_queue_ = new (buffer) BufferList(buffer_size_);
         tail_of_queue_ = head_of_queue_;
     }
-    MPSCQueue() : tail_of_queue_(NULL), buffer_size_(NODE_SIZE), tail_(0) {
+    MPSCQueue() : buffer_size_(NODE_SIZE), tail_of_queue_(NULL), tail_(0) {
         void *buffer = align_malloc(QUEUE_PAGE_SIZE, sizeof(BufferList));
         head_of_queue_ = new (buffer) BufferList(buffer_size_);
         tail_of_queue_ = head_of_queue_;

@@ -58,6 +58,7 @@ struct WalEntry {
         int64_t max_lsn;
     };
 
+    virtual ~WalEntry() = default;
     virtual int32_t
     GetSize() = 0;  // size of the entry, excluding the 4 bytes pad.
 };
@@ -404,7 +405,7 @@ main(int argc, char* argv[]) {
     std::vector<std::unique_ptr<std::thread>> m_threads;
     // All threads from the pool will be used to call the corresponding
     // asynchronous operation completion callbacks.
-    for (int i = 0; i < ioc_threads; i++) {
+    for (int i = 0; i < (int)ioc_threads; i++) {
         std::unique_ptr<std::thread> th(new std::thread([&ioc]() {
             while(!ioc.stopped()) {
                 // Process asynchronous operations till all are completed.
@@ -417,7 +418,7 @@ main(int argc, char* argv[]) {
     }
 
     std::vector<Session*> sesses;
-    for (int i = 0; i != sessions; i++) {
+    for (int i = 0; i != (int)sessions; i++) {
         Session* sess = new Session(i);
         sesses.emplace_back(sess);
         sess->Start();
@@ -427,12 +428,12 @@ main(int argc, char* argv[]) {
 
     // Stop generating transactions. This allows the I/O threads to exit the
     // event loop when there are no more pending asynchronous operations.
-    for (int i = 0; i != sessions; ++i) {
+    for (int i = 0; i != (int)sessions; ++i) {
         sesses[i]->Stop();
         delete sesses[i];
     }
     // Waiting for the I/O threads to exit.
-    for (int i = 0; i < ioc_threads; i++) {
+    for (int i = 0; i < (int)ioc_threads; i++) {
         m_threads[i]->join();
     }
 

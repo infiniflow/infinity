@@ -203,7 +203,7 @@ int main() {
                 profiler_in.Begin();
                 input_embeddings = load_data<f32>(base_file, embedding_count, dim);
                 profiler_in.End();
-                assert((int)dimension == dim || !"embedding dimension wrong");
+                assert(dimension == dim || !"embedding dimension wrong");
                 assert(base_counts == embedding_count || !"embedding count wrong");
                 std::cout << "Load base data: " << profiler_in.ElapsedToString() << std::endl;
                 // output embedding_count, dimension
@@ -224,7 +224,7 @@ int main() {
                 input_train = load_data<f32>(train_file, train_count, dim);
                 profiler_in.End();
                 input_train_ptr = input_train.get();
-                assert((int)dimension == dim || !"embedding dimension wrong");
+                assert(dimension == dim || !"embedding dimension wrong");
                 std::cout << "Load train data: " << profiler_in.ElapsedToString() << std::endl;
                 // output embedding_count, dimension
                 std::cout << "train_count: " << train_count << std::endl;
@@ -262,7 +262,7 @@ int main() {
         profiler.Begin();
         queries = load_data<f32>(query_file, number_of_queries, dim);
         profiler.End();
-        assert((int)dimension == dim || !"query does not have same dimension as train set");
+        assert(dimension == dim || !"query does not have same dimension as train set");
         std::cout << "Load query data: " << profiler.ElapsedToString() << std::endl;
     }
 
@@ -315,7 +315,7 @@ int main() {
             results.resize(number_of_queries);
             for (size_t i = 0; i < number_of_queries; ++i) {
                 results[i].resize(top_k);
-                for (size_t j = 0; (int)j < top_k; ++j) {
+                for (size_t j = 0; j < top_k; ++j) {
                     results[i][j] = ID[i * top_k + j].segment_offset_;
                 }
             }
