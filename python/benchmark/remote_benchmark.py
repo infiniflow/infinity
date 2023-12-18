@@ -165,13 +165,12 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         raise Exception(f"File: {query_path} doesn't exist")
 
     results = []
+    queries = fvecs_read_all(query_path)
 
     for i in range(rounds):
-        start = time.time()
-
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", table_name)
-        queries = fvecs_read_all(query_path)
+
         query_results = [[] for _ in range(len(queries))]
 
         dur = 0.0
@@ -191,8 +190,8 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
             res_list = res["ROW_ID"]
             # print(len(res_list))
 
-            for i in range(len(res_list)):
-                query_results[idx].append(res_list[i][1])
+            for j in range(len(res_list)):
+                query_results[idx].append(res_list[j][1])
 
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 
@@ -254,14 +253,14 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=16,
+        default=1,
         dest="threads",
     )
     parser.add_argument(
         "-r",
         "--rounds",
         type=int,
-        default=1,
+        default=5,
         dest="rounds",
     )
     parser.add_argument(
