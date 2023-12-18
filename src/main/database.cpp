@@ -97,7 +97,7 @@ SharedPtr<Table> Database::GetTable(const String &table_name) {
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeShared<CheckTable>(table_name.c_str());
+    command_statement->command_info_ = MakeUnique<CheckTable>(table_name.c_str());
     QueryResult result= query_context_ptr->QueryStatement(command_statement.get());
     if (result.status_.ok()) {
         return MakeShared<Table>(table_name, session_);

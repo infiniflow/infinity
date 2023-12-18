@@ -30,7 +30,7 @@ namespace infinity {
 export class PhysicalCommand final : public PhysicalOperator {
 public:
     explicit PhysicalCommand(u64 id,
-                             SharedPtr<CommandInfo> command_info,
+                             UniquePtr<CommandInfo> command_info,
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              SharedPtr<Vector<LoadMeta>> load_metas)
@@ -48,7 +48,7 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    const SharedPtr<CommandInfo> command_info_{};
+    const UniquePtr<CommandInfo> command_info_{};
 
     const SharedPtr<Vector<String>> output_names_{};
     const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

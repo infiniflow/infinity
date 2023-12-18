@@ -741,7 +741,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_command = (LogicalCommand *)(logical_operator.get());
     return MakeUnique<PhysicalCommand>(logical_command->node_id(),
-                                       logical_command->command_info(),
+                                       Move(logical_command->command_info_),
                                        logical_command->GetOutputNames(),
                                        logical_command->GetOutputTypes(),
                                        logical_operator->load_metas());

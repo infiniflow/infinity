@@ -41,6 +41,7 @@ public:
 
     QueryResult Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
+    QueryResult Command(UniquePtr<CommandInfo> command_info);
 private:
     String table_name_{};
     SharedPtr<BaseSession> session_{};

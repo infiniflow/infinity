@@ -26,12 +26,10 @@ namespace infinity {
 
 export class LogicalCommand : public LogicalNode {
 public:
-    LogicalCommand(u64 node_id, SharedPtr<CommandInfo> command_info)
+    LogicalCommand(u64 node_id, UniquePtr<CommandInfo> command_info)
         : LogicalNode(node_id, LogicalNodeType::kCommand), command_info_(Move(command_info)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
-
-    [[nodiscard]] SharedPtr<CommandInfo> command_info() const { return command_info_; }
 
     [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const final;
 
@@ -41,8 +39,7 @@ public:
 
     inline String name() final { return "LogicalCommand"; }
 
-private:
-    SharedPtr<CommandInfo> command_info_{};
+    UniquePtr<CommandInfo> command_info_{};
 };
 
 } // namespace infinity

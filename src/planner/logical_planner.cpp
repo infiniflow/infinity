@@ -707,7 +707,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             Status status = txn->GetDatabase(use_command_info->db_name(), base_db_entry);
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), Move(command_statement->command_info_));
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -717,14 +717,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kSet: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), Move(command_statement->command_info_));
 
             this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kExport: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), Move(command_statement->command_info_));
 
             this->logical_plan_ = logical_command;
             break;
@@ -734,7 +734,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [base_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), Move(command_statement->command_info_));
 
                 this->logical_plan_ = logical_command;
             } else {

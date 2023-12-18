@@ -164,4 +164,18 @@ QueryResult Table::Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<Pa
     return result;
 }
 
+QueryResult Table::Command(UniquePtr<CommandInfo> command_info) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = Move(command_info);
+
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
+    return result;
+}
+
 } // namespace infinity
