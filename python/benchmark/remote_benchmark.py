@@ -74,7 +74,6 @@ def read_groundtruth(filename):
     return ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100
 
 
-
 def calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100, query_results):
     correct_1 = 0.0
     correct_10 = 0.0
@@ -113,9 +112,9 @@ def trace_unhandled_exceptions(func):
 
 
 @trace_unhandled_exceptions
-def work(query_vec, topk, metric_type, column_name, data_type):
+def work(query_vec, topk, metric_type, column_name, data_type, table_name="sift_benchmark"):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", "sift_benchmark")
+    table = RemoteTable(conn, "default", table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
     query_builder.knn(column_name, query_vec, data_type, metric_type, topk)
@@ -134,19 +133,18 @@ def fvecs_read(filename):
                 break
 
 
-def process_pool(threads, rounds, path):
-    sift_query_path = path + "/sift_query.fvecs"
-    if not os.path.exists(sift_query_path):
-        print(f"File: {sift_query_path} doesn't exist")
-        raise Exception(f"File: {sift_query_path} doesn't exist")
+def process_pool(threads, rounds, query_path, tabel_name):
+    if not os.path.exists(query_path):
+        print(f"File: {query_path} doesn't exist")
+        raise Exception(f"File: {query_path} doesn't exist")
 
     results = []
 
     for i in range(rounds):
         start = time.time()
         p = multiprocessing.Pool(threads)
-        for idx, query_vec in enumerate(fvecs_read(sift_query_path)):
-            p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float"))
+        for idx, query_vec in enumerate(fvecs_read(query_path)):
+            p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float", tabel_name))
         p.close()
         p.join()
 
@@ -161,11 +159,10 @@ def process_pool(threads, rounds, path):
         print(result)
 
 
-def one_thread(rounds, path):
-    sift_query_path = path + "/sift_query.fvecs"
-    if not os.path.exists(sift_query_path):
-        print(f"File: {sift_query_path} doesn't exist")
-        raise Exception(f"File: {sift_query_path} doesn't exist")
+def one_thread(rounds, query_path, ground_truth_path, table_name):
+    if not os.path.exists(query_path):
+        print(f"File: {query_path} doesn't exist")
+        raise Exception(f"File: {query_path} doesn't exist")
 
     results = []
 
@@ -173,8 +170,8 @@ def one_thread(rounds, path):
         start = time.time()
 
         conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default", "sift_benchmark")
-        queries = fvecs_read_all(sift_query_path)
+        table = RemoteTable(conn, "default", table_name)
+        queries = fvecs_read_all(query_path)
         query_results = [[] for _ in range(len(queries))]
 
         dur = 0.0
@@ -197,8 +194,6 @@ def one_thread(rounds, path):
             for i in range(len(res_list)):
                 query_results[idx].append(res_list[i][1])
 
-
-        ground_truth_path = path + "/sift_groundtruth.ivecs"
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
@@ -215,16 +210,34 @@ def one_thread(rounds, path):
         print(result)
 
 
-def benchmark(threads, rounds, path):
-    if threads > 1:
-        print(f"Multi-threads: {threads}")
-        print(f"Rounds: {rounds}")
-        process_pool(threads, rounds, path)
+def benchmark(threads, rounds, data_set, path):
+    if not os.path.exists(path):
+        print(f"Path: {path} doesn't exist")
+        raise Exception(f"Path: {path} doesn't exist")
+    if data_set == "sift_1m":
+        query_path = path + "/sift_query.fvecs"
+        ground_truth_path = path + "/sift_groundtruth.ivecs"
+        if threads > 1:
+            print(f"Multi-threads: {threads}")
+            print(f"Rounds: {rounds}")
+            process_pool(threads, rounds, query_path, "sift_benchmark")
 
-    else:
-        print(f"Single-thread")
-        print(f"Rounds: {rounds}")
-        one_thread(rounds, path)
+        else:
+            print(f"Single-thread")
+            print(f"Rounds: {rounds}")
+            one_thread(rounds, path, ground_truth_path, "sift_benchmark")
+    elif data_set == "gist_1m":
+        query_path = path + "/gist_query.fvecs"
+        ground_truth_path = path + "/gist_groundtruth.ivecs"
+        if threads > 1:
+            print(f"Multi-threads: {threads}")
+            print(f"Rounds: {rounds}")
+            process_pool(threads, rounds, query_path, "gist_benchmark")
+
+        else:
+            print(f"Single-thread")
+            print(f"Rounds: {rounds}")
+            one_thread(rounds, query_path, ground_truth_path, "gist_benchmark")
 
 
 if __name__ == '__main__':
@@ -235,16 +248,13 @@ if __name__ == '__main__':
     print(f"Current Path: {current_path}")
     print(f"Parent Path: {parent_path}")
 
-    data_dir = parent_path + "/test/data/benchmark/sift_1m"
-    print(f"Data Dir: {data_dir}")
-
     parser = argparse.ArgumentParser(description="Benchmark Infinity")
 
     parser.add_argument(
         "-t",
         "--threads",
         type=int,
-        default=1,
+        default=16,
         dest="threads",
     )
     parser.add_argument(
@@ -254,7 +264,17 @@ if __name__ == '__main__':
         default=1,
         dest="rounds",
     )
+    parser.add_argument(
+        "-d",
+        "--data",
+        type=str,
+        default='gist_1m',  # gist_1m
+        dest="data_set",
+    )
+
+    data_dir = parent_path + "/test/data/benchmark/" + parser.parse_args().data_set
+    print(f"Data Dir: {data_dir}")
 
     args = parser.parse_args()
 
-    benchmark(args.threads, args.rounds, path=data_dir)
+    benchmark(args.threads, args.rounds, args.data_set, path=data_dir)

@@ -199,7 +199,7 @@ def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> tty
     raise KeyError(f"column name {column_name} not found in column defs")
 
 
-def build_result(res: ttypes.SelectResponse) -> tuple[dict[str, list[Any]], dict[str, Any]]:
+def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any]]:
     data_dict = {}
     data_type_dict = {}
     column_counter = defaultdict(int)
