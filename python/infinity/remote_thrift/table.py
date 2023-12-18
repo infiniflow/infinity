@@ -13,7 +13,7 @@
 # limitations under the License.
 import os
 from abc import ABC
-from typing import Optional, Union, List, Any
+from typing import Optional, Union, List, Any, Tuple, Dict
 
 from sqlglot import condition
 
@@ -196,7 +196,7 @@ class RemoteTable(Table, ABC):
     def query_builder(self) -> InfinityThriftQueryBuilder:
         return InfinityThriftQueryBuilder(table=self)
 
-    def _execute_query(self, query: Query) -> tuple[dict[str, list[Any, Any]], dict[str, Any]]:
+    def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         # process select_list
         select_list: List[ttypes.ParsedExpr] = []
         for column in query.columns:
