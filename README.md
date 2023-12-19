@@ -5,7 +5,7 @@
 
 <p align="center">
     <b>The AI-native database built for the next-gen Retrieval-Augmented Generation</b>
-    <b>Blazing fast vector search</b>
+    <b>Incredibly fast vector search</b>
     <b></b>
 </p>
 ---
