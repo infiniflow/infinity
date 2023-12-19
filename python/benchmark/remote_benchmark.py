@@ -52,7 +52,7 @@ def read_groundtruth(filename):
             except struct.error:
                 break
 
-    print("len(vectors): ", len(vectors))
+    # print("len(vectors): ", len(vectors))
 
     gt_count = len(vectors)
     gt_top_k = len(vectors[0])
@@ -140,10 +140,12 @@ def process_pool(threads, rounds, query_path, tabel_name):
 
     results = []
 
+    queries = fvecs_read_all(query_path)
+
     for i in range(rounds):
         start = time.time()
         p = multiprocessing.Pool(threads)
-        for idx, query_vec in enumerate(fvecs_read(query_path)):
+        for idx, query_vec in enumerate(queries):
             p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float", tabel_name))
         p.close()
         p.join()
@@ -151,9 +153,9 @@ def process_pool(threads, rounds, query_path, tabel_name):
         end = time.time()
         dur = end - start
         results.append(f"Round {i + 1}:")
-        results.append(f"Total Dur: {dur}")
-        qps = 10000 / dur
-        results.append(f"QPS: {qps}")
+        results.append(f"Total Dur: {dur} s")
+        results.append(f"Query Count: {len(queries)}")
+        results.append(f"QPS: {len(queries) / dur}")
 
     for result in results:
         print(result)
@@ -165,13 +167,12 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         raise Exception(f"File: {query_path} doesn't exist")
 
     results = []
+    queries = fvecs_read_all(query_path)
 
     for i in range(rounds):
-        start = time.time()
-
         conn = ThriftInfinityClient(REMOTE_HOST)
         table = RemoteTable(conn, "default", table_name)
-        queries = fvecs_read_all(query_path)
+
         query_results = [[] for _ in range(len(queries))]
 
         dur = 0.0
@@ -191,20 +192,20 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
             res_list = res["ROW_ID"]
             # print(len(res_list))
 
-            for i in range(len(res_list)):
-                query_results[idx].append(res_list[i][1])
+            for j in range(len(res_list)):
+                query_results[idx].append(res_list[j][1])
 
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
                                                                ground_truth_sets_100, query_results)
         results.append(f"Round {i + 1}:")
-        results.append(f"recall_1: {recall_1}")
-        results.append(f"recall_10: {recall_10}")
-        results.append(f"recall_100: {recall_100}")
-        results.append(f"Total Dur: {dur}")
-        qps = 10000 / dur
-        results.append(f"QPS: {qps}")
+        results.append(f"Total Dur: {dur} s")
+        results.append(f"Query Count: {len(queries)}")
+        results.append(f"QPS: {len(queries) / dur}")
+        results.append(f"Recall@1: {recall_1}")
+        results.append(f"Recall@10: {recall_10}")
+        results.append(f"Recall@100: {recall_100}")
 
     for result in results:
         print(result)
@@ -225,7 +226,7 @@ def benchmark(threads, rounds, data_set, path):
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, path, ground_truth_path, "sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, "sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
@@ -254,21 +255,21 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=16,
+        default=1,
         dest="threads",
     )
     parser.add_argument(
         "-r",
         "--rounds",
         type=int,
-        default=1,
+        default=5,
         dest="rounds",
     )
     parser.add_argument(
         "-d",
         "--data",
         type=str,
-        default='gist_1m',  # gist_1m
+        default='sift_1m',  # gist_1m
         dest="data_set",
     )
 

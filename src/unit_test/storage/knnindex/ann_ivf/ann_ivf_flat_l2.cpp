@@ -117,7 +117,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
 
         p_bitmask->SetFalse(0);
         {
-            ann_distance_m.Begin();
+            ann_distance_m.ReInitialize();
             ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, *p_bitmask);
             ann_distance_m.End();
             f32 *distance_array_m = ann_distance_m.GetDistanceByIdx(0);
@@ -134,7 +134,7 @@ TEST_F(AnnIVFFlatL2Test, test1) {
 
         p_bitmask->SetFalse(2);
         {
-            ann_distance_m.Begin();
+            ann_distance_m.ReInitialize();
             ann_distance_m.Search(ann_ivf_l2_index.get(), 0, 1, *p_bitmask);
             ann_distance_m.End();
             f32 *distance_array_m = ann_distance_m.GetDistanceByIdx(0);

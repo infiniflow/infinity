@@ -20,25 +20,26 @@ namespace infinity {
 
 // assume that distances have been initialized
 // the 1st element may not be the largest / smallest when heap is not full
-export template <typename Compare, typename DistType, typename ID>
+export template <typename Compare>
 class heap_twin_multiple {
+    using DistType = typename Compare::DistanceType;
+    using ID = typename Compare::IDType;
     u64 nq{};
     u32 top_k{};
     DistType *distance_ptr = nullptr;
     ID *id_ptr = nullptr;
     Vector<u32> sizes;
-    Compare comp{};
-    void down(DistType *distance, ID *id, u32 size, u32 index) {
+    static void down(DistType *distance, ID *id, u32 size, u32 index) {
         if (index == 0 || (index << 1) > size) {
             return;
         }
         DistType tmp_d = distance[index];
         ID tmp_i = id[index];
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-            if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
+            if (sub + 1 <= size && Compare::Compare(distance[sub + 1], distance[sub])) {
                 ++sub;
             }
-            if (!comp(distance[sub], tmp_d)) {
+            if (!Compare::Compare(distance[sub], tmp_d)) {
                 break;
             }
             distance[index] = distance[sub];
@@ -52,16 +53,17 @@ public:
     explicit heap_twin_multiple(u64 nq, u32 top_k, DistType *distance_ptr, ID *id_ptr)
         : nq{nq}, top_k{top_k}, distance_ptr{distance_ptr}, id_ptr{id_ptr}, sizes(nq) {}
     ~heap_twin_multiple() = default;
-    void initialize() {
+    void initialize() { std::fill_n(distance_ptr, nq * top_k, Compare::InitialValue()); }
+    void reinitialize() {
         std::fill(sizes.begin(), sizes.end(), 0);
-        std::fill_n(distance_ptr, nq * top_k, comp(1, 0) ? std::numeric_limits<DistType>::max() : std::numeric_limits<DistType>::lowest());
+        std::fill_n(distance_ptr, nq * top_k, Compare::InitialValue());
     }
     void add(u64 q_id, DistType d, ID i) {
         u32 &size = sizes[q_id];
         DistType *distance = distance_ptr + q_id * top_k - 1;
         ID *id = id_ptr + q_id * top_k - 1;
         if (size == top_k) {
-            if (comp(distance[1], d)) {
+            if (Compare::Compare(distance[1], d)) {
                 distance[1] = d;
                 id[1] = i;
                 down(distance, id, size, 1);
@@ -110,7 +112,6 @@ class heap_twin {
     ID *id = nullptr;
     u32 size{};
     u32 capacity{};
-    Compare comp{};
     void down(u32 index) {
         if (index == 0 || (index << 1) > size) {
             return;
@@ -118,10 +119,10 @@ class heap_twin {
         DistType tmp_d = distance[index];
         ID tmp_i = id[index];
         for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-            if (sub + 1 <= size && comp(distance[sub + 1], distance[sub])) {
+            if (sub + 1 <= size && Compare::Compare(distance[sub + 1], distance[sub])) {
                 ++sub;
             }
-            if (!comp(distance[sub], tmp_d)) {
+            if (!Compare::Compare(distance[sub], tmp_d)) {
                 break;
             }
             distance[index] = distance[sub];
@@ -150,11 +151,11 @@ public:
     heap_twin(u32 capacity, DistType *distance_ptr, ID *id_ptr) : capacity{capacity}, size{0}, distance{distance_ptr - 1}, id{id_ptr - 1} {}
     void initialize() {
         size = 0;
-        std::fill_n(distance + 1, capacity, comp(1, 0) ? std::numeric_limits<DistType>::max() : std::numeric_limits<DistType>::lowest());
+        std::fill_n(distance + 1, capacity, Compare::InitialValue());
     }
     void add(DistType d, ID i) {
         if (size == capacity) {
-            if (comp(distance[1], d)) {
+            if (Compare::Compare(distance[1], d)) {
                 distance[1] = d;
                 id[1] = i;
                 down(1);

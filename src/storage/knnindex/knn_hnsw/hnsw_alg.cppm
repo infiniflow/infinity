@@ -20,6 +20,7 @@ import stl;
 import file_system;
 import file_system_type;
 import infinity_exception;
+import knn_result_handler;
 import bitmask;
 
 import hnsw_common;
@@ -49,6 +50,7 @@ public:
     using PDV = Pair<DataType, VertexType>;
     using CMP = CompareByFirst<DataType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
+    using HnswLabelType = LabelType;
 
     constexpr static int prefetch_offset_ = 0;
     constexpr static int prefetch_step_ = 2;
@@ -242,6 +244,113 @@ public:
         return result;
     }
 
+    Pair<u32, Pair<UniquePtr<DataType[]>, UniquePtr<VertexType[]>>>
+    SearchLayerReturnPair(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT candidate_n) const {
+        auto d_ptr = MakeUniqueForOverwrite<DataType[]>(candidate_n);
+        auto i_ptr = MakeUniqueForOverwrite<VertexType[]>(candidate_n);
+        HeapResultHandler<CompareMax<DataType, VertexType>> result_handler(1, candidate_n, d_ptr.get(), i_ptr.get());
+        result_handler.Begin();
+        DistHeap candidate;
+
+        data_store_.Prefetch(enter_point);
+        auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
+
+        candidate.emplace(-dist, enter_point);
+        result_handler.AddResult(0, dist, enter_point);
+
+        Vector<bool> visited(data_store_.cur_vec_num(), false);
+        visited[enter_point] = true;
+
+        while (!candidate.empty()) {
+            const auto [minus_c_dist, c_idx] = candidate.top();
+            candidate.pop();
+            if (result_handler.GetSize(0) == candidate_n && -minus_c_dist > result_handler.GetDistance0(0)) {
+                break;
+            }
+            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
+            int prefetch_start = neighbor_size - 1 - prefetch_offset_;
+            for (int i = neighbor_size - 1; i >= 0; --i) {
+                VertexType n_idx = neighbors_p[i];
+                if (visited[n_idx]) {
+                    continue;
+                }
+                visited[n_idx] = true;
+                if (prefetch_start >= 0) {
+                    int lower = Max(0, prefetch_start - prefetch_step_);
+                    for (int i = prefetch_start; i >= lower; --i) {
+                        data_store_.Prefetch(neighbors_p[i]);
+                    }
+                    prefetch_start -= prefetch_step_;
+                }
+                auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
+                if (result_handler.GetSize(0) < candidate_n || dist < result_handler.GetDistance0(0)) {
+                    candidate.emplace(-dist, n_idx);
+                    result_handler.AddResult(0, dist, n_idx);
+                }
+            }
+        }
+        result_handler.EndWithoutSort();
+        return {result_handler.GetSize(0), MakePair(Move(d_ptr), Move(i_ptr))};
+    }
+
+    Pair<u32, Pair<UniquePtr<DataType[]>, UniquePtr<VertexType[]>>>
+    SearchLayerReturnPair(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT candidate_n, const Bitmask &bitmask) const {
+        if (bitmask.IsAllTrue()) {
+            return SearchLayerReturnPair(enter_point, query, layer_idx, candidate_n);
+        }
+        auto d_ptr = MakeUniqueForOverwrite<DataType[]>(candidate_n);
+        auto v_ptr = MakeUniqueForOverwrite<VertexType[]>(candidate_n);
+        HeapResultHandler<CompareMax<DataType, VertexType>> result_handler(1, candidate_n, d_ptr.get(), v_ptr.get());
+        result_handler.Begin();
+        DistHeap candidate;
+
+        if (bitmask.IsTrue(enter_point)) {
+            data_store_.Prefetch(enter_point);
+            auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
+
+            candidate.emplace(-dist, enter_point);
+            result_handler.AddResult(0, dist, enter_point);
+        } else {
+            candidate.emplace(LimitMax<DataType>(), enter_point);
+        }
+
+        Vector<bool> visited(data_store_.cur_vec_num(), false);
+        visited[enter_point] = true;
+
+        while (!candidate.empty()) {
+            const auto [minus_c_dist, c_idx] = candidate.top();
+            candidate.pop();
+            if (result_handler.GetSize(0) == candidate_n && -minus_c_dist > result_handler.GetDistance0(0)) {
+                break;
+            }
+            const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
+            int prefetch_start = neighbor_size - 1 - prefetch_offset_;
+            for (int i = neighbor_size - 1; i >= 0; --i) {
+                VertexType n_idx = neighbors_p[i];
+                if (visited[n_idx]) {
+                    continue;
+                }
+                visited[n_idx] = true;
+                if (prefetch_start >= 0) {
+                    int lower = Max(0, prefetch_start - prefetch_step_);
+                    for (int i = prefetch_start; i >= lower; --i) {
+                        data_store_.Prefetch(neighbors_p[i]);
+                    }
+                    prefetch_start -= prefetch_step_;
+                }
+                auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
+                if (result_handler.GetSize(0) < candidate_n || dist < result_handler.GetDistance0(0)) {
+                    candidate.emplace(-dist, n_idx);
+                    if (bitmask.IsTrue(n_idx)) {
+                        result_handler.AddResult(0, dist, n_idx);
+                    }
+                }
+            }
+        }
+        result_handler.EndWithoutSort();
+        return {result_handler.GetSize(0), MakePair(Move(d_ptr), Move(v_ptr))};
+    }
+
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
         DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_);
@@ -359,7 +468,7 @@ public:
     }
     void Insert(const DataType *query, LabelType label) { Insert(query, &label, 1); }
 
-    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k, const Bitmask *bitmask = nullptr) const {
+    MaxHeap<Pair<DataType, LabelType>> KnnSearch(const DataType *q, SizeT k) const {
         auto query = data_store_.MakeQuery(q);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
@@ -395,6 +504,31 @@ public:
             search_result.pop();
         }
         return result;
+    }
+
+    Pair<u32, Pair<UniquePtr<DataType[]>, UniquePtr<LabelType[]>>> KnnSearchReturnPair(const DataType *q, SizeT k, const Bitmask &bitmask) const {
+        auto query = data_store_.MakeQuery(q);
+        VertexType ep = graph_store_.enterpoint();
+        for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
+            ep = SearchLayerNearest(ep, query, cur_layer);
+        }
+        auto search_result = SearchLayerReturnPair(ep, query, 0, Max(k, ef_), bitmask);
+        auto &[result_size, unique_ptr_pair] = search_result;
+        auto &[d_ptr, v_ptr] = unique_ptr_pair;
+        UniquePtr<LabelType[]> l_ptr;
+        if constexpr (sizeof(LabelType) == sizeof(VertexType)) {
+            auto label_ptr = reinterpret_cast<LabelType *>(v_ptr.get());
+            for (SizeT i = 0; i < result_size; ++i) {
+                label_ptr[i] = labels_[v_ptr[i]];
+            }
+            l_ptr.reset(reinterpret_cast<LabelType *>(v_ptr.release()));
+        } else {
+            l_ptr = MakeUniqueForOverwrite<LabelType[]>(result_size);
+            for (SizeT i = 0; i < result_size; ++i) {
+                l_ptr[i] = labels_[v_ptr[i]];
+            }
+        }
+        return {result_size, MakePair(Move(d_ptr), Move(l_ptr))};
     }
 
 public:

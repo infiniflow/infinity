@@ -44,7 +44,7 @@ import column_expression;
 import index_base;
 import buffer_manager;
 import merge_knn;
-import faiss;
+import knn_result_handler;
 import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
@@ -338,14 +338,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
                 auto IVFFlatScan = [&]<typename AnnIVFFlatType>() {
-                    AnnIVFFlatType ann_ivfflat_query{query,
+                    AnnIVFFlatType ann_ivfflat_query(query,
                                                      knn_scan_shared_data->query_count_,
                                                      knn_scan_shared_data->topk_,
                                                      knn_scan_shared_data->dimension_,
-                                                     knn_scan_shared_data->elem_type_};
+                                                     knn_scan_shared_data->elem_type_);
                     ann_ivfflat_query.Begin();
                     ann_ivfflat_query.Search(index, segment_id, n_probes, bitmask);
-                    ann_ivfflat_query.End();
+                    ann_ivfflat_query.EndWithoutSort();
                     auto dists = ann_ivfflat_query.GetDistances();
                     auto row_ids = ann_ivfflat_query.GetIDs();
                     // TODO: now only work for one query
@@ -373,7 +373,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             case IndexType::kHnsw: {
                 BufferHandle index_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry, buffer_mgr);
                 auto index_hnsw = static_cast<IndexHnsw *>(segment_column_index_entry->column_index_entry_->index_base_.get());
-                auto KnnScan = [&](auto *index) {
+                auto KnnScanOld = [&](auto *index) {
                     Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
                     Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
 
@@ -418,6 +418,65 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         }
                     }
                     merge_heap->Search(dists.data(), row_ids.data(), result_n);
+                };
+                auto KnnScanUseHeap = [&]<typename LabelType>(auto *index) {
+                    if constexpr (!std::is_same_v<LabelType, u64>) {
+                        Error<ExecutorException>("Bug: Hnsw LabelType must be u64");
+                    }
+                    for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
+                        if (opt_param.param_name_ == "ef") {
+                            u64 ef = std::stoull(opt_param.param_value_);
+                            index->SetEf(ef);
+                        }
+                    }
+                    i64 result_n = -1;
+                    for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
+                        const DataType *query =
+                            static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
+                        auto search_result = index->KnnSearchReturnPair(query, knn_scan_shared_data->topk_, bitmask);
+                        auto &[result_size, unique_ptr_pair] = search_result;
+                        auto &[d_ptr, l_ptr] = unique_ptr_pair;
+                        if (result_n < 0) {
+                            result_n = result_size;
+                        } else if (result_n != (i64)result_size) {
+                            throw ExecutorException("Bug");
+                        }
+                        if (result_size <= 0) {
+                            continue;
+                        }
+                        UniquePtr<RowID[]> row_ids_ptr;
+                        RowID *row_ids = nullptr;
+                        if constexpr (sizeof(RowID) == sizeof(LabelType)) {
+                            row_ids = reinterpret_cast<RowID *>(l_ptr.get());
+                        } else {
+                            row_ids_ptr = MakeUniqueForOverwrite<RowID[]>(result_size);
+                            row_ids = row_ids_ptr.get();
+                        }
+                        for (SizeT i = 0; i < result_size; ++i) {
+                            row_ids[i] = RowID::FromUint64(l_ptr[i]);
+                        }
+                        switch (knn_scan_shared_data->knn_distance_type_) {
+                            case KnnDistanceType::kInvalid: {
+                                throw ExecutorException("Bug");
+                            }
+                            case KnnDistanceType::kL2:
+                            case KnnDistanceType::kHamming: {
+                                break;
+                            }
+                            case KnnDistanceType::kCosine:
+                            case KnnDistanceType::kInnerProduct: {
+                                for (SizeT i = 0; i < result_size; ++i) {
+                                    d_ptr[i] = -d_ptr[i];
+                                }
+                                break;
+                            }
+                        }
+                        merge_heap->Search(0, d_ptr.get(), row_ids, result_size);
+                    }
+                };
+                auto KnnScan = [&](auto *index) {
+                    using LabelType = typename std::remove_pointer_t<decltype(index)>::HnswLabelType;
+                    KnnScanUseHeap.template operator()<LabelType>(index);
                 };
                 switch (index_hnsw->encode_type_) {
                     case HnswEncodeType::kPlain: {
@@ -476,20 +535,22 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         merge_heap->End();
         i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
-        UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
-        data_block->Init(*GetOutputTypes());
-        operator_state->data_block_array_.emplace_back(Move(data_block));
-        SizeT row_idx = DEFAULT_BLOCK_CAPACITY;
-
-        SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
-        for (; row_idx < total_data_row_count; row_idx += DEFAULT_BLOCK_CAPACITY) {
-            data_block = DataBlock::MakeUniquePtr();
-            data_block->Init(*GetOutputTypes());
-            operator_state->data_block_array_.emplace_back(Move(data_block));
+        if (!operator_state->data_block_array_.empty()) {
+            Error<ExecutorException>("In physical_knn_scan : operator_state->data_block_array_ is not empty.");
+        }
+        {
+            SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
+            SizeT row_idx = 0;
+            do {
+                auto data_block = DataBlock::MakeUniquePtr();
+                data_block->Init(*GetOutputTypes());
+                operator_state->data_block_array_.emplace_back(Move(data_block));
+                row_idx += DEFAULT_BLOCK_CAPACITY;
+            } while (row_idx < total_data_row_count);
         }
 
         SizeT output_block_row_id = 0;
-        SizeT output_block_idx = operator_state->data_block_array_.size() - 1;
+        SizeT output_block_idx = 0;
         DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
         for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
             DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
@@ -505,12 +566,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    throw ExecutorException(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
                     output_block_ptr->Finalize();
-                    --output_block_idx;
+                    ++output_block_idx;
                     output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
                     output_block_row_id = 0;
                 }

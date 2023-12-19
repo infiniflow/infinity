@@ -31,7 +31,7 @@ import knn_flat_l2_top1;
 import knn_flat_l2_top1_blas;
 
 import merge_knn;
-import faiss;
+import knn_result_handler;
 import vector_distance;
 import data_block;
 import column_vector;

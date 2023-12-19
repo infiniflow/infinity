@@ -257,6 +257,11 @@ export {
     }
 
     template <typename T>
+    constexpr T LimitLowest() {
+        return std::numeric_limits<T>::lowest();
+    }
+
+    template <typename T>
     using Atomic = std::atomic<T>;
 
     // Smart ptr
@@ -275,6 +280,11 @@ export {
     template <typename T, typename... Args>
     inline UniquePtr<T> MakeUnique(Args && ...args) {
         return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+
+    template <typename T, typename... Args>
+    inline UniquePtr<T> MakeUniqueForOverwrite(Args && ...args) {
+        return std::make_unique_for_overwrite<T>(std::forward<Args>(args)...);
     }
 
     template <typename T, typename U>
