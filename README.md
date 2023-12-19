@@ -5,10 +5,10 @@
 
 <p align="center">
     <b>The AI-native database built for the next-gen Retrieval-Augmented Generation</b>
-    <b>Incredibly fast vector search</b>
+    <p><b>Incredibly fast vector search</b></p>
     <b></b>
 </p>
----
+
 <h4 align="center">
   <a href="https://github.com/infiniflow/infinity/discussions">GitHub Discussions</a> |
   <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
@@ -19,13 +19,13 @@
 </h4>
 
 
-Infinity is an open-source AI-native database designed to enhance retrieval-augmented generation (RAG) applications. As a natural partner to mainstream LLMs, Infinity solves primary challenges faced by B2B applications, such as internal enterprise search, industry-specific search, in-house AI assistants, chatbots, in-house knowledge management systems, and more.
+Infinity is an open-source AI-native database designed to enhance retrieval-augmented generation (RAG) applications. As a natural partner to mainstream LLMs, Infinity solves primary challenges faced by B2B applications, such as internal enterprise search, industry-specific search, in-house AI assistants, chatbots, in-house knowledge management systems, and more. Infinity empowers these applications by supporting full-text search, multi-embedding search, multiple-collection query, and fused search. 
 
-Infinity empowers these applications by supporting full-text search, multi-embedding search, multiple-collection query, and fused search. 
+The vector search performance of Infinity on common datasets is exceptionally superior to all known open source vector databases, the higher the dimensionality the embeddings, the greater performance improvements achieved.
 
-Infinity was released under the [open-source Apache License 2.0](https://github.com/infiniflow/infinity/blob/master/LICENSE) on December 21, 2023.
+Infinity was released under the [open-source Apache License 2.0](https://github.com/infiniflow/infinity/blob/master/LICENSE) on December 20, 2023.
 
-###🧐 Benchmark
+### 🧐 Benchmark
 
 See a Benchmark report [here]().
 
@@ -48,7 +48,7 @@ See [Build from Source](build_from_source.md).
 
 Infinity comes with **performance**, **flexibility**, **ease-of-use**, and many features designed to address the challenges facing the next-gen RAG applications:
 
-### Blazing fast
+### Incredibly fast
 
 - End-to-end latency as low as 0.1 ms. See the [Benchmarking](https://www.example.com).
 - 10K QPS on CPU: 
@@ -59,7 +59,7 @@ Infinity comes with **performance**, **flexibility**, **ease-of-use**, and many 
 In addition to hybrid search, Infinity takes over the decision-making process previously owned by the upper-level applications, thereby simplifying complex queries considerably.
 
 - Full-text search
-- KNN-based  vector search
+- KNN-based vector search
 
 
 ### Rich data types
