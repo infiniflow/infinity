@@ -226,7 +226,7 @@ def benchmark(threads, rounds, data_set, path):
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, path, ground_truth_path, "sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, "sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
@@ -255,7 +255,7 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=16,
+        default=1,
         dest="threads",
     )
     parser.add_argument(
@@ -269,7 +269,7 @@ if __name__ == '__main__':
         "-d",
         "--data",
         type=str,
-        default='gist_1m',  # gist_1m
+        default='sift_1m',  # gist_1m
         dest="data_set",
     )
 
