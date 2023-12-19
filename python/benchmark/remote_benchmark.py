@@ -52,7 +52,7 @@ def read_groundtruth(filename):
             except struct.error:
                 break
 
-    print("len(vectors): ", len(vectors))
+    # print("len(vectors): ", len(vectors))
 
     gt_count = len(vectors)
     gt_top_k = len(vectors[0])
@@ -140,10 +140,12 @@ def process_pool(threads, rounds, query_path, tabel_name):
 
     results = []
 
+    queries = fvecs_read_all(query_path)
+
     for i in range(rounds):
         start = time.time()
         p = multiprocessing.Pool(threads)
-        for idx, query_vec in enumerate(fvecs_read(query_path)):
+        for idx, query_vec in enumerate(queries):
             p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float", tabel_name))
         p.close()
         p.join()
@@ -151,9 +153,9 @@ def process_pool(threads, rounds, query_path, tabel_name):
         end = time.time()
         dur = end - start
         results.append(f"Round {i + 1}:")
-        results.append(f"Total Dur: {dur}")
-        qps = 10000 / dur
-        results.append(f"QPS: {qps}")
+        results.append(f"Total Dur: {dur} s")
+        results.append(f"Query Count: {len(queries)}")
+        results.append(f"QPS: {len(queries) / dur}")
 
     for result in results:
         print(result)
@@ -198,12 +200,12 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
                                                                ground_truth_sets_100, query_results)
         results.append(f"Round {i + 1}:")
-        results.append(f"recall_1: {recall_1}")
-        results.append(f"recall_10: {recall_10}")
-        results.append(f"recall_100: {recall_100}")
-        results.append(f"Total Dur: {dur}")
-        qps = 10000 / dur
-        results.append(f"QPS: {qps}")
+        results.append(f"Total Dur: {dur} s")
+        results.append(f"Query Count: {len(queries)}")
+        results.append(f"QPS: {len(queries) / dur}")
+        results.append(f"Recall@1: {recall_1}")
+        results.append(f"Recall@10: {recall_10}")
+        results.append(f"Recall@100: {recall_100}")
 
     for result in results:
         print(result)
@@ -253,7 +255,7 @@ if __name__ == '__main__':
         "-t",
         "--threads",
         type=int,
-        default=1,
+        default=16,
         dest="threads",
     )
     parser.add_argument(
