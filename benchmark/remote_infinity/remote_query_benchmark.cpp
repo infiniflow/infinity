@@ -108,10 +108,13 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, auto fn) {
 int main() {
     size_t thread_num = 1;
     size_t total_times = 1;
+    size_t ef = 100;
     std::cout << "Please input thread_num, 0 means use all resources:" << std::endl;
     std::cin >> thread_num;
     std::cout << "Please input total_times:" << std::endl;
     std::cin >> total_times;
+    std::cout << "Please input ef:" << std::endl;
+    std::cin >> ef;
 
     infinity::LocalFileSystem fs;
 
@@ -175,12 +178,11 @@ int main() {
         for (auto &v : query_results) {
             v.reserve(100);
         }
-        auto query_function = [dimension, topk, queries, &query_results](size_t query_idx, InfinityClient &client, size_t threadId) {
-            int64_t session_id = client.session_id;
+        auto query_function = [ef, dimension, topk, queries, &query_results](size_t query_idx, InfinityClient &client, size_t threadId) {
             SelectRequest req;
             SelectResponse ret;
             {
-                req.session_id = session_id;
+                req.session_id = client.session_id;
                 req.__isset.session_id = true;
                 req.db_name = "default";
                 req.__isset.db_name = true;
@@ -215,6 +217,15 @@ int main() {
                     knn_expr.__isset.distance_type = true;
                     knn_expr.topn = topk;
                     knn_expr.__isset.topn = true;
+                    InitParameter init_param;
+                    {
+                        init_param.param_name = "ef";
+                        init_param.__isset.param_name = true;
+                        init_param.param_value = std::to_string(ef);
+                        init_param.__isset.param_value = true;
+                    }
+                    knn_expr.opt_params.push_back(std::move(init_param));
+                    knn_expr.__isset.opt_params = true;
                 }
                 req.search_expr.knn_exprs.push_back(std::move(knn_expr));
                 req.search_expr.__isset.knn_exprs = true;

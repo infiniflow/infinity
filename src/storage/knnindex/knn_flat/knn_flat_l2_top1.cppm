@@ -15,11 +15,8 @@
 module;
 
 import stl;
-import knn_heap;
 import knn_result_handler;
 import knn_distance;
-import knn_partition;
-import faiss;
 import parser;
 
 import infinity_exception;
@@ -34,18 +31,16 @@ namespace infinity {
 export template <typename DistType>
 class KnnFlatL2Top1 final : public KnnDistance<DistType> {
 
-    using SingleBestResultHandler = SingleBestResultHandler<CompareMax<DistType, RowID>>;
-    using SingleResultHandler = SingleBestResultHandler::SingleResultHandler;
+    using ResultHandler = SingleBestResultHandler<CompareMax<DistType, RowID>>;
 
 public:
     explicit KnnFlatL2Top1(const DistType *queries, i64 query_count, i64 dimension, EmbeddingDataType elem_data_type)
         : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type, query_count, dimension, 1), queries_(queries) {
 
-        id_array_ = MakeUnique<Vector<RowID>>(this->query_count_, RowID());
-        distance_array_ = MakeUnique<DistType[]>(sizeof(DistType) * this->query_count_);
+        id_array_ = MakeUniqueForOverwrite<RowID[]>(this->query_count_);
+        distance_array_ = MakeUniqueForOverwrite<DistType[]>(this->query_count_);
 
-        single_best_result_handler_ = MakeUnique<SingleBestResultHandler>(query_count, distance_array_.get(), id_array_->data());
-        single_result_handler_ = MakeUnique<SingleResultHandler>(*single_best_result_handler_);
+        result_handler_ = MakeUnique<ResultHandler>(query_count, distance_array_.get(), id_array_.get());
     }
 
     void Begin() final {
@@ -53,9 +48,7 @@ public:
             return;
         }
 
-        for (u64 i = 0; i < this->query_count_; ++i) {
-            single_result_handler_->begin(i);
-        }
+        result_handler_->Begin();
 
         begin_ = true;
     }
@@ -79,7 +72,7 @@ public:
             for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
 
                 auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                single_result_handler_->add_result(l2_distance, RowID{segment_id, segment_offset_start + j}, i);
+                result_handler_->AddResult(i, l2_distance, RowID{segment_id, segment_offset_start + j});
             }
         }
     }
@@ -108,7 +101,7 @@ public:
                 auto segment_offset = segment_offset_start + j;
                 if (bitmask.IsTrue(segment_offset)) {
                     auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    single_result_handler_->add_result(l2_distance, RowID{segment_id, segment_offset}, i);
+                    result_handler_->AddResult(i, l2_distance, RowID{segment_id, segment_offset});
                 }
             }
         }
@@ -118,37 +111,35 @@ public:
         if (!begin_)
             return;
 
-        for (u64 i = 0; i < this->query_count_; ++i) {
-            single_result_handler_->end(i);
-        }
+        result_handler_->End();
 
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const final { return single_best_result_handler_->dis_tab; }
+    [[nodiscard]] inline DistType *GetDistances() const final { return distance_array_.get(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const final { return single_best_result_handler_->ids_tab; }
+    [[nodiscard]] inline RowID *GetIDs() const final { return id_array_.get(); }
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return single_best_result_handler_->dis_tab + idx * 1;
+        return distance_array_.get() + idx * 1;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             Error<ExecutorException>("Query index exceeds the limit");
         }
-        return single_best_result_handler_->ids_tab + idx * 1;
+        return id_array_.get() + idx * 1;
     }
 
 private:
-    UniquePtr<Vector<RowID>> id_array_{};
+    UniquePtr<RowID[]> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
 
-    UniquePtr<SingleBestResultHandler> single_best_result_handler_{};
-    UniquePtr<SingleResultHandler> single_result_handler_{};
+    UniquePtr<ResultHandler> result_handler_{};
+
     const DistType *queries_{};
     bool begin_{false};
 };

@@ -23,6 +23,7 @@ import vector_distance;
 import search_top_1_sgemm;
 import search_top_k_sgemm;
 import heap_twin_operation;
+import knn_result_handler;
 
 export module search_top_k;
 
@@ -31,7 +32,7 @@ namespace infinity {
 template <typename TypeX, typename TypeY, typename ID, typename DistType>
 void search_top_1_simple_with_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances) {
     for (u32 i = 0; i < nx; ++i) {
-        DistType min_dist = std::numeric_limits<DistType>::max();
+        DistType min_dist = LimitMax<DistType>();
         u32 min_idx = 0;
         for (u32 j = 0; j < ny; ++j) {
             DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);
@@ -57,7 +58,7 @@ void search_top_1_with_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const 
 template <typename DistType, typename TypeX, typename TypeY, typename ID>
 void search_top_1_simple_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels) {
     for (u32 i = 0; i < nx; ++i) {
-        DistType min_dist = std::numeric_limits<DistType>::max();
+        DistType min_dist = LimitMax<DistType>();
         u32 min_idx = 0;
         for (u32 j = 0; j < ny; ++j) {
             DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);
@@ -81,8 +82,8 @@ void search_top_1_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, con
 
 template <typename TypeX, typename TypeY, typename ID, typename DistType>
 void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
-    heap_twin_multiple<std::greater<DistType>, DistType, ID> heap(nx, k, distances, labels);
-    std::fill(distances, distances + nx * k, std::numeric_limits<DistType>::max());
+    heap_twin_multiple<CompareMax<DistType, ID>> heap(nx, k, distances, labels);
+    heap.initialize();
     for (u32 i = 0; i < nx; ++i) {
         const DistType *x_i = x + i * dimension;
         for (u32 j = 0; j < ny; j++) {

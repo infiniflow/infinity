@@ -36,15 +36,15 @@ static const char *ivfflat_index_name_suffix = "/ivfflat_index.save";
 using namespace infinity;
 
 template <typename T>
-std::unique_ptr<T[]> load_data(const std::string &filename,
-                               size_t &num,
-                               size_t &dim) { // load data with sift10K pattern
+std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, size_t &dim) {
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open()) {
         std::cout << "open file error" << std::endl;
         exit(-1);
     }
-    in.read((char *)&dim, 4);
+    int dim_;
+    in.read((char *)&dim_, 4);
+    dim = (size_t)dim_;
     in.seekg(0, std::ios::end);
     auto ss = in.tellg();
     num = ((size_t)ss) / (dim + 1) / 4;

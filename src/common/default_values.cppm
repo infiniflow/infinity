@@ -100,6 +100,10 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
+
+    // default distance compute blas parameter
+    constexpr SizeT DISTANCE_COMPUTE_BLAS_QUERY_BS = 4096;
+    constexpr SizeT DISTANCE_COMPUTE_BLAS_DATABASE_BS = 1024;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

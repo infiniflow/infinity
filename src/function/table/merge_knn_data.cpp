@@ -20,7 +20,7 @@ import base_table_ref;
 
 import infinity_exception;
 import merge_knn;
-import faiss;
+import knn_result_handler;
 
 module merge_knn_data;
 
