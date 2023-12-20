@@ -24,7 +24,7 @@ from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 def connect(
         uri: URI = LOCAL_HOST
 ) -> InfinityConnection:
-    if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 9080 or uri.port == 9070):
+    if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
         return RemoteThriftInfinityConnection(uri)
     else:
         raise Exception(f"unknown uri: {uri}")

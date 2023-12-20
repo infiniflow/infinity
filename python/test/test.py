@@ -34,7 +34,7 @@ class TestCase:
         method: connect server
         expect: connect and disconnect successfully
         """
-        ports = [9090, 9080, 9070]
+        ports = [9090, 23817, 9070]
         for port in ports:
             infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj
@@ -73,7 +73,7 @@ class TestCase:
         12.
         expect: all operations successfully
         """
-        ports = [9080]
+        ports = [23817]
         for port in ports:
             infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj

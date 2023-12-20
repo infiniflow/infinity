@@ -218,7 +218,7 @@ class TestBenchmark:
 
         ip: str = '0.0.0.0'
         thrift = ("Thrift", ip, 9090)
-        thread_pool_thrift = ("Thread Pool Thrift", ip, 9080)
+        thread_pool_thrift = ("Thread Pool Thrift", ip, 23817)
         async_thrift = ("AsyncThrift", ip, 9070)
         num_processes = 16
         num_threads = 16
