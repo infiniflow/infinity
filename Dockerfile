@@ -11,7 +11,7 @@ ENV CC=/usr/bin/clang-17
 ENV CXX=/usr/bin/clang++-17
 
 # tools
-RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison flex thrift-compiler postgresql-client python3-full tree
+RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison flex thrift-compiler postgresql-client python3-full tree rpm
 
 # rust, refers to https://rsproxy.cn/
 ENV RUSTUP_DIST_SERVER="https://rsproxy.cn"
@@ -33,9 +33,9 @@ RUN mkdir -vp $HOME/.cargo && echo "[source.crates-io]" >> $HOME/.cargo/config \
 RUN cargo install sqllogictest-bin
 
 # CMake 3.28+ is requrired for C++20 modules.
-# download https://github.com/Kitware/CMake/releases/download/v3.28.0/cmake-3.28.0-linux-x86_64.tar.gz
-COPY cmake-3.28.0-linux-x86_64.tar.gz .
-RUN tar xzf cmake-3.28.0-linux-x86_64.tar.gz && cp -rf cmake-3.28.0-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.0-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.0-linux-x86_64
+# download https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz
+COPY cmake-3.28.1-linux-x86_64.tar.gz .
+RUN tar xzf cmake-3.28.1-linux-x86_64.tar.gz && cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.1-linux-x86_64
 
 # build dependencies
 RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libthrift-dev
