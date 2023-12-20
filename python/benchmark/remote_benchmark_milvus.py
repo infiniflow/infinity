@@ -7,6 +7,7 @@
 # 6. delete entities by PK
 # 7. drop collection
 import argparse
+import concurrent
 import os
 import struct
 import time
@@ -199,7 +200,7 @@ def fvecs_read_all(filename):
 
 
 def import_sift_1m_milvus(path):
-    connections.connect("default", host="localhost", port="19530")
+    connections.connect("default", host="192.168.200.151", port="19530")
 
     has = utility.has_collection("sift_benchmark")
     print(f"Does collection sift_benchmark exist in Milvus: {has}")
@@ -263,10 +264,6 @@ def import_sift_1m_milvus(path):
         print("End Creating index HNSW")
 
 
-
-
-
-
 def import_gist_1m_milvus(path):
     num_entities, dim = 100_0000, 960
     fields = [
@@ -316,10 +313,20 @@ def benchmark(threads, rounds, data_set, path):
         raise Exception("Invalid data set")
 
 
+def search_query(query):
+    connections.connect("default", host="192.168.200.151", port="19530")
+    sift_collection = Collection("sift_benchmark")
+    search_params = {
+        "metric_type": "L2",
+        "params": {"ef": 200},
+    }
+    return sift_collection.search([query], "col1", search_params, limit=100)
+
+
 def query_sift_1m(query_path, ground_truth_path):
     # Before conducting a search or a query, you need to load the data in `hello_milvus` into memory.
     print(f"Start loading")
-    connections.connect("default", host="localhost", port="19530")
+    connections.connect("default", host="192.168.200.151", port="19530")
     sift_collection = Collection("sift_benchmark")
     sift_collection.load()
 
@@ -328,19 +335,13 @@ def query_sift_1m(query_path, ground_truth_path):
     queries = fvecs_read_all(query_path)
     print(f"Number of queries: {len(queries)}")
 
-    search_params = {
-        "metric_type": "L2",
-        "params": {"ef": 200},
-    }
-
     start_time = time.time()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = list(executor.map(search_query, queries))
+        print(len(results))
 
-    result = sift_collection.search([queries[1]], "col1", search_params, limit=100)
     end_time = time.time()
     print(f"Time of search = {end_time - start_time}s")
-
-    print(f"Number of results: {len(result)}")
-    print(result)
 
 
 def query_gist_1m(query_path, ground_truth_path):

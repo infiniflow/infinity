@@ -1,6 +1,6 @@
 [project]
 name = "infinity"
-version = "0.0.1"
+version = "0.1.0-dev1"
 dependencies = [
     "sqlglot==11.7.1",
     "pydantic",
