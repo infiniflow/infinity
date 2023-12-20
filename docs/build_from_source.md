@@ -7,13 +7,13 @@
 
 This section provides instructions on building Infinity from source on Ubuntu 22.04.
 
-#### Step1 Download the source code
+### Step1 Download the source code
 
 ```shell
 $ git clone https://github.com/infiniflow/infinity.git
 ```
 
-#### Step2 Install necessary dependencies
+### Step2 Install necessary dependencies
 
 ```bash
 wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
@@ -44,7 +44,6 @@ ninja -j 12
 ```shell
 .build/src/infinity_main
 ```
-
 
 
 ## Build from source on Ubuntu 23.10
