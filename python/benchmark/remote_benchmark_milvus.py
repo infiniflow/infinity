@@ -19,10 +19,8 @@ from pymilvus import (
     Collection,
 )
 
-from benchmark.hello_milvus import fmt
 
-
-def test_hello_milvus():
+def hello_milvus():
     fmt = "\n=== {:30} ===\n"
     search_latency_fmt = "search latency = {:.4f}s"
     num_entities, dim = 3000, 8
@@ -201,35 +199,72 @@ def fvecs_read_all(filename):
 
 
 def import_sift_1m_milvus(path):
-    print(fmt.format("start connecting to Milvus"))
     connections.connect("default", host="localhost", port="19530")
 
     has = utility.has_collection("sift_benchmark")
     print(f"Does collection sift_benchmark exist in Milvus: {has}")
 
-    num_entities, dim = 100_0000, 128
-    fields = [
-        FieldSchema(name="col1", dtype=DataType.FLOAT_VECTOR, dim=dim)
-    ]
-    schema = CollectionSchema(fields, "sift_1m is a collection for benchmark")
-    sift_collection = Collection("sift_benchmark", schema, consistency_level="Strong")
+    if has is False:
+        print("Start creating collection")
 
-    # import data
-    print("Start importing data")
-    vectors = fvecs_read_all(path)
-    print(f"Number of entities: {len(vectors)}")
+        num_entities, dim = 1000000, 128
+        fields = [
+            FieldSchema(name="pk", dtype=DataType.INT64, is_primary=True, auto_id=False),
+            FieldSchema(name="col1", dtype=DataType.FLOAT_VECTOR, dim=dim)
+        ]
+        schema = CollectionSchema(fields, "sift_1m is a collection for benchmark")
+        sift_collection = Collection("sift_benchmark", schema)
 
-    entities = [
-        vectors
-    ]
+        # import data
+        print("Start importing data")
+        vectors = fvecs_read_all(path)
+        print(f"Number of vectors entities: {len(vectors)}")
+        pk_list = [i for i in range(num_entities)]
+        print(f"Number of pk_list entities:{len(pk_list)}")
 
-    start = time.time()
-    sift_collection.insert(entities)
-    end = time.time()
-    print(f"Time to insert {num_entities} entities: {end - start}")
+        total_entities = [
+            pk_list,
+            vectors
+        ]
 
-    sift_collection.flush()
-    print(f"Number of entities in Milvus: {sift_collection.num_entities}")
+        start = time.time()
+
+        for i in range(len(total_entities[0])):
+            # insert one row
+            entity = [
+                [total_entities[0][i]],
+                [total_entities[1][i]]
+            ]
+
+            sift_collection.insert(entity)
+
+            if i % 1000 == 0:
+                print(f"Number of entities in Milvus: {i}")
+
+        sift_collection.flush()
+        end = time.time()
+        print(f"Time to insert {num_entities} entities: {end - start}")
+
+        print("Start Creating index HNSW")
+        index = {
+            "index_type": "HNSW",
+            "metric_type": "L2",
+            "params": {"M": 16, "efConstruction": 200, "ef": 200},
+        }
+
+        print(f"Number of entities in Milvus: {sift_collection.num_entities}")
+
+        start = time.time()
+
+        sift_collection.create_index("col1", index)
+        end = time.time()
+        print(f"Time to create index: {end - start}")
+
+        print("End Creating index HNSW")
+
+
+
+
 
 
 def import_gist_1m_milvus(path):
@@ -272,14 +307,44 @@ def benchmark(threads, rounds, data_set, path):
     if data_set == "sift_1m":
         query_path = path + "/sift_query.fvecs"
         ground_truth_path = path + "/sift_groundtruth.ivecs"
-
-
+        query_sift_1m(query_path, ground_truth_path)
 
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
     else:
         raise Exception("Invalid data set")
+
+
+def query_sift_1m(query_path, ground_truth_path):
+    # Before conducting a search or a query, you need to load the data in `hello_milvus` into memory.
+    print(f"Start loading")
+    connections.connect("default", host="localhost", port="19530")
+    sift_collection = Collection("sift_benchmark")
+    sift_collection.load()
+
+    # search based on vector similarity
+
+    queries = fvecs_read_all(query_path)
+    print(f"Number of queries: {len(queries)}")
+
+    search_params = {
+        "metric_type": "L2",
+        "params": {"ef": 200},
+    }
+
+    start_time = time.time()
+
+    result = sift_collection.search([queries[1]], "col1", search_params, limit=100)
+    end_time = time.time()
+    print(f"Time of search = {end_time - start_time}s")
+
+    print(f"Number of results: {len(result)}")
+    print(result)
+
+
+def query_gist_1m(query_path, ground_truth_path):
+    pass
 
 
 if __name__ == '__main__':

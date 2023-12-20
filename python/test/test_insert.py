@@ -57,14 +57,17 @@ class TestInsert:
         res = table_obj.insert([{"c1": 0, "c2": 0}])
         assert res.success
 
-        res = table_obj.insert([{"c1": 1, "c2": 2}])
+        res = table_obj.insert([{"c1": 1, "c2": 1}])
         assert res.success
 
-        res = table_obj.insert([{"c2": 1, "c1": 2}])
+        res = table_obj.insert({"c2": 2, "c1": 2})
+        assert res.success
+
+        res = table_obj.insert([{"c2": 3, "c1": 3}, {"c1": 4, "c2": 4}])
         assert res.success
 
         res = table_obj.query_builder().output(["*"]).to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2), 'c2': (0, 2, 1)})
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2, 3, 4), 'c2': (0, 1, 2, 3, 4)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = db_obj.drop_table("table_2")

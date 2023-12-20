@@ -18,6 +18,7 @@ from typing import Optional, Union, List, Any, Tuple, Dict
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from infinity.common import INSERT_DATA
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
@@ -56,12 +57,16 @@ class RemoteTable(Table, ABC):
         return self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                      index_name=index_name)
 
-    def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
+    def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
         table_name = self._table_name
         column_names: list[str] = []
         fields: list[ttypes.Field] = []
+
+        if isinstance(data, dict):
+            data = [data]
+
         for row in data:
             column_names = list(row.keys())
             parse_exprs = []
