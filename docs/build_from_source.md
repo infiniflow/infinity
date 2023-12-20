@@ -16,6 +16,7 @@ $ git clone https://github.com/infiniflow/infinity.git
 ### Step2 Install necessary dependencies
 
 ```bash
+sudo apt update && sudo apt install git wget unzip software-properties-common
 wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
 tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
 cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
@@ -24,7 +25,7 @@ unzip ninja-linux.zip && cp ninja /usr/local/bin && rm ninja ninja-linux.zip
 wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
-sudo apt update && sudo apt install git wget unzip software-properties-common g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
+sudo apt update && sudo apt install g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ```
 
