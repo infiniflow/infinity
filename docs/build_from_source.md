@@ -42,7 +42,7 @@ ninja -j 12
 ### Step4 Start up the Infinity server
 
 ```shell
-./src/infinity_main
+.build/src/infinity_main
 ```
 
 
@@ -69,7 +69,6 @@ sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev li
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ```
 
-
 ### Step3 Build source code
 
 ```shell
@@ -84,5 +83,5 @@ ninja -j 12
 ### Step4 Start up Infinity server
 
 ```shell
-./src/infinity_main
+.build/src/infinity_main
 ```
