@@ -15,7 +15,6 @@
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
-from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 
 
 def main():
@@ -33,18 +32,7 @@ def main():
     table.insert(
         [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
 
-    table.create_index("my_index",
-                       [index.IndexInfo("body",
-                                        index.IndexType.IRSFullText,
-                                        [index.InitParameter("ANALYZER", "segmentation")]),
-                        ], None)
-
-    query_builder = InfinityThriftQueryBuilder(table)
-    query_builder.output(['num', 'body', 'vec'])
-    query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
-    query_builder.match('body', 'harmful', 'topn=2')
-    query_builder.fusion('rrf')
-    res = query_builder.to_pl()
+    res = table.query_builder().output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
     print(res)
 
 
