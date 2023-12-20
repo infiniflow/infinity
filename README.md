@@ -44,7 +44,13 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
+### Docker pull
 
+```bash
+docker pull infinity:0.1.0-nightly-20231221
+docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity bash ./opt/bin/infinity
+
+```
 
 
 ### Install Infinity's Python client
