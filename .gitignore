@@ -99,8 +99,8 @@ benchmark/csv/csv_config.h
 #python sdk
 python/build
 python/dist
-python/infinity.egg-info
 python/.idea
+python/infinity_sdk.egg-info
 
 
 sift_1m

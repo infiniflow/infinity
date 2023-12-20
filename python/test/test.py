@@ -50,7 +50,7 @@ class TestCase:
         assert infinity_obj
 
         res = infinity_obj.create_database("")
-        assert res.success == False
+        assert not res.success
         assert res.error_msg
 
         assert infinity_obj.disconnect()
@@ -79,8 +79,8 @@ class TestCase:
             assert infinity_obj
 
             # infinity
-            res = infinity_obj.create_database("my_db")
-            assert res.success
+            db_obj = infinity_obj.create_database("my_db")
+            assert db_obj is not None
 
             res = infinity_obj.list_databases()
             assert res.success
@@ -93,9 +93,9 @@ class TestCase:
 
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("my_table1", if_exists=True)
-            res = db_obj.create_table(
+            table_obj = db_obj.create_table(
                 "my_table1", {"c1": "int, primary key"}, None)
-            assert res.success
+            assert table_obj is not None
 
             res = db_obj.list_tables()
             assert res.success
@@ -104,9 +104,10 @@ class TestCase:
             assert res.success
 
             # index
-            res = db_obj.create_table(
+            db_obj.drop_table("my_table2", if_exists=True)
+            table_obj = db_obj.create_table(
                 "my_table2", {"c1": "vector,1024,float"}, None)
-            assert res.success
+            assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table2")
             assert table_obj
@@ -126,9 +127,9 @@ class TestCase:
 
             # insert
             db_obj.drop_table("my_table3", if_exists=True)
-            res = db_obj.create_table(
+            table_obj = db_obj.create_table(
                 "my_table3", {"c1": "int, primary key", "c2": "float"}, None)
-            assert res.success
+            assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table3")
             assert table_obj
@@ -137,12 +138,12 @@ class TestCase:
                 [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
             assert res.success
             # search
-            res = table_obj.query_builder().output(["c1 + 0.1"]).to_df()
+            res = table_obj.output(["c1 + 0.1"]).to_df()
             pd.testing.assert_frame_equal(res,
                                           pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
                                               {'(c1 + 0.100000)': dtype('float64')}))
 
-            res = table_obj.query_builder().output(
+            res = table_obj.output(
                 ["*"]).filter("c1 > 1").to_df()
             pd.testing.assert_frame_equal(res,
                                           pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
@@ -152,9 +153,10 @@ class TestCase:
             assert res.success
 
             # import
-            res = db_obj.create_table(
+            db_obj.drop_table("my_table4", if_exists=True)
+            table_obj = db_obj.create_table(
                 "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
-            assert res.success
+            assert table_obj is not None
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
 
@@ -166,7 +168,7 @@ class TestCase:
             assert res.success
 
             # search
-            res = table_obj.query_builder().output(
+            res = table_obj.output(
                 ["c1"]).filter("c1 > 1").to_df()
             print(res)
             res = db_obj.drop_table("my_table4")

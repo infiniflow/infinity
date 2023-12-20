@@ -125,9 +125,13 @@ class RemoteDatabase(Database, ABC):
                 get_ordinary_info(
                     column_big_info, column_defs, column_name, index)
         # print(column_defs)
-        return self._conn.create_table(db_name=self._db_name, table_name=table_name,
-                                       column_defs=column_defs,
-                                       option=options)
+        res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
+                                      column_defs=column_defs,
+                                      option=options)
+        if res.success is True:
+            return RemoteTable(self._conn, self._db_name, table_name)
+        else:
+            raise Exception(res.error_msg)
 
     def drop_table(self, table_name, if_exists=True):
         return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)

@@ -29,37 +29,29 @@ class TestImport:
         method: connect server, create table, import data, search, drop table, disconnect
         expect: all operations successfully
         """
-        ports = [9080]
-        for port in ports:
-            infinity_obj = infinity.connect(REMOTE_HOST)
-            assert infinity_obj
 
-            # infinity
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        assert infinity_obj
 
-            db_obj = infinity_obj.get_database("default")
-            assert db_obj
+        # infinity
 
-            # import
-            db_obj.drop_table("test_import", True)
-            res = db_obj.create_table(
-                "test_import", {"c1": "int", "c2": "vector,3,int"}, None)
-            table_obj = db_obj.get_table("test_import")
-            assert table_obj
+        db_obj = infinity_obj.get_database("default")
+        assert db_obj
 
-            test_dir = "/tmp/infinity/test_data/"
-            test_csv_dir = test_dir + "embedding_int_dim3.csv"
-            assert os.path.exists(test_csv_dir)
+        # import
+        db_obj.drop_table("test_import", True)
+        table_obj = db_obj.create_table(
+            "test_import", {"c1": "int", "c2": "vector,3,int"}, None)
 
-            res = table_obj.import_data(test_csv_dir, None)
-            assert res.success
+        test_dir = "/tmp/infinity/test_data/"
+        test_csv_dir = test_dir + "embedding_int_dim3.csv"
+        assert os.path.exists(test_csv_dir)
 
-            # search
-            res = table_obj.query_builder().output(
-                ["c1"]).filter("c1 > 1").to_df()
-            print(res)
-            res = db_obj.drop_table("test_import")
-            assert res.success
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.success
 
-            # disconnect
-            res = infinity_obj.disconnect()
-            assert res.success
+        # search
+        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        print(res)
+        res = db_obj.drop_table("test_import")
+        assert res.success

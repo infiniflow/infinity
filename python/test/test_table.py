@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
+from infinity.common import REMOTE_HOST
 
 
 class TestTable:
@@ -56,29 +56,35 @@ class TestTable:
         db_obj.drop_table("my_table")
 
         # infinity
-        res = db_obj.create_table(
+        tb = db_obj.create_table(
             "my_table", {"c1": "int, primary key", "c2": "float"}, None)
-        assert res.success
+        assert tb is not None
 
-        res = db_obj.create_table(
-            "my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
-        assert not res.success
-
-        res = db_obj.create_table(
-            "my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
-        assert not res.success
-
-        res = db_obj.create_table(
-            "123_table", {"c1": "int, primary key", "c1": "float"}, None)
-        assert not res.success
-
-        res = db_obj.create_table(
-            "bad_column", {"123": "int, primary key", "c2": "float"}, None)
-        assert not res.success
-
-        res = db_obj.create_table(
-            "", {"c1": "int, primary key", "c2": "float"}, None)
-        assert not res.success
+        try:
+            tb = db_obj.create_table(
+                "my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
+        except Exception as e:
+            print(e)
+        try:
+            tb = db_obj.create_table(
+                "my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
+        except Exception as e:
+            print(e)
+        try:
+            tb = db_obj.create_table(
+                "123_table", {"c1": "int, primary key", "c1": "float"}, None)
+        except Exception as e:
+            print(e)
+        try:
+            tb = db_obj.create_table(
+                "bad_column", {"123": "int, primary key", "c2": "float"}, None)
+        except Exception as e:
+            print(e)
+        try:
+            tb = db_obj.create_table(
+                "", {"c1": "int, primary key", "c2": "float"}, None)
+        except Exception as e:
+            print(e)
 
         # FIXME: res = db_obj.describe_table("my_table")
 

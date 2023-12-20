@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import infinity
-import infinity.index as index
 from infinity.common import REMOTE_HOST
 
 
@@ -21,10 +20,8 @@ def main():
     infinity_obj = infinity.connect(REMOTE_HOST)
     db = infinity_obj.get_database("default")
     db.drop_table("my_table", if_exists=True)
-    db.create_table(
+    table = db.create_table(
         "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
-
-    table = db.get_table("my_table")
     table.insert(
         [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
     table.insert(
@@ -32,7 +29,7 @@ def main():
     table.insert(
         [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
 
-    res = table.query_builder().output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
+    res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
     print(res)
 
 

@@ -48,11 +48,9 @@ class TestInsert:
 
         db_obj.drop_table(table_name="table_2", if_exists=True)
         # infinity
-        res = db_obj.create_table(
+        table_obj = db_obj.create_table(
             "table_2", {"c1": "int, primary key, not null", "c2": "int, not null"}, None)
-        assert res.success
-
-        table_obj = db_obj.get_table("table_2")
+        assert table_obj is not None
 
         res = table_obj.insert([{"c1": 0, "c2": 0}])
         assert res.success
@@ -66,7 +64,7 @@ class TestInsert:
         res = table_obj.insert([{"c2": 3, "c1": 3}, {"c1": 4, "c2": 4}])
         assert res.success
 
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2, 3, 4), 'c2': (0, 1, 2, 3, 4)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
@@ -87,11 +85,10 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_varchar", True)
-        res = db_obj.create_table("test_insert_varchar", {
+        table_obj = db_obj.create_table("test_insert_varchar", {
             "c1": "varchar"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_insert_varchar")
         assert table_obj
+
         res = table_obj.insert([{"c1": "test_insert_varchar"}])
         assert res.success
         res = table_obj.insert([{"c1": " test insert varchar "}])
@@ -99,7 +96,7 @@ class TestInsert:
         res = table_obj.insert([{"c1": "^789$ test insert varchar"}])
         assert res.success
 
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
                                                                 "^789$ test insert varchar")}))
         db_obj.drop_table("test_insert_varchar")
@@ -113,16 +110,14 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_varchar", True)
-        res = db_obj.create_table("test_insert_big_varchar", {
+        table_obj = db_obj.create_table("test_insert_big_varchar", {
             "c1": "varchar"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_insert_big_varchar")
         assert table_obj
         for i in range(100):
             res = table_obj.insert([{"c1": "test_insert_big_varchar" * 1000}])
             assert res.success
 
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ["test_insert_big_varchar" * 1000] * 100}))
 
@@ -137,10 +132,8 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_embedding", True)
-        res = db_obj.create_table("test_insert_embedding", {
+        table_obj = db_obj.create_table("test_insert_embedding", {
             "c1": "vector,3,int"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_insert_embedding")
         assert table_obj
         res = table_obj.insert([{"c1": [1, 2, 3]}])
         assert res.success
@@ -150,13 +143,13 @@ class TestInsert:
         assert res.success
         res = table_obj.insert([{"c1": [-7, -8, -9]}])
         assert res.success
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
         res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
             "c1": [7, 8, 9]}, {"c1": [-7, -8, -9]}])
         assert res.success
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9],
                                                                 [1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
 
@@ -174,7 +167,7 @@ class TestInsert:
         res = table_obj.insert([{"c1": [-7.7, -8.8, -9.9]}])
         assert res.success
 
-        res = table_obj.query_builder().output(["*"]).to_df()
+        res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([1.1, 2.2, 3.3], [4.4, 5.5, 6.6], [7.7, 8.8, 9.9], [-7.7, -8.8, -9.9])}))
 
@@ -189,9 +182,8 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_embedding", True)
-        res = db_obj.create_table("test_insert_big_embedding", {
+        table_obj = db_obj.create_table("test_insert_big_embedding", {
             "c1": "vector,65535,int"}, None)
-        table_obj = db_obj.get_table("test_insert_big_embedding")
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 65535}])
         assert res.success
@@ -211,10 +203,8 @@ class TestInsert:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_embedding_float", True)
-        res = db_obj.create_table("test_insert_big_embedding_float", {
+        table_obj = db_obj.create_table("test_insert_big_embedding_float", {
             "c1": "vector,65535,float"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_insert_big_embedding_float")
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 65535}])
         assert res.success
