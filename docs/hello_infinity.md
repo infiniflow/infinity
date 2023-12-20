@@ -1,0 +1,38 @@
+# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import infinity
+import infinity.index as index
+from infinity.common import REMOTE_HOST
+
+
+def main():
+    infinity_obj = infinity.connect(REMOTE_HOST)
+    db = infinity_obj.get_database("default")
+    db.drop_table("my_table", if_exists=True)
+    db.create_table(
+        "my_table", {"num": "integer", "body": "varchar", "vec": "vector,4,float"}, None)
+
+    table = db.get_table("my_table")
+    table.insert(
+        [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+    table.insert(
+        [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+
+    res = table.query_builder().output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+    print(res)
+
+
+if __name__ == '__main__':
+    main()

@@ -4,7 +4,7 @@
 </div>
 
 <p align="center">
-    <b>The AI-native database built for LLM applications, offering incredibly fast vector and full-text search</b>
+    <b>The AI-native database built for LLM applications, providing incredibly fast vector and full-text search</b>
 </p>
 
 <h4 align="center">
@@ -19,13 +19,14 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 ## 🌟 Key Features
 
-Infinity comes with **performance**, **flexibility**, **ease-of-use**, and many features designed to address the challenges facing the next-gen RAG applications:
+Infinity comes with high performance, flexibility, ease-of-use, and many features designed to address the challenges facing the next-generation AI applications:
 
 ### ⚡️ Incredibly fast
 
 - Achieves 0.1 milliseconds query latency on million-scale vector datasets.
 - Up to 10K QPS on million-scale vector datasets.
-- See the [Benchmarking](https://www.example.com).
+
+> See the [Benchmarking](https://www.example.com).
 
 
 ### 🔮 Fused search
@@ -45,6 +46,8 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 ## 🎮 Get Started
 
 CONTENT MISSING HERE
+
+> For more information about the Python API, see the [Python API Reference]().
 
 
 ## 🛠️ Build from Source
