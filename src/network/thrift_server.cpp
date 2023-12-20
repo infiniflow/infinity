@@ -1096,7 +1096,7 @@ void PoolThriftServer::Init(i32 port_no, i32 pool_size) {
     threadManager->threadFactory(threadFactory);
     threadManager->start();
 
-    std::cout << "Thrift server listen on: 0.0.0.0:" << port_no << ", thread pool: " << pool_size << std::endl;
+    std::cout << "API server listen on: 0.0.0.0:" << port_no << ", thread pool: " << pool_size << std::endl;
 
     server =
         MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),

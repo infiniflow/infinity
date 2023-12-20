@@ -31,8 +31,6 @@ class ThriftServer;
 
 export class DBServer {
 public:
-    void Init(const StartupParameter& parameter);
-
     void Run();
 
     void Shutdown();
@@ -46,7 +44,6 @@ private:
     atomic_u64 running_connection_count_{0};
     AsioIOService io_service_{};
     UniquePtr<AsioAcceptor> acceptor_ptr_{};
-    SharedPtr<String> config_path_{};
 };
 
 }

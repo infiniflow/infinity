@@ -8,7 +8,7 @@ sdk_port                = 23817
 
 [system]
 # 0 means use all cpus
-worker_cpu_limit        = 4
+worker_cpu_limit        = 0
 # 0 means use all memory
 total_memory_size       = "8GB"
 # memory limit per query
@@ -28,7 +28,7 @@ log_max_size           = "10GB"
 log_file_rotate_count   = 10
 
 # trace/info/warning/error/critical 5 log levels, default: info
-log_level               = "trace"
+log_level               = "warning"
 
 [storage]
 data_dir                = "/tmp/infinity/data"

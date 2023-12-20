@@ -191,7 +191,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Resource
         { system_option_.resource_dict_path_ = default_resource_dict_path; }
     } else {
-        Printf("Read config from: {}", *config_path);
+        Printf("Read config from: {}\n", *config_path);
         TomlTable config = TomlParseFile(*config_path);
         // General
         {

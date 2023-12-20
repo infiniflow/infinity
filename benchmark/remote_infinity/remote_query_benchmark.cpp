@@ -42,7 +42,7 @@ struct InfinityClient {
     std::unique_ptr<InfinityServiceClient> client;
     int64_t session_id;
     InfinityClient() {
-        socket.reset(new TSocket("127.0.0.1", 9080));
+        socket.reset(new TSocket("127.0.0.1", 23817));
         transport.reset(new TBufferedTransport(socket));
         protocol.reset(new TBinaryProtocol(transport));
         client = std::make_unique<InfinityServiceClient>(protocol);
