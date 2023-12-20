@@ -39,6 +39,10 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
 
     String expr_name = expr->GetName();
 
+    if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
+        expr_name = Format("{}.{}", bind_context_ptr->binding_names_by_column_[expr_name][0], expr_name);
+    }
+
     if (bind_context_ptr->select_alias2index_.contains(expr_name)) {
         return;
     }
@@ -57,6 +61,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     }
 
     i64 column_id = -1;
+    String binding_table_name = bind_context_ptr->project_table_name_;
+    SizeT binding_table_index = bind_context_ptr->project_table_index_;
 
     // If the expr is from projection, then create a column reference from projection.
     if (expr.type_ == ParsedExprType::kConstant) {
@@ -72,6 +78,13 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
     } else {
         String expr_name = expr.GetName();
+
+        if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
+            auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];
+            expr_name = Format("{}.{}", table_name, expr_name);
+            binding_table_name = table_name;
+            binding_table_index = bind_context_ptr->table_name2table_index_[table_name];
+        }
 
         if (bind_context_ptr->select_alias2index_.contains(expr_name)) {
             column_id = bind_context_ptr->select_alias2index_[expr_name];
@@ -89,8 +102,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     const SharedPtr<BaseExpression> &project_expr = bind_context_ptr->project_exprs_[column_id];
 
     SharedPtr<ColumnExpression> result = ColumnExpression::Make(project_expr->Type(),
-                                                                bind_context_ptr->project_table_name_,
-                                                                bind_context_ptr->project_table_index_,
+                                                                binding_table_name,
+                                                                binding_table_index,
                                                                 ToStr(column_id),
                                                                 column_id,
                                                                 depth);

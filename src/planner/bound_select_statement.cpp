@@ -99,10 +99,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = having_filter;
         }
 
-        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
-        project->set_left_node(root);
-        root = project;
-
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
                 Error<PlannerException>("Unknown error on order by expression");
@@ -111,6 +107,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             sort->set_left_node(root);
             root = sort;
         }
+
+        auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
+        project->set_left_node(root);
+        root = project;
 
         if (!pruned_expression_.empty()) {
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);

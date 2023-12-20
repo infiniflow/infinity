@@ -691,9 +691,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+            if (fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(
-                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                    Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -701,7 +701,11 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
+                auto sink_state = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
+                sink_state->column_types_ = last_operator->GetOutputTypes();
+                sink_state->column_names_ = last_operator->GetOutputNames();
+
+                tasks_[task_id]->sink_state_ = Move(sink_state);
             }
             break;
         }

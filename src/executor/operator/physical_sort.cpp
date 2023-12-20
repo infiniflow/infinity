@@ -14,389 +14,241 @@
 
 module;
 
-#include <string>
 #include <algorithm>
+#include <string>
 
 import stl;
 import txn;
 import query_context;
 import table_def;
 import data_table;
+import data_block;
+import default_values;
+import column_vector;
+import expression_state;
+import base_expression;
+import expression_evaluator;
 import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
+import infinity_exception;
+import third_party;
 
 module physical_sort;
 
 namespace infinity {
 
+#define COMPARE(type)                                                                                                                                \
+    type left_value = ((type *)(left_result_vector->data()))[left_index.offset];                                                                     \
+    type right_value = ((type *)(right_result_vector->data()))[right_index.offset];                                                                  \
+    if (left_value == right_value) {                                                                                                                 \
+        continue;                                                                                                                                    \
+    }                                                                                                                                                \
+    if (order_type == OrderType::kAsc) {                                                                                                             \
+        return left_value < right_value;                                                                                                             \
+    } else {                                                                                                                                         \
+        return left_value > right_value;                                                                                                             \
+    }
+
 class Comparator {
 public:
-    explicit Comparator(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types)
-        : order_by_table_(order_by_table), order_by_types_(order_by_types) {}
+    explicit Comparator(const Vector<UniquePtr<DataBlock>> &order_by_blocks,
+                        const Vector<OrderType> &order_by_types,
+                        Vector<SharedPtr<BaseExpression>> expressions)
+        : order_by_blocks_(order_by_blocks), order_by_types_(order_by_types), expressions_(expressions) {}
 
-    bool operator()(RowID, RowID ) {
-#if 0
-        SizeT column_count = order_by_table_->ColumnCount();
-        for(SizeT col_id = 0; col_id < column_count; ++col_id) {
+    bool operator()(BlockRawIndex left_index, BlockRawIndex right_index) {
+        SizeT exprs_count = expressions_.size();
+        for (SizeT expr_idx = 0; expr_idx < exprs_count; ++expr_idx) {
+            auto expr = expressions_[expr_idx];
+            DataType type = expr->Type();
+            OrderType order_type = order_by_types_[expr_idx];
 
-            SharedPtr<DataType> type = order_by_table_->GetColumnTypeById(col_id);
-            OrderType order_type = order_by_types_[col_id];
+            const UniquePtr<DataBlock> &left_block = order_by_blocks_[left_index.block_idx];
+            SharedPtr<ColumnVector> left_result_vector = EvalOrderVector(left_block.get(), left_index.block_idx, expr);
 
-            const SharedPtr<DataBlock>& left_block = order_by_table_->GetDataBlockById(left.segment_id_);
-            const SharedPtr<ColumnVector>& left_column = left_block->column_vectors[col_id];
-            const SharedPtr<DataBlock>& right_block = order_by_table_->GetDataBlockById(right.segment_id_);
-            const SharedPtr<ColumnVector>& right_column = right_block->column_vectors[col_id];
+            const UniquePtr<DataBlock> &right_block = order_by_blocks_[right_index.block_idx];
+            SharedPtr<ColumnVector> right_result_vector = EvalOrderVector(right_block.get(), right_index.block_idx, expr);
 
-            switch(type->type()) {
+            switch (type.type()) {
                 case kBoolean: {
-                    BooleanT left_value = ((BooleanT*)(left_column->data()))[left.segment_offset_];
-                    BooleanT right_value = ((BooleanT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
+                    COMPARE(BooleanT)
                 }
                 case kTinyInt: {
-                    TinyIntT left_value = ((TinyIntT*)(left_column->data()))[left.segment_offset_];
-                    TinyIntT right_value = ((TinyIntT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
+                    COMPARE(TinyIntT)
                 }
                 case kSmallInt: {
-                    SmallIntT left_value = ((SmallIntT*)(left_column->data()))[left.segment_offset_];
-                    SmallIntT right_value = ((SmallIntT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
+                    COMPARE(SmallIntT)
                 }
                 case kInteger: {
-                    IntegerT left_value = ((IntegerT*)(left_column->data()))[left.segment_offset_];
-                    IntegerT right_value = ((IntegerT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
+                    COMPARE(IntegerT)
                 }
                 case kBigInt: {
-                    BigIntT left_value = ((BigIntT*)(left_column->data()))[left.segment_offset_];
-                    BigIntT right_value = ((BigIntT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
-                }
-                case kHugeInt: {
-                    NotImplementError("HugeInt comparation isn't implemented.")
+                    COMPARE(BigIntT)
                 }
                 case kFloat: {
-                    FloatT left_value = ((FloatT*)(left_column->data()))[left.segment_offset_];
-                    FloatT right_value = ((FloatT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
+                    COMPARE(FloatT)
                 }
                 case kDouble: {
-                    DoubleT left_value = ((DoubleT*)(left_column->data()))[left.segment_offset_];
-                    DoubleT right_value = ((DoubleT*)(right_column->data()))[right.segment_offset_];
-                    if(left_value == right_value) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_value < right_value;
-                    } else {
-                        return left_value > right_value;
-                    }
-                }
-                case kDecimal: {
-                    NotImplementError("Decimal comparation isn't implemented.")
-                }
-                case kVarchar: {
-                    VarcharType& left_ref = ((VarcharType*)(left_column->data()))[left.segment_offset_];
-                    VarcharType& right_ref = ((VarcharType*)(right_column->data()))[right.segment_offset_];
-                    if(left_ref == right_ref) {
-                        continue;
-                    }
-
-                    if(order_type == OrderType::kAsc) {
-                        return left_ref < right_ref;
-                    } else {
-                        return left_ref > right_ref;
-                    }
-                }
-                case kDate: {
-                    NotImplementError("Date comparation isn't implemented.")
-                }
-                case kTime: {
-                    NotImplementError("Time comparation isn't implemented.")
-                }
-                case kDateTime: {
-                    NotImplementError("Datetime comparation isn't implemented.")
-                }
-                case kTimestamp: {
-                    NotImplementError("Timestamp comparation isn't implemented.")
-                }
-                case kInterval: {
-                    NotImplementError("Interval comparation isn't implemented.")
-                }
-                case kMixed: {
-                    NotImplementError("Heterogeneous comparation isn't implemented.")
+                    COMPARE(DoubleT)
                 }
                 default: {
-                    ExecutorError("Unexpected data type")
+                    Error<NotImplementException>(Format("{} not implemented.", type.type()));
                 }
             }
         }
-#endif
         return true;
     }
 
 private:
-    const SharedPtr<DataTable> &order_by_table_;
+    SharedPtr<ColumnVector> EvalOrderVector(DataBlock *block, SizeT block_idx, SharedPtr<BaseExpression> &expr) {
+        auto eval_key = MakeShared<Pair<SizeT, SharedPtr<BaseExpression>>>(block_idx, expr);
+        if (eval_cache_.contains(eval_key)) {
+            return eval_cache_[eval_key];
+        } else {
+            ExpressionEvaluator expr_evaluator;
+            auto state = ExpressionState::CreateState(expr);
+            SharedPtr<ColumnVector> result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expr->Type()));
+            result_vector->Initialize();
+
+            expr_evaluator.Init(block);
+            expr_evaluator.Execute(expr, state, result_vector);
+
+            eval_cache_[eval_key] = result_vector;
+
+            return result_vector;
+        }
+    }
+
+    const Vector<UniquePtr<DataBlock>> &order_by_blocks_;
+
     const Vector<OrderType> &order_by_types_;
+    Vector<SharedPtr<BaseExpression>> expressions_;
+
+    // K: BlockIdx & Expression
+    // V: ColumnVector
+    HashMap<SharedPtr<Pair<SizeT, SharedPtr<BaseExpression>>>, SharedPtr<ColumnVector>> eval_cache_{};
 };
+
+Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &indexes_a, Vector<BlockRawIndex> &indexes_b, Comparator &comparator) {
+    if (indexes_a.empty() || indexes_b.empty()) {
+        return indexes_a.empty() ? indexes_b : indexes_a;
+    }
+    Vector<BlockRawIndex> merged_indexes;
+    merged_indexes.reserve(indexes_a.size() + indexes_b.size());
+
+    auto ptr_a = indexes_a.begin();
+    auto ptr_b = indexes_b.begin();
+
+    while (ptr_a != indexes_a.end() && ptr_b != indexes_b.end()) {
+        if (comparator(*ptr_a, *ptr_b)) {
+            merged_indexes.push_back(*ptr_a);
+            ++ptr_a;
+        } else {
+            merged_indexes.push_back(*ptr_b);
+            ++ptr_b;
+        }
+    }
+    if (ptr_a != indexes_a.end()) {
+        merged_indexes.insert(merged_indexes.end(), ptr_a, indexes_a.end());
+    }
+    if (ptr_b != indexes_b.end()) {
+        merged_indexes.insert(merged_indexes.end(), ptr_b, indexes_b.end());
+    }
+
+    return merged_indexes;
+}
+
+Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &&indexes_group, Comparator &comparator) {
+    Vector<BlockRawIndex> ans;
+    for (SizeT i = 0; i < indexes_group.size(); ++i) {
+        ans = MergeTwoIndexes(ans, indexes_group[i], comparator);
+    }
+    return ans;
+}
+
+void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
+                     Vector<UniquePtr<DataBlock>> &output_blocks,
+                     const Vector<BlockRawIndex> &block_indexes,
+                     const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
+    auto block_count = (block_indexes.size() + DEFAULT_BLOCK_CAPACITY) / DEFAULT_BLOCK_CAPACITY;
+
+    // copy with block_indexes and push to unmerge_sorted_blocks
+    for (SizeT i = 0; i < block_count; ++i) {
+        auto sorted_datablock = DataBlock::MakeUniquePtr();
+        sorted_datablock->Init(*types.get());
+
+        output_blocks.push_back(Move(sorted_datablock));
+    }
+    for (SizeT index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
+        auto &block_index = block_indexes[index_idx];
+        const Vector<SharedPtr<ColumnVector>> &output_column_vectors = output_blocks[index_idx / DEFAULT_BLOCK_CAPACITY]->column_vectors;
+
+        for (SizeT column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
+            output_column_vectors[column_id]->AppendValue(input_blocks[block_index.block_idx]->GetValue(column_id, block_index.offset));
+        }
+    }
+    for (SizeT i = 0; i < block_count; ++i) {
+        output_blocks[i]->Finalize();
+    }
+}
 
 void PhysicalSort::Init() {}
 
-bool PhysicalSort::Execute(QueryContext *, OperatorState *) {
-#if 0
-    executor_.Init(this->expressions_);
+bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
+    auto *prev_op_state = operator_state->prev_op_state_;
+    auto *sort_operator_state = static_cast<SortOperatorState *>(operator_state);
 
-    input_table_ = left_->output();
+    // Generate block indexes
+    Vector<BlockRawIndex> block_indexes;
+    auto pre_op_state = operator_state->prev_op_state_;
 
-    ExecutorAssert(input_table_ != nullptr, "Input table count isn't matched.");
+    // filling block_indexes
+    for (SizeT block_id = 0; block_id < pre_op_state->data_block_array_.size(); block_id++) {
+        for (SizeT offset = 0; offset < pre_op_state->data_block_array_[block_id]->row_count(); offset++) {
+            BlockRawIndex block_index(block_id, offset);
 
-    // output table definition is same as input
-    SizeT column_count = input_table_->ColumnCount();
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for(SizeT idx = 0; idx < column_count; ++ idx) {
-        SharedPtr<DataType> col_type = input_table_->GetColumnTypeById(idx);
-        String col_name = input_table_->GetColumnNameById(idx);
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
-        columns.emplace_back(col_def);
+            block_indexes.push_back(block_index);
+        }
     }
 
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"),
-                                                   MakeShared<String>("sort"),
-                                                   columns);
+    // sort block_indexes
+    std::sort(block_indexes.begin(), block_indexes.end(), Comparator(pre_op_state->data_block_array_, order_by_types_, expressions_));
 
-    output_ = DataTable::Make(table_def, TableType::kIntermediate);
+    auto types = left_->GetOutputTypes();
 
-    // Generate table before getting the order of row id.
-    SharedPtr<DataTable> order_by_table = GetOrderTable();
+    CopyWithIndexes(pre_op_state->data_block_array_, sort_operator_state->unmerge_sorted_blocks_, block_indexes, types);
+    prev_op_state->data_block_array_.clear();
 
-    // Fill the order by table
-    this->executor_.Execute(input_table_, order_by_table);
+    if (prev_op_state->Complete()) {
+        auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
+        auto merge_comparator = Comparator(unmerge_sorted_blocks, order_by_types_, expressions_);
 
-    Sort(order_by_table, order_by_types_);
-#endif
-    return true;
-}
+        Vector<Vector<BlockRawIndex>> indexes_group;
+        indexes_group.reserve(unmerge_sorted_blocks.size());
+        for (SizeT block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
+            Vector<BlockRawIndex> indexes;
+            indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
 
-SharedPtr<DataTable> PhysicalSort::GetOrderTable() const {
-    SizeT column_count = this->expressions_.size();
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        SharedPtr<DataType> col_type = MakeShared<DataType>(this->expressions_[idx]->Type());
-        String col_name = this->expressions_[idx]->Name();
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
-        columns.emplace_back(col_def);
-    }
-
-    //    // offset column is used to indicate which row this data belong to.
-    //    SharedPtr<ColumnDef> offset_col = ColumnDef::Make("_offset",
-    //                                                      column_count,
-    //                                                      DataType(LogicalType::kInteger),
-    //                                                      Set<ConstrainType>());
-    //
-    //    columns.emplace_back(offset_col);
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("order_by_key_table"), columns);
-
-    return DataTable::Make(table_def, TableType::kIntermediate);
-}
-
-void PhysicalSort::Sort(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types) {
-    // Generate row id vector
-    SharedPtr<Vector<RowID>> rowid_vector = order_by_table->GetRowIDVector();
-
-    std::sort(rowid_vector->begin(), rowid_vector->end(), Comparator(order_by_table, order_by_types));
-
-    // Generate
-    output_ = GenerateOutput(input_table_, rowid_vector);
-}
-
-SharedPtr<DataTable> PhysicalSort::GenerateOutput(const SharedPtr<DataTable> &, const SharedPtr<Vector<RowID>> &) {
-#if 0
-    // output table definition is same as input
-    SizeT column_count = input_table->ColumnCount();
-    Vector<SharedPtr<DataType>> types;
-    types.reserve(column_count);
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
-        types.emplace_back(col_type);
-
-        String col_name = input_table->GetColumnNameById(idx);
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
-        columns.emplace_back(col_def);
-    }
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("sort"), columns);
-    SharedPtr<DataTable> output_table = DataTable::Make(table_def, TableType::kIntermediate);
-
-    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-
-    //    SizeT vector_count = rowid_vector->size();
-    SizeT vector_idx = 0;
-    SizeT block_count = input_table->data_blocks_.size();
-    for(SizeT block_id = 0; block_id < block_count; ++block_id) {
-        SharedPtr<DataBlock> output_datablock = DataBlock::Make();
-        output_datablock->Init(types);
-        const Vector<SharedPtr<ColumnVector>>& output_column_vectors = output_datablock->column_vectors;
-
-        SizeT block_row_count = input_datablocks[block_id]->row_count();
-        for(SizeT block_row_idx = 0; block_row_idx < block_row_count; ++block_row_idx) {
-            RowID row_id = rowid_vector->at(vector_idx++);
-            u32 input_block_id = row_id.segment_id_;
-            u32 input_offset = row_id.segment_offset_;
-
-            for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-                switch(types[column_id]->type()) {
-                    case LogicalType::kBoolean: {
-                        ((BooleanT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((BooleanT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case LogicalType::kTinyInt: {
-                        ((TinyIntT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((TinyIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case LogicalType::kSmallInt: {
-                        ((SmallIntT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((SmallIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case LogicalType::kInteger: {
-                        ((IntegerT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((IntegerT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case LogicalType::kBigInt: {
-                        ((BigIntT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((BigIntT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case kHugeInt: {
-                        NotImplementError("HugeInt data shuffle isn't implemented.")
-                    }
-                    case kFloat: {
-                        ((FloatT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((FloatT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case kDouble: {
-                        ((DoubleT*)(output_column_vectors[column_id]->data()))[block_row_idx]
-                                = ((DoubleT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        break;
-                    }
-                    case kDecimal: {
-                        NotImplementError("Decimal data shuffle isn't implemented.")
-                    }
-                    case kVarchar: {
-                        VarcharT& dst_ref = ((VarcharT*)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
-                        VarcharT& src_ref = ((VarcharT*)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                        if(src_ref.IsInlined()) {
-                            memcpy((char*)&dst_ref, (char*)&src_ref, sizeof(VarcharT));
-                        } else {
-                            dst_ref.length = src_ref.length;
-                            memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-
-                            dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(
-                                    src_ref.length);
-                            memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-                        }
-                        break;
-                    }
-                    case kDate: {
-                        NotImplementError("Date data shuffle isn't implemented.")
-                    }
-                    case kTime: {
-                        NotImplementError("Time data shuffle isn't implemented.")
-                    }
-                    case kDateTime: {
-                        NotImplementError("Datetime data shuffle isn't implemented.")
-                    }
-                    case kTimestamp: {
-                        NotImplementError("Timestamp data shuffle isn't implemented.")
-                    }
-                    case kInterval: {
-                        NotImplementError("Interval data shuffle isn't implemented.")
-                    }
-                    case kMixed: {
-                        NotImplementError("Heterogeneous data shuffle isn't implemented.")
-                    }
-                    default: {
-                        ExecutorError("Unexpected data type")
-                    }
-                }
+            for (SizeT offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
+                BlockRawIndex block_index(block_id, offset);
+                indexes.push_back(block_index);
             }
+            indexes_group.push_back(indexes);
+
+            auto output_datablock = DataBlock::MakeUniquePtr();
+            output_datablock->Init(*types.get());
+
+            sort_operator_state->data_block_array_.push_back(Move(output_datablock));
         }
+        auto merge_indexes = MergeIndexes(Move(indexes_group), merge_comparator);
 
-        for(SizeT column_id = 0; column_id < column_count; ++column_id) {
-            output_column_vectors[column_id]->tail_index_ = block_row_count;
-        }
-
-        output_datablock->Finalize();
-
-        output_table->Append(output_datablock);
+        CopyWithIndexes(sort_operator_state->unmerge_sorted_blocks_, sort_operator_state->data_block_array_, merge_indexes, types);
+        sort_operator_state->unmerge_sorted_blocks_.clear();
+        sort_operator_state->SetComplete();
     }
-    return output_table;
-#endif
-    return nullptr;
+    return true;
 }
 
 } // namespace infinity

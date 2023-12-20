@@ -18,15 +18,22 @@ import stl;
 import parser;
 import query_context;
 import operator_state;
+import expression_evaluator;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
+import data_block;
 import load_meta;
 
 export module physical_sort;
 
 namespace infinity {
+
+struct BlockRawIndex {
+    SizeT block_idx;
+    SizeT offset;
+};
 
 export class PhysicalSort : public PhysicalOperator {
 public:
@@ -48,18 +55,10 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    void Sort(const SharedPtr<DataTable> &order_by_table, const Vector<OrderType> &order_by_types_);
-
-    static SharedPtr<DataTable> GenerateOutput(const SharedPtr<DataTable> &input_table, const SharedPtr<Vector<RowID>> &rowid_vector);
-
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderType> order_by_types_{};
 
 private:
-    SharedPtr<DataTable> GetOrderTable() const;
-
-private:
-    SharedPtr<DataTable> input_table_{};
     u64 input_table_index_{};
 };
 

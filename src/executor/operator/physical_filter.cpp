@@ -88,10 +88,6 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     if (prev_op_state->Complete()) {
         filter_operator_state->SetComplete();
     }
-
-    if(prev_op_state->Complete()) {
-        filter_operator_state->SetComplete();
-    }
     return true;
 }
 
