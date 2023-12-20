@@ -126,7 +126,7 @@ See [Build from Source](docs/build_from_source.md).
 
 ## 📜 Roadmap
 
-- [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/338)
+See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/338)
 
 ## 🙌 Community
 
