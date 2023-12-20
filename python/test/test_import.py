@@ -29,7 +29,7 @@ class TestImport:
         method: connect server, create table, import data, search, drop table, disconnect
         expect: all operations successfully
         """
-        ports = [9080]
+        ports = [23817]
         for port in ports:
             infinity_obj = infinity.connect(REMOTE_HOST)
             assert infinity_obj

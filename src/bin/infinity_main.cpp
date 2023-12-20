@@ -21,6 +21,7 @@ import stl;
 import third_party;
 import db_server;
 import infinity_exception;
+import infinity_context;
 
 namespace {
 
@@ -145,13 +146,17 @@ auto main(int argc, char **argv) -> int {
     StartupParameter parameters;
     ParseArguments(argc, argv, parameters);
 
-    db_server.Init(parameters);
+    InfinityContext::instance().Init(parameters.config_path);
+
     RegisterSignal();
+
+    InfinityContext::instance().config()->PrintAll();
 
 //    threaded_thrift_server.Init(9090);
 //    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+    u32 thrift_server_port = InfinityContext::instance().config()->sdk_port();
 
-    pool_thrift_server.Init(9080, 128);
+    pool_thrift_server.Init(thrift_server_port, 128);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
 //    non_block_pool_thrift_server.Init(9070, 64);

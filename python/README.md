@@ -30,7 +30,7 @@ pip install dist/infinity-0.0.1-py3-none-any.whl
 import infinity
 from infinity import NetworkAddress
 
-infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 9080))
+infinity_obj = infinity.connect(NetworkAddress('127.0.0.1', 23817))
 
 # infinity
 res = infinity_obj.create_database("my_db")

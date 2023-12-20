@@ -143,13 +143,12 @@ def process_pool(threads, rounds, query_path, tabel_name):
     queries = fvecs_read_all(query_path)
 
     for i in range(rounds):
-        start = time.time()
         p = multiprocessing.Pool(threads)
-        for idx, query_vec in enumerate(queries):
+        start = time.time()
+        for idx, query_vec in enumerate(fvecs_read(query_path)):
             p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float", tabel_name))
         p.close()
         p.join()
-
         end = time.time()
         dur = end - start
         results.append(f"Round {i + 1}:")

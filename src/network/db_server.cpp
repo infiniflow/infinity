@@ -29,8 +29,6 @@ import connection;
 
 namespace infinity {
 
-void DBServer::Init(const StartupParameter &parameter) { config_path_ = Move(parameter.config_path); }
-
 void DBServer::Run() {
     if (initialized) {
         return;
@@ -38,15 +36,13 @@ void DBServer::Run() {
 
     initialized = true;
 
-    InfinityContext::instance().Init(config_path_);
-
     u16 pg_port = InfinityContext::instance().config()->pg_port();
-    const String &listen_address_ref = InfinityContext::instance().config()->listen_address();
+    const String &pg_listen_addr = InfinityContext::instance().config()->listen_address();
 
     BoostErrorCode error;
-    AsioIpAddr address = asio_make_address(listen_address_ref, error);
+    AsioIpAddr address = asio_make_address(pg_listen_addr, error);
     if (error) {
-        Printf("{} isn't a valid IPv4 address.\n", listen_address_ref);
+        Printf("{} isn't a valid IPv4 address.\n", pg_listen_addr);
         infinity::InfinityContext::instance().UnInit();
         return ;
     }
@@ -54,15 +50,7 @@ void DBServer::Run() {
     acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));
     CreateConnection();
 
-    if (config_path_) {
-        Printf("Start up database server, at: {} and port: {}, config: {}\n", listen_address_ref, pg_port, *config_path_);
-    } else {
-        Printf("Start up database server, at: {} and port: {}\n", listen_address_ref, pg_port);
-    }
-
-    InfinityContext::instance().config()->PrintAll();
-
-    Printf("Run 'psql -h {} -p {}' to connect to the server.\n", listen_address_ref, pg_port);
+    Printf("Run 'psql -h {} -p {}' to connect to the server.\n", pg_listen_addr, pg_port);
 
     io_service_.run();
 }
