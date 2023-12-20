@@ -20,6 +20,8 @@ from pymilvus import (
     Collection,
 )
 
+from benchmark.remote_benchmark import calculate_recall_all, read_groundtruth
+
 
 def hello_milvus():
     fmt = "\n=== {:30} ===\n"
@@ -200,7 +202,7 @@ def fvecs_read_all(filename):
 
 
 def import_sift_1m_milvus(path):
-    connections.connect("default", host="192.168.200.151", port="19530")
+    connections.connect("default", host="localhost", port="19530")
 
     has = utility.has_collection("sift_benchmark")
     print(f"Does collection sift_benchmark exist in Milvus: {has}")
@@ -304,7 +306,8 @@ def benchmark(threads, rounds, data_set, path):
     if data_set == "sift_1m":
         query_path = path + "/sift_query.fvecs"
         ground_truth_path = path + "/sift_groundtruth.ivecs"
-        query_sift_1m(query_path, ground_truth_path)
+        if threads == 1:
+            one_thread(rounds, query_path, ground_truth_path, "sift_benchmark")
 
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
@@ -314,7 +317,7 @@ def benchmark(threads, rounds, data_set, path):
 
 
 def search_query(query):
-    connections.connect("default", host="192.168.200.151", port="19530")
+    connections.connect("default", host="localhost", port="19530")
     sift_collection = Collection("sift_benchmark")
     search_params = {
         "metric_type": "L2",
@@ -326,7 +329,7 @@ def search_query(query):
 def query_sift_1m(query_path, ground_truth_path):
     # Before conducting a search or a query, you need to load the data in `hello_milvus` into memory.
     print(f"Start loading")
-    connections.connect("default", host="192.168.200.151", port="19530")
+    connections.connect("default", host="localhost", port="19530")
     sift_collection = Collection("sift_benchmark")
     sift_collection.load()
 
@@ -336,12 +339,66 @@ def query_sift_1m(query_path, ground_truth_path):
     print(f"Number of queries: {len(queries)}")
 
     start_time = time.time()
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
         results = list(executor.map(search_query, queries))
         print(len(results))
 
     end_time = time.time()
     print(f"Time of search = {end_time - start_time}s")
+
+
+def one_thread(rounds, query_path, ground_truth_path, table_name):
+    if not os.path.exists(query_path):
+        print(f"File: {query_path} doesn't exist")
+        raise Exception(f"File: {query_path} doesn't exist")
+
+    results = []
+    queries = fvecs_read_all(query_path)
+
+    for i in range(rounds):
+        connections.connect("default", host="localhost", port="19530")
+
+        query_results = [[] for _ in range(len(queries))]
+
+        dur = 0.0
+        for idx, query_vec in enumerate(queries):
+
+            start = time.time()
+
+            sift_collection = Collection(table_name)
+            search_params = {
+                "metric_type": "L2",
+                "params": {"ef": 200},
+            }
+            res = sift_collection.search([query_vec], "col1", search_params, limit=100)
+
+            end = time.time()
+
+            diff = end - start
+            dur += diff
+
+            res_list = res[0]
+            # print(len(res_list))
+            # print(res_list.ids)
+            # print(len(res_list.ids))
+
+            # for j in range(len(res_list)):
+            query_results[idx]=res_list.ids
+
+        ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
+
+        recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
+                                                               ground_truth_sets_100, query_results)
+        results.append(f"Round {i + 1}:")
+        results.append(f"Total Dur: {dur} s")
+        results.append(f"Query Count: {len(queries)}")
+        results.append(f"QPS: {len(queries) / dur}")
+        results.append(f"Recall@1: {recall_1}")
+        results.append(f"Recall@10: {recall_10}")
+        results.append(f"Recall@100: {recall_100}")
+
+    for result in results:
+        print(result)
 
 
 def query_gist_1m(query_path, ground_truth_path):
