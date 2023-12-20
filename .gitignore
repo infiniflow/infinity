@@ -56,7 +56,7 @@
 
 # build directory of Gradle, CMake etc
 tmp
-build
+build*/
 cmake-build-*
 
 # ignore compilation configure file
