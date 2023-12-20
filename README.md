@@ -83,18 +83,15 @@ db = infinity_obj.get_database("default")
 # Drop my_table if it already exists
 db.drop_table("my_table", if_exists=True)
 # Create a table named "my_table"
-table=db.create_table(
-    "my_table", {"num": "integer", "body": "varchar", "vec": "vector,4,float"}, None)
+table=db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
 ```
 
 
 ### Insert two records 
 
 ```python
-table.insert(
-    [{"num": 1, "body": "unnecessary, and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-table.insert(
-    [{"num": 2, "body": "publisher=US Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 ```
 
 

@@ -1,5 +1,66 @@
 
 
+- [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
+- [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
+
+## Build from source on Ubuntu 22.04
+
+This section provides instructions on building Infinity from source on Ubuntu 22.04.
+
+### Step1 Download source code
+
+```shell
+$ git clone https://github.com/infiniflow/infinity.git
+```
+
+### Step2 Install necessary dependencies
+
+#### Step [1/9]: sudo apt update && sudo apt install -y git wget unzip software-properties-common
+
+```bash
+sudo apt update && sudo apt install -y git wget unzip software-properties-common
+```
+
+#### Step [2/9]: Download cmake-3.28.1
+
+```bash
+wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
+```
+
+### Step [3/9]: Install cmake-3.28.1
+
+```bash
+tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
+cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
+```
+
+### 
+
+
+## Step3 Build source code
+
+```shell
+$ git config --global --add safe.directory infinity
+$ cd infinity && mkdir build && cd build
+$ export CC=/usr/bin/clang-18
+$ export CXX=/usr/bin/clang++-18
+$ cmake -G Ninja ..
+$ ninja -j 12
+```
+
+### Step4 Start up Infinity server
+
+```shell
+$ ./src/infinity_main
+```
+
+
+
+## Build from source on Ubuntu 23.10
+
+```shell
+$ git clone https://github.com/infiniflow/infinity.git
+```
 
 
 ## Step1 Download Source Code
@@ -10,28 +71,10 @@ $ git clone https://github.com/infiniflow/infinity.git
 
 ## Step2 Install dependencies
 
-Taking Ubuntu 22.4+ as an example:
 
-```shell
-# Clang 17 or 18 is required. GCC is not supported.
-$ apt install clang-*-17
-$ ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 
-# CMake 3.28+ is requrired.
-$ wget https://github.com/Kitware/CMake/releases/download/v3.28.0-rc5/cmake-3.28.0-rc5-linux-x86_64.tar.gz
-$ tar xzvf cmake-3.28.0-rc5-linux-x86_64.tar.gz
-$ sudo cp -r cmake-3.28.0-rc5-linux-x86_64/bin/* /usr/local/bin/
 
-$ sudo apt install make libevent-dev ninja-build bison flex libomp-17-dev libblas-dev liblapack-dev libboost1.81-dev liburing-dev libgflags-dev libleveldb-dev
 
-# iresearch requires lz4
-$ git clone https://github.com/lz4/lz4.git
-$ cd lz4
-$ make
-$ sudo make install
-$ export LZ4_ROOT=/usr/local
-
-```
 
 ## Step3 Build source code
 
