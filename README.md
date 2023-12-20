@@ -23,7 +23,9 @@ Infinity comes with **performance**, **flexibility**, **ease-of-use**, and many 
 
 ### ⚡️ Incredibly fast
 
-0.1 milliseconds query latency with 10K QPS on million-scale vector datasets. See the [Benchmarking](https://www.example.com).
+- Achieves 0.1 milliseconds query latency on million-scale vector datasets.
+- Up to 10K QPS on million-scale vector datasets.
+- See the [Benchmarking](https://www.example.com).
 
 
 ### 🔮 Fused search
