@@ -27,10 +27,8 @@ class TestCreateTable:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_varchar_table", True)
-        res = db_obj.create_table("test_create_varchar_table", {
+        table_obj = db_obj.create_table("test_create_varchar_table", {
                                   "c1": "varchar, primary key", "c2": "float"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_create_varchar_table")
         assert table_obj
 
         db_obj.drop_table("test_create_varchar_table")
@@ -44,10 +42,8 @@ class TestCreateTable:
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_embedding_table", True)
-        res = db_obj.create_table("test_create_embedding_table", {
+        table_obj = db_obj.create_table("test_create_embedding_table", {
                                   "c1": "vector,128,float"}, None)
-        assert res.success
-        table_obj = db_obj.get_table("test_create_embedding_table")
         assert table_obj
 
         db_obj.drop_table("test_create_embedding_table")

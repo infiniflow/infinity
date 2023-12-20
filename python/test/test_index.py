@@ -24,12 +24,9 @@ class TestIndex:
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_ivfflat", True)
         assert res.success
-        res = db_obj.create_table("test_index_ivfflat", {
+        table_obj = db_obj.create_table("test_index_ivfflat", {
             "c1": "vector,1024,float"}, None)
-        assert res.success
-
-        table_obj = db_obj.get_table("test_index_ivfflat")
-        assert table_obj
+        assert table_obj is not None
 
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
@@ -47,12 +44,9 @@ class TestIndex:
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_hnsw", True)
         assert res.success
-        res = db_obj.create_table(
+        table_obj = db_obj.create_table(
             "test_index_hnsw", {"c1": "vector,1024,float"}, None)
-        assert res.success
-
-        table_obj = db_obj.get_table("test_index_hnsw")
-        assert table_obj
+        assert table_obj is not None
 
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
@@ -75,12 +69,9 @@ class TestIndex:
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_fulltext", if_exists=True)
         assert res.success
-        res = db_obj.create_table(
+        table_obj = db_obj.create_table(
             "test_index_fulltext", {"doctitle": "varchar", "docdate": "varchar", "body": "varchar"}, None)
-        assert res.success
-
-        table_obj = db_obj.get_table("test_index_fulltext")
-        assert table_obj
+        assert table_obj is not None
 
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("body",

@@ -31,7 +31,11 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self.disconnect()
 
     def create_database(self, db_name: str, options=None):
-        return self._client.create_database(db_name=db_name)
+        res = self._client.create_database(db_name=db_name)
+        if res.success is True:
+            return RemoteDatabase(self._client, db_name)
+        else:
+            raise Exception(res.error_msg)
 
     def list_databases(self):
         return self._client.list_databases()

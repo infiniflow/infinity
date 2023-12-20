@@ -44,9 +44,6 @@ class Table(ABC):
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         pass
 
-    @abstractmethod
-    def query_builder(self):
-        pass
 
     @abstractmethod
     def _execute_query(self, query):

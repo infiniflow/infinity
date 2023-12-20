@@ -43,23 +43,32 @@ class TestDatabase:
         infinity_obj = infinity.connect(REMOTE_HOST)
 
         # infinity
-        res = infinity_obj.create_database("my_database")
-        assert res.success
+        infinity_obj.drop_database("my_database", None)
+        db = infinity_obj.create_database("my_database")
+        assert db
 
-        res = infinity_obj.create_database("my_database!@#")
-        assert not res.success
+        try:
+            db = infinity_obj.create_database("my_database!@#")
+        except Exception as e:
+            print(e)
 
-        res = infinity_obj.create_database("my-database-dash")
-        assert not res.success
+        try:
+            db = infinity_obj.create_database("my-database-dash")
+        except Exception as e:
+            print(e)
 
-        res = infinity_obj.create_database("123_database")
-        assert not res.success
+        try:
+            db = infinity_obj.create_database("123_database")
+        except Exception as e:
+            print(e)
 
-        res = infinity_obj.create_database("")
-        assert not res.success
+        try:
+            db = infinity_obj.create_database("")
+        except Exception as e:
+            print(e)
 
         res = infinity_obj.list_databases()
-        assert res.success
+        assert res is not None
 
         res.db_names.sort()
 

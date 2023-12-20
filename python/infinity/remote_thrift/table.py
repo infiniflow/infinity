@@ -13,11 +13,12 @@
 # limitations under the License.
 import os
 from abc import ABC
-from typing import Optional, Union, List, Any, Tuple, Dict
+from typing import Optional, Union, List, Any
 
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from infinity.common import INSERT_DATA, VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
@@ -31,6 +32,7 @@ class RemoteTable(Table, ABC):
         self._conn = conn
         self._db_name = db_name
         self._table_name = table_name
+        self.query_builder = InfinityThriftQueryBuilder(table=self)
 
     def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
 
@@ -56,12 +58,16 @@ class RemoteTable(Table, ABC):
         return self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                      index_name=index_name)
 
-    def insert(self, data: list[dict[str, Union[str, int, float, list[Union[int, float]]]]]):
+    def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
         db_name = self._db_name
         table_name = self._table_name
         column_names: list[str] = []
         fields: list[ttypes.Field] = []
+
+        if isinstance(data, dict):
+            data = [data]
+
         for row in data:
             column_names = list(row.keys())
             parse_exprs = []
@@ -191,10 +197,50 @@ class RemoteTable(Table, ABC):
         return self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
                                  update_expr_array=update_expr_array)
 
-        pass
+    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
+            topn: int):
+        self.query_builder.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
 
-    def query_builder(self) -> InfinityThriftQueryBuilder:
-        return InfinityThriftQueryBuilder(table=self)
+        return self
+
+    def match(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, topn: int):
+        self.query_builder.match(vector_column_name, embedding_data, embedding_data_type, topn)
+
+        return self
+
+    def output(self, columns: Optional[List[str]]):
+        self.query_builder.output(columns)
+
+        return self
+
+    def filter(self, filter: Optional[str]):
+        self.query_builder.filter(filter)
+
+        return self
+
+    def limit(self, limit: Optional[int]):
+        self.query_builder.limit(limit)
+
+        return self
+
+    def offset(self, offset: Optional[int]):
+
+        self.query_builder.offset(offset)
+
+        return self
+
+    def to_result(self):
+        return self.query_builder.to_result()
+
+    def to_df(self):
+        return self.query_builder.to_df()
+
+    def to_pl(self):
+        return self.query_builder.to_pl()
+
+    def to_arrow(self):
+        return self.query_builder.to_arrow()
+
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
         # process select_list
