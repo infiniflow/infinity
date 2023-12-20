@@ -44,12 +44,6 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-### Prerequisites
-
-- Operating system: Ubuntu 22.04 or higher
-- Clang-17 or higher to support C++20 and modules
-- CMake 3.28 or higher
-
 
 
 
@@ -76,7 +70,6 @@ infinity_obj = infinity.connect(REMOTE_HOST)
 ```
 
 
-
 ### Get a database
 
 ```python
@@ -84,38 +77,33 @@ db = infinity_obj.get_database("default")
 ```
 
 
-
 ### Create a table
 
 ```python
-    # Drop my_table if it already exists
-    db.drop_table("my_table", if_exists=True)
-    # Create a table named "my_table"
-    table=db.create_table(
-        "my_table", {"num": "integer", "body": "varchar", "vec": "vector,4,float"}, None)
+# Drop my_table if it already exists
+db.drop_table("my_table", if_exists=True)
+# Create a table named "my_table"
+table=db.create_table(
+    "my_table", {"num": "integer", "body": "varchar", "vec": "vector,4,float"}, None)
 ```
-
 
 
 ### Insert two records 
 
 ```python
-    table.insert(
-        [{"num": 1, "body": "unnecessary, and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-    table.insert(
-        [{"num": 2, "body": "publisher=US Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+table.insert(
+    [{"num": 1, "body": "unnecessary, and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table.insert(
+    [{"num": 2, "body": "publisher=US Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 ```
-
 
 
 ### Execute a vector search
 
 ```python
-    res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
-    print(res)
+res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+print(res)
 ```
-
-
 
 > 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
 

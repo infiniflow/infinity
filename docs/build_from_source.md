@@ -1,8 +1,6 @@
-## Prerequisites
 
--  Operating system: Ubuntu 22.04,  openSUSE Tumbleweed 20230828 or higher
--  GCC 13 / Clang-18 or higher to support C++23
--  CMake 3.10 or higher
+
+
 
 ## Step1 Download Source Code
 
