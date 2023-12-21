@@ -37,19 +37,21 @@ unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
 
 echo
 echo 'step [6/9] : add apt source for llvm-17'
-echo 'command: sudo echo -e "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" > /etc/apt/sources.list.d/llvm17.list'
+echo 'command: sudo echo -e "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-17 main" > /etc/apt/sources.list.d/llvm17.list'
 echo 'command: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc'
 echo
-sudo echo -e "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" > /etc/apt/sources.list.d/llvm17.list
+sudo echo -e "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-17 main" > /etc/apt/sources.list.d/llvm17.list
 wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
 
 echo
-echo 'step [7/9] : add apt source for g++-13 gcc-13 libstdc++-13-dev libboost1.81-dev'
-echo 'command: sudo add-apt-repository -y -P ppa:ubuntu-toolchain-r/test'
-echo 'command: sudo add-apt-repository -y -P ppa:mhier/libboost-latest'
+echo 'step [7/9] : add apt source for g++-13 gcc-13 libstdc++-13-dev libboost1.81-dev liburing-dev'
+echo 'command: sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test'
+echo 'command: sudo add-apt-repository -y ppa:mhier/libboost-latest'
+echo 'command: sudo add-apt-repository -y ppa:rhansen/qemu'
 echo
-sudo add-apt-repository -y -P ppa:ubuntu-toolchain-r/test
-sudo add-apt-repository -y -P ppa:mhier/libboost-latest
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+sudo add-apt-repository -y ppa:mhier/libboost-latest
+sudo add-apt-repository -y ppa:rhansen/qemu
 
 echo
 echo "step [8/9] : sudo apt update && sudo apt install -y g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev"
