@@ -100,17 +100,6 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             remove.VisitNodeChildren(op);
             return;
         }
-        case LogicalNodeType::kSort: {
-            if (!all_referenced_) {
-                //                auto &sort = op.Cast<LogicalSort>();
-                //                PlannerAssert(sort.expressions_.empty(), "'Order by' clause object should not yet be set");
-                // TODO: Sort's projections is not supported yet
-            }
-            RemoveUnusedColumns remove;
-            remove.VisitNodeExpression(op);
-            remove.VisitNodeChildren(op);
-            return;
-        }
         case LogicalNodeType::kDelete: {
             RemoveUnusedColumns remove;
             remove.VisitNodeExpression(op);
@@ -197,6 +186,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kCommand:
             break;
         case LogicalNodeType::kFusion:
+            break;
+        case LogicalNodeType::kSort:
             break;
     }
     LogicalNodeVisitor::VisitNodeExpression(op);

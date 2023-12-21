@@ -106,6 +106,19 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kSort: {
+            SortOperatorState *sort_output_state = static_cast<SortOperatorState *>(task_op_state);
+            if (sort_output_state->data_block_array_.empty()) {
+                if(materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    Error<ExecutorException>("Empty sort output");
+                }
+            } else {
+                materialize_sink_state->data_block_array_ = Move(sort_output_state->data_block_array_);
+            }
+            break;
+        }
         case PhysicalOperatorType::kKnnScan: {
             throw ExecutorException("KnnScan shouldn't be here");
             KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_op_state);

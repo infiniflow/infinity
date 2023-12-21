@@ -139,8 +139,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kFilter:
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit:
-        case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kSort: {
+        case PhysicalOperatorType::kTop: {
             if (phys_op->left() == nullptr) {
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
             }
@@ -150,7 +149,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             break;
         }
         case PhysicalOperatorType::kUpdate:
-        case PhysicalOperatorType::kDelete:  {
+        case PhysicalOperatorType::kDelete:
+        case PhysicalOperatorType::kSort: {
             if (phys_op->left() == nullptr) {
                 Error<SchedulerException>(Format("No input node of {}", phys_op->GetName()));
             }
