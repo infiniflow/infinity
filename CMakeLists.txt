@@ -133,10 +133,15 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM appl
 set(CPACK_PACKAGE_VENDOR "infiniflow")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_HOST_SYSTEM_PROCESSOR}")
 
-# Define the files to include in the packages
-install(TARGETS infinity DESTINATION /usr/bin)
-install(FILES conf/infinity.service DESTINATION /usr/lib/systemd/system)
-install(FILES conf/infinity_conf.toml DESTINATION /etc)
+# https://cmake.org/cmake/help/latest/command/install.html
+# Install target
+# WANNING: If an absolute path is given, cpack will install the specific files on the host system (requires root permission) and then included in the package.
+# If an relative path (interpreted relative to the value of the CMAKE_INSTALL_PREFIX variable) is given, cpack include specific files in the package without actually installing them on the host system.
+# CMAKE_INSTALL_PREFIX defaults to "/usr/local"
+set(CMAKE_INSTALL_PREFIX /usr)
+install(TARGETS infinity DESTINATION bin)
+install(FILES conf/infinity.service DESTINATION lib/systemd/system)
+install(FILES conf/infinity_conf.toml DESTINATION etc)
 
 # https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
 # Specify the post-install script for RPM
@@ -151,4 +156,9 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/conf/postins
 # Specify the package generators
 set(CPACK_GENERATOR "RPM;DEB;TGZ")
 
+# Enable CPack debug output
+set(CPACK_PACKAGE_DEBUG True)
+
+# https://cmake.org/cmake/help/latest/variable/CPACK_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION.html
+set(CPACK_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION "ON")
 include(CPack)
