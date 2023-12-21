@@ -10,7 +10,7 @@
 <h4 align="center">
   <a href="https://github.com/infiniflow/infinity/issues/338">Roadmap 2024</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
-  <a href="https://discord.gg/6Zex37FE">Discord</a> |
+  <a href="https://discord.gg/jEfRUwEYEV">Discord</a> |
   <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
 </h4>
 
@@ -121,7 +121,7 @@ See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/33
 
 ## 🙌 Community
 
-- [Discord](https://discord.gg/6Zex37FE)
+- [Discord](https://discord.gg/jEfRUwEYEV)
 - [Twitter](https://twitter.com/infiniflowai)
 - [GitHub Discussions](https://github.com/infiniflow/infinity/discussions)
 - [YouTube](https://www.youtube.com/@InfiniFlow-AI)
