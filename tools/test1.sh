@@ -1,10 +1,10 @@
 #!/bin/bash
 
-GITHUB_WORKSPACE=/data01/zhichyu
+: ${GITHUB_WORKSPACE:=/home/zhichyu/github.com/infiniflow/infinity}
 
 echo "#    - name: start builder container"
 sudo docker rm -f infinity_build
-sudo docker run -d --name infinity_build --network=host -v $GITHUB_WORKSPACE/infinity:/infinity infiniflow/infinity_build:0.1
+sudo docker run -d --name infinity_build --network=host -v $GITHUB_WORKSPACE:/infinity infiniflow/infinity_build:0.1
 if [ $? -ne 0 ] ; then
     echo "### failure! $? ###"
     exit 1
