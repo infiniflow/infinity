@@ -120,8 +120,8 @@ private:
             ExpressionEvaluator expr_evaluator;
             auto state = ExpressionState::CreateState(expr);
             SharedPtr<ColumnVector> result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expr->Type()));
-            result_vector->Initialize();
 
+            result_vector->Initialize();
             expr_evaluator.Init(block);
             expr_evaluator.Execute(expr, state, result_vector);
 
@@ -132,7 +132,6 @@ private:
     }
 
     const Vector<UniquePtr<DataBlock>> &order_by_blocks_;
-
     const Vector<OrderType> &order_by_types_;
     Vector<SharedPtr<BaseExpression>> expressions_;
 
@@ -225,7 +224,6 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
             block_indexes.push_back(block_index);
         }
     }
-
     // sort block_indexes
     std::sort(block_indexes.begin(), block_indexes.end(), Comparator(pre_op_state->data_block_array_, order_by_types_, expressions_));
 
