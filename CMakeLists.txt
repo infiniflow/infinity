@@ -122,3 +122,33 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile benchmark
 add_subdirectory(benchmark)
+
+
+# CPack settings
+set(CPACK_PACKAGE_NAME "infinity")
+set(CPACK_PACKAGE_VERSION "0.1.0-dev")
+set(CPACK_PACKAGE_RELEASE 1)
+set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")
+set(CPACK_PACKAGE_VENDOR "infiniflow")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_HOST_SYSTEM_PROCESSOR}")
+
+# Define the files to include in the packages
+install(TARGETS infinity DESTINATION /usr/bin)
+install(FILES conf/infinity.service DESTINATION /usr/lib/systemd/system)
+install(FILES conf/infinity_conf.toml DESTINATION /etc)
+
+# https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
+# Specify the post-install script for RPM
+# CPackRPM needs the absolute path of the file as CPack does not know that script is relative to source tree.
+set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
+
+# https://cmake.org/cmake/help/latest/cpack_gen/deb.html
+# Add custom script to the control.tar.gz. Typical usage is for conffiles, postinst, postrm, prerm.
+# Note: DEB requires the file name be one of postinst, postrm, prerm and the "+x" permission, while rpm doesn't require that.
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
+
+# Specify the package generators
+set(CPACK_GENERATOR "RPM;DEB;TGZ")
+
+include(CPack)

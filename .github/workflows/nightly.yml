@@ -1,0 +1,70 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # This schedule runs every night at midnight UTC
+
+jobs:
+  release:
+    runs-on: self-hosted
+    steps:
+    - name: Cleanup workspace
+      run: echo "cleanup $GITHUB_WORKSPACE/*" && sudo rm -fr $GITHUB_WORKSPACE/*
+
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: start builder container
+      run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
+
+    - name: Build release version
+      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+
+    - name: Build RPM and DEB
+      run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
+
+    - name: Check if Release Exists
+      id: check_release
+      run: |
+        TAG_NAME=nightly
+        RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+                      -H "Accept: application/vnd.github.v3+json" \
+                      https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME \
+                      | jq -r '.id')
+        echo "::set-output name=release_id::$RELEASE_ID"
+
+    - name: Delete Existing Release (Optional)
+      if: steps.check_release.outputs.release_id != 'null'
+      run: |
+        RELEASE_ID=${{ steps.check_release.outputs.release_id }}
+        curl -X DELETE -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
+      with:
+        tag_name: nightly
+        release_name: Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} '+%Y-%m-%d %H:%M:%S')
+        body: |
+          # Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} '+%Y-%m-%d %H:%M:%S') from ${{ github.ref }}
+        draft: true
+        prerelease: false
+
+    - name: Upload Binary
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: |
+          cmake-build-release/infinity-0.1.0-dev-x86_64.deb
+          cmake-build-release/infinity-0.1.0-dev-x86_64.rpm
+        asset_name: |
+          infinity-0.1.0-dev-x86_64.deb
+          infinity-0.1.0-dev-x86_64.rpm
+        asset_content_type: application/octet-stream
