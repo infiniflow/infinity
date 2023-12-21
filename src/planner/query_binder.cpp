@@ -140,13 +140,16 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
                 Error<PlannerException>("KNN expression in select list must have an alias.");
             }
 
-            const String select_expr_name = select_expr->ToString();
+            String select_expr_name = select_expr->ToString();
             if (bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
                 LOG_TRACE(Format("Same expression: {} had already been found in select list index: {}",
                                  select_expr_name,
                                  bind_context_ptr_->select_expr_name2index_[select_expr_name]));
                 // TODO: create an map from secondary expression to the primary one.
             } else {
+                if (bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
+                    select_expr_name = Format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
+                }
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
         }

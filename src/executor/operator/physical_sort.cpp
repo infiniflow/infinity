@@ -102,8 +102,18 @@ public:
     }
 
 private:
+    struct HashPair {
+        template <class T1, class T2>
+        SizeT operator()(const Pair<T1, T2> &p) const {
+            auto hash_1 = Hash<T1>(p.first);
+            auto hash_2 = Hash<T2>(p.second);
+            return hash_1 ^ hash_2;
+        }
+    };
+
     SharedPtr<ColumnVector> EvalOrderVector(DataBlock *block, SizeT block_idx, SharedPtr<BaseExpression> &expr) {
-        auto eval_key = MakeShared<Pair<SizeT, SharedPtr<BaseExpression>>>(block_idx, expr);
+        Pair<SizeT, SharedPtr<BaseExpression>> eval_key = {block_idx, expr};
+
         if (eval_cache_.contains(eval_key)) {
             return eval_cache_[eval_key];
         } else {
@@ -128,7 +138,7 @@ private:
 
     // K: BlockIdx & Expression
     // V: ColumnVector
-    HashMap<SharedPtr<Pair<SizeT, SharedPtr<BaseExpression>>>, SharedPtr<ColumnVector>> eval_cache_{};
+    HashMap<Pair<SizeT, SharedPtr<BaseExpression>>, SharedPtr<ColumnVector>, HashPair> eval_cache_;
 };
 
 Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &indexes_a, Vector<BlockRawIndex> &indexes_b, Comparator &comparator) {
@@ -171,8 +181,9 @@ Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &&indexes_group
 void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
                      Vector<UniquePtr<DataBlock>> &output_blocks,
                      const Vector<BlockRawIndex> &block_indexes,
+                     SizeT start_block_index,
                      const SharedPtr<Vector<SharedPtr<DataType>>> &types) {
-    auto block_count = (block_indexes.size() + DEFAULT_BLOCK_CAPACITY) / DEFAULT_BLOCK_CAPACITY;
+    auto block_count = (block_indexes.size() + DEFAULT_BLOCK_CAPACITY - 1) / DEFAULT_BLOCK_CAPACITY;
 
     // copy with block_indexes and push to unmerge_sorted_blocks
     for (SizeT i = 0; i < block_count; ++i) {
@@ -183,14 +194,15 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
     }
     for (SizeT index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
         auto &block_index = block_indexes[index_idx];
-        const Vector<SharedPtr<ColumnVector>> &output_column_vectors = output_blocks[index_idx / DEFAULT_BLOCK_CAPACITY]->column_vectors;
+        const Vector<SharedPtr<ColumnVector>> &output_column_vectors =
+            output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors;
 
         for (SizeT column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
             output_column_vectors[column_id]->AppendValue(input_blocks[block_index.block_idx]->GetValue(column_id, block_index.offset));
         }
     }
     for (SizeT i = 0; i < block_count; ++i) {
-        output_blocks[i]->Finalize();
+        output_blocks[i + start_block_index]->Finalize();
     }
 }
 
@@ -199,6 +211,7 @@ void PhysicalSort::Init() {}
 bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     auto *prev_op_state = operator_state->prev_op_state_;
     auto *sort_operator_state = static_cast<SortOperatorState *>(operator_state);
+    auto types = left_->GetOutputTypes();
 
     // Generate block indexes
     Vector<BlockRawIndex> block_indexes;
@@ -216,38 +229,36 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     // sort block_indexes
     std::sort(block_indexes.begin(), block_indexes.end(), Comparator(pre_op_state->data_block_array_, order_by_types_, expressions_));
 
-    auto types = left_->GetOutputTypes();
-
-    CopyWithIndexes(pre_op_state->data_block_array_, sort_operator_state->unmerge_sorted_blocks_, block_indexes, types);
+    CopyWithIndexes(pre_op_state->data_block_array_,
+                    sort_operator_state->unmerge_sorted_blocks_,
+                    block_indexes,
+                    sort_operator_state->unmerge_sorted_blocks_.size(),
+                    types);
     prev_op_state->data_block_array_.clear();
 
-    if (prev_op_state->Complete()) {
-        auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
-        auto merge_comparator = Comparator(unmerge_sorted_blocks, order_by_types_, expressions_);
-
-        Vector<Vector<BlockRawIndex>> indexes_group;
-        indexes_group.reserve(unmerge_sorted_blocks.size());
-        for (SizeT block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
-            Vector<BlockRawIndex> indexes;
-            indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
-
-            for (SizeT offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
-                BlockRawIndex block_index(block_id, offset);
-                indexes.push_back(block_index);
-            }
-            indexes_group.push_back(indexes);
-
-            auto output_datablock = DataBlock::MakeUniquePtr();
-            output_datablock->Init(*types.get());
-
-            sort_operator_state->data_block_array_.push_back(Move(output_datablock));
-        }
-        auto merge_indexes = MergeIndexes(Move(indexes_group), merge_comparator);
-
-        CopyWithIndexes(sort_operator_state->unmerge_sorted_blocks_, sort_operator_state->data_block_array_, merge_indexes, types);
-        sort_operator_state->unmerge_sorted_blocks_.clear();
-        sort_operator_state->SetComplete();
+    if (!prev_op_state->Complete()) {
+        return false;
     }
+    auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
+    auto merge_comparator = Comparator(unmerge_sorted_blocks, order_by_types_, expressions_);
+
+    Vector<Vector<BlockRawIndex>> indexes_group;
+    indexes_group.reserve(unmerge_sorted_blocks.size());
+    for (SizeT block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
+        Vector<BlockRawIndex> indexes;
+        indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
+
+        for (SizeT offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
+            BlockRawIndex block_index(block_id, offset);
+            indexes.push_back(block_index);
+        }
+        indexes_group.push_back(indexes);
+    }
+    auto merge_indexes = MergeIndexes(Move(indexes_group), merge_comparator);
+
+    CopyWithIndexes(sort_operator_state->unmerge_sorted_blocks_, sort_operator_state->data_block_array_, merge_indexes, 0, types);
+    sort_operator_state->unmerge_sorted_blocks_.clear();
+    sort_operator_state->SetComplete();
     return true;
 }
 

@@ -85,8 +85,13 @@ export {
     template <typename T>
     using Set = std::set<T>;
 
-    template <typename S, typename T>
-    using HashMap = std::unordered_map<S, T>;
+    template <typename T>
+    inline size_t Hash(T t) {
+        return std::hash<T>()(t);
+    }
+
+    template <typename S, typename T, typename H = std::hash<S>>
+    using HashMap = std::unordered_map<S, T, H>;
 
     template <typename S>
     using HashSet = std::unordered_set<S>;

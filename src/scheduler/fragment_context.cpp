@@ -689,8 +689,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit:
-        case PhysicalOperatorType::kTop:
-        case PhysicalOperatorType::kSort: {
+        case PhysicalOperatorType::kTop: {
             if (fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(
                     Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -751,6 +750,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kSort:
         case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
