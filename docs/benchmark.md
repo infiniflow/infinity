@@ -1,17 +1,17 @@
 # Benchmark
 
-**infinity** supply python script for sift1m and gist1m dataset benchmark.
+**Infinity** provides Python script for sift1m and gist1m dataset benchmark.
 
-## Get infinity binary file
+## Get the Infinity binary file
 
 ```sh
 git clone https://github.com/infiniflow/infinity.git
 cd infinity
 ```
 
-## download benchmark file
+## Download the benchmark file
 
-download via wget
+Download via wget.
 
 ```sh
 #download sift benchmark
@@ -21,8 +21,7 @@ wget ftp://ftp.irisa.fr/local/texmex/corpus/gist.tar.gz
 
 ```
 
-or  
-visit [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/) to download manually.
+or visit [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/) to download manually.
 
 ```sh
 #uncompress and move benchmark file
@@ -39,7 +38,7 @@ mv gist/gist_groundtruth.ivecs test/data/benchmark/gist_1m/gist_groundtruth.ivec
 
 ```
 
-## Benchmark dependency
+## Benchmark dependencies
 
 ```sh
 cd python
@@ -49,9 +48,9 @@ python setup.py bdist_wheel
 pip install dist/infinity_sdk-0.1.0.dev1-py3-none-any.whl
 ```
 
-## Start infinity
+## Start Infinity
 
-Read [README.md](https://github.com/infiniflow/infinity/blob/main/README.md) to start infinity.
+See the [README.md](https://github.com/infiniflow/infinity/blob/main/README.md) to start Infinity.
 
 ## Import data
 
@@ -66,7 +65,7 @@ python remote_benchmark_import.py -d sift_1m
 python remote_benchmark_import.py -d gist_1m
 ```
 
-## run benchmark
+## Run benchmark
 
 ```sh
 options:
@@ -75,9 +74,9 @@ options:
   -r ROUNDS, --rounds ROUNDS
   -d DATA_SET, --data DATA_SET
 
-# ROUNDS means how many times python runs the benchmark. The result is the average for each time.
+# ROUNDS refers to the number of times that Python runs the benchmark. The result is the average time for all runs.
 
-# following command means run benchmark with 1 thread, for 1 time using sift dataset
+# The following command means run benchmark with one thread, for one time using the sift dataset.
 python remote_benchmark.py -t 1 -r 1 -d sift_1m
 
 python remote_benchmark.py -t 1 -r 1 -d gist_1m

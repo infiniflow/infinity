@@ -8,7 +8,7 @@
 </p>
 
 <h4 align="center">
-  <a href="https://www.meilisearch.com/pricing?utm_campaign=oss&utm_source=github&utm_medium=meilisearch&utm_content=nav">Roadmap 2024</a> |
+  <a href="https://github.com/infiniflow/infinity/issues/338">Roadmap 2024</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
   <a href="https://discord.gg/6Zex37FE">Discord</a> |
   <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
@@ -26,7 +26,7 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 - Achieves 0.1 milliseconds query latency on million-scale vector datasets.
 - Up to 10K QPS on million-scale vector datasets.
 
-> See the [Benchmark](https://www.example.com).
+> See the [Benchmark](docs/benchmark.md).
 
 
 ### 🔮 Fused search
@@ -39,23 +39,19 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python client]()
+- Intuitive Python API. See the [Python API](docs/pysdk_api_reference.md)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
 ## 🎮 Get Started
 
-### Prerequisites
 
-- Operating system: Ubuntu 22.04 or higher
-- Clang-17 or higher to support C++20 and modules
-- CMake 3.28 or higher
+
 
 ### Install Infinity's Python client
 
 ```bash
+pip install infinity_sdk 
 ```
-
-
 
 ### Import necessary modules
 
@@ -74,7 +70,6 @@ infinity_obj = infinity.connect(REMOTE_HOST)
 ```
 
 
-
 ### Get a database
 
 ```python
@@ -82,49 +77,41 @@ db = infinity_obj.get_database("default")
 ```
 
 
-
 ### Create a table
 
 ```python
-    # Drop my_table if it already exists
-    db.drop_table("my_table", if_exists=True)
-    # Create a table named "my_table"
-    db.create_table(
-        "my_table", {"num": "integer", "body": "varchar", "vec": "vector,4,float"}, None)
+# Drop my_table if it already exists
+db.drop_table("my_table", if_exists=True)
+# Create a table named "my_table"
+table=db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
 ```
-
 
 
 ### Insert two records 
 
 ```python
-    table.insert(
-        [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-    table.insert(
-        [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
 ```
-
 
 
 ### Execute a vector search
 
 ```python
-    res = table.query_builder().output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
-    print(res)
+res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+print(res)
 ```
 
-
-
-> 💡 For more information about the Python API, see the [Python API Reference]().
+> 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
 
 
 ## 🛠️ Build from Source
 
-See [Build from Source](build_from_source.md).
+See [Build from Source](docs/build_from_source.md).
 
 ## 📜 Roadmap
 
-- [Infinity Roadmap 2024]()
+See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/338)
 
 ## 🙌 Community
 
