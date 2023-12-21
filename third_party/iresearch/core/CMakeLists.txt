@@ -354,6 +354,7 @@ target_link_libraries(iresearch
   ${SIMD_LIBRARY_STATIC}
   text
   ${LIBURING}
+  ${CMAKE_DL_LIBS}
   )
 
 if (CLANG_TIDY_EXE)
