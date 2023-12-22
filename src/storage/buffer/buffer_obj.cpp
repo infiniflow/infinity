@@ -21,6 +21,9 @@ import buffer_manager;
 import infinity_exception;
 import logger;
 
+import third_party;
+import logger;
+
 module buffer_obj;
 
 namespace infinity {
@@ -133,6 +136,7 @@ bool BufferObj::Save() {
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
+            LOG_TRACE(Format("{}: Save kEphemeral.", *file_worker_->file_name_));
             file_worker_->WriteToFile(false);
             break;
         }

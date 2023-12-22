@@ -128,7 +128,7 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     i64 write_count = write(fd, data, nbytes);
     if (write_count == -1) {
-        Error<StorageException>(Format("Can't write file: {}: {}", file_handler.path_.string(), strerror(errno)));
+        Error<StorageException>(Format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
     }
     return write_count;
 }

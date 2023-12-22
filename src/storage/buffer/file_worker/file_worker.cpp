@@ -22,6 +22,9 @@ import third_party;
 import file_system_type;
 import defer_op;
 
+import local_file_system;
+import logger;
+
 module file_worker;
 
 namespace infinity {
@@ -52,6 +55,10 @@ void FileWorker::WriteToFile(bool to_spill) {
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+    if (to_spill) {
+        auto local_file_handle_ = static_cast<LocalFileHandler *>(file_handler_.get());
+        LOG_WARN(Format("Open spill file: {}, fd: {}", write_path, local_file_handle_->fd_));
+    }
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
         if (!prepare_success) {
