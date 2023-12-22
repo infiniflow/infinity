@@ -112,7 +112,6 @@ bool BufferObj::Free() {
                     break;
                 }
                 case BufferType::kEphemeral: {
-                    LOG_WARN(Format("{}: Free kEphemeral.", *file_worker_->file_name_));
                     file_worker_->WriteToFile(true);
                     break;
                 }
@@ -129,15 +128,15 @@ bool BufferObj::Free() {
 }
 
 bool BufferObj::Save() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    rw_locker_.lock(); // This lock will be released in CloseFile()
     if (type_ == BufferType::kPersistent) {
         // No need to save because of no change happens
+        rw_locker_.unlock();
         return false;
     }
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
-            LOG_WARN(Format("{}: Save kEphemeral.", *file_worker_->file_name_));
             file_worker_->WriteToFile(false);
             break;
         }
@@ -158,8 +157,8 @@ bool BufferObj::Save() {
 void BufferObj::Sync() { file_worker_->Sync(); }
 
 void BufferObj::CloseFile() {
-    LOG_WARN(Format("BufferObj::Close {}", *file_worker_->file_name_));
     file_worker_->CloseFile();
+    rw_locker_.unlock();
 }
 
 void BufferObj::CheckState() const {

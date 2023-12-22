@@ -43,6 +43,7 @@ void Logger::Initialize(const Config *config_ptr) {
     Vector<spd_sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
 
     infinity_logger = MakeShared<spd_logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+    infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
     RegisterLogger(infinity_logger);
 
     SetLogLevel(config_ptr->log_level());
