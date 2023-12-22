@@ -97,6 +97,16 @@ public:
         return row_count_;
     }
 
+    [[nodiscard]] inline Vector<SharedPtr<DataType>> types() const {
+        Vector<SharedPtr<DataType>> types;
+
+        types.reserve(column_count());
+        for (SizeT colum_idx = 0; colum_idx < column_vectors.size(); ++colum_idx) {
+            types.push_back(column_vectors[colum_idx]->data_type());
+        }
+        return types;
+    }
+
     [[nodiscard]] inline SizeT capacity() const { return capacity_; }
     [[nodiscard]] inline SizeT available_capacity() const { return capacity_ - row_count_; }
 
