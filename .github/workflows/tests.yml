@@ -20,32 +20,32 @@ jobs:
     - name: Show working copy revision
       run: git branch --show-current && git rev-parse HEAD
 
-    - name: start builder container
+    - name: Start builder container
       run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
     
     - name: Build debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
 
-    - name: install pysdk
+    - name: Install pysdk
       run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
-    - name: start infinity debug version
+    - name: Start infinity debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
     - name: pysdk & sqllogictest debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: stop infinity debug version
+    - name: Stop infinity debug version
       run: sudo kill `pidof infinity`
 
     - name: Build release version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
-    - name: start infinity release version
+    - name: Start infinity release version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ &&rm -fr /tmp/infinity && cmake-build-release/src/infinity > debug.log 2>&1" &
 
     - name: pysdk & sqllogictest release version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: stop infinity release version
+    - name: Stop infinity release version
       run: sudo kill `pidof infinity`

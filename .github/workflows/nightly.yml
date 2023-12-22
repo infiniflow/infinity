@@ -2,19 +2,22 @@ name: Nightly Build
 
 on:
   schedule:
-    - cron: '0 * * * *'  # This schedule runs every night at midnight UTC
+    - cron: '0 0 * * *'  # This schedule runs every night at midnight UTC
 
 jobs:
-  release:
+  nightly:
     runs-on: self-hosted
     steps:
-    - name: Cleanup workspace
-      run: echo "cleanup $GITHUB_WORKSPACE/*" && sudo rm -fr $GITHUB_WORKSPACE/*
+    - name: Ensure workspace ownership
+      run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
     - name: Check out code
       uses: actions/checkout@v2
 
-    - name: start builder container
+    - name: Show working copy revision
+      run: git branch --show-current && git rev-parse HEAD
+
+    - name: Start builder container
       run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
 
     - name: Build release version
