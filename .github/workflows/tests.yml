@@ -11,8 +11,8 @@ jobs:
     name: tests
     runs-on: self-hosted
     steps:
-    - name: Cleanup workspace
-      run: echo "cleanup $GITHUB_WORKSPACE/*" && sudo rm -fr $GITHUB_WORKSPACE/*
+    - name: Ensure workspace ownership
+      run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
     - name: Check out code
       uses: actions/checkout@v2
