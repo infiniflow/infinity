@@ -11,7 +11,7 @@ User=infinity
 Restart=on-failure
 RestartSec=30
 ExecStart=/usr/bin/infinity -f /usr/etc/infinity_conf.toml
-LimitCORE=infinity
+LimitCORE=1G
 LimitNOFILE=500000
 
 [Install]
