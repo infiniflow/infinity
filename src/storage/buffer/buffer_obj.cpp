@@ -155,13 +155,10 @@ bool BufferObj::Save() {
     return true;
 }
 
-void BufferObj::Sync() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
-    file_worker_->Sync();
-}
+void BufferObj::Sync() { file_worker_->Sync(); }
 
 void BufferObj::CloseFile() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    LOG_WARN(Format("BufferObj::Close {}", *file_worker_->file_name_));
     file_worker_->CloseFile();
 }
 
