@@ -112,6 +112,7 @@ bool BufferObj::Free() {
                     break;
                 }
                 case BufferType::kEphemeral: {
+                    LOG_WARN(Format("{}: Free kEphemeral.", *file_worker_->file_name_));
                     file_worker_->WriteToFile(true);
                     break;
                 }
@@ -136,7 +137,7 @@ bool BufferObj::Save() {
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
-            LOG_TRACE(Format("{}: Save kEphemeral.", *file_worker_->file_name_));
+            LOG_WARN(Format("{}: Save kEphemeral.", *file_worker_->file_name_));
             file_worker_->WriteToFile(false);
             break;
         }
@@ -156,7 +157,10 @@ bool BufferObj::Save() {
 
 void BufferObj::Sync() { file_worker_->Sync(); }
 
-void BufferObj::CloseFile() { file_worker_->CloseFile(); }
+void BufferObj::CloseFile() {
+    LOG_WARN(Format("BufferObj::Close {}", *file_worker_->file_name_));
+    file_worker_->CloseFile();
+}
 
 void BufferObj::CheckState() const {
     switch (status_) {
