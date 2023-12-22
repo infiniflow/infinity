@@ -23,9 +23,6 @@ jobs:
     - name: Build debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
 
-    - name: Build release version
-      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
-
     - name: install pysdk
       run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
@@ -37,6 +34,9 @@ jobs:
 
     - name: stop infinity debug version
       run: sudo kill `pidof infinity`
+
+    - name: Build release version
+      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
     - name: start infinity release version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ &&rm -fr /tmp/infinity && cmake-build-release/src/infinity > debug.log 2>&1" &
