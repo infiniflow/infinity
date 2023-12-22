@@ -22,9 +22,25 @@ import buffer_manager;
 import buffer_handle;
 import buffer_obj;
 import data_file_worker;
+import global_resource_usage;
+import infinity_context;
 
 class BufferObjTest : public BaseTest {
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override {
+        BaseTest::SetUp();
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+        BaseTest::TearDown();
+    }
 };
 
 // Test status transfer of buffer handle.
