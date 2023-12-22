@@ -97,9 +97,9 @@ void FileWorker::MoveFile() {
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);
     }
-    if (fs.Exists(dest_path)) {
-        Error<StorageException>(Format("File {} was already been created before.", dest_path));
-    }
+    // if (fs.Exists(dest_path)) {
+    //     Error<StorageException>(Format("File {} was already been created before.", dest_path));
+    // }
     fs.Rename(src_path, dest_path);
 }
 
