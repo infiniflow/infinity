@@ -55,9 +55,6 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kFreed: {
             buffer_mgr_->RequestSpace(GetBufferSize(), this);
-            if (type_ != BufferType::kPersistent) {
-                LOG_WARN(Format("BufferObj::Load() kEphemeral spill file {}/{} (Not from this address)", *file_worker_->file_dir_, *file_worker_->file_name_));
-            }
             file_worker_->ReadFromFile(type_ != BufferType::kPersistent);
             if (type_ == BufferType::kEphemeral) {
                 type_ = BufferType::kTemp;
@@ -78,7 +75,6 @@ BufferHandle BufferObj::Load() {
 
 void BufferObj::GetMutPointer() {
     UniqueLock<RWMutex> w_locker(rw_locker_);
-    // LOG_WARN(Format("GetMutPointer of file {}/{} (Not from this address)", *file_worker_->file_dir_, *file_worker_->file_name_));
     type_ = BufferType::kEphemeral;
 }
 
@@ -116,7 +112,6 @@ bool BufferObj::Free() {
                     break;
                 }
                 case BufferType::kEphemeral: {
-                    LOG_WARN(Format("BufferObj::Free {}/{}: Free kEphemeral.", *file_worker_->file_dir_, *file_worker_->file_name_));
                     file_worker_->WriteToFile(true);
                     break;
                 }
@@ -142,7 +137,6 @@ bool BufferObj::Save() {
     switch (status_) {
         case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
-            LOG_WARN(Format("BufferObj::Save() {}/{}: Save kEphemeral.", *file_worker_->file_dir_, *file_worker_->file_name_));
             file_worker_->WriteToFile(false);
             break;
         }
@@ -163,7 +157,6 @@ bool BufferObj::Save() {
 void BufferObj::Sync() { file_worker_->Sync(); }
 
 void BufferObj::CloseFile() {
-    LOG_WARN(Format("BufferObj::CloseFile() {}/{}", *file_worker_->file_dir_, *file_worker_->file_name_));
     file_worker_->CloseFile();
     rw_locker_.unlock();
 }
