@@ -17,6 +17,9 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v2
 
+    - name: Show working copy revision
+      run: git branch --show-current && git rev-parse HEAD
+
     - name: start builder container
       run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
     
