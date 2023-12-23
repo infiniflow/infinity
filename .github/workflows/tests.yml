@@ -3,7 +3,7 @@ name: tests
 on:
   push:
     branches: [ main ]
-  pull_request_target:
+  pull_request:
     types: [ opened, synchronize, reopened, edited ]
 
 jobs:
@@ -15,10 +15,7 @@ jobs:
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
     - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Show working copy revision
-      run: git branch --show-current && git rev-parse HEAD
+      uses: actions/checkout@v3
 
     - name: Start builder container
       run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
