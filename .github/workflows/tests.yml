@@ -18,7 +18,9 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Start builder container
-      run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
+      run: |
+        TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+        sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_build:0.1
     
     - name: Build debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
@@ -30,14 +32,17 @@ jobs:
       run: |
         # Run a command in the background
         sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
-        # Save its process ID to a file for later use
-        echo $! > background_process_pid.txt
 
     - name: pysdk & sqllogictest debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: Collect infinity debug output and stop it
-      run: cat debug.log && sudo kill $(cat background_process_pid.txt) && rm -f background_process_pid.txt
+    - name: Stop infinity debug
+      run: sudo kill $(pidof cmake-build-debug/src/infinity)
+      if: always() # always run this step even if previous steps failed
+
+    - name: Collect infinity debug output
+      # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
+      run: cat debug.log 2>/dev/null || true
       if: always() # always run this step even if previous steps failed
 
     - name: Build release version
@@ -45,12 +50,16 @@ jobs:
 
     - name: Start infinity release version
       run: |
-        sudo docker exec infinity_build bash -c "cd /infinity/ &&rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
-        echo $! > background_process_pid.txt
+        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
     - name: pysdk & sqllogictest release version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: Collect infinity release output and stop it
-      run: cat release.log && sudo kill $(cat background_process_pid.txt) && rm -f background_process_pid.txt
+    - name: Stop infinity release
+      run: sudo kill $(pidof cmake-build-release/src/infinity)
+      if: always() # always run this step even if previous steps failed
+
+    - name: Collect infinity release output
+      # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
+      run: cat release.log 2>/dev/null || true
       if: always() # always run this step even if previous steps failed

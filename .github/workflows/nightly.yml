@@ -18,7 +18,9 @@ jobs:
       run: git branch --show-current && git rev-parse HEAD
 
     - name: Start builder container
-      run: sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -v $PWD:/infinity infiniflow/infinity_build:0.1
+      run: |
+        TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+        sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_build:0.1
 
     - name: Build release version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
