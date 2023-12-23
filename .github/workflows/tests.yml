@@ -27,22 +27,30 @@ jobs:
       run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
     - name: Start infinity debug version
-      run: sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+      run: |
+        # Run a command in the background
+        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+        # Save its process ID to a file for later use
+        echo $! > background_process_pid.txt
 
     - name: pysdk & sqllogictest debug version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: Stop infinity debug version
-      run: sudo kill `pidof infinity`
+    - name: Collect infinity debug output and stop it
+      run: cat debug.log && sudo kill $(cat background_process_pid.txt) && rm -f background_process_pid.txt
+      if: always() # always run this step even if previous steps failed
 
     - name: Build release version
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
     - name: Start infinity release version
-      run: sudo docker exec infinity_build bash -c "cd /infinity/ &&rm -fr /tmp/infinity && cmake-build-release/src/infinity > debug.log 2>&1" &
+      run: |
+        sudo docker exec infinity_build bash -c "cd /infinity/ &&rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+        echo $! > background_process_pid.txt
 
     - name: pysdk & sqllogictest release version
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-    - name: Stop infinity release version
-      run: sudo kill `pidof infinity`
+    - name: Collect infinity release output and stop it
+      run: cat release.log && sudo kill $(cat background_process_pid.txt) && rm -f background_process_pid.txt
+      if: always() # always run this step even if previous steps failed
