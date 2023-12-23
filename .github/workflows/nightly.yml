@@ -26,23 +26,18 @@ jobs:
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
 
-    - name: Check if Release Exists
-      id: check_release
+    - name: Delete Existing nightly build if it exists
       run: |
         TAG_NAME=nightly
         RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
                       -H "Accept: application/vnd.github.v3+json" \
                       https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME \
                       | jq -r '.id')
-        echo "::set-output name=release_id::$RELEASE_ID"
-
-    - name: Delete Existing Release (Optional)
-      if: steps.check_release.outputs.release_id != 'null'
-      run: |
-        RELEASE_ID=${{ steps.check_release.outputs.release_id }}
-        curl -X DELETE -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+        if [ -n "$RELEASE_ID ]; then
+          curl -X DELETE -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
              -H "Accept: application/vnd.github.v3+json" \
              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+        fi
 
     - name: Create GitHub Release
       id: create_release
@@ -65,9 +60,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: |
-          cmake-build-release/infinity-0.1.0-dev-x86_64.deb
-          cmake-build-release/infinity-0.1.0-dev-x86_64.rpm
-        asset_name: |
-          infinity-0.1.0-dev-x86_64.deb
-          infinity-0.1.0-dev-x86_64.rpm
+          cmake-build-release/infinity-*.deb
+          cmake-build-release/infinity-*.rpm
+          cmake-build-release/infinity-*.tar.gz
         asset_content_type: application/octet-stream
