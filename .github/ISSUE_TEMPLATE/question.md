@@ -10,11 +10,11 @@ labels: Question
 
 Before asking a question, make sure you have:
 
-- Searched questions at https://github.com/infiniflow/infinity
+- Searched questions at https://github.com/infiniflow/infinity/tree/main/docs
 
 - Googled your question 
 
-- Read the documentation at https://github.com/infiniflow/infinity
+- Read the documentation at https://github.com/infiniflow/infinity/tree/main/docs
 
 -->
 A clear description of what your question is.
