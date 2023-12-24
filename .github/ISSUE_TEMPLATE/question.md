@@ -17,4 +17,4 @@ Before asking a question, make sure you have:
 - Read the documentation at https://github.com/infiniflow/infinity
 
 -->
-A clear description of what your quesion is.
+A clear description of what your question is.
