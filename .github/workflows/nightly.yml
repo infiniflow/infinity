@@ -12,7 +12,7 @@ jobs:
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Show working copy revision
       run: git branch --show-current && git rev-parse HEAD
@@ -35,7 +35,8 @@ jobs:
                       -H "Accept: application/vnd.github.v3+json" \
                       https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME \
                       | jq -r '.id')
-        if [ -n "$RELEASE_ID ]; then
+        echo "existing nightly build release id: $RELEASE_ID"
+        if [ "$RELEASE_ID" != "null" ]; then
           curl -X DELETE -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
              -H "Accept: application/vnd.github.v3+json" \
              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
