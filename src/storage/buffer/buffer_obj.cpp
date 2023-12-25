@@ -129,7 +129,7 @@ bool BufferObj::Free() {
 
 bool BufferObj::Save() {
     bool write = false;
-    rw_locker_.lock(); // This lock will be released in CloseFile()
+    rw_locker_.lock(); // This lock will be released on return if not write, otherwise released by CloseFile()
     if (type_ != BufferType::kPersistent) {
         switch (status_) {
             case BufferStatus::kLoaded:
