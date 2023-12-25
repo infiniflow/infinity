@@ -37,16 +37,11 @@ import query_result;
 
 using namespace infinity;
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        std::cout << "import sift or gist" << std::endl;
-        return 1;
-    }
+int main() {
     bool sift = true;
-    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
-        return 1;
-    }
-    sift = strcmp(argv[1], "sift") == 0;
+    int M = 16;
+    int ef_construct = 200;
+    std::cout << "benchmark: " << (sift ? "sift" : "gist") << std::endl;
 
     std::string data_path = "/tmp/infinity";
 
@@ -75,13 +70,14 @@ int main(int argc, char *argv[]) {
         if (sift) {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
             base_path += "/benchmark/sift_1m/sift_base.fvecs";
-            table_name = "sift_benchmark";
+            table_name = "sift_benchmark_M" + std::to_string(M) + "_ef" + std::to_string(ef_construct);
         } else {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 960));
             base_path += "/benchmark/gist_1m/gist_base.fvecs";
-            table_name = "gist_benchmark";
+            table_name = "gist_benchmark_M" + std::to_string(M) + "_ef" + std::to_string(ef_construct);
         }
         std::cout << "Import from: " << base_path << std::endl;
+        std::cout << "table_name: " << table_name << std::endl;
 
         std::string col1_name = "col1";
         auto col1_def = std::make_unique<ColumnDef>(0, col1_type, col1_name, std::unordered_set<ConstraintType>());
@@ -123,8 +119,8 @@ int main(int argc, char *argv[]) {
 
             {
                 auto index_param_list = new std::vector<InitParameter *>();
-                index_param_list->emplace_back(new InitParameter("M", std::to_string(16)));
-                index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
+                index_param_list->emplace_back(new InitParameter("M", std::to_string(M)));
+                index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(ef_construct)));
                 index_param_list->emplace_back(new InitParameter("ef", std::to_string(200)));
                 index_param_list->emplace_back(new InitParameter("metric", "l2"));
                 index_param_list->emplace_back(new InitParameter("encode", "lvq"));

@@ -84,24 +84,18 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     }
 }
 
-int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        std::cout << "query gist/sift ef=?" << std::endl;
-        return 1;
-    }
+int main() {
     bool sift = true;
-    if (strcmp(argv[1], "sift") && strcmp(argv[1], "gist")) {
-        return 1;
-    }
-    sift = strcmp(argv[1], "sift") == 0;
-    size_t ef = std::stoull(argv[2]);
-
+    int ef = 100;
+    int M = 16;
+    int ef_construct = 200;
     size_t thread_num = 1;
-    size_t total_times = 1;
-    std::cout << "Please input thread_num, 0 means use all resources:" << std::endl;
-    std::cin >> thread_num;
-    std::cout << "Please input total_times:" << std::endl;
-    std::cin >> total_times;
+    size_t total_times = 3;
+
+    std::cout << "benchmark: " << (sift ? "sift" : "gist") << std::endl;
+    std::cout << "ef: " << ef << std::endl;
+    std::cout << "thread_n: " << thread_num << std::endl;
+    std::cout << "total_times: " << total_times << std::endl;
 
     std::string path = "/tmp/infinity";
     LocalFileSystem fs;
@@ -123,15 +117,16 @@ int main(int argc, char *argv[]) {
         dimension = 128;
         query_path += "/benchmark/sift_1m/sift_query.fvecs";
         groundtruth_path += "/benchmark/sift_1m/sift_groundtruth.ivecs";
-        table_name = "sift_benchmark";
+        table_name = "sift_benchmark_M" + std::to_string(M) + "_ef" + std::to_string(ef_construct);
     } else {
         dimension = 960;
         query_path += "/benchmark/gist_1m/gist_query.fvecs";
         groundtruth_path += "/benchmark/gist_1m/gist_groundtruth.ivecs";
-        table_name = "gist_benchmark";
+        table_name = "gist_benchmark_M" + std::to_string(M) + "_ef" + std::to_string(ef_construct);
     }
     std::cout << "query from: " << query_path << std::endl;
     std::cout << "groundtruth is: " << groundtruth_path << std::endl;
+    std::cout << "table_name: " << table_name << std::endl;
 
     if (!fs.Exists(query_path)) {
         std::cerr << "File: " << query_path << " doesn't exist" << std::endl;
@@ -218,7 +213,7 @@ int main(int argc, char *argv[]) {
                     query_results[query_idx].emplace_back(data[i].ToUint64());
                 }
             }
-//            delete[] embedding_data_ptr;
+            // delete[] embedding_data_ptr;
         };
         BaseProfiler profiler;
         profiler.Begin();

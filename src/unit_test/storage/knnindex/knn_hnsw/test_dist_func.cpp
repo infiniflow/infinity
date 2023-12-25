@@ -43,13 +43,11 @@ float F32L2Test(const float *v1, const float *v2, size_t dim) {
 }
 
 TEST_F(DistFuncTest, test1) {
-    size_t dim = 32;
+    size_t dim = 200;
     size_t vec_n = 10000;
 
     auto vecs1 = std::make_unique<int8_t[]>(dim * vec_n);
     auto vecs2 = std::make_unique<int8_t[]>(dim * vec_n);
-
-    assert(dim % 32 == 0);
 
     // generate a random vector of int8_t
     std::default_random_engine rng;
@@ -64,7 +62,7 @@ TEST_F(DistFuncTest, test1) {
     for (size_t i = 0; i < vec_n; ++i) {
         auto v1 = vecs1.get() + i * dim;
         auto v2 = vecs2.get() + i * dim;
-        int32_t res = I8IPAVX(v1, v2, dim);
+        int32_t res = I8IPAVXResidual(v1, v2, dim);
         int32_t res2 = I8IPTest(v1, v2, dim);
         EXPECT_EQ(res, res2);
     }
@@ -75,7 +73,7 @@ TEST_F(DistFuncTest, test2) {
     using Distance = LVQL2Dist<float, int8_t>;
     using LVQ8Data = LVQ8Store::StoreType;
 
-    size_t dim = 128;
+    size_t dim = 200;
     size_t vec_n = 10000;
 
     auto vecs1 = std::make_unique<float[]>(dim * vec_n);
@@ -83,11 +81,11 @@ TEST_F(DistFuncTest, test2) {
 
     // generate a random vector of float
     std::default_random_engine rng;
-    std::uniform_real_distribution<float> dist(0, 1);
+    std::uniform_real_distribution<float> rdist(0, 1);
     for (size_t i = 0; i < vec_n; ++i) {
         for (size_t j = 0; j < dim; ++j) {
-            vecs1[i * dim + j] = dist(rng);
-            vecs2[i * dim + j] = dist(rng);
+            vecs1[i * dim + j] = rdist(rng);
+            vecs2[i * dim + j] = rdist(rng);
         }
     }
 
