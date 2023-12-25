@@ -14,8 +14,13 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
 
-    - name: Set Datetime Variable
-      run: echo "RELEASE_DATETIME=$(date -d @${{ env.GITHUB_RUN_STARTED }} --rfc-3339=seconds)" >> $GITHUB_ENV
+    - name: Prepare release body
+      run: |
+        RELEASE_DATETIME=$(date --rfc-3339=seconds)
+        cat <<EOF > release_template.md
+        Release created at $RELEASE_DATETIME
+        EOF
+        envsubst < release_template.md > release_body.md
 
     - name: Start builder container
       run: |
@@ -35,7 +40,8 @@ jobs:
         token: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
         prerelease: true
         tag_name: nightly
-        body: Nightly created at ${{ env.RELEASE_DATETIME }}
+        # The body field does not support environment variable substitution directly.
+        body_path: release_body.md
         files: |
           cmake-build-release/infinity-*.deb
           cmake-build-release/infinity-*.rpm
