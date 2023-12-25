@@ -21,6 +21,9 @@ import buffer_manager;
 import infinity_exception;
 import logger;
 
+import third_party;
+import logger;
+
 module buffer_obj;
 
 namespace infinity {
@@ -125,9 +128,10 @@ bool BufferObj::Free() {
 }
 
 bool BufferObj::Save() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    rw_locker_.lock(); // This lock will be released in CloseFile()
     if (type_ == BufferType::kPersistent) {
         // No need to save because of no change happens
+        rw_locker_.unlock();
         return false;
     }
     switch (status_) {
@@ -152,7 +156,10 @@ bool BufferObj::Save() {
 
 void BufferObj::Sync() { file_worker_->Sync(); }
 
-void BufferObj::CloseFile() { file_worker_->CloseFile(); }
+void BufferObj::CloseFile() {
+    file_worker_->CloseFile();
+    rw_locker_.unlock();
+}
 
 void BufferObj::CheckState() const {
     switch (status_) {

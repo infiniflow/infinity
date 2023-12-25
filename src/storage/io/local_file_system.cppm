@@ -22,7 +22,7 @@ export module local_file_system;
 
 namespace infinity {
 
-class LocalFileHandler : public FileHandler {
+export class LocalFileHandler : public FileHandler {
 public:
     LocalFileHandler(FileSystem &file_system, String path, i32 fd) : FileHandler(file_system, Move(path)), fd_(fd) {}
 

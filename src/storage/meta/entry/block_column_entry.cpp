@@ -208,6 +208,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
 //            SizeT buffer_size = row_count * column_type->Size();
             if (block_column_entry->buffer_->Save()) {
                 block_column_entry->buffer_->Sync();
+                LOG_WARN(Format("Close file {}", block_column_entry->FilePath()));
                 block_column_entry->buffer_->CloseFile();
             }
 

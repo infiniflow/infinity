@@ -22,6 +22,9 @@ import third_party;
 import file_system_type;
 import defer_op;
 
+import local_file_system;
+import logger;
+
 module file_worker;
 
 namespace infinity {
@@ -52,8 +55,15 @@ void FileWorker::WriteToFile(bool to_spill) {
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+    if (to_spill) {
+        auto local_file_handle_ = static_cast<LocalFileHandler *>(file_handler_.get());
+        LOG_WARN(Format("Open spill file: {}, fd: {}", write_path, local_file_handle_->fd_));
+    }
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
+        if (to_spill) {
+            LOG_WARN(Format("Write to spill file {} finished. success {}", write_path, prepare_success));
+        }
         if (!prepare_success) {
             file_handler_->Close();
             file_handler_ = nullptr;
@@ -87,9 +97,9 @@ void FileWorker::MoveFile() {
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);
     }
-    if (fs.Exists(dest_path)) {
-        Error<StorageException>(Format("File {} was already been created before.", dest_path));
-    }
+    // if (fs.Exists(dest_path)) {
+    //     Error<StorageException>(Format("File {} was already been created before.", dest_path));
+    // }
     fs.Rename(src_path, dest_path);
 }
 
