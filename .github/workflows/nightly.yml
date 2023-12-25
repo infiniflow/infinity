@@ -33,6 +33,10 @@ jobs:
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
 
+    - name: Remove existing tag
+      # https://github.com/softprops/action-gh-release/issues/171
+      run: git push origin :refs/tags/nightly || true
+
     - name: Create or overwrite a releae
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release
       uses: softprops/action-gh-release@v1
