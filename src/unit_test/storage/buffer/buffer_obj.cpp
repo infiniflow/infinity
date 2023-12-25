@@ -25,6 +25,8 @@ import data_file_worker;
 import global_resource_usage;
 import infinity_context;
 
+using namespace infinity;
+
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
@@ -41,13 +43,19 @@ class BufferObjTest : public BaseTest {
         infinity::GlobalResourceUsage::UnInit();
         BaseTest::TearDown();
     }
+
+public:
+    void SaveBufferObj(BufferObj *buffer_obj) {
+        if (buffer_obj->Save()) {
+            buffer_obj->Sync();
+            buffer_obj->CloseFile();
+        }
+    };
 };
 
 // Test status transfer of buffer handle.
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
-    using namespace infinity;
-
     SizeT memory_limit = 1024;
     auto temp_dir = MakeShared<String>("/tmp/infinity/spill");
     auto base_dir = MakeShared<String>("/tmp/infinity/data");
@@ -117,7 +125,7 @@ TEST_F(BufferObjTest, test1) {
     // kUnloaded, kTemp -> kFreed, kTemp
     EXPECT_EQ(buf1->status(), BufferStatus::kFreed);
 
-    buf1->Save();
+    SaveBufferObj(buf1);
     // kFreed, kTemp -> kFreed, kPersistent
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
 
@@ -148,7 +156,7 @@ TEST_F(BufferObjTest, test1) {
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
     }
 
-    buf1->Save();
+    SaveBufferObj(buf1);
     // kUnloadedModified, kEphemeral -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
@@ -160,7 +168,7 @@ TEST_F(BufferObjTest, test1) {
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kEphemeral);
 
-        buf1->Save();
+        SaveBufferObj(buf1);
         // kLoaded, kEphemeral -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
@@ -173,7 +181,7 @@ TEST_F(BufferObjTest, test1) {
 
     {
         auto handle1 = buf1->Load();
-        buf1->Save();
+        SaveBufferObj(buf1);
         // kLoaded, kEphemeral -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
@@ -186,7 +194,7 @@ TEST_F(BufferObjTest, test1) {
     { auto handle2 = buf2->Load(); }
     {
         auto handle1 = buf1->Load();
-        buf1->Save();
+        SaveBufferObj(buf1);
         // kLoaded, kPersistent -> kLoaded, kPersistent
         EXPECT_EQ(buf1->status(), BufferStatus::kLoaded);
         EXPECT_EQ(buf1->type(), BufferType::kPersistent);
@@ -197,7 +205,7 @@ TEST_F(BufferObjTest, test1) {
     }
     { auto handle2 = buf2->Load(); }
     { auto handle1 = buf1->Load(); }
-    buf1->Save();
+    SaveBufferObj(buf1);
     // kUnloaded, kPersistent -> kUnloaded, kPersistent
     EXPECT_EQ(buf1->status(), BufferStatus::kUnloaded);
     EXPECT_EQ(buf1->type(), BufferType::kPersistent);
