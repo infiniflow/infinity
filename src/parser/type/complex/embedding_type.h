@@ -142,22 +142,20 @@ private:
         return ss.str();
     }
 
-//    template <>
-//    inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
-//        char buf[6 * dimension * 2];
-//        std::stringstream ss(buf, std::ios::in | std::ios::out | std::ios::binary);
-//        for (size_t i = 0; i < dimension - 1; ++i) {
-//            char buffer[20];
-//            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
-//            ss.write((const char *)buffer, ptr - buffer);
-//            ss.put(',');
-//        }
-//        char buffer[20];
-//        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
-//        ss.write((const char *)buffer, ptr - buffer);
-//        return ss.str();
-
-//    }
+    template <>
+    inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
+            ss.write((const char *)buffer, ptr - buffer);
+            ss.put(',');
+        }
+        char buffer[20];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
+        ss.write((const char *)buffer, ptr - buffer);
+        return ss.str();
+    }
 
     [[nodiscard]] static inline std::string BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
