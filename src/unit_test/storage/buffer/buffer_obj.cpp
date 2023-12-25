@@ -25,6 +25,8 @@ import data_file_worker;
 import global_resource_usage;
 import infinity_context;
 
+using namespace infinity;
+
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
@@ -41,20 +43,19 @@ class BufferObjTest : public BaseTest {
         infinity::GlobalResourceUsage::UnInit();
         BaseTest::TearDown();
     }
-};
 
-// Test status transfer of buffer handle.
-// ?? status transfer in all
-TEST_F(BufferObjTest, test1) {
-    using namespace infinity;
-
-    auto SaveBufferObj = [](BufferObj *buffer_obj) {
+public:
+    void SaveBufferObj(BufferObj *buffer_obj) {
         if (buffer_obj->Save()) {
             buffer_obj->Sync();
             buffer_obj->CloseFile();
         }
     };
+};
 
+// Test status transfer of buffer handle.
+// ?? status transfer in all
+TEST_F(BufferObjTest, test1) {
     SizeT memory_limit = 1024;
     auto temp_dir = MakeShared<String>("/tmp/infinity/spill");
     auto base_dir = MakeShared<String>("/tmp/infinity/data");
