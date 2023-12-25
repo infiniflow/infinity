@@ -102,9 +102,10 @@ int main() {
     }
 
     auto r = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
-    if (!r.IsOk()) {
-        std::cout << "Create index failed: " << r.ToString() << std::endl;
-        return 1;
+    if (r.IsOk()) {
+        r = infinity->Flush();
+    } else {
+        std::cout << "Fail to create index." << r.ToString() << std::endl;
     }
     std::cout << "Create index cost: " << profiler.ElapsedToString();
     profiler.End();

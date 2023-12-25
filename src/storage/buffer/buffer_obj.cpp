@@ -128,30 +128,32 @@ bool BufferObj::Free() {
 }
 
 bool BufferObj::Save() {
-    rw_locker_.lock(); // This lock will be released in CloseFile()
-    if (type_ == BufferType::kPersistent) {
-        // No need to save because of no change happens
+    bool write = false;
+    rw_locker_.lock(); // This lock will be released on return if not write, otherwise released by CloseFile()
+    if (type_ != BufferType::kPersistent) {
+        switch (status_) {
+            case BufferStatus::kLoaded:
+            case BufferStatus::kUnloaded: {
+                file_worker_->WriteToFile(false);
+                write = true;
+                break;
+            }
+            case BufferStatus::kFreed: {
+                file_worker_->MoveFile();
+                break;
+            }
+            default: {
+                UniquePtr<String> err_msg = MakeUnique<String>("Invalid buffer status.");
+                LOG_ERROR(*err_msg);
+                Error<StorageException>(*err_msg);
+            }
+        }
+        type_ = BufferType::kPersistent;
+    }
+    if (!write) {
         rw_locker_.unlock();
-        return false;
     }
-    switch (status_) {
-        case BufferStatus::kLoaded:
-        case BufferStatus::kUnloaded: {
-            file_worker_->WriteToFile(false);
-            break;
-        }
-        case BufferStatus::kFreed: {
-            file_worker_->MoveFile();
-            break;
-        }
-        default: {
-            UniquePtr<String> err_msg = MakeUnique<String>("Invalid buffer status.");
-            LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
-        }
-    }
-    type_ = BufferType::kPersistent;
-    return true;
+    return write;
 }
 
 void BufferObj::Sync() { file_worker_->Sync(); }
