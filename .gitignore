@@ -5,9 +5,6 @@
 !*.*
 !*/
 
-# names with only extension
-.*
-
 # names with special characters
 *#*
 *~*
@@ -58,6 +55,7 @@
 tmp
 build*/
 cmake-build-*
+.idea
 
 # ignore compilation configure file
 src/bin/compilation_config.h
