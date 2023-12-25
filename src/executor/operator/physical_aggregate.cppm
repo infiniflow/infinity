@@ -60,7 +60,9 @@ public:
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    void SimpleAggregate(SharedPtr<DataTable> &output_table);
+    bool SimpleAggregate(SharedPtr<DataTable> &output_table,
+                                            OperatorState *pre_operator_state,
+                                            AggregateOperatorState *aggregate_operator_state);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 

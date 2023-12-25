@@ -121,6 +121,14 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         }
         case PhysicalOperatorType::kAggregate: {
             current_fragment_ptr->AddOperator(phys_op);
+            if (phys_op->left() == nullptr) {
+                Error<SchedulerException>("No input node of aggregate operator");
+            } else {
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+                BuildFragments(phys_op->left(), current_fragment_ptr);
+            }
+            return;
+            current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
             if (phys_op->left() == nullptr) {
                 Error<SchedulerException>("No input node of aggregate operator");
