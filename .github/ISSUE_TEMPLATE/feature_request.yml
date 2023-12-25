@@ -32,7 +32,7 @@ body:
       required: false
   - type: textarea
     attributes:
-      label: Documentation, Adoption, Use Case, Migration Strategy
+      label: Documentation, adoption, use case
       description: If you can, explain some scenarios how users might use this, situations it would be helpful in. Any API designs, mockups, or diagrams are also helpful.
       render: Markdown
     validations:

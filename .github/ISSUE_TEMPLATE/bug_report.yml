@@ -15,7 +15,7 @@ body:
     value: "Please provide the following information to help us understand the issue."
 - type: input
   attributes:
-    label: Branch Name
+    label: Branch name
     description: Enter the name of the branch where you encountered the issue.
     placeholder: e.g., main
   validations:
@@ -29,9 +29,9 @@ body:
     required: true
 - type: textarea
   attributes:
-    label: Other Environment Information
+    label: Other environment information
     description: |
-      Enter the Environment Details:
+      Enter the environment details:
       value: |
       - Hardware parameters:
       - OS type:
@@ -41,19 +41,19 @@ body:
     required: false
 - type: textarea
   attributes:
-    label: Actual Behavior
+    label: Actual behavior
     description: Describe what you encountered.
   validations:
     required: true
 - type: textarea
   attributes:
-    label: Expected Behavior
+    label: Expected behavior
     description: Describe what you expected.
   validations:
     required: false
 - type: textarea
   attributes:
-    label: Steps to Reproduce
+    label: Steps to reproduce
     description: Steps to reproduce what you encountered.
     render: Markdown
   validations:
