@@ -14,6 +14,9 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
 
+    - name: Set Datetime Variable
+      run: echo "RELEASE_DATETIME=$(date -d @${{ env.GITHUB_RUN_STARTED }} --rfc-3339=seconds)" >> $GITHUB_ENV
+
     - name: Start builder container
       run: |
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
@@ -32,7 +35,7 @@ jobs:
         token: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
         prerelease: true
         tag_name: nightly
-        body: Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} --rfc-3339=seconds) from ${{ github.ref }}
+        body: Nightly created at ${{ env.RELEASE_DATETIME }}
         files: |
           cmake-build-release/infinity-*.deb
           cmake-build-release/infinity-*.rpm
