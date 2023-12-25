@@ -2,7 +2,7 @@ name: Nightly Build
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # This schedule runs every night at midnight UTC
+    - cron: '*/30 * * * *'  # This schedule runs every night at midnight UTC
 
 jobs:
   nightly:
@@ -13,9 +13,6 @@ jobs:
 
     - name: Check out code
       uses: actions/checkout@v3
-
-    - name: Show working copy revision
-      run: git branch --show-current && git rev-parse HEAD
 
     - name: Start builder container
       run: |
@@ -28,42 +25,14 @@ jobs:
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
 
-    - name: Delete Existing nightly build if it exists
-      run: |
-        TAG_NAME=nightly
-        RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-                      -H "Accept: application/vnd.github.v3+json" \
-                      https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME \
-                      | jq -r '.id')
-        echo "existing nightly build release id: $RELEASE_ID"
-        if [ "$RELEASE_ID" != "null" ]; then
-          curl -X DELETE -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-             -H "Accept: application/vnd.github.v3+json" \
-             https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
-        fi
-
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
+    - name: Create or overwrite a releae
+      # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release
+      uses: softprops/action-gh-release@v1
       with:
+        token: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
+        prerelease: true
         tag_name: nightly
-        release_name: Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} '+%Y-%m-%d %H:%M:%S')
-        body: |
-          # Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} '+%Y-%m-%d %H:%M:%S') from ${{ github.ref }}
-        draft: true
-        prerelease: false
-
-    - name: Upload Binary
-      id: upload-release-asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: |
+        files: |
           cmake-build-release/infinity-*.deb
           cmake-build-release/infinity-*.rpm
           cmake-build-release/infinity-*.tar.gz
-        asset_content_type: application/octet-stream
