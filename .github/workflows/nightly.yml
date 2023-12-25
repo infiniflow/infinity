@@ -32,6 +32,7 @@ jobs:
         token: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
         prerelease: true
         tag_name: nightly
+        body: Nightly build $(date -d @${{ env.GITHUB_RUN_STARTED }} --rfc-3339=seconds) from ${{ github.ref }}
         files: |
           cmake-build-release/infinity-*.deb
           cmake-build-release/infinity-*.rpm
