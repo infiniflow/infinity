@@ -96,6 +96,11 @@ public:
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
+private:
+    void MakeSourceState(i64 parallel_count);
+
+    void MakeSinkState(i64 parallel_count);
+
 protected:
     virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
@@ -128,7 +133,11 @@ public:
     SharedPtr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> shared_data_{};
+    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+};
+
+export struct CreateIndexSharedData {
+    Vector<atomic_u64> create_index_idxes_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
@@ -141,7 +150,9 @@ public:
     SharedPtr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> shared_data_{};
+    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+
+    UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

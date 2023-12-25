@@ -85,6 +85,9 @@ public:
                                 TxnTimeStamp begin_ts,
                                 BufferManager *buffer_mgr);
 
+    static void
+    CreateIndexFilePrepare(TableCollectionEntry *table_entry, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
+
     static UniquePtr<String> Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state);
 
     static void CommitAppend(TableCollectionEntry *table_entry, Txn *txn_ptr, const AppendState *append_state_ptr);

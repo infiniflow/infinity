@@ -232,6 +232,18 @@ export struct CreateIndexOperatorState : public OperatorState {
     inline explicit CreateIndexOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndex) {}
 };
 
+export struct CreateIndexPrepareOperatorState : public OperatorState {
+    inline explicit CreateIndexPrepareOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexPrepare) {}
+};
+
+export struct CreateIndexDoOperatorState : public OperatorState {
+    inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
+};
+
+export struct CreateIndexFinishOperatorState : public OperatorState {
+    inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
+};
+
 // Create Collection
 export struct CreateCollectionOperatorState : public OperatorState {
     inline explicit CreateCollectionOperatorState() : OperatorState(PhysicalOperatorType::kCreateCollection) {}

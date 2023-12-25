@@ -95,6 +95,8 @@ public:
     // Index OPs
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
 
+    Status CreateIndex(const String &table_name, TableCollectionEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
     // View Ops

@@ -75,6 +75,12 @@ public:
                                                               BufferManager *buffer_mgr,
                                                               TxnTableStore *txn_store);
 
+    static SharedPtr<SegmentColumnIndexEntry> CreateIndexFilePrepare(SegmentEntry *segment_entry,
+                                                                     ColumnIndexEntry *column_index_entry,
+                                                                     SharedPtr<ColumnDef> column_def,
+                                                                     TxnTimeStamp create_ts,
+                                                                     BufferManager *buffer_mgr);
+
     static void CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16 start_pos, u16 row_count);
 
     static void CommitDelete(SegmentEntry *segment_entry, Txn *txn_ptr, const HashMap<u16, Vector<RowID>> &block_row_hashmap);

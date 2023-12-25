@@ -421,6 +421,21 @@ Status Txn::CreateIndex(const String &db_name, const String &table_name, const S
     return index_status;
 }
 
+Status
+Txn::CreateIndex(const String &table_name, TableCollectionEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    BaseEntry *base_entry{nullptr};
+    Status index_status = TableCollectionEntry::CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_, base_entry);
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    auto *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
+    TableCollectionEntry::CreateIndexFilePrepare(table_entry, table_index_entry, begin_ts, GetBufferMgr());
+    return index_status;
+}
+
 Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {

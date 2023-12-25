@@ -147,8 +147,8 @@ void PhysicalKnnScan::Init() {}
 
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
-    auto elem_type = knn_scan_operator_state->knn_scan_function_data_->shared_data_->elem_type_;
-    auto dist_type = knn_scan_operator_state->knn_scan_function_data_->shared_data_->knn_distance_type_;
+    auto elem_type = knn_scan_operator_state->knn_scan_function_data_->knn_scan_shared_data_->elem_type_;
+    auto dist_type = knn_scan_operator_state->knn_scan_function_data_->knn_scan_shared_data_->knn_distance_type_;
     switch (elem_type) {
         case kElemFloat: {
             switch (dist_type) {
@@ -239,7 +239,7 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
     auto knn_scan_function_data = operator_state->knn_scan_function_data_.get();
-    auto knn_scan_shared_data = knn_scan_function_data->shared_data_;
+    auto knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
 
     auto dist_func = static_cast<KnnDistance1<DataType> *>(knn_scan_function_data->knn_distance_.get());
     auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
