@@ -83,4 +83,4 @@ python remote_benchmark.py -t 1 -r 1 -d gist_1m
 - **Operating system**: Ubuntu 22.04
 - **Dataset**: SIFT1M; **topk**: 100; **recall**: 97%+
 - **QPS**: 10,305
-- **P99 Latency**: 0.3 ms
+- **P99 Latency**: < 0.4 ms
