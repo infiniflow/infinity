@@ -33,13 +33,7 @@ docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE
 
 This section provides instructions on building Infinity from source on Ubuntu 22.04.
 
-### Step1 Download the source code
-
-```shell
-git clone https://github.com/infiniflow/infinity.git
-```
-
-### Step2 Install necessary dependencies
+### Step1 Install necessary dependencies
 
 ```shell
 sudo apt update && sudo apt install git wget unzip software-properties-common
@@ -48,12 +42,18 @@ tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
 wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
-sudo echo 'deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main' > /etc/apt/sources.list.d/llvm17.list
+echo 'deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main' | sudo tee /etc/apt/sources.list.d/llvm17.list
 wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
 sudo apt update && sudo apt install g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
+```
+
+### Step2 Download the source code
+
+```shell
+git clone https://github.com/infiniflow/infinity.git
 ```
 
 ### Step3 Build the source code
@@ -78,22 +78,21 @@ ninja -j 12
 
 This section provides instructions on building Infinity from source on Ubuntu 23.10.
 
-
-### Step1 Download Source Code
-
-```shell
-git clone https://github.com/infiniflow/infinity.git
-```
-
-### Step2 Install dependencies
+### Step1 Install dependencies
 
 ```shell
 sudo apt update && sudo apt install -y git wget
 wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
 tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
-sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
+sudo apt install ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
+```
+
+### Step2 Download Source Code
+
+```shell
+git clone https://github.com/infiniflow/infinity.git
 ```
 
 ### Step3 Build source code
