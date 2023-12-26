@@ -24,6 +24,7 @@ import physical_sink;
 import data_table;
 import data_block;
 import knn_scan_data;
+import create_index_data;
 
 export module fragment_context;
 
@@ -134,10 +135,6 @@ public:
 
 public:
     UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
-};
-
-export struct CreateIndexSharedData {
-    Vector<atomic_u64> create_index_idxes_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {

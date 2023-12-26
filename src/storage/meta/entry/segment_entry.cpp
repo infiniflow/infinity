@@ -164,22 +164,6 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-template <typename DataType>
-class OneColumnIterator {
-public:
-    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
-
-    Optional<const DataType *> Next() {
-        if (auto ret = segment_iter_.Next(); ret) {
-            return reinterpret_cast<const DataType *>((*ret)[0]);
-        }
-        return None;
-    }
-
-private:
-    SegmentIter segment_iter_;
-};
-
 SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
                                                                  ColumnIndexEntry *column_index_entry,
                                                                  SharedPtr<ColumnDef> column_def,
@@ -324,45 +308,6 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *s
     }
     txn_store->CreateIndexFile(column_index_entry->table_index_entry_, column_id, segment_entry->segment_id_, segment_column_index_entry);
     return segment_column_index_entry;
-}
-
-SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFilePrepare(SegmentEntry *segment_entry,
-                                                                        ColumnIndexEntry *column_index_entry,
-                                                                        SharedPtr<ColumnDef> column_def,
-                                                                        TxnTimeStamp create_ts,
-                                                                        BufferManager *buffer_mgr) {
-    u64 column_id = column_def->id();
-    IndexBase *index_base = column_index_entry->index_base_.get();
-    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
-    SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
-        SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, segment_entry->segment_id_, create_ts, buffer_mgr, create_index_param.get());
-
-    if (index_base->index_type_ != IndexType::kHnsw) {
-        Error<StorageException>("Only HNSW index is supported.");
-    }
-    auto *index_hnsw = static_cast<IndexHnsw *>(index_base);
-    if (column_def->type()->type() != LogicalType::kEmbedding) {
-        Error<StorageException>("HNSW supports embedding type.");
-    }
-    TypeInfo *type_info = column_def->type()->type_info().get();
-    auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-
-    BufferHandle buffer_handle = SegmentColumnIndexEntry::GetIndex(segment_column_index_entry.get(), buffer_mgr);
-    auto InsertHnswPrepare = [&](auto &hnsw_index) {
-        u32 segment_offset = 0;
-        Vector<u64> row_ids;
-        for (const auto &block_entry : segment_entry->block_entries_) {
-            SizeT block_row_cnt = block_entry->row_count_;
-
-            for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
-                RowID row_id(segment_entry->segment_id_, segment_offset + block_offset);
-                row_ids.push_back(row_id.ToUint64());
-            }
-            segment_offset += DEFAULT_BLOCK_CAPACITY;
-        }
-        OneColumnIterator<float> one_column_iter(segment_entry, column_id);
-        // hnsw_index->
-    };
 }
 
 void SegmentEntry::CommitAppend(SegmentEntry *segment_entry, Txn *txn_ptr, u16 block_id, u16, u16) {

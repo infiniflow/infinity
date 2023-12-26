@@ -47,7 +47,8 @@ String LogicalCreateIndex::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "Create Table: " << *schema_name_ << "." << index_definition_->ToString();
+    ss << String(space, ' ') << arrow_str << "Create Table: " << *base_table_ref_->table_name() << "."
+       << index_definition_->ToString();
     space += arrow_str.size();
 
     return ss.str();

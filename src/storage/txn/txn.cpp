@@ -83,6 +83,21 @@ Status Txn::GetTableEntry(const String &db_name, const String &table_name, Table
     return Status::OK();
 }
 
+Status Txn::GetTableIndexEntry(const String &db_name, const String &table_name, const String &index_name, TableIndexEntry *&table_index_entry) {
+    TableCollectionEntry *table_entry = nullptr;
+    Status table_status = GetTableEntry(db_name, table_name, table_entry);
+    if (!table_status.ok()) {
+        return table_status;
+    }
+
+    BaseEntry *base_entry = nullptr;
+    TableCollectionEntry::GetIndex(table_entry, index_name, txn_id_, txn_context_.GetBeginTS(), base_entry);
+    table_index_entry = static_cast<TableIndexEntry *>(base_entry);
+
+    return Status::OK();
+}
+
+
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     TableCollectionEntry *table_entry{nullptr};
     Status status = GetTableEntry(db_name, table_name, table_entry);
@@ -422,7 +437,7 @@ Status Txn::CreateIndex(const String &db_name, const String &table_name, const S
 }
 
 Status
-Txn::CreateIndex(const String &table_name, TableCollectionEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type) {
+Txn::CreateIndex(TableCollectionEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, TableIndexEntry *&table_index_entry) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     BaseEntry *base_entry{nullptr};
@@ -431,8 +446,8 @@ Txn::CreateIndex(const String &table_name, TableCollectionEntry *table_entry, co
         return index_status;
     }
 
-    auto *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
-    TableCollectionEntry::CreateIndexFilePrepare(table_entry, table_index_entry, begin_ts, GetBufferMgr());
+    table_index_entry = static_cast<TableIndexEntry *>(base_entry);
+    txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
     return index_status;
 }
 

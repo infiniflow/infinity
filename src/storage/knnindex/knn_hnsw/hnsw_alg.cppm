@@ -378,6 +378,8 @@ public:
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
+    SizeT GetVertexNum() const { return data_store_.cur_vec_num(); }
+
     void Save(FileHandler &file_handler) {
         file_handler.Write(&M_, sizeof(M_));
         file_handler.Write(&ef_construction_, sizeof(ef_construction_));

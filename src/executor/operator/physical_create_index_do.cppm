@@ -23,6 +23,7 @@ import operator_state;
 import load_meta;
 
 import index_def;
+import base_table_ref;
 
 export module physical_create_index_do;
 
@@ -32,9 +33,8 @@ export class PhysicalCreateIndexDo : public PhysicalOperator {
 public:
     PhysicalCreateIndexDo(u64 id,
                           UniquePtr<PhysicalOperator> left,
-                          SharedPtr<String> schema_name,
-                          SharedPtr<String> table_name,
-                          SharedPtr<IndexDef> index_definition,
+                          SharedPtr<BaseTableRef> base_table_ref,
+                          SharedPtr<String> index_name,
                           SharedPtr<Vector<String>> output_names,
                           SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                           SharedPtr<Vector<LoadMeta>> load_metas);
@@ -49,9 +49,9 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    const SharedPtr<String> schema_name_{};
-    const SharedPtr<String> table_name_{};
-    const SharedPtr<IndexDef> index_def_ptr_{};
+    // for create fragemnt context
+    const SharedPtr<BaseTableRef> base_table_ref_{};
+    const SharedPtr<String> index_name_{};
 
     const SharedPtr<Vector<String>> output_names_{};
     const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

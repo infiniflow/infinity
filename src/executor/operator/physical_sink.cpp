@@ -325,6 +325,17 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             }
             break;
         }
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
+            if (output_state->error_message_.get() != nullptr) {
+                result_sink_state->error_message_ = Move(output_state->error_message_);
+                break;
+            }
+            result_sink_state->result_def_ = {
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+            };
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
@@ -343,6 +354,11 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = Move(insert_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *create_index_prepare_output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
+            message_sink_state->message_ = Move(create_index_prepare_output_state->result_msg_);
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
@@ -351,15 +367,13 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 }
 
 void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
-    if(queue_sink_state->error_message_.get() != nullptr) {
+    if (queue_sink_state->error_message_.get() != nullptr) {
         LOG_TRACE(Format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
-        SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-        fragment_data->error_message_ = MakeUnique<String>(*queue_sink_state->error_message_);
-        fragment_data->fragment_id_ = queue_sink_state->fragment_id_;
+        auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-            next_fragment_queue->Enqueue(fragment_data);
+            next_fragment_queue->Enqueue(fragment_error);
         }
-        return ;
+        return;
     }
 
     if (!task_operator_state->Complete()) {
@@ -368,15 +382,18 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
     }
     SizeT output_data_block_count = task_operator_state->data_block_array_.size();
     if (output_data_block_count == 0) {
-        Error<ExecutorException>("No output from knn scan");
+        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+            next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
+        }
+        return;
+        // Error<ExecutorException>("No output from last operator.");
     }
     for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-        SharedPtr<FragmentData> fragment_data = MakeShared<FragmentData>();
-        fragment_data->fragment_id_ = queue_sink_state->fragment_id_;
-        fragment_data->task_id_ = queue_sink_state->task_id_;
-        fragment_data->data_block_ = Move(task_operator_state->data_block_array_[idx]);
-        fragment_data->data_count_ = output_data_block_count;
-        fragment_data->data_idx_ = idx;
+        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+                                                      Move(task_operator_state->data_block_array_[idx]),
+                                                      queue_sink_state->task_id_,
+                                                      idx,
+                                                      output_data_block_count);
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_data);
         }

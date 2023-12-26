@@ -262,26 +262,6 @@ void TableCollectionEntry::CreateIndexFile(TableCollectionEntry *table_entry,
     }
 }
 
-void TableCollectionEntry::CreateIndexFilePrepare(TableCollectionEntry *table_entry,
-                                                  TableIndexEntry *table_index_entry,
-                                                  TxnTimeStamp begin_ts,
-                                                  BufferManager *buffer_mgr) {
-    if (table_index_entry->irs_index_entry_.get() != nullptr) {
-        Error<NotImplementException>("TableCollectionEntry::CreateIndexFilePrepare");
-    }
-    if (table_index_entry->column_index_map_.size() != 1) {
-        Error<NotImplementException>("TableCollectionEntry::CreateIndexFilePrepare");
-    }
-
-    auto [column_id, base_entry] = *table_index_entry->column_index_map_.begin();
-    SharedPtr<ColumnDef> column_def = table_entry->columns_[column_id];
-    auto column_index_entry = static_cast<ColumnIndexEntry *>(base_entry.get());
-
-    for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
-        SegmentEntry::CreateIndexFilePrepare(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr);
-    }
-}
-
 UniquePtr<String> TableCollectionEntry::Delete(TableCollectionEntry *table_entry, Txn *txn_ptr, DeleteState &delete_state) {
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;

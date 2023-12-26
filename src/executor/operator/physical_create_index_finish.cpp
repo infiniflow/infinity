@@ -22,21 +22,36 @@ import query_context;
 import operator_state;
 import load_meta;
 
+import index_def;
+import wal_entry;
+
 module physical_create_index_finish;
 
 namespace infinity {
 PhysicalCreateIndexFinish::PhysicalCreateIndexFinish(u64 id,
                                                      UniquePtr<PhysicalOperator> left,
+                                                     SharedPtr<String> db_name,
+                                                     SharedPtr<String> table_name,
+                                                     SharedPtr<IndexDef> index_def,
                                                      SharedPtr<Vector<String>> output_names,
                                                      SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                      SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, Move(left), nullptr, id, load_metas), output_names_(output_names),
-      output_types_(output_types) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, Move(left), nullptr, id, load_metas), db_name_(db_name), table_name_(table_name),
+      index_def_(index_def), output_names_(output_names), output_types_(output_types) {}
 
 void PhysicalCreateIndexFinish::Init() {}
 
 bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    //
+    auto *txn = query_context->GetTxn();
+    auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(operator_state);
+
+    if (create_index_finish_op_state->input_complete_) {
+        txn->AddWalCmd(MakeShared<WalCmdCreateIndex>(*db_name_, *table_name_, index_def_));
+
+        operator_state->SetComplete();
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

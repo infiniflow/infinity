@@ -39,35 +39,59 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // A false return value indicate there are more data need to read from source.
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
-    SharedPtr<FragmentData> fragment_data = nullptr;
-    source_queue_.Dequeue(fragment_data);
+    SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
+    source_queue_.Dequeue(fragment_data_base);
 
-    if(fragment_data->error_message_.get() != nullptr) {
-        if(this->error_message_.get() == nullptr) {
-            // Only record the first error of input data.
-            this->error_message_ = Move(fragment_data->error_message_);
+    switch (fragment_data_base->type_) {
+        case FragmentDataType::kData: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
+                // Get an all data from this
+                MarkCompletedTask(fragment_data->fragment_id_);
+            }
+            break;
         }
-
-        // Get an error message from predecessor fragment
-        MarkCompletedTask(fragment_data->fragment_id_);
-    } else if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
-        // Get an all data from this
-        MarkCompletedTask(fragment_data->fragment_id_);
+        case FragmentDataType::kError: {
+            auto *fragment_error = static_cast<FragmentError *>(fragment_data_base.get());
+            if (this->error_message_.get() == nullptr) {
+                // Only record the first error of input data.
+                this->error_message_ = Move(fragment_error->error_message_);
+            }
+            // Get an error message from predecessor fragment
+            MarkCompletedTask(fragment_error->fragment_id_);
+            break;
+        }
+        case FragmentDataType::kNone: {
+            auto *fragment_none = static_cast<FragmentNone *>(fragment_data_base.get());
+            MarkCompletedTask(fragment_none->fragment_id_);
+            break;
+        }
+        default: {
+            Error<ExecutorException>("Not support fragment data type");
+            break;
+        }
     }
 
     bool completed = num_tasks_.empty();
     OperatorState *next_op_state = this->next_op_state_;
     switch (next_op_state->operator_type_) {
         case PhysicalOperatorType::kMergeKnn: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
             merge_knn_op_state->input_data_block_ = Move(fragment_data->data_block_);
             merge_knn_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kFusion: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             FusionOperatorState *fusion_op_state = (FusionOperatorState *)next_op_state;
             fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(Move(fragment_data->data_block_));
             fusion_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
+            create_index_finish_op_state->input_complete_ = completed;
             break;
         }
         default: {

@@ -24,6 +24,7 @@ import knn_scan_data;
 import table_def;
 import parser;
 import merge_knn_data;
+import create_index_data;
 import blocking_queue;
 
 export module operator_state;
@@ -234,14 +235,21 @@ export struct CreateIndexOperatorState : public OperatorState {
 
 export struct CreateIndexPrepareOperatorState : public OperatorState {
     inline explicit CreateIndexPrepareOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexPrepare) {}
+
+    UniquePtr<String> result_msg_{};
 };
 
 export struct CreateIndexDoOperatorState : public OperatorState {
     inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
+
+    CreateIndexSharedData *create_index_shared_data_{};
 };
 
 export struct CreateIndexFinishOperatorState : public OperatorState {
     inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
+
+    bool input_complete_ = false;
+    UniquePtr<String> error_message_{};
 };
 
 // Create Collection
@@ -351,7 +359,7 @@ export struct QueueSourceState : public SourceState {
 
     bool GetData();
 
-    BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
+    BlockingQueue<SharedPtr<FragmentDataBase>> source_queue_{};
 
     Map<u64, u64> num_tasks_; // fragment_id -> number of pending tasks
 
@@ -368,7 +376,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    BlockingQueue<UniquePtr<FragmentData>> source_queue_{};
+    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -418,7 +426,7 @@ export struct QueueSinkState : public SinkState {
     inline explicit QueueSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kQueue, fragment_id, task_id) {}
 
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-    Vector<BlockingQueue<SharedPtr<FragmentData>> *> fragment_data_queues_;
+    Vector<BlockingQueue<SharedPtr<FragmentDataBase>> *> fragment_data_queues_;
 };
 
 export struct MaterializeSinkState : public SinkState {

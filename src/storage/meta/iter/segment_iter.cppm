@@ -56,4 +56,20 @@ private:
     SharedPtr<Vector<SizeT>> column_ids_;
 };
 
+export template <typename DataType>
+class OneColumnIterator {
+public:
+    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
+
+    Optional<const DataType *> Next() {
+        if (auto ret = segment_iter_.Next(); ret) {
+            return reinterpret_cast<const DataType *>((*ret)[0]);
+        }
+        return None;
+    }
+
+private:
+    SegmentIter segment_iter_;
+};
+
 } // namespace infinity

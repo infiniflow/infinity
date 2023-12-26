@@ -45,6 +45,7 @@ import data_table;
 import data_block;
 import physical_merge_knn;
 import merge_knn_data;
+import create_index_data;
 import logger;
 
 import plan_fragment;
@@ -57,6 +58,13 @@ template <typename OperatorStateType>
 UniquePtr<OperatorState> MakeTaskStateTemplate(PhysicalOperator *physical_op) {
 
     return MakeUnique<OperatorStateType>();
+}
+
+UniquePtr<OperatorState> MakeCreateIndexDoState(PhysicalCreateIndexDo *physical_create_index_do, FragmentTask *task, FragmentContext *fragment_ctx) {
+    UniquePtr<CreateIndexDoOperatorState> operator_state = MakeUnique<CreateIndexDoOperatorState>();
+    auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
+    operator_state->create_index_shared_data_ = parallel_materialize_fragment_ctx->create_index_shared_data_.get();
+    return operator_state;
 }
 
 UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_scan, FragmentTask *task) {
@@ -223,7 +231,8 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<CreateIndexPrepareOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateIndexDo: {
-            return MakeTaskStateTemplate<CreateIndexDoOperatorState>(physical_ops[operator_id]);
+            auto *physical_create_index_do = static_cast<PhysicalCreateIndexDo *>(physical_ops[operator_id]);
+            return MakeCreateIndexDoState(physical_create_index_do, task, fragment_ctx);
         }
         case PhysicalOperatorType::kCreateIndexFinish: {
             return MakeTaskStateTemplate<CreateIndexFinishOperatorState>(physical_ops[operator_id]);
@@ -465,31 +474,31 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
             serial_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                                                          knn_scan_operator->filter_expression_,
-                                                                                          Move(knn_scan_operator->block_column_entries_),
-                                                                                          Move(knn_scan_operator->index_entries_),
-                                                                                          Move(knn_expr->opt_params_),
-                                                                                          knn_expr->topn_,
-                                                                                          knn_expr->dimension_,
-                                                                                          1,
-                                                                                          knn_expr->query_embedding_.ptr,
-                                                                                          knn_expr->embedding_data_type_,
-                                                                                          knn_expr->distance_type_);
+                                                                                                   knn_scan_operator->filter_expression_,
+                                                                                                   Move(knn_scan_operator->block_column_entries_),
+                                                                                                   Move(knn_scan_operator->index_entries_),
+                                                                                                   Move(knn_expr->opt_params_),
+                                                                                                   knn_expr->topn_,
+                                                                                                   knn_expr->dimension_,
+                                                                                                   1,
+                                                                                                   knn_expr->query_embedding_.ptr,
+                                                                                                   knn_expr->embedding_data_type_,
+                                                                                                   knn_expr->distance_type_);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                                                            knn_scan_operator->filter_expression_,
-                                                                                            Move(knn_scan_operator->block_column_entries_),
-                                                                                            Move(knn_scan_operator->index_entries_),
-                                                                                            Move(knn_expr->opt_params_),
-                                                                                            knn_expr->topn_,
-                                                                                            knn_expr->dimension_,
-                                                                                            1,
-                                                                                            knn_expr->query_embedding_.ptr,
-                                                                                            knn_expr->embedding_data_type_,
-                                                                                            knn_expr->distance_type_);
+                                                                                                     knn_scan_operator->filter_expression_,
+                                                                                                     Move(knn_scan_operator->block_column_entries_),
+                                                                                                     Move(knn_scan_operator->index_entries_),
+                                                                                                     Move(knn_expr->opt_params_),
+                                                                                                     knn_expr->topn_,
+                                                                                                     knn_expr->dimension_,
+                                                                                                     1,
+                                                                                                     knn_expr->query_embedding_.ptr,
+                                                                                                     knn_expr->embedding_data_type_,
+                                                                                                     knn_expr->distance_type_);
             break;
         }
         default: {
@@ -500,10 +509,14 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     return task_n;
 }
 
-void InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index_do_operator, FragmentContext *fragment_ctx) {
+SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index_do_operator, FragmentContext *fragment_ctx) {
+    auto *table_entry = create_index_do_operator->base_table_ref_->table_entry_ptr_;
+    // FIXME: to create index on unsealed_segment
+    SizeT segment_cnt = table_entry->segment_map_.size();
+
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
-    // TODO: set create_index_idxes_ size to segment number. AAA
-    // parallel_materialize_fragment_ctx->create_index_idxes_
+    parallel_materialize_fragment_ctx->create_index_shared_data_ = MakeUnique<CreateIndexSharedData>(table_entry->segment_map_);
+    return segment_cnt;
 }
 
 void FragmentContext::MakeSourceState(i64 parallel_count) {
@@ -613,7 +626,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
 
             for (SizeT task_id = 0; (i64)task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<QueueSourceState>();
+                tasks_[task_id]->source_state_ = MakeUnique<EmptySourceState>();
             }
             break;
         }
@@ -692,8 +705,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
-        case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kCreateIndexPrepare: {
+        case PhysicalOperatorType::kMergeKnn: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -811,6 +823,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -889,7 +902,8 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kCreateIndexDo: {
             const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
-            InitCreateIndexDoFragmentContext(create_index_do_operator, this);
+            SizeT segment_n = InitCreateIndexDoFragmentContext(create_index_do_operator, this);
+            parallel_count = Min(parallel_count, (i64)segment_n);
             break;
         }
         default: {
