@@ -15,7 +15,6 @@
 #include "decimal_info.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/number/decimal_type.h"
-#include <format>
 
 namespace infinity {
 
