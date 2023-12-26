@@ -1,11 +1,14 @@
-name: Nightly Build
+name: release
 
 on:
   schedule:
     - cron: '*/30 * * * *'  # This schedule runs every night at midnight UTC
+  push:
+    tags:
+      - "v*.*.*"            # normal release
 
 jobs:
-  nightly:
+  release:
     runs-on: self-hosted
     steps:
     - name: Ensure workspace ownership
@@ -16,34 +19,48 @@ jobs:
 
     - name: Prepare release body
       run: |
+        if [[ ${{ github.ref }} =~ ^refs/tags/v(.*) ]]; then
+          RELEASE_TAG=v${BASH_REMATCH[1]}
+          PRERELEASE=false
+        else
+          RELEASE_TAG=nightly
+          PRERELEASE=true
+        fi
+        echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+        echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
         RELEASE_DATETIME=$(date --rfc-3339=seconds)
         cat <<EOF > release_template.md
-        Release created at $RELEASE_DATETIME
+        Release $RELEASE_TAG created from $GITHUB_SHA at $RELEASE_DATETIME
         EOF
         envsubst < release_template.md > release_body.md
 
     - name: Start builder container
       run: |
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_build:0.1
+        sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
 
     - name: Build release version
-      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
 
-    - name: Remove existing tag
+    - name: Move the existing mutable tag
       # https://github.com/softprops/action-gh-release/issues/171
-      run: git push origin :refs/tags/nightly || true
+      run: |
+        if [[ $RELEASE_TAG != v* ]]; then
+          echo "moving mutalbe tag $RELEASE_TAG to $GITHUB_SHA"
+          git tag -f $RELEASE_TAG
+          git push -f origin $RELEASE_TAG:refs/tags/$RELEASE_TAG
+        fi
 
     - name: Create or overwrite a releae
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release
       uses: softprops/action-gh-release@v1
       with:
         token: ${{ secrets.MY_GITHUB_TOKEN }}  # Use the secret as an environment variable
-        prerelease: true
-        tag_name: nightly
+        prerelease: ${{ env.PRERELEASE }}
+        tag_name: ${{ env.RELEASE_TAG }}
         # The body field does not support environment variable substitution directly.
         body_path: release_body.md
         files: |
