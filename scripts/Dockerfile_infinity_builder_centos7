@@ -1,17 +1,18 @@
-FROM centos:7
+# NOTICE: This Dockerfile depends on BuildKit
+# NOTICE: You should prepare the following files:
+# bison-3.8.2.tar.xz
+# binutils-2.41.tar.xz
+# gcc-13.2.0.tar.xz
+# cmake-3.28.1-linux-x86_64.tar.gz
+# ninja-linux.zip
+# llvm-project-17.0.6.src.tar.xz
+# boost_1_81_0.tar.bz2
+# flex-2.6.4.tar.gz
+# liburing-2.5.tar.gz
+# libevent-2.1.12-stable.tar.gz
+# lz4-1.9.4.tar.gz
 
-#NOTICE: You should prepare the following files:
-#bison-3.8.2.tar.xz
-#binutils-2.41.tar.xz
-#gcc-13.2.0.tar.xz
-#cmake-3.28.1-linux-x86_64.tar.gz
-#ninja-linux.zip
-#llvm-project-17.0.6.src.tar.xz
-#boost_1_81_0.tar.bz2
-#flex-2.6.4.tar.gz
-#liburing-2.5.tar.gz
-#libevent-2.1.12-stable.tar.gz
-#lz4-1.9.4.tar.gz
+FROM centos:7
 
 RUN yum -y upgrade \
     && yum -y install git make wget which vim file gcc-c++ \
@@ -79,7 +80,7 @@ RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-pr
 RUN --mount=type=bind,source=boost_1_81_0.tar.bz2,target=/root/boost_1_81_0.tar.bz2 \
     cd /root && tar xf boost_1_81_0.tar.bz2 \
     && cd boost_1_81_0 && ./bootstrap.sh --with-python=python3 \
-    && ./b2 -j install \
+    && ./b2 -j12 install \
     && ldconfig && cd /root && rm -rf boost_1_81_0
 
 # Install flex-2.6.4
