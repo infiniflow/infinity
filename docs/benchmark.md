@@ -11,7 +11,7 @@ You have two options for building Infinity. Choose the option that best fits you
 
 ## Download the Benchmark datasets
 
-To obtain the benchmark files, you have the option to download them using the wget command.
+To obtain the benchmark datasets, you have the option to download them using the wget command.
 
 ```sh
 #download sift benchmark
@@ -21,7 +21,7 @@ wget ftp://ftp.irisa.fr/local/texmex/corpus/gist.tar.gz
 
 ```
 
-Alternatively, you can manually download the benchmark files by visiting [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/).
+Alternatively, you can manually download the benchmark datasets by visiting [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/).
 
 ```sh
 # Unzip and move the SIFT1M benchmark file.
