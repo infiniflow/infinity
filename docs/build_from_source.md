@@ -26,7 +26,7 @@ docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja .. && n
 ### Step3 Start up the Infinity server
 
 ```shell
-.build/src/infinity
+./build/src/infinity
 ```
 
 ## Build from source on Ubuntu 22.04
@@ -70,7 +70,7 @@ ninja -j 12
 ### Step4 Start up the Infinity server
 
 ```shell
-.build/src/infinity
+./src/infinity
 ```
 
 
@@ -110,5 +110,5 @@ ninja -j 12
 ### Step4 Start up Infinity server
 
 ```shell
-.build/src/infinity
+./src/infinity
 ```
