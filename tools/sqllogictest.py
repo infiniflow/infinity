@@ -10,6 +10,7 @@ from generate_sort import generate as generate3
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
+    os.system(f"pip install infinity_sdk")
     os.system(f"python -m pytest {python_test_dir}/test")
 
 

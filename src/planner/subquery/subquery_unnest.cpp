@@ -126,7 +126,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             u64 group_by_index = bind_context->GenerateTableIndex();
             u64 aggregate_index = bind_context->GenerateTableIndex();
             SharedPtr<LogicalAggregate> aggregate_node =
-                MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(), groups, group_by_index, aggregates, aggregate_index);
+                MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(), nullptr, groups, group_by_index, aggregates, aggregate_index);
 
             aggregate_node->set_left_node(limit_node);
 

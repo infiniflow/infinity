@@ -20,31 +20,26 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import base_expression;
-import data_table;
-import base_table_ref;
 import load_meta;
-import knn_expression;
+import base_table_ref;
 import infinity_exception;
 
-export module physical_merge_knn;
+export module physical_merge_aggregate;
 
 namespace infinity {
 
-export class PhysicalMergeKnn final : public PhysicalOperator {
+export class PhysicalMergeAggregate final : public PhysicalOperator {
 public:
-    explicit PhysicalMergeKnn(u64 id,
-                              SharedPtr<BaseTableRef> table_ref,
-                              UniquePtr<PhysicalOperator> left,
-                              SharedPtr<Vector<String>> output_names,
-                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                              SharedPtr<KnnExpression> knn_expr,
-                              u64 knn_table_index,
-                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, Move(left), nullptr, id, load_metas), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), knn_table_index_(knn_table_index), knn_expression_(Move(knn_expr)), table_ref_(table_ref) {}
+    explicit PhysicalMergeAggregate(u64 id,
+                                    SharedPtr<BaseTableRef> table_ref,
+                                    UniquePtr<PhysicalOperator> left,
+                                    SharedPtr<Vector<String>> output_names,
+                                    SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                                    SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kMergeAggregate, Move(left), nullptr, id, load_metas), output_names_(Move(output_names)),
+          output_types_(Move(output_types)), table_ref_(Move(table_ref)) {}
 
-    ~PhysicalMergeKnn() override = default;
+    ~PhysicalMergeAggregate() override = default;
 
     void Init() override;
 
@@ -58,21 +53,11 @@ public:
         Error<NotImplementException>("TaskletCount not Implement");
         return 0;
     }
-
-    inline u64 knn_table_index() const { return knn_table_index_; }
-
-private:
-    template <typename T, template <typename, typename> typename C>
-    void ExecuteInner(QueryContext *query_context, MergeKnnOperatorState *operator_state);
-
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
-    u64 knn_table_index_{};
 
 public:
-    SharedPtr<KnnExpression> knn_expression_{};
-    SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseTableRef> table_ref_{};
 };
 

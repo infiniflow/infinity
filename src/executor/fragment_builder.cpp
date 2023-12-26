@@ -168,7 +168,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             break;
         }
         case PhysicalOperatorType::kFusion:
-        case PhysicalOperatorType::kMergeParallelAggregate:
+        case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:

@@ -24,6 +24,7 @@ import table_collection_entry;
 import base_expression;
 import fusion_expression;
 import load_meta;
+import infinity_exception;
 
 export module physical_fusion;
 
@@ -45,6 +46,11 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); };
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); };
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     String ToString(i64 &space) const;
 

@@ -39,6 +39,8 @@ public:
 
     virtual void Init() = 0;
 
+    virtual SizeT TaskletCount() = 0;
+
     inline PhysicalOperator* left() const { return left_.get(); }
 
     inline PhysicalOperator* right() const { return right_.get(); }

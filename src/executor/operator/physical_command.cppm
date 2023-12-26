@@ -22,6 +22,7 @@ import query_context;
 import parser;
 import operator_state;
 import load_meta;
+import infinity_exception;
 
 export module physical_command;
 
@@ -42,6 +43,11 @@ public:
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     inline SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 

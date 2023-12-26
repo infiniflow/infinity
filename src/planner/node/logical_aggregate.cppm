@@ -20,6 +20,7 @@ import column_binding;
 import logical_node;
 import base_expression;
 import parser;
+import base_table_ref;
 
 export module logical_aggregate;
 
@@ -28,12 +29,13 @@ namespace infinity {
 export class LogicalAggregate : public LogicalNode {
 public:
     explicit LogicalAggregate(u64 node_id,
+                              SharedPtr<BaseTableRef> base_table_ref,
                               Vector<SharedPtr<BaseExpression>> groups,
                               u64 groupby_index,
                               Vector<SharedPtr<BaseExpression>> aggregates,
                               u64 aggregate_index)
-        : LogicalNode(node_id, LogicalNodeType::kAggregate), groups_(Move(groups)), groupby_index_(groupby_index),
-          aggregates_(Move(aggregates)), aggregate_index_(aggregate_index) {}
+        : LogicalNode(node_id, LogicalNodeType::kAggregate), groups_(Move(groups)), groupby_index_(groupby_index), aggregates_(Move(aggregates)),
+          aggregate_index_(aggregate_index), base_table_ref_(Move(base_table_ref)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -50,6 +52,8 @@ public:
 
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     u64 aggregate_index_{};
+
+    SharedPtr<BaseTableRef> base_table_ref_;
 };
 
 } // namespace infinity

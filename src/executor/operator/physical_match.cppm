@@ -25,6 +25,7 @@ import base_expression;
 import match_expression;
 import base_table_ref;
 import load_meta;
+import infinity_exception;
 
 export module physical_match;
 
@@ -47,6 +48,11 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});

@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import index_def;
 import load_meta;
+import infinity_exception;
 
 export module physical_create_view;
 
@@ -42,6 +43,11 @@ public:
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     inline const SharedPtr<CreateViewInfo> &bound_select_statement() const { return create_view_info_; };
 

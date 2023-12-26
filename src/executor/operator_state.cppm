@@ -56,6 +56,11 @@ export struct AggregateOperatorState : public OperatorState {
     inline explicit AggregateOperatorState() : OperatorState(PhysicalOperatorType::kAggregate) {}
 };
 
+// Merge Aggregate
+export struct MergeAggregateOperatorState : public OperatorState {
+    inline explicit MergeAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeAggregate) {}
+};
+
 // Merge Parallel Aggregate
 export struct MergeParallelAggregateOperatorState : public OperatorState {
     inline explicit MergeParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeParallelAggregate) {}

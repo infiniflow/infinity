@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import data_table;
 import load_meta;
+import infinity_exception;
 
 export module physical_cross_product;
 
@@ -37,6 +38,11 @@ public:
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     SharedPtr<Vector<String>> GetOutputNames() const final;
 

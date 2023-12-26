@@ -144,6 +144,19 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             knn_output_state->data_block_array_.clear();
             break;
         }
+        case PhysicalOperatorType::kAggregate: {
+            AggregateOperatorState *agg_output_state = static_cast<AggregateOperatorState *>(task_op_state);
+            if (agg_output_state->data_block_array_.empty()) {
+                if(materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    Error<ExecutorException>("Empty sort output");
+                }
+            } else {
+                materialize_sink_state->data_block_array_ = Move(agg_output_state->data_block_array_);
+            }
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
         }
