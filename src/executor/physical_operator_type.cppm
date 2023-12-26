@@ -24,6 +24,7 @@ export enum class PhysicalOperatorType : i8 {
     kInvalid = 0,
 
     kAggregate,
+    kMergeAggregate,
 
     kParallelAggregate,
     kMergeParallelAggregate,

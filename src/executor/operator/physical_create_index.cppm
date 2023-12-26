@@ -22,6 +22,7 @@ import physical_operator;
 import physical_operator_type;
 import index_def;
 import load_meta;
+import infinity_exception;
 
 export module physical_create_index;
 
@@ -31,6 +32,11 @@ public:
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 

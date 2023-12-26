@@ -34,6 +34,7 @@ import block_index;
 import table_collection_entry;
 import default_values;
 import infinity_exception;
+import infinity_exception;
 
 module physical_table_scan;
 
@@ -77,6 +78,8 @@ TableCollectionEntry *PhysicalTableScan::TableEntry() const { return base_table_
 
 SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
+SizeT PhysicalTableScan::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
+
 BlockIndex *PhysicalTableScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
 Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
@@ -110,9 +113,8 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
     return result;
 }
 
-void PhysicalTableScan::ExecuteInternal(QueryContext *query_context,
-                                        TableScanOperatorState *table_scan_operator_state) {
-    if(!table_scan_operator_state->data_block_array_.empty()) {
+void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {
+    if (!table_scan_operator_state->data_block_array_.empty()) {
         Error<ExecutorException>("Table scan output data block array should be empty");
     }
 

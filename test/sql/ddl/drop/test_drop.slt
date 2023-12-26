@@ -7,20 +7,24 @@
 # expect: success
 
 statement ok
-CREATE TABLE a (i INTEGER);
+DROP TABLE IF EXISTS test_drop;
 
-# crash!
-#statement ok
-#INSERT INTO a VALUES (42);
-
-
-statement error
-SELECT COUNT(*) FROM a;
+statement ok
+CREATE TABLE test_drop (i INTEGER);
 
 
 query I
-SELECT * FROM a;
+INSERT INTO test_drop VALUES (42);
 ----
 
+#statement error
+#SELECT COUNT(*) FROM a;
+
+
+query I
+SELECT * FROM test_drop;
+----
+42
+
 statement ok
-DROP TABLE a;
+DROP TABLE test_drop;

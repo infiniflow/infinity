@@ -23,6 +23,7 @@ import physical_operator_type;
 import base_expression;
 import data_table;
 import load_meta;
+import infinity_exception;
 
 export module physical_nested_loop_join;
 
@@ -48,6 +49,11 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     inline const Vector<SharedPtr<BaseExpression>> &conditions() const { return conditions_; }
 

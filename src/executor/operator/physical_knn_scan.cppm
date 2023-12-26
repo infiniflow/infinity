@@ -27,6 +27,7 @@ import table_collection_entry;
 import block_index;
 import load_meta;
 import knn_expression;
+import infinity_exception;
 
 export module physical_knn_scan;
 
@@ -72,6 +73,10 @@ public:
     void PlanWithIndex(QueryContext *query_context);
 
     inline SizeT TaskCount() const {
+        return block_column_entries_->size() + index_entries_->size();
+    }
+
+    SizeT TaskletCount() override {
         return block_column_entries_->size() + index_entries_->size();
     }
 

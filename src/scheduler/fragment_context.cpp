@@ -144,6 +144,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kAggregate: {
             return MakeTaskStateTemplate<AggregateOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kMergeAggregate: {
+            return MakeTaskStateTemplate<MergeAggregateOperatorState>(physical_ops[operator_id]);
+        }
         case PhysicalOperatorType::kParallelAggregate: {
             return MakeTaskStateTemplate<ParallelAggregateOperatorState>(physical_ops[operator_id]);
         }
@@ -494,7 +497,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     switch (first_operator->operator_type()) {
         case PhysicalOperatorType::kTableScan: {
             auto *table_scan_operator = static_cast<PhysicalTableScan *>(first_operator);
-            parallel_count = Min(parallel_count, (i64)(table_scan_operator->BlockEntryCount()));
+            parallel_count = Min(parallel_count, (i64)(table_scan_operator->TaskletCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }
@@ -580,7 +583,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             Error<SchedulerException>(
                 Format("{} shouldn't be the first operator of the fragment", PhysicalOperatorToString(first_operator->operator_type())));
         }
-        case PhysicalOperatorType::kMergeParallelAggregate:
+        case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
@@ -691,8 +694,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(
-                    Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                Error<SchedulerException>(Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {

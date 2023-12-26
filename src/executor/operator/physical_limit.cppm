@@ -23,6 +23,7 @@ import physical_operator_type;
 import base_expression;
 import data_table;
 import load_meta;
+import infinity_exception;
 
 export module physical_limit;
 
@@ -47,6 +48,11 @@ public:
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
 

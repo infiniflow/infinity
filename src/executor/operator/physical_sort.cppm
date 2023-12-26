@@ -25,6 +25,7 @@ import base_expression;
 import data_table;
 import data_block;
 import load_meta;
+import infinity_exception;
 
 export module physical_sort;
 
@@ -54,6 +55,11 @@ public:
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderType> order_by_types_{};

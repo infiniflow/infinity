@@ -48,6 +48,8 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
+    SizeT TaskletCount() override;
+
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;

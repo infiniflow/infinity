@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import load_meta;
+import infinity_exception;
 
 export module physical_drop_view;
 
@@ -35,14 +36,18 @@ public:
                               u64 id,
                               SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kDropView, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-          view_name_(Move(view_name)), conflict_type_(conflict_type), output_names_(Move(output_names)),
-          output_types_(Move(output_types)) {}
+          view_name_(Move(view_name)), conflict_type_(conflict_type), output_names_(Move(output_names)), output_types_(Move(output_types)) {}
 
     ~PhysicalDropView() override = default;
 
     void Init() override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

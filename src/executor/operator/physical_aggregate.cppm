@@ -24,6 +24,7 @@ import data_table;
 import hash_table;
 import base_expression;
 import load_meta;
+import infinity_exception;
 
 export module physical_aggregate;
 
@@ -52,6 +53,11 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
+
     void GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
 
     void GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
@@ -60,7 +66,9 @@ public:
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    void SimpleAggregate(SharedPtr<DataTable> &output_table);
+    bool SimpleAggregate(SharedPtr<DataTable> &output_table,
+                                            OperatorState *pre_operator_state,
+                                            AggregateOperatorState *aggregate_operator_state);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 

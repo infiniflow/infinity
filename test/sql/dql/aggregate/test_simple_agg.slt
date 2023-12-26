@@ -1,0 +1,59 @@
+statement ok
+DROP TABLE IF EXISTS simple_agg;
+
+statement ok
+CREATE TABLE simple_agg (c1 INTEGER , c2 FLOAT);
+
+# insert data
+query I
+INSERT INTO simple_agg VALUES (1, 1.0),(2,2.0),(3,3.0);
+----
+
+query I
+SELECT SUM(c1) FROM simple_agg
+----
+6
+
+query II
+SELECT SUM(c2) FROM simple_agg
+----
+6.000000
+
+query I
+SELECT AVG(c1) FROM simple_agg
+----
+2.000000
+
+query II
+SELECT AVG(c2) FROM simple_agg
+----
+2.000000
+
+query I
+SELECT MIN(c1) FROM simple_agg
+----
+1
+
+query II
+SELECT MIN(c2) FROM simple_agg
+----
+1.000000
+
+query I
+SELECT MAX(c1) FROM simple_agg
+----
+3
+
+query II
+SELECT MAX(c2) FROM simple_agg
+----
+3.000000
+
+query I
+SELECT COUNT(c1) FROM simple_agg
+----
+3
+
+
+statement ok
+DROP TABLE simple_agg;

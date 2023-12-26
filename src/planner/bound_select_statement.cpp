@@ -83,7 +83,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
             // Build logical aggregate
+            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             auto aggregate = MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                          base_table_ref,
                                                           group_by_expressions_,
                                                           groupby_index_,
                                                           aggregate_expressions_,

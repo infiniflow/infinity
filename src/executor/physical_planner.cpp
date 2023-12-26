@@ -53,6 +53,8 @@ import physical_merge_hash;
 import physical_merge_join;
 import physical_merge_knn;
 import physical_merge_limit;
+import physical_aggregate;
+import physical_merge_aggregate;
 import physical_merge_parallel_aggregate;
 import physical_merge_sort;
 import physical_merge_top;
@@ -490,13 +492,26 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
 
-    return MakeUnique<PhysicalAggregate>(logical_aggregate->node_id(),
-                                         Move(input_physical_operator),
-                                         logical_aggregate->groups_,
-                                         logical_aggregate->groupby_index_,
-                                         logical_aggregate->aggregates_,
-                                         logical_aggregate->aggregate_index_,
-                                         logical_operator->load_metas());
+    SizeT tasklet_count = input_physical_operator->TaskletCount();
+
+    auto physical_agg_op = MakeUnique<PhysicalAggregate>(logical_aggregate->node_id(),
+                                                         Move(input_physical_operator),
+                                                         logical_aggregate->groups_,
+                                                         logical_aggregate->groupby_index_,
+                                                         logical_aggregate->aggregates_,
+                                                         logical_aggregate->aggregate_index_,
+                                                         logical_operator->load_metas());
+
+    if (tasklet_count == 1) {
+        return physical_agg_op;
+    } else {
+        return MakeUnique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),
+                                            logical_aggregate->base_table_ref_,
+                                            Move(physical_agg_op),
+                                            logical_aggregate->GetOutputNames(),
+                                            logical_aggregate->GetOutputTypes(),
+                                            logical_operator->load_metas());
+    }
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNode> &logical_operator) const {
@@ -713,18 +728,18 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_knn_scan = (LogicalKnnScan *)(logical_operator.get());
-//    logical_knn_scan->
+    //    logical_knn_scan->
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
-                                                                          logical_knn_scan->base_table_ref_,
-                                                                          logical_knn_scan->knn_expression_,
-                                                                          logical_knn_scan->filter_expression_,
-                                                                          logical_knn_scan->GetOutputNames(),
-                                                                          logical_knn_scan->GetOutputTypes(),
-                                                                          logical_knn_scan->knn_table_index_,
-                                                                          logical_operator->load_metas());
+                                                                         logical_knn_scan->base_table_ref_,
+                                                                         logical_knn_scan->knn_expression_,
+                                                                         logical_knn_scan->filter_expression_,
+                                                                         logical_knn_scan->GetOutputNames(),
+                                                                         logical_knn_scan->GetOutputTypes(),
+                                                                         logical_knn_scan->knn_table_index_,
+                                                                         logical_operator->load_metas());
 
     knn_scan_op->PlanWithIndex(query_context_ptr_);
-    if(knn_scan_op->TaskCount() == 1) {
+    if (knn_scan_op->TaskletCount() == 1) {
         return knn_scan_op;
     } else {
         return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),

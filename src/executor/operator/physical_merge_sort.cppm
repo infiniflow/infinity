@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import load_meta;
+import infinity_exception;
 
 export module physical_merge_sort;
 
@@ -44,6 +45,11 @@ public:
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+
+    SizeT TaskletCount() override {
+        Error<NotImplementException>("TaskletCount not Implement");
+        return 0;
+    }
 
 private:
     SharedPtr<Vector<String>> output_names_{};
