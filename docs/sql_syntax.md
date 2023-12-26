@@ -70,6 +70,6 @@ DESCRIBE INDEX table_name;
 #### Example
 
 ```sql
-SELECT col1 FROM tbl1 ORDER BY KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2') LIMIT 2;
-SELECT col1 FROM tbl1 ORDER BY KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip') DESC LIMIT 2;
+SELECT col1 FROM tbl1 SEARCH KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 2);
+SELECT col1 FROM tbl1 SEARCH KNN(col2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 2);
 ```

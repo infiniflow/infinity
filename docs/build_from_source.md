@@ -1,7 +1,33 @@
 # Build from Source
 
+- [Build from source on Linux using Docker](#build-from-source-on-linux-using-docker)
 - [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
 - [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
+
+## Build from source on Linux using Docker
+
+This section provides instructions on building Infinity from source on Linux using Docker.
+
+### Step1 Download the source code
+
+```shell
+git clone https://github.com/infiniflow/infinity.git
+```
+
+### Step2 Build the source code using Docker
+
+```shell
+cd infinity && mkdir build
+TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
+docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja .. && ninja -j 12"
+```
+
+### Step3 Start up the Infinity server
+
+```shell
+.build/src/infinity
+```
 
 ## Build from source on Ubuntu 22.04
 
