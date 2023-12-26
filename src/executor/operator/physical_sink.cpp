@@ -81,7 +81,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         }
         case PhysicalOperatorType::kShow: {
             ShowOperatorState *show_output_state = static_cast<ShowOperatorState *>(task_op_state);
-            materialize_sink_state->data_block_array_ = Move(show_output_state->output_);
+            for (auto &data_block : show_output_state->output_) {
+                materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
+            }
+            show_output_state->output_.clear();
             break;
         }
         case PhysicalOperatorType::kExplain: {
@@ -90,7 +93,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 Error<ExecutorException>("Empty explain output");
             }
 
-            materialize_sink_state->data_block_array_ = Move(explain_output_state->data_block_array_);
+            for (auto &data_block : explain_output_state->data_block_array_) {
+                materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
+            }
+            explain_output_state->data_block_array_.clear();
             break;
         }
         case PhysicalOperatorType::kProjection: {
@@ -102,7 +108,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                     Error<ExecutorException>("Empty projection output");
                 }
             } else {
-                materialize_sink_state->data_block_array_ = Move(projection_output_state->data_block_array_);
+                for (auto &data_block : projection_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
+                }
+                projection_output_state->data_block_array_.clear();
             }
             break;
         }
@@ -115,7 +124,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                     Error<ExecutorException>("Empty sort output");
                 }
             } else {
-                materialize_sink_state->data_block_array_ = Move(sort_output_state->data_block_array_);
+                for (auto &data_block : sort_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
+                }
+                sort_output_state->data_block_array_.clear();
             }
             break;
         }
@@ -126,7 +138,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 Error<ExecutorException>("Empty knn scan output");
             }
 
-            materialize_sink_state->data_block_array_ = Move(knn_output_state->data_block_array_);
+            for (auto &data_block : knn_output_state->data_block_array_) {
+                materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
+            }
+            knn_output_state->data_block_array_.clear();
             break;
         }
         default: {

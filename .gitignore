@@ -108,3 +108,9 @@ test/data/benchmark/*
 
 # ignore valgrind output file
 callgrind.out.*
+
+# ignore vscode config file
+.vscode/
+
+# ignore vscode clangd cache file
+.cache/
