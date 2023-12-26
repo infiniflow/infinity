@@ -15,7 +15,7 @@ on:
 jobs:
   tests:
     name: tests
-    runs-on: self-hosted
+    runs-on: [ "self-hosted", "avx512" ]
     steps:
     - name: Ensure workspace ownership
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE

@@ -2,14 +2,14 @@ name: release
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # This schedule runs every night at midnight UTC
+    - cron: '0 0 * * *'  # This schedule runs every night at midnight UTC
   push:
     tags:
       - "v*.*.*"            # normal release
 
 jobs:
   release:
-    runs-on: self-hosted
+    runs-on: [ "self-hosted", "avx2" ]
     steps:
     - name: Ensure workspace ownership
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
@@ -40,7 +40,7 @@ jobs:
         sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
 
     - name: Build release version
-      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
