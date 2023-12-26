@@ -9,7 +9,7 @@ on:
 
 jobs:
   release:
-    runs-on: [ "self-hosted", "avx2" ]
+    runs-on: ubuntu-latest
     steps:
     - name: Ensure workspace ownership
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
