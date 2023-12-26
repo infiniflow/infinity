@@ -48,7 +48,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ```bash
 docker pull infiniflow/infinity
-docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity bash ./opt/bin/infinity
+docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity ./opt/bin/infinity
 
 ```
 
