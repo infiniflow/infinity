@@ -35,8 +35,8 @@ ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir build && cd build
-export CC=/usr/bin/clang-18
-export CXX=/usr/bin/clang++-18
+export CC=/usr/bin/clang-17
+export CXX=/usr/bin/clang++-17
 cmake -G Ninja ..
 ninja -j 12
 ```
