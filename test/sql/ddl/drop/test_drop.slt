@@ -12,9 +12,10 @@ DROP TABLE IF EXISTS test_drop;
 statement ok
 CREATE TABLE test_drop (i INTEGER);
 
-statement ok
-INSERT INTO a VALUES (42);
 
+query I
+INSERT INTO test_drop VALUES (42);
+----
 
 #statement error
 #SELECT COUNT(*) FROM a;
@@ -23,6 +24,7 @@ INSERT INTO a VALUES (42);
 query I
 SELECT * FROM test_drop;
 ----
+42
 
 statement ok
 DROP TABLE test_drop;
