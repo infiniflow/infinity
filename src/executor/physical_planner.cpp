@@ -739,7 +739,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                                                          logical_operator->load_metas());
 
     knn_scan_op->PlanWithIndex(query_context_ptr_);
-    if (knn_scan_op->TaskCount() == 1) {
+    if (knn_scan_op->TaskletCount() == 1) {
         return knn_scan_op;
     } else {
         return MakeUnique<PhysicalMergeKnn>(query_context_ptr_->GetNextNodeID(),

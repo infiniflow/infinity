@@ -497,7 +497,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
     switch (first_operator->operator_type()) {
         case PhysicalOperatorType::kTableScan: {
             auto *table_scan_operator = static_cast<PhysicalTableScan *>(first_operator);
-            parallel_count = Min(parallel_count, (i64)(table_scan_operator->BlockEntryCount()));
+            parallel_count = Min(parallel_count, (i64)(table_scan_operator->TaskletCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }
@@ -694,8 +694,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(
-                    Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                Error<SchedulerException>(Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
