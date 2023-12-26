@@ -1,6 +1,6 @@
 # Benchmark
 
-**Infinity** provides Python script for sift1m and gist1m dataset benchmark.
+Infinity provides a Python script for benchmarking the SIFT1M and GIST1M datasets.
 
 ## Get the Infinity binary file
 
@@ -9,9 +9,9 @@ git clone https://github.com/infiniflow/infinity.git
 cd infinity
 ```
 
-## Download the benchmark file
+## Download the benchmark files
 
-Download via wget.
+To obtain the benchmark files, you have the option to download them using the wget command.
 
 ```sh
 #download sift benchmark
@@ -21,16 +21,16 @@ wget ftp://ftp.irisa.fr/local/texmex/corpus/gist.tar.gz
 
 ```
 
-or visit [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/) to download manually.
+Alternatively, you can manually download the benchmark files by visiting [http://corpus-texmex.irisa.fr/](http://corpus-texmex.irisa.fr/).
 
 ```sh
-#uncompress and move benchmark file
+# Unzip and move the SIFT1M benchmark file.
 tar -zxvf sift.tar.gz
 mv sift/sift_base.fvecs test/data/benchmark/sift_1m/sift_base.fvecs
 mv sift/sift_query.fvecs test/data/benchmark/sift_1m/sift_query.fvecs
 mv sift/sift_groundtruth.ivecs test/data/benchmark/sift_1m/sift_groundtruth.ivecs
 
-
+# Unzip and move the GIST1M benchmark file.
 tar -zxvf gist.tar.gz
 mv gist/gist_base.fvecs test/data/benchmark/gist_1m/gist_base.fvecs
 mv gist/gist_query.fvecs test/data/benchmark/gist_1m/gist_query.fvecs
@@ -74,10 +74,17 @@ options:
   -r ROUNDS, --rounds ROUNDS
   -d DATA_SET, --data DATA_SET
 
-# ROUNDS refers to the number of times that Python runs the benchmark. The result is the average time for all runs.
+# ROUNDS indicates the number of times Python executes the benchmark, and the result represents the average duration for each run.
 
-# The following command means run benchmark with one thread, for one time using the sift dataset.
+# Perform a benchmark on the SIFT1M dataset using a single thread, running it only once.
 python remote_benchmark.py -t 1 -r 1 -d sift_1m
-
+# Perform a benchmark on the GIST1M dataset using a single thread, running it only once.
 python remote_benchmark.py -t 1 -r 1 -d gist_1m
 ```
+## A SIFT benchmark report
+
+- **Hardware**: Intel i5-12500H, 16C, 16GB
+- **Operating system**: Ubuntu 22.04
+- **Dataset**: SIFT1M; **topk**: 100; **recall**: 97%+
+- **QPS**: 10,305
+- **P99 Latency**: 0.3 ms
