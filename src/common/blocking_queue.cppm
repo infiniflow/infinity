@@ -31,11 +31,11 @@ public:
     }
 
     bool Enqueue(T& task) {
-        UniqueLock<Mutex> lock(queue_mutex_);
-
         if (!allow_enqueue_) {
             return false;
         }
+
+        UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(task);
         empty_cv_.notify_one();
@@ -43,11 +43,11 @@ public:
     }
 
     bool Enqueue(T&& task) {
-        UniqueLock<Mutex> lock(queue_mutex_);
-
         if (!allow_enqueue_) {
             return false;
         }
+
+        UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(Forward<T>(task));
         empty_cv_.notify_one();
