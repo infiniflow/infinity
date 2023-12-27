@@ -131,19 +131,6 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
-        case PhysicalOperatorType::kKnnScan: {
-            throw ExecutorException("KnnScan shouldn't be here");
-            KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_op_state);
-            if (knn_output_state->data_block_array_.empty()) {
-                Error<ExecutorException>("Empty knn scan output");
-            }
-
-            for (auto &data_block : knn_output_state->data_block_array_) {
-                materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
-            }
-            knn_output_state->data_block_array_.clear();
-            break;
-        }
         case PhysicalOperatorType::kAggregate: {
             AggregateOperatorState *agg_output_state = static_cast<AggregateOperatorState *>(task_op_state);
             if (agg_output_state->data_block_array_.empty()) {

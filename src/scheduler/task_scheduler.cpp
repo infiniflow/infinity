@@ -30,6 +30,7 @@ import query_context;
 import plan_fragment;
 import fragment_context;
 import default_values;
+import physical_operator_type;
 
 module task_scheduler;
 
@@ -93,8 +94,20 @@ void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentT
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
-    // ScheduleOneWorkerIfPossible(query_context, tasks, plan_fwosfasdfragment);
-    ScheduleRoundRobin(query_context, tasks, plan_fragment);
+    if (plan_fragment->GetOperators().empty()) {
+        Error<SchedulerException>("Empty fragment");
+    }
+    auto *last_operator = plan_fragment->GetOperators()[0];
+    switch (last_operator->operator_type()) {
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            ScheduleRoundRobin(query_context, tasks, plan_fragment);
+            break;
+        }
+        default: {
+            ScheduleOneWorkerIfPossible(query_context, tasks, plan_fragment);
+            break;
+        }
+    }
 }
 
 void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
