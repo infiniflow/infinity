@@ -192,6 +192,27 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             Value value = Value::MakeDate(date_value);
             return MakeShared<ValueExpression>(value);
         }
+        case LiteralType::kTime: {
+            SizeT date_str_len = strlen(expr.date_value_);
+            TimeT date_value;
+            date_value.FromString(expr.date_value_, date_str_len);
+            Value value = Value::MakeDate(date_value);
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kDateTime: {
+            SizeT date_str_len = strlen(expr.date_value_);
+            DateTimeT date_value;
+            date_value.FromString(expr.date_value_, date_str_len);
+            Value value = Value::MakeDate(date_value);
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kTimestamp: {
+            SizeT date_str_len = strlen(expr.date_value_);
+            TimestampT date_value;
+            date_value.FromString(expr.date_value_, date_str_len);
+            Value value = Value::MakeDate(date_value);
+            return MakeShared<ValueExpression>(value);
+        }
         case LiteralType::kInterval: {
             // IntervalT should be a struct including the type of the value and an value of the interval
             // It will be bound into a ValueExpression here.

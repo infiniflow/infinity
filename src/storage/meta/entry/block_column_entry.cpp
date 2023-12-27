@@ -107,6 +107,9 @@ void BlockColumnEntry::AppendRaw(BlockColumnEntry *block_column_entry,
     switch (column_type->type()) {
         case kBoolean:
         case kDate:
+        case kTime:
+        case kDateTime:
+        case kTimestamp:
         case kTinyInt:
         case kSmallInt:
         case kInteger:

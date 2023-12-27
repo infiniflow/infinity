@@ -2403,6 +2403,21 @@ constant_expr: STRING {
     const_expr->date_value_ = $2;
     $$ = const_expr;
 }
+| TIME STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTime);
+    const_expr->date_value_ = $2;
+    $$ = const_expr;
+}
+| DATETIME STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDateTime);
+    const_expr->date_value_ = $2;
+    $$ = const_expr;
+}
+| TIMESTAMP STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTimestamp);
+    const_expr->date_value_ = $2;
+    $$ = const_expr;
+}
 | INTERVAL interval_expr {
     $$ = $2;
 }

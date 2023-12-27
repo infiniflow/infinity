@@ -16,12 +16,12 @@
 #include <format>
 
 namespace infinity {
-// min time: 00:00:00
+// min time: 00:00:00.000
 constexpr static int32_t MIN_TIME_HOUR = 0;
 constexpr static int32_t MIN_TIME_MINUTE = 0;
 constexpr static int32_t MIN_TIME_SECOND = 0;
 constexpr static int32_t MIN_TIME_MILLISECOND = 0;
-// max time: 23:59:59
+// max time: 23:59:59.999
 constexpr static int32_t MAX_TIME_HOUR = 23;
 constexpr static int32_t MAX_TIME_MINUTE = 59;
 constexpr static int32_t MAX_TIME_SECOND = 59;

@@ -20,12 +20,20 @@
 namespace infinity {
 
 ConstantExpr::~ConstantExpr() {
-    if (literal_type_ == LiteralType::kString) {
-        free(str_value_);
-        return;
-    }
-    if (literal_type_ == LiteralType::kDate) {
-        free(date_value_);
+    switch (literal_type_) {
+        case LiteralType::kString: {
+            free(str_value_);
+            break;
+        }
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
+            free(date_value_);
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -42,7 +50,10 @@ std::string ConstantExpr::ToString() const {
         case LiteralType::kNull: {
             ParserError("Null constant value");
         }
-        case LiteralType::kDate: {
+        case LiteralType::kDate:
+        case LiteralType::kTime:
+        case LiteralType::kDateTime:
+        case LiteralType::kTimestamp: {
             return fmt::format("{}", date_value_);
         }
         case LiteralType::kInterval: {
