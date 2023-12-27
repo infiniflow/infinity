@@ -93,7 +93,8 @@ void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentT
     //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
     //    According to the fragment output type to set the correct fragment task sink type.
     //    Set the queue of parent fragment task.
-    ScheduleOneWorkerIfPossible(query_context, tasks, plan_fragment);
+    // ScheduleOneWorkerIfPossible(query_context, tasks, plan_fwosfasdfragment);
+    ScheduleRoundRobin(query_context, tasks, plan_fragment);
 }
 
 void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
@@ -138,9 +139,11 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
 
 void TaskScheduler::ScheduleRoundRobin(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
     LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
+    u64 worker_id = 0;
     for (const auto &fragment_task : tasks) {
-        u64 worker_id = ProposedWorkerID(worker_count_);
         ScheduleTask(fragment_task, worker_id);
+        worker_id++;
+        worker_id %= worker_count_;
     }
 }
 

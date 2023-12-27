@@ -242,7 +242,8 @@ export struct CreateIndexPrepareOperatorState : public OperatorState {
 export struct CreateIndexDoOperatorState : public OperatorState {
     inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
 
-    CreateIndexSharedData *create_index_shared_data_{};
+    bool input_complete_ = false;
+    CreateIndexSharedData *create_index_shared_data_;
 };
 
 export struct CreateIndexFinishOperatorState : public OperatorState {

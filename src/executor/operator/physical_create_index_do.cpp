@@ -41,6 +41,8 @@ import lvq_store;
 import plain_store;
 import buffer_manager;
 import txn_store;
+import third_party;
+import logger;
 
 module physical_create_index_do;
 
@@ -75,6 +77,9 @@ void InsertHnsw(HashMap<u32, atomic_u64> &create_index_idxes,
         SizeT vertex_n = hnsw_index->GetVertexNum();
         while (true) {
             SizeT idx = create_index_idx.fetch_add(1);
+            if (idx % 10000 == 0) {
+                LOG_INFO(Format("Insert index: {}", idx));
+            }
             if (idx >= vertex_n) {
                 break;
             }
@@ -98,7 +103,9 @@ bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *
     TxnTableStore *table_store = txn->GetTxnTableStore(table_entry);
     auto iter = table_store->txn_indexes_store_.find(*index_name_);
     if (iter == table_store->txn_indexes_store_.end()) {
-        Error<ExecutorException>("Index name not found in txn index store.");
+        // the table is empty
+        operator_state->SetComplete();
+        return true;
     }
     TxnIndexStore &txn_index_store = iter->second;
 

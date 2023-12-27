@@ -575,6 +575,16 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             tasks_[0]->source_state_ = MakeUnique<QueueSourceState>();
             break;
         }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+                Error<SchedulerException>(
+                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
+            }
+            for (auto &task : tasks_) {
+                task->source_state_ = MakeUnique<QueueSourceState>();
+            }
+            break;
+        }
         case PhysicalOperatorType::kUnionAll:
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
@@ -613,20 +623,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
 
             for (SizeT task_id = 0; (i64)task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<KnnScanSourceState>();
-            }
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            if (fragment_type_ != FragmentType::kParallelMaterialize) {
-                Error<SchedulerException>(
-                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
-            }
-            if ((i64)tasks_.size() != parallel_count) {
-                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
-            }
-
-            for (SizeT task_id = 0; (i64)task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<EmptySourceState>();
             }
             break;
         }
@@ -744,6 +740,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kSort:
         case PhysicalOperatorType::kKnnScan:
+        case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kCreateIndexDo: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
@@ -823,7 +820,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
-        case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -903,7 +899,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kCreateIndexDo: {
             const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
             SizeT segment_n = InitCreateIndexDoFragmentContext(create_index_do_operator, this);
-            parallel_count = Min(parallel_count, (i64)segment_n);
+            parallel_count = Max(parallel_count, 1l);
             break;
         }
         default: {
