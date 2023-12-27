@@ -44,7 +44,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-### Deploy infinity database
+### Deploy Infinity database
 
 #### Deploy using binary package on Linux x86_64
 
