@@ -103,6 +103,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         case PhysicalOperatorType::kMergeLimit: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
             limit_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
             limit_op_state->input_complete_ = completed;
