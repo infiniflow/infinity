@@ -7,6 +7,7 @@
 
 import stl;
 import hnsw_alg;
+import hnsw_common;
 import local_file_system;
 import file_system_type;
 import file_system;
@@ -19,9 +20,13 @@ import compilation_config;
 using namespace infinity;
 
 int main() {
-    String base_file = String(test_data_path()) + "/benchmark/sift/base.fvecs";
-    String query_file = String(test_data_path()) + "/benchmark/sift/query.fvecs";
-    String groundtruth_file = String(test_data_path()) + "/benchmark/sift/l2_groundtruth.ivecs";
+    // String base_file = String(test_data_path()) + "/benchmark/text2image_10m/base.fvecs";
+    // String query_file = String(test_data_path()) + "/benchmark/text2image_10m/query.fvecs";
+    // String groundtruth_file = String(test_data_path()) + "/benchmark/text2image_10m/groundtruth.ivecs";
+
+    String base_file = String(test_data_path()) + "/benchmark/sift_1m/sift_base.fvecs";
+    String query_file = String(test_data_path()) + "/benchmark/sift_1m/sift_query.fvecs";
+    String groundtruth_file = String(test_data_path()) + "/benchmark/sift_1m/sift_groundtruth.ivecs";
 
     LocalFileSystem fs;
     std::string save_dir = tmp_data_path();
@@ -31,7 +36,8 @@ int main() {
     size_t ef_construction = 200;
     size_t embedding_count = 1000000;
     size_t test_top = 100;
-    const int thread_n = 1;
+    const int build_thread_n = 1;
+    const int query_thread_n = 1;
 
     using LabelT = uint64_t;
 
@@ -41,7 +47,7 @@ int main() {
 
     using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
     SizeT init_args = {0};
-    std::string save_place = save_dir + "/my_sift_lvq8_l2.hnsw";
+    std::string save_place = save_dir + "/my_sift_lvq8_l2_1.hnsw";
 
     // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
     // std::tuple<> init_args = {};
@@ -69,25 +75,35 @@ int main() {
         std::cout << "Begin memory cost: " << get_current_rss() << "B" << std::endl;
         profiler.Begin();
 
-        if (false) {
-            for (size_t idx = 0; idx < embedding_count; ++idx) {
-                // insert data into index
-                const float *query = input_embeddings + idx * dimension;
-                knn_hnsw->Insert(query, idx);
-                if (idx % 100000 == 0) {
-                    std::cout << idx << ", " << get_current_rss() << " B, " << profiler.ElapsedToString() << std::endl;
-                }
-            }
-        } else {
+        {
+            std::cout << "Build thread number: " << build_thread_n << std::endl;
             auto labels = std::make_unique<LabelT[]>(embedding_count);
             std::iota(labels.get(), labels.get() + embedding_count, 0);
-            knn_hnsw->Insert(input_embeddings, labels.get(), embedding_count);
+            VertexType start_i = knn_hnsw->StoreDataRaw(input_embeddings, labels.get(), embedding_count);
+            delete[] input_embeddings;
+            AtomicVtxType next_i = start_i;
+            std::vector<std::thread> threads;
+            for (int i = 0; i < build_thread_n; ++i) {
+                threads.emplace_back([&]() {
+                    while (true) {
+                        VertexType cur_i = next_i.fetch_add(1);
+                        if (cur_i >= VertexType(start_i + embedding_count)) {
+                            break;
+                        }
+                        knn_hnsw->Build<true>(cur_i);
+                        if (cur_i && cur_i % 10000 == 0) {
+                            std::cout << "Inserted " << cur_i << " / " << embedding_count << std::endl;
+                        }
+                    }
+                });
+            }
+            for (auto &thread : threads) {
+                thread.join();
+            }
         }
 
         profiler.End();
         std::cout << "Insert data cost: " << profiler.ElapsedToString() << " memory cost: " << get_current_rss() << "B" << std::endl;
-
-        delete[] input_embeddings;
 
         uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kWriteLock);
@@ -100,7 +116,13 @@ int main() {
         std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_place, file_flags, FileLockType::kReadLock);
 
         knn_hnsw = Hnsw::Load(*file_handler, init_args);
+        std::cout << "Loaded" << std::endl;
+
+        // std::ofstream out("dump.txt");
+        // knn_hnsw->Dump(out);
+        // knn_hnsw->Check();
     }
+    return 0;
 
     size_t number_of_queries;
     const float *queries = nullptr;
@@ -114,11 +136,10 @@ int main() {
     Vector<HashSet<int>> ground_truth_sets; // number_of_queries * top_k matrix of ground-truth nearest-neighbors
 
     {
-        // size_t *ground_truth;
         // load ground-truth and convert int to long
         size_t nq2;
         int *gt_int = ivecs_read(groundtruth_file.c_str(), &top_k, &nq2);
-        assert(nq2 == number_of_queries || !"incorrect nb of ground truth entries");
+        assert(nq2 >= number_of_queries || !"incorrect nb of ground truth entries");
         assert(top_k >= test_top || !"dataset does not provide enough ground truth data");
 
         ground_truth_sets.resize(number_of_queries);
@@ -130,10 +151,10 @@ int main() {
     }
 
     infinity::BaseProfiler profiler;
-    int round = 10;
-    Vector<MaxHeap<Pair<float, LabelT>>> results;
-    results.reserve(number_of_queries);
-    std::cout << "thread number: " << thread_n << std::endl;
+    std::cout << "Start!" << std::endl;
+    int round = 3;
+    Vector<Vector<Pair<float, LabelT>>> results(number_of_queries);
+    std::cout << "Query thread number: " << query_thread_n << std::endl;
     for (int ef = 100; ef <= 300; ef += 25) {
         knn_hnsw->SetEf(ef);
         int correct = 0;
@@ -142,7 +163,7 @@ int main() {
             std::atomic_int idx(0);
             std::vector<std::thread> threads;
             profiler.Begin();
-            for (int j = 0; j < thread_n; ++j) {
+            for (int j = 0; j < query_thread_n; ++j) {
                 threads.emplace_back([&]() {
                     while (true) {
                         int cur_idx = idx.fetch_add(1);
@@ -150,7 +171,7 @@ int main() {
                             break;
                         }
                         const float *query = queries + cur_idx * dimension;
-                        MaxHeap<Pair<float, LabelT>> result = knn_hnsw->KnnSearch(query, test_top);
+                        auto result = knn_hnsw->KnnSearch<false>(query, test_top);
                         results[cur_idx] = std::move(result);
                     }
                 });
@@ -161,12 +182,10 @@ int main() {
             profiler.End();
             if (i == 0) {
                 for (size_t query_idx = 0; query_idx < number_of_queries; ++query_idx) {
-                    auto &result = results[query_idx];
-                    while (!result.empty()) {
-                        if (ground_truth_sets[idx].contains(result.top().second)) {
+                    for (const auto &[_, label] : results[query_idx]) {
+                        if (ground_truth_sets[query_idx].contains(label)) {
                             ++correct;
                         }
-                        result.pop();
                     }
                 }
                 printf("Recall = %.4f\n", correct / float(test_top * number_of_queries));

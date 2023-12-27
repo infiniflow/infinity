@@ -42,6 +42,8 @@ public:
 
     UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
+    SharedPtr<TableRef> GetTableRef(const String &db_name, const String &table_name);
+
     QueryContext *query_context_ptr_;
 
     SharedPtr<BindContext> bind_context_ptr_;

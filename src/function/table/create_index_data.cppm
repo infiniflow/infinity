@@ -14,31 +14,23 @@
 
 module;
 
-import stl;
-import query_context;
-import plan_fragment;
-import physical_operator;
+#include <algorithm>
 
-export module fragment_builder;
+import stl;
+import segment_entry;
+
+export module create_index_data;
 
 namespace infinity {
 
-export class FragmentBuilder {
-public:
-    explicit FragmentBuilder(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
+export struct CreateIndexSharedData {
+    CreateIndexSharedData(const Map<u32, SharedPtr<SegmentEntry>> &segment_map)  {
+        for (const auto &[segment_id, _] : segment_map) {
+            create_index_idxes_.emplace(segment_id, 0);
+        }
+    }
 
-    UniquePtr<PlanFragment> BuildFragment(PhysicalOperator *phys_op);
-
-private:
-    void BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);
-
-    void BuildExplain(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);
-
-    idx_t GetFragmentId() { return fragment_id_++; }
-
-private:
-    QueryContext *query_context_ptr_{};
-    idx_t fragment_id_{};
+    HashMap<u32, atomic_u64> create_index_idxes_{};
 };
 
-} // namespace infinity
+}; // namespace infinity

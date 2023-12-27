@@ -22,6 +22,7 @@ import table_collection_entry;
 import parser;
 import table_function;
 import block_index;
+import db_entry;
 
 import infinity_exception;
 
@@ -42,7 +43,7 @@ public:
           block_index_(Move(block_index)), column_names_(Move(column_names)), column_types_(Move(column_types)), table_index_(table_index) {}
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
-         // OPT1212: linear judge in assert
+         // FIXME: linear judge in assert
         if (!std::is_sorted(indices.cbegin(), indices.cend())) {
             Error<PlannerException>("Indices must be in order");
         }
@@ -51,6 +52,10 @@ public:
         replace_field<String>(*column_names_, indices);
         replace_field<SharedPtr<DataType>>(*column_types_, indices);
     };
+
+    SharedPtr<String> schema_name() const { return table_entry_ptr_->table_collection_meta_->db_entry_->db_name_; }
+
+    SharedPtr<String> table_name() const { return table_entry_ptr_->table_collection_name_; }
 
     TableCollectionEntry *table_entry_ptr_{};
     Vector<SizeT> column_ids_{};

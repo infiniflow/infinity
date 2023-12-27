@@ -30,6 +30,7 @@ module;
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <shared_mutex>
@@ -211,6 +212,7 @@ export {
     using atomic_u32 = std::atomic_uint32_t;
     using atomic_u64 = std::atomic_uint64_t;
     using ai64 = std::atomic_int64_t;
+    using ai32 = std::atomic_int32_t;
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
 
@@ -359,6 +361,8 @@ export {
     template <typename T>
     using LockGuard = std::lock_guard<T>;
 
+    using TryToLock = std::try_to_lock_t;
+
     constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
     constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
     constexpr std::memory_order MemoryOrderRelease = std::memory_order::release;
@@ -431,6 +435,12 @@ export template <typename T1, typename T2>
 struct CompareByFirst {
     using P = std::pair<T1, T2>;
     bool operator()(const P &lhs, const P &rhs) const { return lhs.first < rhs.first; }
+};
+
+export template <typename T1, typename T2>
+struct CompareByFirstReverse {
+    using P = std::pair<T1, T2>;
+    bool operator()(const P &lhs, const P &rhs) const { return lhs.first > rhs.first; }
 };
 
 } // namespace infinity

@@ -75,6 +75,9 @@ import physical_drop_index;
 import physical_command;
 import physical_match;
 import physical_fusion;
+import physical_create_index_prepare;
+import physical_create_index_do;
+import physical_create_index_finish;
 
 import logical_node;
 import logical_node_type;
@@ -307,14 +310,48 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
     auto logical_create_index = static_pointer_cast<LogicalCreateIndex>(logical_operator);
-    return PhysicalCreateIndex::Make(logical_create_index->schema_name(),
-                                     logical_create_index->table_name(),
-                                     logical_create_index->index_definition(),
-                                     logical_create_index->conflict_type(),
-                                     logical_create_index->GetOutputNames(),
-                                     logical_create_index->GetOutputTypes(),
-                                     logical_create_index->node_id(),
-                                     logical_operator->load_metas());
+    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->schema_name();
+    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_name();
+    const auto &index_def_ptr = logical_create_index->index_definition();
+    if (false || index_def_ptr->index_array_.size() != 1 || index_def_ptr->index_array_[0]->index_type_ != IndexType::kHnsw) {
+        // TODO: invalidate multiple index in one statement.
+        // TODO: support other index types build in parallel.
+        // use old `PhysicalCreateIndex`
+        return PhysicalCreateIndex::Make(schema_name,
+                                         table_name,
+                                         logical_create_index->index_definition(),
+                                         logical_create_index->conflict_type(),
+                                         logical_create_index->GetOutputNames(),
+                                         logical_create_index->GetOutputTypes(),
+                                         logical_create_index->node_id(),
+                                         logical_operator->load_metas());
+    }
+
+    // use new `PhysicalCreateIndexPrepare` `PhysicalCreateIndexDo` `PhysicalCreateIndexFinish`
+    auto create_index_prepare = MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
+                                                                       schema_name,
+                                                                       table_name,
+                                                                       logical_create_index->index_definition(),
+                                                                       logical_create_index->conflict_type(),
+                                                                       logical_create_index->GetOutputNames(),
+                                                                       logical_create_index->GetOutputTypes(),
+                                                                       logical_create_index->load_metas());
+    auto create_index_do = MakeUnique<PhysicalCreateIndexDo>(logical_create_index->node_id(),
+                                                             Move(create_index_prepare),
+                                                             logical_create_index->base_table_ref(),
+                                                             logical_create_index->index_definition()->index_name_,
+                                                             logical_create_index->GetOutputNames(),
+                                                             logical_create_index->GetOutputTypes(),
+                                                             logical_create_index->load_metas());
+    auto create_index_finish = MakeUnique<PhysicalCreateIndexFinish>(logical_create_index->node_id(),
+                                                                     Move(create_index_do),
+                                                                     schema_name,
+                                                                     table_name,
+                                                                     logical_create_index->index_definition(),
+                                                                     logical_create_index->GetOutputNames(),
+                                                                     logical_create_index->GetOutputTypes(),
+                                                                     logical_create_index->load_metas());
+    return create_index_finish;
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const {

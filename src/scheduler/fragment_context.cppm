@@ -24,6 +24,7 @@ import physical_sink;
 import data_table;
 import data_block;
 import knn_scan_data;
+import create_index_data;
 
 export module fragment_context;
 
@@ -96,6 +97,11 @@ public:
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
+private:
+    void MakeSourceState(i64 parallel_count);
+
+    void MakeSinkState(i64 parallel_count);
+
 protected:
     virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
@@ -128,7 +134,7 @@ public:
     SharedPtr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> shared_data_{};
+    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
 };
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
@@ -141,7 +147,9 @@ public:
     SharedPtr<DataTable> GetResultInternal() final;
 
 public:
-    UniquePtr<KnnScanSharedData> shared_data_{};
+    UniquePtr<KnnScanSharedData> knn_scan_shared_data_{};
+
+    UniquePtr<CreateIndexSharedData> create_index_shared_data_{};
 
 protected:
     HashMap<u64, Vector<SharedPtr<DataBlock>>> task_results_{};

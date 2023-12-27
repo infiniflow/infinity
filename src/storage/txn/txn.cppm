@@ -92,8 +92,12 @@ public:
 
     Status GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
 
+    Status GetTableIndexEntry(const String &db_name, const String &table_name, const String &index_name, TableIndexEntry *&table_index_entry);
+
     // Index OPs
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+
+    Status CreateIndex(TableCollectionEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, TableIndexEntry *&table_index_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 

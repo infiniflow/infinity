@@ -164,22 +164,6 @@ void SegmentEntry::DeleteData(SegmentEntry *segment_entry, Txn *txn_ptr, const H
     }
 }
 
-template <typename DataType>
-class OneColumnIterator {
-public:
-    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
-
-    Optional<const DataType *> Next() {
-        if (auto ret = segment_iter_.Next(); ret) {
-            return reinterpret_cast<const DataType *>((*ret)[0]);
-        }
-        return None;
-    }
-
-private:
-    SegmentIter segment_iter_;
-};
-
 SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(SegmentEntry *segment_entry,
                                                                  ColumnIndexEntry *column_index_entry,
                                                                  SharedPtr<ColumnDef> column_def,

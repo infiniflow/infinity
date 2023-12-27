@@ -70,6 +70,7 @@ export enum class PhysicalOperatorType : i8 {
     kInsert,
     kImport,
     kExport,
+    kCreateIndexDo,
 
     // DDL
     kAlter,
@@ -83,6 +84,9 @@ export enum class PhysicalOperatorType : i8 {
     kDropCollection,
     kDropDatabase,
     kDropView,
+
+    kCreateIndexPrepare,
+    kCreateIndexFinish,
 
     // misc
     kExplain,

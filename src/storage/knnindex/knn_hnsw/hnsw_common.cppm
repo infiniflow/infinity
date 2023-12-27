@@ -124,6 +124,7 @@ public:
 };
 
 export using VertexType = i32;
+export using AtomicVtxType = ai32;
 export using VertexListSize = i32;
 export using LayerSize = i32;
 

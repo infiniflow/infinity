@@ -63,8 +63,8 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 // --------------------------------------------
 
 KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 current_parallel_idx)
-    : shared_data_(shared_data), task_id_(current_parallel_idx) {
-    switch (shared_data_->elem_type_) {
+    : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx) {
+    switch (knn_scan_shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
             Init<f32>();
             break;
@@ -77,32 +77,32 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 cur
 
 template <typename DataType>
 void KnnScanFunctionData::Init() {
-    switch (shared_data_->knn_distance_type_) {
+    switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
             throw ExecutorException("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax>>(shared_data_->query_count_, shared_data_->topk_);
+            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_max->Begin();
             merge_knn_base_ = Move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin>>(shared_data_->query_count_, shared_data_->topk_);
+            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_min->Begin();
             merge_knn_base_ = Move(merge_knn_min);
             break;
         }
     }
 
-    knn_distance_ = MakeUnique<KnnDistance1<DataType>>(shared_data_->knn_distance_type_);
+    knn_distance_ = MakeUnique<KnnDistance1<DataType>>(knn_scan_shared_data_->knn_distance_type_);
 
-    if (shared_data_->filter_expression_) {
-        filter_state_ = ExpressionState::CreateState(shared_data_->filter_expression_);
+    if (knn_scan_shared_data_->filter_expression_) {
+        filter_state_ = ExpressionState::CreateState(knn_scan_shared_data_->filter_expression_);
         db_for_filter_ = MakeUnique<DataBlock>();
-        db_for_filter_->Init(*(shared_data_->table_ref_->column_types_));                         // default capacity
+        db_for_filter_->Init(*(knn_scan_shared_data_->table_ref_->column_types_));                         // default capacity
         bool_column_ = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean)); // default capacity
     }
 }
