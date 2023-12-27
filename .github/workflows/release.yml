@@ -19,6 +19,8 @@ jobs:
     # https://github.com/actions/checkout/blob/v3/README.md
     - name: Check out code
       uses: actions/checkout@v3
+      with:
+        ssh-key: ${{ secrets.MY_DEPLOY_KEY }}
 
     - name: Prepare release body
       run: |
