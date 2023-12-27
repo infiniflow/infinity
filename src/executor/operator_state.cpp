@@ -106,7 +106,12 @@ bool QueueSourceState::GetData() {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
             limit_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
-            limit_op_state->input_complete_ = completed;
+            if (!limit_op_state->input_complete_) {
+                limit_op_state->input_complete_ = completed;
+            }
+            if (limit_op_state->input_complete_) {
+                source_queue_.NotAllowEnqueue();
+            }
             break;
         }
         default: {

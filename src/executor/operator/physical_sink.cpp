@@ -115,7 +115,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kSort: {
             SortOperatorState *sort_output_state = static_cast<SortOperatorState *>(task_op_state);
             if (sort_output_state->data_block_array_.empty()) {
-                if(materialize_sink_state->Error()) {
+                if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
                     Error<ExecutorException>("Empty sort output");
@@ -131,7 +131,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kAggregate: {
             AggregateOperatorState *agg_output_state = static_cast<AggregateOperatorState *>(task_op_state);
             if (agg_output_state->data_block_array_.empty()) {
-                if(materialize_sink_state->Error()) {
+                if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
                     Error<ExecutorException>("Empty agg output");
@@ -378,7 +378,12 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
         }
 
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-            next_fragment_queue->Enqueue(fragment_data);
+            // when the Enqueue returns false,
+            // it means that the downstream has collected enough data,
+            // preventing the Queue from Enqueue in data again to avoid redundant calculations.
+            if (!next_fragment_queue->Enqueue(fragment_data)) {
+                task_operator_state->SetComplete();
+            }
         }
     }
     task_operator_state->data_block_array_.clear();
