@@ -21,6 +21,7 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import value_expression;
 import data_table;
 import load_meta;
 import infinity_exception;
@@ -29,19 +30,65 @@ export module physical_limit;
 
 namespace infinity {
 
+class DataBlock;
+
+export class LimitCounter {
+public:
+    // Returns the left index after offset
+    virtual SizeT Offset(SizeT row_count) = 0;
+
+    // Returns the right index after limit
+    virtual SizeT Limit(SizeT row_count) = 0;
+
+    virtual bool IsLimitOver() = 0;
+};
+
+export class AtomicCounter : public LimitCounter {
+public:
+    AtomicCounter(const i64 &offset, const i64 &limit) : offset_(offset), limit_(limit) {}
+
+    SizeT Offset(SizeT row_count);
+
+    SizeT Limit(SizeT row_count);
+
+    bool IsLimitOver();
+
+private:
+    ai64 offset_;
+    ai64 limit_;
+};
+
+export class UnSyncCounter : public LimitCounter {
+public:
+    UnSyncCounter(const i64 &offset, const i64 &limit) : offset_(offset), limit_(limit) {}
+
+    SizeT Offset(SizeT row_count);
+
+    SizeT Limit(SizeT row_count);
+
+    bool IsLimitOver();
+
+private:
+    i64 offset_;
+    i64 limit_;
+};
+
 export class PhysicalLimit : public PhysicalOperator {
 public:
     explicit PhysicalLimit(u64 id,
                            UniquePtr<PhysicalOperator> left,
                            SharedPtr<BaseExpression> limit_expr,
                            SharedPtr<BaseExpression> offset_expr,
-                           SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kLimit, Move(left), nullptr, id, load_metas), limit_expr_(Move(limit_expr)),
-          offset_expr_(Move(offset_expr)) {}
+                           SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalLimit() override = default;
 
     void Init() override;
+
+    static bool Execute(QueryContext *query_context,
+                        const Vector<UniquePtr<DataBlock>> &input_blocks,
+                        Vector<UniquePtr<DataBlock>> &output_blocks,
+                        SharedPtr<LimitCounter> counter);
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -49,23 +96,17 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
-        return 0;
-    }
+    SizeT TaskletCount() override;
 
     inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
 
     inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
 
-    static SharedPtr<DataTable> GetLimitOutput(const SharedPtr<DataTable> &input_table, i64 limit, i64 offset);
-
 private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
 
-    SharedPtr<DataTable> input_table_{};
-    u64 input_table_index_{};
+    SharedPtr<LimitCounter> counter_;
 };
 
 } // namespace infinity

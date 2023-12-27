@@ -638,11 +638,20 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
 
     SharedPtr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
     UniquePtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
+    auto limit_op = MakeUnique<PhysicalLimit>(logical_operator->node_id(),
                                      Move(input_physical_operator),
                                      logical_limit->limit_expression_,
                                      logical_limit->offset_expression_,
                                      logical_operator->load_metas());
+    if (limit_op->TaskletCount() <= 1) {
+        return limit_op;
+    } else {
+        return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
+                                              Move(limit_op),
+                                              logical_limit->limit_expression_,
+                                              logical_limit->offset_expression_,
+                                              logical_operator->load_metas());
+    }
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {

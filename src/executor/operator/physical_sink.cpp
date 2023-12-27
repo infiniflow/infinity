@@ -20,6 +20,7 @@ import query_context;
 import parser;
 import operator_state;
 import physical_operator_type;
+import fragment_context;
 import third_party;
 import fragment_data;
 import data_block;
@@ -102,11 +103,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kProjection: {
             ProjectionOperatorState *projection_output_state = static_cast<ProjectionOperatorState *>(task_op_state);
             if (projection_output_state->data_block_array_.empty()) {
-                if(materialize_sink_state->Error()) {
-                    materialize_sink_state->empty_result_ = true;
-                } else {
-                    Error<ExecutorException>("Empty projection output");
-                }
+                materialize_sink_state->empty_result_ = true;
             } else {
                 for (auto &data_block : projection_output_state->data_block_array_) {
                     materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
@@ -137,7 +134,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if(materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    Error<ExecutorException>("Empty sort output");
+                    Error<ExecutorException>("Empty agg output");
                 }
             } else {
                 materialize_sink_state->data_block_array_ = Move(agg_output_state->data_block_array_);
@@ -358,7 +355,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
         return;
     }
 
-    if (!task_operator_state->Complete()) {
+    if (!task_operator_state->Complete() && queue_sink_state->IsMaterialize()) {
         LOG_TRACE("Task not completed");
         return;
     }
@@ -376,6 +373,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
                                                       queue_sink_state->task_id_,
                                                       idx,
                                                       output_data_block_count);
+        if (task_operator_state->Complete() && !queue_sink_state->IsMaterialize()) {
+            fragment_data->data_idx_ = None;
+        }
+
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_data);
         }

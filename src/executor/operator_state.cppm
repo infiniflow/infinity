@@ -31,6 +31,13 @@ export module operator_state;
 
 namespace infinity {
 
+export enum class FragmentType {
+    kInvalid,
+    kSerialMaterialize,
+    kParallelMaterialize,
+    kParallelStream,
+};
+
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
     virtual ~OperatorState() = default;
@@ -153,6 +160,9 @@ export struct LimitOperatorState : public OperatorState {
 // Merge Limit
 export struct MergeLimitOperatorState : public OperatorState {
     inline explicit MergeLimitOperatorState() : OperatorState(PhysicalOperatorType::kMergeLimit) {}
+
+    Vector<UniquePtr<DataBlock>> input_data_blocks_{}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    bool input_complete_{false};
 };
 
 // Merge Top
@@ -407,31 +417,34 @@ export enum class SinkStateType {
 
 export struct SinkState {
     virtual ~SinkState() {}
-    inline explicit SinkState(SinkStateType state_type, u64 fragment_id, u64 task_id)
-        : fragment_id_(fragment_id), task_id_(task_id), state_type_(state_type) {}
+    inline explicit SinkState(SinkStateType state_type, u64 fragment_id, FragmentType fragment_type, u64 task_id)
+        : fragment_id_(fragment_id), task_id_(task_id), fragment_type_(fragment_type), state_type_(state_type) {}
 
     inline void SetPrevOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
 
     [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
 
+    [[nodiscard]] inline bool IsMaterialize() const { return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize; }
+
     inline bool Error() const { return error_message_.get() != nullptr; }
 
     u64 fragment_id_{};
     u64 task_id_{};
+    FragmentType fragment_type_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
     UniquePtr<String> error_message_{};
 };
 
 export struct QueueSinkState : public SinkState {
-    inline explicit QueueSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kQueue, fragment_id, task_id) {}
+    inline explicit QueueSinkState(u64 fragment_id, FragmentType fragment_type, u64 task_id) : SinkState(SinkStateType::kQueue, fragment_id, fragment_type, task_id) {}
 
     Vector<UniquePtr<DataBlock>> data_block_array_{};
     Vector<BlockingQueue<SharedPtr<FragmentDataBase>> *> fragment_data_queues_;
 };
 
 export struct MaterializeSinkState : public SinkState {
-    inline explicit MaterializeSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kMaterialize, fragment_id, task_id) {}
+    inline explicit MaterializeSinkState(u64 fragment_id, FragmentType fragment_type, u64 task_id) : SinkState(SinkStateType::kMaterialize, fragment_id, fragment_type, task_id) {}
 
     SharedPtr<Vector<SharedPtr<DataType>>> column_types_{};
     SharedPtr<Vector<String>> column_names_{};
@@ -441,19 +454,19 @@ export struct MaterializeSinkState : public SinkState {
 };
 
 export struct ResultSinkState : public SinkState {
-    inline explicit ResultSinkState() : SinkState(SinkStateType::kResult, 0, 0) {}
+    inline explicit ResultSinkState() : SinkState(SinkStateType::kResult, 0, FragmentType::kInvalid, 0) {}
 
     SharedPtr<ColumnDef> result_def_{};
 };
 
 export struct MessageSinkState : public SinkState {
-    inline explicit MessageSinkState() : SinkState(SinkStateType::kMessage, 0, 0) {}
+    inline explicit MessageSinkState() : SinkState(SinkStateType::kMessage, 0, FragmentType::kInvalid, 0) {}
 
     UniquePtr<String> message_{};
 };
 
 export struct SummarySinkState : public SinkState {
-    inline explicit SummarySinkState() : SinkState(SinkStateType::kSummary, 0, 0), count_(0), sum_(0) {}
+    inline explicit SummarySinkState() : SinkState(SinkStateType::kSummary, 0, FragmentType::kInvalid, 0), count_(0), sum_(0) {}
 
     u64 count_;
     u64 sum_;

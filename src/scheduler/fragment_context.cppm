@@ -18,6 +18,7 @@ import stl;
 import fragment_task;
 import query_context;
 import profiler;
+import operator_state;
 import physical_operator;
 import physical_source;
 import physical_sink;
@@ -31,21 +32,6 @@ export module fragment_context;
 namespace infinity {
 
 class PlanFragment;
-
-//class KnnScanSharedData;
-
-// enum class FragmentStatus {
-//     kNotStart,
-//     k
-//     kStart,
-//     kFinish,
-// };
-export enum class FragmentType {
-    kInvalid,
-    kSerialMaterialize,
-    kParallelMaterialize,
-    kParallelStream,
-};
 
 export class FragmentContext {
 public:

@@ -18,6 +18,7 @@ import stl;
 import parser;
 import data_table;
 import fragment_context;
+import operator_state;
 import physical_operator;
 import physical_source;
 import physical_sink;

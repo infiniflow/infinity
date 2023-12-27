@@ -22,6 +22,7 @@ import physical_sink;
 import physical_source;
 import physical_explain;
 import physical_knn_scan;
+import operator_state;
 
 import infinity_exception;
 import parser;
