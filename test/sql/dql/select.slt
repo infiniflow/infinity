@@ -23,3 +23,50 @@ DROP TABLE select1;
 
 statement ok
 DROP TABLE select2;
+
+statement ok
+DROP TABLE IF EXISTS date1selectwhere;
+
+statement ok
+CREATE TABLE date1selectwhere (i INTEGER, d1 DATE, d2 DATE);
+
+statement ok
+INSERT INTO date1selectwhere VALUES (1, DATE '1970-1-1', DATE '2970-1-1');
+
+statement ok
+INSERT INTO date1selectwhere VALUES (11, DATE '1870-11-1', DATE '2570-1-1');
+
+statement ok
+INSERT INTO date1selectwhere VALUES (111, DATE '6570-11-1', DATE '5570-6-21');
+
+query I
+SELECT * FROM date1selectwhere;
+----
+1 1970-01-01 2970-01-01
+11 1870-11-01 2570-01-01
+111 6570-11-01 5570-06-21
+
+query II
+SELECT * FROM date1selectwhere WHERE d1 < d2;
+----
+1 1970-01-01 2970-01-01
+11 1870-11-01 2570-01-01
+
+query III
+SELECT * FROM date1selectwhere WHERE d2 >= DATE '2970-1-1';
+----
+1 1970-01-01 2970-01-01
+111 6570-11-01 5570-06-21
+
+query IV
+SELECT * FROM date1selectwhere WHERE d1 = DATE '1970-1-1' + INTERVAL -100 YEAR + INTERVAL 10 MONTH;
+----
+11 1870-11-01 2570-01-01
+
+query V
+SELECT * FROM date1selectwhere WHERE i <= 22 - 11 AND d1 < DATE '1900-1-1';
+----
+11 1870-11-01 2570-01-01
+
+statement ok
+DROP TABLE date1selectwhere;
