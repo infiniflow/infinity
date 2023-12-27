@@ -694,7 +694,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             }
         }
         case kDate: {
-            Error<TypeException>("Not implemented");
+            return ((DateT *)data_ptr_)[row_index].ToString();
         }
         case kTime: {
             Error<TypeException>("Not implemented");
