@@ -8,14 +8,13 @@ def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 9000
     limit = 8500
     offset = 20
-    dim = 128
     limit_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql"
 
-    table_name = "test_limit"
-    limit_path = limit_dir + "/test_limit.csv"
-    slt_path = slt_dir + "/limit.slt"
-    copy_path = copy_dir + "/test_limit.csv"
+    table_name = "test_big_limit"
+    limit_path = limit_dir + "/test_big_limit.csv"
+    slt_path = slt_dir + "/big_limit.slt"
+    copy_path = copy_dir + "/test_big_limit.csv"
 
     os.makedirs(limit_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
@@ -32,7 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 int, c2 int);\n".format(table_name, dim)
+            "CREATE TABLE {} (c1 int, c2 int);\n".format(table_name)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
@@ -52,7 +51,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
             limit_file.write("\n")
 
         for _ in range(limit):
-            slt_file.write("0,0")
+            slt_file.write("0 0")
             slt_file.write("\n")
 
         slt_file.write("\n")

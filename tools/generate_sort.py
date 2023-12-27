@@ -6,7 +6,6 @@ import argparse
 
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 9000
-    dim = 128
     sort_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql"
 
@@ -30,7 +29,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 int, c2 int);\n".format(table_name, dim)
+            "CREATE TABLE {} (c1 int, c2 int);\n".format(table_name)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
