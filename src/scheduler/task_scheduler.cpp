@@ -79,35 +79,58 @@ void TaskScheduler::UnInit() {
     }
 }
 
-void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+void TaskScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
     if (!initialized_) {
         Error<SchedulerException>("Scheduler isn't initialized");
     }
 
-    //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
-    //    if(!children.empty()) {
-    //        SchedulerError("Only support one fragment query")
-    //    }
-    // 1. Recursive traverse the fragment tree
-    // 2. Check the fragment
-    //    if the first op is SCAN op, then get all block entry and create the source type is kScan.
-    //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
-    //    According to the fragment output type to set the correct fragment task sink type.
-    //    Set the queue of parent fragment task.
-    if (plan_fragment->GetOperators().empty()) {
-        Error<SchedulerException>("Empty fragment");
-    }
-    auto *last_operator = plan_fragment->GetOperators()[0];
-    switch (last_operator->operator_type()) {
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            ScheduleRoundRobin(query_context, tasks, plan_fragment);
-            break;
+    Vector<Vector<FragmentTask *>> tasks_list = TraversePlanFragment(plan_fragment);
+    u64 worker_id = 0;
+    for (const auto &tasks : tasks_list) {
+        for (auto it = tasks.rbegin(); it != tasks.rend(); ++it) {
+            ScheduleTask(*it, worker_id);
         }
-        default: {
-            ScheduleOneWorkerIfPossible(query_context, tasks, plan_fragment);
-            break;
-        }
+        ++worker_id;
+        worker_id %= worker_count_;
     }
+}
+
+Vector<Vector<FragmentTask *>> TaskScheduler::TraversePlanFragment(PlanFragment *plan_fragment) {
+    Vector<Vector<FragmentTask *>> tasks_list;
+
+    HashSet<FragmentTask *> visited;
+    SizeT cur_idx = 0;
+    StdFunction<int(FragmentTask *)> Traverse = [&](FragmentTask *cur) -> int {
+        if (visited.find(cur) != visited.end()) {
+            return 0;
+        }
+        visited.emplace(cur);
+
+        if (cur_idx == tasks_list.size()) {
+            tasks_list.emplace_back();
+        }
+        tasks_list.back().emplace_back(cur);
+        int unvisited_child_count = 0;
+        auto *plan_fragment = cur->fragment_context()->fragment_ptr();
+        for (auto &child : plan_fragment->Children()) {
+            auto *child_fragment_ctx = child->GetContext();
+            for (auto &task : child_fragment_ctx->Tasks()) {
+                unvisited_child_count += Traverse(task.get());
+            }
+        }
+        if (unvisited_child_count == 0) {
+            ++cur_idx;
+        }
+        
+        return 1;
+    };
+
+    if (plan_fragment->GetContext()->Tasks().size() != 1) {
+        Error<SchedulerException>("Only support one task as start");
+    }
+    auto *first_task = plan_fragment->GetContext()->Tasks()[0].get();
+    Traverse(first_task);
+    return tasks_list;
 }
 
 void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
@@ -123,20 +146,20 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
     u64 scheduled_worker = u64_max;
     u64 min_load_worker{0};
     u64 min_work_load{u64_max};
-    for(u64 proposed_worker = 0; proposed_worker < worker_count_; ++ proposed_worker) {
+    for (u64 proposed_worker = 0; proposed_worker < worker_count_; ++proposed_worker) {
         u64 current_work_load = worker_workloads_[proposed_worker];
-        if(current_work_load < 1) {
+        if (current_work_load < 1) {
             scheduled_worker = proposed_worker;
             break;
         } else {
-            if(current_work_load < min_work_load) {
+            if (current_work_load < min_work_load) {
                 min_load_worker = proposed_worker;
                 min_work_load = current_work_load;
             }
         }
     }
 
-    if(scheduled_worker == u64_max) {
+    if (scheduled_worker == u64_max) {
         scheduled_worker = min_load_worker;
     }
 

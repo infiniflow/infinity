@@ -22,6 +22,8 @@ export module fragment_task;
 
 namespace infinity {
 
+class FragmentContext;
+
 // Task type:
 // DDL task
 // DML task
@@ -78,6 +80,8 @@ public:
 
     [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
+    u64 FragmentId() const;
+
     [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
     [[nodiscard]] bool Ready() const;
@@ -90,13 +94,11 @@ public:
 
     String PhysOpsToString();
 
-    inline void set_status(FragmentTaskStatus new_status) {
-        status_ = new_status;
-    }
+    inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
 
-    [[nodiscard]] inline FragmentTaskStatus status() const {
-        return status_;
-    }
+    [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
+
+    FragmentContext *fragment_context() const;
 
 public:
     FragmentTaskStatus status_{FragmentTaskStatus::kReady};

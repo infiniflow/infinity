@@ -46,9 +46,11 @@ public:
 
     void UnInit();
 
-    void Schedule(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    void Schedule(QueryContext* query_context, PlanFragment* plan_fragment);
 
 private:
+    Vector<Vector<FragmentTask *>> TraversePlanFragment(PlanFragment* plan_fragment);
+
     void ScheduleOneWorkerPerQuery(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
     void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
     void ScheduleRoundRobin(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);

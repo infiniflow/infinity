@@ -326,10 +326,7 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     }
 }
 
-void FragmentContext::BuildTask(QueryContext *query_context,
-                                FragmentContext *parent_context,
-                                PlanFragment *fragment_ptr,
-                                Vector<FragmentTask *> &task_array) {
+void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr) {
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
@@ -419,7 +416,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     if (fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : fragment_ptr->Children()) {
-            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), task_array);
+            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get());
         }
     }
     switch (fragment_operators[0]->operator_type()) {
@@ -430,16 +427,11 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             if (explain_op->explain_type() == ExplainType::kPipeline) {
                 CollectTasks(result, fragment_ptr->Children()[0].get());
                 explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
-                task_array.clear();
                 break;
             }
         }
         default:
             break;
-    }
-
-    for (const auto &task : tasks) {
-        task_array.emplace_back(task.get());
     }
 
     fragment_ptr->SetContext(Move(fragment_context));

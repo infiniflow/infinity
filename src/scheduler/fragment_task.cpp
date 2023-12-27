@@ -31,6 +31,7 @@ import physical_operator_type;
 import query_context;
 import base_table_ref;
 import defer_op;
+import fragment_context;
 
 module fragment_task;
 
@@ -59,7 +60,7 @@ void FragmentTask::OnExecute(i64) {
 
     bool execute_success{false};
     bool source_complete = source_op->Execute(fragment_context->query_context(), source_state_.get());
-    if(source_state_->error_message_.get() == nullptr) {
+    if (source_state_->error_message_.get() == nullptr) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -93,7 +94,7 @@ void FragmentTask::OnExecute(i64) {
         }
     }
 
-    if(source_complete && source_state_->error_message_.get() != nullptr) {
+    if (source_complete && source_state_->error_message_.get() != nullptr) {
         sink_state_->error_message_ = Move(source_state_->error_message_);
         this->set_status(FragmentTaskStatus::kError);
     }
@@ -102,6 +103,11 @@ void FragmentTask::OnExecute(i64) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, fragment_context, sink_state_.get());
     }
+}
+
+u64 FragmentTask::FragmentId() const {
+    auto *fragment_context = static_cast<FragmentContext *>(fragment_context_);
+    return fragment_context->fragment_ptr()->FragmentID();
 }
 
 bool FragmentTask::Ready() const {
@@ -113,17 +119,16 @@ bool FragmentTask::Ready() const {
 bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() or status() == FragmentTaskStatus::kError; }
 
 TaskBinding FragmentTask::TaskBinding() const {
-    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     struct TaskBinding binding {};
 
     binding.task_id_ = task_id_;
-    binding.fragment_id_ = fragment_context->fragment_ptr()->FragmentID();
+    binding.fragment_id_ = FragmentId();
     return binding;
 }
 
 void FragmentTask::TryCompleteFragment() {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    LOG_TRACE(Format("Task: {} of Fragment: {} is completed", task_id_, fragment_context->fragment_ptr()->FragmentID()));
+    LOG_TRACE(Format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
     fragment_context->FinishTask();
 }
 
@@ -135,5 +140,7 @@ String FragmentTask::PhysOpsToString() {
     }
     return ss.str();
 }
+
+FragmentContext *FragmentTask::fragment_context() const { return reinterpret_cast<FragmentContext *>(fragment_context_); }
 
 } // namespace infinity
