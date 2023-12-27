@@ -48,7 +48,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 #### Deploy using binary package on Linux x86_64
 
-Download binary package(deb, rpm and tgz) from `https://github.com/infiniflow/infinity/releases` according to your host OS. They should run on any Linux x86_64 hosts no older than CentOS 7 since they are static linked except glibc. For example:
+You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. These packages are designed to be compatible with Linux x86_64 hosts that are no older than CentOS 7. They are statically linked, except for glibc. For example:
 
 ```bash
 sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
