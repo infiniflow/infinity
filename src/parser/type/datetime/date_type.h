@@ -20,20 +20,27 @@
 namespace infinity {
 
 struct DateType {
+    friend struct DateTimeType;
+
     DateType() = default;
 
     explicit DateType(int32_t date_value) : value(date_value){};
 
+    // keep compatible with iresearch
+    operator int32_t() const { return value; }
+
     inline void FromString(const std::string &date_str) { FromString(date_str.c_str(), date_str.length()); }
 
     void FromString(const char *date, size_t length);
+
+    void FromString(const char *date, size_t length, size_t &end_length);
 
     [[nodiscard]] std::string ToString() const;
 
     int32_t value{0};
 
 private:
-    static bool ConvertFromString(const char *date_ptr, size_t length, DateType &date);
+    static bool ConvertFromString(const char *date_ptr, size_t length, DateType &date, size_t &end_length);
 
     static bool YMD2Date(int32_t year, int32_t month, int32_t day, DateType &date);
 

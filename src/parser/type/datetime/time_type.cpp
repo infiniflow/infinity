@@ -13,3 +13,254 @@
 // limitations under the License.
 
 #include "time_type.h"
+#include <format>
+
+namespace infinity {
+// min time: 00:00:00
+constexpr static int32_t MIN_TIME_HOUR = 0;
+constexpr static int32_t MIN_TIME_MINUTE = 0;
+constexpr static int32_t MIN_TIME_SECOND = 0;
+constexpr static int32_t MIN_TIME_MILLISECOND = 0;
+// max time: 23:59:59
+constexpr static int32_t MAX_TIME_HOUR = 23;
+constexpr static int32_t MAX_TIME_MINUTE = 59;
+constexpr static int32_t MAX_TIME_SECOND = 59;
+constexpr static int32_t MAX_TIME_MILLISECOND = 999;
+
+constexpr static int32_t SECOND_MILLI = 1000;
+constexpr static int32_t MINUTE_MILLI = 60 * SECOND_MILLI;
+constexpr static int32_t HOUR_MILLI = 60 * MINUTE_MILLI;
+constexpr static int32_t DAY_MILLI = 24 * HOUR_MILLI;
+
+void TimeType::FromString(const char *time_ptr, size_t length) {
+    if (!ConvertFromString(time_ptr, length, *this)) {
+        ParserError("Invalid time format ( HH:MM:SS or HH:MM:SS.millisecond ).");
+    }
+}
+
+std::string TimeType::ToString() const {
+    int32_t hour{}, minute{}, second{}, millisecond{};
+    if (!Time2HMSM(value, hour, minute, second, millisecond)) {
+        ParserError(std::format("Invalid millisecond value: {}", value));
+    }
+    return std::format("{:02d}:{:02d}:{:02d}.{:03d}", hour, minute, second, millisecond);
+}
+
+bool TimeType::Add(TimeType input, IntervalType interval, TimeType &output) {
+    auto calc_time_add = [&](int32_t interval_product_milliseconds) {
+        auto tot = input.value + interval.value * interval_product_milliseconds;
+        output.value = ((tot % DAY_MILLI) + DAY_MILLI) % DAY_MILLI;
+    };
+    switch (interval.unit) {
+        case kYear:
+        case kMonth:
+        case kDay: {
+            output = input;
+            return true;
+        }
+        case kHour: {
+            calc_time_add(HOUR_MILLI);
+            return true;
+        }
+        case kMinute: {
+            calc_time_add(MINUTE_MILLI);
+            return true;
+        }
+        case kSecond: {
+            calc_time_add(SECOND_MILLI);
+            return true;
+        }
+        case kInvalidUnit: {
+            ParserError("Invalid interval unit.");
+        }
+    }
+    return false;
+}
+
+bool TimeType::Subtract(TimeType input, IntervalType interval, TimeType &output) {
+    interval.value = -interval.value;
+    return Add(input, interval, output);
+}
+
+bool TimeType::Add(TimeType input, IntervalType interval, TimeType &output, int32_t &overflow_days) {
+    auto calc_overflow_days = [&](int32_t interval_product_milliseconds) {
+        int32_t tot = input.value + interval.value * interval_product_milliseconds;
+        int32_t res = ((tot % DAY_MILLI) + DAY_MILLI) % DAY_MILLI;
+        overflow_days = (tot - res) / DAY_MILLI;
+        // now tot == overflow_days * DAY_MILLI + res
+        output.value = res;
+    };
+    switch (interval.unit) {
+        case kYear:
+        case kMonth:
+        case kDay: {
+            output = input;
+            return true;
+        }
+        case kHour: {
+            calc_overflow_days(HOUR_MILLI);
+            return true;
+        }
+        case kMinute: {
+            calc_overflow_days(MINUTE_MILLI);
+            return true;
+        }
+        case kSecond: {
+            calc_overflow_days(SECOND_MILLI);
+            return true;
+        }
+        case kInvalidUnit: {
+            ParserError("Invalid interval unit.");
+        }
+    }
+    return false;
+}
+
+bool TimeType::Subtract(TimeType input, IntervalType interval, TimeType &output, int32_t &overflow_days) {
+    interval.value = -interval.value;
+    return Add(input, interval, output, overflow_days);
+}
+
+int64_t TimeType::GetTimePart(TimeType input, TimeUnit unit) {
+    int32_t hour{}, minute{}, second{}, millisecond{};
+    auto result = Time2HMSM(input.value, hour, minute, second, millisecond);
+    ParserAssert(result, "Invalid time value");
+    switch (unit) {
+        case TimeUnit::kYear: {
+            ParserError("Can't extract year from time");
+        }
+        case TimeUnit::kMonth: {
+            ParserError("Can't extract month from time");
+        }
+        case TimeUnit::kDay: {
+            ParserError("Can't extract day from time");
+        }
+        case TimeUnit::kHour: {
+            return hour;
+        }
+        case TimeUnit::kMinute: {
+            return minute;
+        }
+        case TimeUnit::kSecond: {
+            return second;
+        }
+        default: {
+            ParserError("Invalid time unit");
+        }
+    }
+    return -1;
+}
+
+bool TimeType::ConvertFromString(const char *time_ptr, size_t length, TimeType &time) {
+    int32_t hour{}, minute{}, second{}, millisecond{};
+    // trim the string
+    size_t pos{0};
+    // skip spaces
+    while (pos < length && std::isspace(time_ptr[pos])) {
+        ++pos;
+    }
+    // Get hour
+    while (pos < length && std::isdigit(time_ptr[pos])) {
+        if (std::isspace(time_ptr[pos])) {
+            ++pos;
+            continue;
+        }
+        if (std::isdigit(time_ptr[pos])) {
+            hour = hour * 10 + (time_ptr[pos] - '0');
+            ++pos;
+            if (hour > MAX_TIME_HOUR)
+                return false;
+            continue;
+        }
+        break;
+    }
+    if (time_ptr[pos] != ':') {
+        return false;
+    }
+    ++pos; // skip :
+    // Get minute
+    while (pos < length && std::isdigit(time_ptr[pos])) {
+        if (std::isspace(time_ptr[pos])) {
+            ++pos;
+            continue;
+        }
+        if (std::isdigit(time_ptr[pos])) {
+            minute = minute * 10 + (time_ptr[pos] - '0');
+            ++pos;
+            if (minute > MAX_TIME_MINUTE)
+                return false;
+            continue;
+        }
+        break;
+    }
+    if (time_ptr[pos] != ':') {
+        return false;
+    }
+    ++pos; // skip :
+    // Get second
+    while (pos < length && std::isdigit(time_ptr[pos])) {
+        if (std::isspace(time_ptr[pos])) {
+            ++pos;
+            continue;
+        }
+        if (std::isdigit(time_ptr[pos])) {
+            second = second * 10 + (time_ptr[pos] - '0');
+            ++pos;
+            if (second > MAX_TIME_SECOND)
+                return false;
+            continue;
+        }
+        break;
+    }
+    if (pos < length) {
+        if (time_ptr[pos] != '.') {
+            return false;
+        }
+        ++pos; // skip .
+        // Get millisecond
+        while (pos < length && std::isdigit(time_ptr[pos])) {
+            if (std::isspace(time_ptr[pos])) {
+                ++pos;
+                continue;
+            }
+            if (std::isdigit(time_ptr[pos])) {
+                millisecond = millisecond * 10 + (time_ptr[pos] - '0');
+                ++pos;
+                if (millisecond > MAX_TIME_MILLISECOND)
+                    return false;
+                continue;
+            }
+            break;
+        }
+    }
+    return HMSM2Time(hour, minute, second, millisecond, time);
+}
+
+bool TimeType::HMSM2Time(int32_t hour, int32_t minute, int32_t second, int32_t millisecond, TimeType &time) {
+    if (!IsTimeValid(hour, minute, second, millisecond)) {
+        return false;
+    }
+    time.value = hour * HOUR_MILLI + minute * MINUTE_MILLI + second * SECOND_MILLI + millisecond;
+    return true;
+}
+
+bool TimeType::Time2HMSM(int32_t milliseconds, int32_t &hour, int32_t &minute, int32_t &second, int32_t &millisecond) {
+    if (milliseconds < 0 || milliseconds >= DAY_MILLI) {
+        return false;
+    }
+    hour = milliseconds / HOUR_MILLI;
+    milliseconds %= HOUR_MILLI;
+    minute = milliseconds / MINUTE_MILLI;
+    milliseconds %= MINUTE_MILLI;
+    second = milliseconds / SECOND_MILLI;
+    milliseconds %= SECOND_MILLI;
+    millisecond = milliseconds;
+    return true;
+}
+
+bool TimeType::IsTimeValid(int32_t hour, int32_t minute, int32_t second, int32_t millisecond) {
+    return hour >= MIN_TIME_HOUR && hour <= MAX_TIME_HOUR && minute >= MIN_TIME_MINUTE && minute <= MAX_TIME_MINUTE && second >= MIN_TIME_SECOND &&
+           second <= MAX_TIME_SECOND && millisecond >= MIN_TIME_MILLISECOND && millisecond <= MAX_TIME_MILLISECOND;
+}
+
+} // namespace infinity

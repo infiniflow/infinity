@@ -13,3 +13,102 @@
 // limitations under the License.
 
 #include "datetime_type.h"
+
+namespace infinity {
+
+void DateTimeType::FromString(const char *datetime_ptr, size_t length) {
+    // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS[.millisecond]"
+    size_t date_length;
+    date.FromString(datetime_ptr, length, date_length);
+    // skip space
+    while (date_length < length && datetime_ptr[date_length] == ' ') {
+        ++date_length;
+    }
+    if (date_length < length) {
+        time.FromString(datetime_ptr + date_length, length - date_length);
+    } else {
+        time = {};
+    }
+}
+
+bool DateTimeType::Add(DateTimeType input, IntervalType interval, DateTimeType &output) {
+    switch (interval.unit) {
+        case kYear:
+        case kMonth:
+        case kDay: {
+            DateType::Add(input.date, interval, input.date);
+            output = input;
+            return true;
+        }
+        case kHour:
+        case kMinute:
+        case kSecond: {
+            int32_t overflow_days{};
+            TimeType::Add(input.time, interval, input.time, overflow_days);
+            if (overflow_days) {
+                IntervalType days(overflow_days);
+                days.unit = TimeUnit::kDay;
+                DateType::Add(input.date, days, input.date);
+            }
+            output = input;
+            return true;
+        }
+        case kInvalidUnit: {
+            ParserError("Invalid interval unit.");
+        }
+    }
+    return false;
+}
+
+bool DateTimeType::Subtract(DateTimeType input, IntervalType interval, DateTimeType &output) {
+    interval.value = -interval.value;
+    return Add(input, interval, output);
+}
+
+int64_t DateTimeType::GetDateTimePart(DateTimeType input, TimeUnit unit) {
+    switch (unit) {
+        case TimeUnit::kYear:
+        case TimeUnit::kMonth:
+        case TimeUnit::kDay: {
+            return DateType::GetDatePart(input.date, unit);
+        }
+        case TimeUnit::kHour:
+        case TimeUnit::kMinute:
+        case TimeUnit::kSecond: {
+            return TimeType::GetTimePart(input.time, unit);
+        }
+        default: {
+            ParserError("Invalid time unit");
+        }
+    }
+    return -1;
+}
+
+bool DateTimeType::YMDHMSM2DateTime(int32_t year,
+                                    int32_t month,
+                                    int32_t day,
+                                    int32_t hour,
+                                    int32_t minute,
+                                    int32_t second,
+                                    int32_t millisecond,
+                                    DateTimeType &datetime) {
+    return TimeType::HMSM2Time(hour, minute, second, millisecond, datetime.time) and DateType::YMD2Date(year, month, day, datetime.date);
+}
+
+bool DateTimeType::DateTime2YMDHMSM(int32_t days,
+                                    int32_t milliseconds,
+                                    int32_t &year,
+                                    int32_t &month,
+                                    int32_t &day,
+                                    int32_t &hour,
+                                    int32_t &minute,
+                                    int32_t &second,
+                                    int32_t &millisecond) {
+    return TimeType::Time2HMSM(milliseconds, hour, minute, second, millisecond) and DateType::Date2YMD(days, year, month, day);
+}
+
+bool DateTimeType::IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, int32_t millisecond) {
+    return TimeType::IsTimeValid(hour, minute, second, millisecond) and DateType::IsDateValid(year, month, day);
+}
+
+} // namespace infinity
