@@ -22,6 +22,8 @@ jobs:
 
     - name: Check out code
       uses: actions/checkout@v3
+      with:
+        ssh-key: ${{ secrets.MY_DEPLOY_KEY }}
 
     - name: Start builder container
       run: |
