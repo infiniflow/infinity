@@ -159,7 +159,7 @@ int main() {
             results.push_back(Format("-> Describe Tables QPS: {}", total_times / tims_costing_second));
         }
         {
-            auto tims_costing_second = Measurement(thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
+            auto tims_costing_second = Measurement("Create Tables", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
                 SizeT column_count = 2;
                 Vector<ColumnDef *> column_definitions;
                 column_definitions.reserve(column_count);
