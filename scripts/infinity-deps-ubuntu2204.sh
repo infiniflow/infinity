@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e -o pipefail
+
 echo
 echo "running script $0"
 echo "current working directory : $PWD"
@@ -37,10 +39,10 @@ unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
 
 echo
 echo 'step [6/9] : add apt source for llvm-17'
-echo 'command: sudo echo -e "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" > /etc/apt/sources.list.d/llvm17.list'
+echo 'command: echo "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee /etc/apt/sources.list.d/llvm17.list'
 echo 'command: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc'
 echo
-sudo echo -e "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" > /etc/apt/sources.list.d/llvm17.list
+echo "deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee /etc/apt/sources.list.d/llvm17.list
 wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
 
 echo

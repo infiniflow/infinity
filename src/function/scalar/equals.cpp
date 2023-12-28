@@ -120,9 +120,9 @@ void RegisterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     //    GenerateEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
     GenerateEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    //    GenerateEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    //    GenerateEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    //    GenerateEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
     //    GenerateEqualsFunction<IntervalT>(function_set_ptr, DataType(LogicalType::kInterval));
 

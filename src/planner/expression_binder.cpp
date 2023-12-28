@@ -196,21 +196,21 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             SizeT date_str_len = strlen(expr.date_value_);
             TimeT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
-            Value value = Value::MakeDate(date_value);
+            Value value = Value::MakeTime(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDateTime: {
             SizeT date_str_len = strlen(expr.date_value_);
             DateTimeT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
-            Value value = Value::MakeDate(date_value);
+            Value value = Value::MakeDateTime(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kTimestamp: {
             SizeT date_str_len = strlen(expr.date_value_);
             TimestampT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
-            Value value = Value::MakeDate(date_value);
+            Value value = Value::MakeTimestamp(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kInterval: {

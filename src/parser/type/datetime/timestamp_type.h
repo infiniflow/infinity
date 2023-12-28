@@ -20,6 +20,7 @@
 
 namespace infinity {
 struct TimestampType : public DateTimeType {
+    TimestampType() = default;
     explicit TimestampType(int32_t date_value, int32_t time_value) : DateTimeType(date_value, time_value){};
     ~TimestampType() = default;
 };
