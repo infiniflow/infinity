@@ -1,5 +1,6 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You should prepare the following files:
+# NOTICE: You should prepare the following files
+# NOTICE: You can use the download_deps_infinity_builder_centos7.sh script to download them
 # bison-3.8.2.tar.xz
 # binutils-2.41.tar.xz
 # gcc-13.2.0.tar.xz
