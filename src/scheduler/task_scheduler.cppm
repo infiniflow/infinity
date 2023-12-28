@@ -26,7 +26,7 @@ namespace infinity {
 class QueryContext;
 class PlanFragment;
 
-using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
+using FragmentTaskBlockQueue = BlockingQueue<FragmentTask *>;
 
 struct Worker {
     Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
@@ -48,35 +48,32 @@ public:
 
     void Schedule(QueryContext* query_context, PlanFragment* plan_fragment);
 
+    void ScheduleFragments(Vector<PlanFragment *> plan_fragment);
+
 private:
-    Vector<Vector<FragmentTask *>> TraversePlanFragment(PlanFragment* plan_fragment);
+    Vector<PlanFragment *> GetStartFragments(PlanFragment* plan_fragment);
 
-    void ScheduleOneWorkerPerQuery(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
-    void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
-    void ScheduleRoundRobin(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    // void ScheduleOneWorkerPerQuery(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    // void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
+    // void ScheduleRoundRobin(const Vector<FragmentTask *> &tasks);
 
-    inline void ScheduleTask(FragmentTask *task, u64 worker_id) {
-        worker_array_[worker_id].queue_->Enqueue(task);
-    }
+    // inline void ScheduleTask(FragmentTask *task, u64 worker_id) {
+    //     worker_array_[worker_id].queue_->Enqueue(task);
+    // }
 
     inline u64 ProposedWorkerID(u64 object_id) const {
         return (object_id) % worker_count_;
     }
 
-    void ToReadyQueue(FragmentTask *task);
-
-    void CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id);
-
     void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
 
 private:
+    u64 last_cpu_id_{0};
+
     bool initialized_{false};
 
     Vector<Worker> worker_array_{};
     Deque<Atomic<u64>> worker_workloads_{};
-
-    UniquePtr<FragmentTaskBlockQueue> ready_queue_{};
-    UniquePtr<Thread> coordinator_{};
 
     u64 worker_count_{0};
 };

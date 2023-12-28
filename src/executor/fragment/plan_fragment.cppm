@@ -57,6 +57,8 @@ public:
 
     [[nodiscard]] inline PhysicalSink *GetSinkNode() const { return sink_.get(); }
 
+    [[nodiscard]] inline PlanFragment *GetParent() const { return parent_; }
+
     inline void AddChild(UniquePtr<PlanFragment> child_fragment) {
         child_fragment->parent_ = this;
         children_.emplace_back(Move(child_fragment));

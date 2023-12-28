@@ -47,7 +47,7 @@ import physical_merge_knn;
 import merge_knn_data;
 import create_index_data;
 import logger;
-
+import task_scheduler;
 import plan_fragment;
 
 module fragment_context;
@@ -438,18 +438,68 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
 }
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
-    : fragment_ptr_(fragment_ptr), fragment_type_(fragment_ptr->GetFragmentType()), query_context_(query_context){};
+    : fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
+      fragment_status_(FragmentStatus::kNotStart), unfinished_child_n_(fragment_ptr->Children().size()) {}
 
-void FragmentContext::FinishTask() {
-    u64 unfinished_task = task_n_.fetch_sub(1);
-    auto sink_op = GetSinkOperator();
-
-    if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
-        LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
-        Complete();
-    } else {
-        LOG_TRACE(Format("Not all tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+void FragmentContext::TryFinishFragment() {
+    if (!TryFinishFragmentInner()) {
+        LOG_TRACE(Format("{} tasks in fragment are not completed: {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        return;
     }
+    LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+    fragment_status_ = FragmentStatus::kFinish;
+
+    auto *sink_op = GetSinkOperator();
+    if (sink_op->sink_type() == SinkType::kResult) {
+        Complete();
+        return;
+    }
+
+    // Try to schedule parent fragment
+    auto *parent_plan_fragment = fragment_ptr_->GetParent();
+    if (parent_plan_fragment == nullptr) {
+        return;
+    }
+    auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+    if (!parent_fragment_ctx->TryStartFragment()) {
+        return;
+    }
+
+    // All child fragment are finished.
+    Vector<PlanFragment *> fragments = parent_fragment_ctx->GetSchedulableFragments();
+    auto *scheduler = query_context_->scheduler();
+    scheduler->ScheduleFragments(Move(fragments));
+}
+
+Vector<PlanFragment *> FragmentContext::GetSchedulableFragments() {
+    Vector<PlanFragment *> result;
+    StdFunction<void(FragmentContext *)> RecursiveScheduleFragment = [&result, &RecursiveScheduleFragment](FragmentContext *fragment_ctx) {
+        switch (fragment_ctx->fragment_status_) {
+            case FragmentStatus::kNotStart: {
+                fragment_ctx->fragment_status_ = FragmentStatus::kStart;
+                result.emplace_back(fragment_ctx->fragment_ptr_);
+
+                // Recursive schedule parent if current fragment is **STREAM**.
+                if (fragment_ctx->fragment_type_ == FragmentType::kParallelStream) {
+                    auto *parent_plan_fragment = fragment_ctx->fragment_ptr_->GetParent();
+                    if (parent_plan_fragment == nullptr) {
+                        return;
+                    }
+                    auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+                    RecursiveScheduleFragment(parent_fragment_ctx);
+                }
+                return;
+            }
+            case FragmentStatus::kStart: {
+                return;
+            }
+            default: {
+                Error<SchedulerException>("Bug: Parent fragment has error stauts.");
+            }
+        }
+    };
+    RecursiveScheduleFragment(this);
+    return result;
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }

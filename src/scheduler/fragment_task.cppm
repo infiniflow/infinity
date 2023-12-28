@@ -64,21 +64,13 @@ public:
 
     [[nodiscard]] inline bool IsTerminator() const { return is_terminator_; }
 
-    // Set source
-    // Scan source
-    //    void
-    //    AddSourceSegment(const SegmentEntry* segment_entry_ptr);
-    //
-    //    // Input queue
-    //    void
-    //    AddQueue(const BatchBlockingQueue);
     void Init();
 
     void OnExecute(i64 worker_id);
 
     inline void SetLastWorkID(i64 worker_id) { last_worker_id_ = worker_id; }
 
-    [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
+    // [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
     u64 FragmentId() const;
 
@@ -90,7 +82,7 @@ public:
 
     [[nodiscard]] TaskBinding TaskBinding() const;
 
-    void TryCompleteFragment();
+    void CompleteTask();
 
     String PhysOpsToString();
 
@@ -112,7 +104,7 @@ public:
 private:
     void *fragment_context_{};
     bool is_terminator_{false};
-    i64 last_worker_id_{-1};
+    [[maybe_unused]] i64 last_worker_id_{-1};
     i64 task_id_{-1};
     i64 operator_count_{0};
 };
