@@ -44,12 +44,22 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-### Docker pull
+### Deploy Infinity database
+
+#### Deploy using binary package on Linux x86_64
+
+You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. These packages are designed to be compatible with Linux x86_64 hosts that are no older than CentOS 7. They are statically linked, except for glibc. For example:
 
 ```bash
-docker pull infiniflow/infinity
-docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity ./opt/bin/infinity
+sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
+sudo systemctl start infinity
+```
 
+#### Deploy using Docker on Linux x86_64 and MacOS x86_64
+
+```bash
+docker pull infiniflow/infinity:nightly
+docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity:nightly
 ```
 
 

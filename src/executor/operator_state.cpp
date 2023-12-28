@@ -45,7 +45,10 @@ bool QueueSourceState::GetData() {
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
-            if (fragment_data->data_idx_ + 1 == fragment_data->data_count_) {
+            if (!fragment_data->data_idx_.has_value()) {
+                // fragment completed
+                MarkCompletedTask(fragment_data->fragment_id_);
+            } else if (fragment_data->data_idx_.value() + 1 == fragment_data->data_count_) {
                 // Get an all data from this
                 MarkCompletedTask(fragment_data->fragment_id_);
             }
@@ -97,6 +100,18 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kCreateIndexFinish: {
             auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
             create_index_finish_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kMergeLimit: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
+            limit_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
+            if (!limit_op_state->input_complete_) {
+                limit_op_state->input_complete_ = completed;
+            }
+            if (limit_op_state->input_complete_) {
+                source_queue_.NotAllowEnqueue();
+            }
             break;
         }
         default: {

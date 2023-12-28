@@ -34,8 +34,8 @@ RUN cargo install sqllogictest-bin
 
 # CMake 3.28+ is requrired for C++20 modules.
 # download https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz
-COPY cmake-3.28.1-linux-x86_64.tar.gz .
-RUN tar xzf cmake-3.28.1-linux-x86_64.tar.gz && cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.1-linux-x86_64
+RUN --mount=type=bind,source=cmake-3.28.1-linux-x86_64.tar.gz,target=/root/cmake-3.28.1-linux-x86_64.tar.gz \
+    cd /root && tar xzf cmake-3.28.1-linux-x86_64.tar.gz && cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.28.1-linux-x86_64
 
 # build dependencies
 RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libthrift-dev

@@ -80,7 +80,7 @@ public:
 
     void AppendWith(const DataBlock *other);
 
-    void AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count);
+    void AppendWith(const DataBlock *other, SizeT from, SizeT count);
 
     void InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index);
 

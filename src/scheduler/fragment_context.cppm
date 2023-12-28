@@ -47,6 +47,8 @@ export enum class FragmentType {
     kParallelStream,
 };
 
+class PlanFragment;
+
 export class FragmentContext {
 public:
     static void
@@ -77,6 +79,9 @@ public:
     void CreateTasks(i64 parallel_count, i64 operator_count);
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
+
+    [[nodiscard]] inline bool IsMaterialize() const { return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize; }
+
 
     inline SharedPtr<DataTable> GetResult() {
         UniqueLock<Mutex> lk(locker_);

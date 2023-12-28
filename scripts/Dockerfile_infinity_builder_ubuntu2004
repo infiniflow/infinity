@@ -66,3 +66,4 @@ RUN cargo install sqllogictest-bin
 RUN python3 -m venv /usr/local/venv
 ENV PATH="/usr/local/venv/bin:$PATH"
 
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

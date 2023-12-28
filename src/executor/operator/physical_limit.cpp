@@ -18,9 +18,13 @@ module;
 
 import stl;
 import txn;
+import base_expression;
+import default_values;
+import load_meta;
 import query_context;
 import table_def;
 import data_table;
+import default_values;
 import parser;
 import physical_operator_type;
 import operator_state;
@@ -34,130 +38,194 @@ module physical_limit;
 
 namespace infinity {
 
-void PhysicalLimit::Init() {}
+SizeT AtomicCounter::Offset(SizeT row_count) {
+    auto success = false;
+    SizeT result = 0;
 
-bool PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    while (!success) {
+        i64 current_offset = offset_;
+        if (current_offset <= 0) {
+            return 0;
+        }
+        i64 last_offset = current_offset - row_count;
 
-#if 0
-    // output table definition is same as input
-    input_table_ = left_->output();
-    Assert<ExecutorException>(input_table_.get() != nullptr, "No input");
-
-    Assert<ExecutorException>(limit_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
-
-    i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
-    Assert<ExecutorException>(limit > 0, "Limit should be larger than 0");
-    i64 offset = 0;
-    if (offset_expr_ != nullptr) {
-        Assert<ExecutorException>(offset_expr_->type() == ExpressionType::kValue, "Currently, only support constant limit expression");
-        offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
-        Assert<ExecutorException>(offset >= 0 && offset < input_table_->row_count(),
-                                  "Offset should be larger or equal than 0 and less than row number");
+        if (last_offset > 0) {
+            success = offset_.compare_exchange_strong(current_offset, last_offset);
+            result = row_count;
+        } else {
+            success = offset_.compare_exchange_strong(current_offset, 0);
+            result = current_offset;
+        }
     }
 
-    output_ = GetLimitOutput(input_table_, limit, offset);
-#endif
+    return result;
+}
+
+SizeT AtomicCounter::Limit(SizeT row_count) {
+    auto success = false;
+    SizeT result = 0;
+
+    while (!success) {
+        i64 current_limit = limit_;
+        if (current_limit <= 0) {
+            return 0;
+        }
+        i64 last_limit = current_limit - row_count;
+
+        if (last_limit > 0) {
+            success = limit_.compare_exchange_strong(current_limit, last_limit);
+            result = row_count;
+        } else {
+            success = limit_.compare_exchange_strong(current_limit, 0);
+            result = current_limit;
+        }
+    }
+
+    return result;
+}
+
+bool AtomicCounter::IsLimitOver() {
+    if (limit_ < 0) {
+        Error<ExecutorException>("limit is not allowed to be smaller than 0");
+    }
+    return limit_ == 0;
+}
+
+SizeT UnSyncCounter::Offset(SizeT row_count) {
+    SizeT result = 0;
+
+    if (offset_ <= 0) {
+        return 0;
+    }
+    i64 last_offset = offset_ - row_count;
+
+    if (last_offset > 0) {
+        result = row_count;
+        offset_ = last_offset;
+    } else {
+        result = offset_;
+        offset_ = 0;
+    }
+
+    return result;
+}
+
+SizeT UnSyncCounter::Limit(SizeT row_count) {
+    SizeT result = 0;
+
+    if (limit_ <= 0) {
+        return 0;
+    }
+    i64 last_limit = limit_ - row_count;
+
+    if (last_limit > 0) {
+        result = row_count;
+        limit_ = last_limit;
+    } else {
+        result = limit_;
+        limit_ = 0;
+    }
+
+    return result;
+}
+
+bool UnSyncCounter::IsLimitOver() {
+    if (limit_ < 0) {
+        Error<ExecutorException>("limit is not allowed to be smaller than 0");
+    }
+    return limit_ == 0;
+}
+
+PhysicalLimit::PhysicalLimit(u64 id,
+                             UniquePtr<PhysicalOperator> left,
+                             SharedPtr<BaseExpression> limit_expr,
+                             SharedPtr<BaseExpression> offset_expr,
+                             SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kLimit, Move(left), nullptr, id, load_metas), limit_expr_(Move(limit_expr)),
+      offset_expr_(Move(offset_expr)) {
+    i64 offset = 0;
+    i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
+
+    if (offset_expr_ != nullptr) {
+        offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
+    }
+
+    counter_ = MakeUnique<UnSyncCounter>(offset, limit);
+}
+
+void PhysicalLimit::Init() {}
+
+//    offset     limit + offset
+//    left       right
+// | a | b | c | d | e | f
+bool PhysicalLimit::Execute(QueryContext *query_context,
+                            const Vector<UniquePtr<DataBlock>> &input_blocks,
+                            Vector<UniquePtr<DataBlock>> &output_blocks,
+                            LimitCounter *counter) {
+    SizeT input_row_count = 0;
+
+    for (SizeT block_id = 0; block_id < input_blocks.size(); block_id++) {
+        input_row_count += input_blocks[block_id]->row_count();
+    }
+
+    SizeT offset = counter->Offset(input_row_count);
+    if (offset == input_row_count) {
+        return true;
+    }
+
+    SizeT limit = counter->Limit(input_row_count - offset);
+    SizeT block_start_idx = 0;
+
+    for (SizeT block_id = 0; block_id < input_blocks.size(); block_id++) {
+        if (input_blocks[block_id]->row_count() == 0) {
+            continue;
+        }
+        SizeT max_offset = input_blocks[block_id]->row_count() - 1;
+
+        if (offset > max_offset) {
+            offset -= max_offset;
+        } else {
+            block_start_idx = block_id;
+            break;
+        }
+    }
+
+    for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); block_id++) {
+        auto &input_block = input_blocks[block_id];
+        auto row_count = input_block->row_count();
+        if (row_count == 0) {
+            continue;
+        }
+        auto block = DataBlock::MakeUniquePtr();
+
+        block->Init(input_block->types());
+        if (limit >= row_count) {
+            block->AppendWith(input_block.get(), offset, row_count);
+            limit -= row_count;
+        } else {
+            block->AppendWith(input_block.get(), offset, limit);
+            limit = 0;
+        }
+        block->Finalize();
+        output_blocks.push_back(Move(block));
+        offset = 0;
+
+        if (limit == 0) {
+            break;
+        }
+    }
+
     return true;
 }
 
-SharedPtr<DataTable> PhysicalLimit::GetLimitOutput(const SharedPtr<DataTable> &input_table, i64 limit, i64 offset) {
-    SizeT start_block = 0;
-    SizeT start_row_id = 0;
-    SizeT end_block = 0;
-    SizeT end_row_id = 0;
+bool PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    auto result = Execute(query_context, operator_state->prev_op_state_->data_block_array_, operator_state->data_block_array_, counter_.get());
 
-    if (offset == 0) {
-        if (limit >= (i64)input_table->row_count()) {
-            return input_table;
-        } else {
-            start_block = 0;
-            start_row_id = 0;
-            SizeT block_count = input_table->DataBlockCount();
-            i64 total_row_count = limit;
-            for (SizeT block_id = 0; block_id < block_count; ++block_id) {
-                SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-                if (total_row_count > (i64)block_row_count) {
-                    total_row_count -= block_row_count;
-                } else {
-                    end_block = block_id;
-                    end_row_id = total_row_count;
-                    break;
-                }
-            }
-        }
-    } else {
-        i64 total_row_count = offset;
-        SizeT block_count = input_table->DataBlockCount();
-        SizeT rest_row_count = 0;
-        for (SizeT block_id = 0; block_id < block_count; ++block_id) {
-            SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-            if (total_row_count >= (i64)block_row_count) {
-                total_row_count -= block_row_count;
-            } else {
-                start_block = block_id;
-                start_row_id = total_row_count;
-                rest_row_count = block_row_count - total_row_count;
-                break;
-            }
-        }
-
-        total_row_count = limit;
-        if (total_row_count <= (i64)rest_row_count) {
-            end_block = start_block;
-            end_row_id = total_row_count;
-        } else {
-            total_row_count -= rest_row_count;
-            for (SizeT block_id = start_block + 1; block_id < block_count; ++block_id) {
-                SizeT block_row_count = input_table->GetDataBlockById(block_id)->row_count();
-                if (total_row_count > (i64)block_row_count) {
-                    total_row_count -= block_row_count;
-                } else {
-                    end_block = block_id;
-                    end_row_id = total_row_count;
-                    break;
-                }
-            }
-        }
+    operator_state->prev_op_state_->data_block_array_.clear();
+    if (counter_->IsLimitOver() || operator_state->prev_op_state_->Complete()) {
+        operator_state->SetComplete();
     }
-
-    // Copy from input table to output table
-    SizeT column_count = input_table->ColumnCount();
-    Vector<SharedPtr<DataType>> types;
-    types.reserve(column_count);
-    Vector<SharedPtr<ColumnDef>> columns;
-    columns.reserve(column_count);
-    for (SizeT idx = 0; idx < column_count; ++idx) {
-        SharedPtr<DataType> col_type = input_table->GetColumnTypeById(idx);
-        types.emplace_back(col_type);
-
-        String col_name = input_table->GetColumnNameById(idx);
-
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, col_type, col_name, HashSet<ConstraintType>());
-        columns.emplace_back(col_def);
-    }
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("limit"), columns);
-    SharedPtr<DataTable> output_table = DataTable::Make(table_def, TableType::kIntermediate);
-
-    const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-
-    for (SizeT block_id = start_block; block_id <= end_block; ++block_id) {
-        SizeT input_start_offset = start_row_id;
-        SizeT input_end_offset;
-        if (end_block == block_id) {
-            input_end_offset = end_row_id;
-        } else {
-            // current input block isn't the last one.
-            input_end_offset = input_datablocks[block_id]->row_count();
-        }
-
-        SharedPtr<DataBlock> output_datablock = DataBlock::Make();
-        output_datablock->Init(input_datablocks[block_id], input_start_offset, input_end_offset);
-        output_table->Append(output_datablock);
-
-        start_row_id = 0;
-    }
-    return output_table;
+    return result;
 }
 
 } // namespace infinity
