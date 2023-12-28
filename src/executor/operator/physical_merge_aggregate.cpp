@@ -38,13 +38,16 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
     auto merge_aggregate_op_state = static_cast<MergeAggregateOperatorState *>(operator_state);
 
     if (!merge_aggregate_op_state->input_complete_) {
+
+        // auto result = SimpleMergeAggregateExecute(merge_aggregate_op_state->input_data_blocks_, merge_aggregate_op_state->data_block_array_);
+
         if (merge_aggregate_op_state->data_block_array_.size() == 0) {
             merge_aggregate_op_state->data_block_array_.emplace_back(Move(merge_aggregate_op_state->input_data_block_));
         } else {
 
             auto agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
 
-            for (auto expr : agg_op->aggregates_) {
+            for (SizeT col_idx = 0; auto expr : agg_op->aggregates_) {
                 auto agg_expression = static_cast<AggregateExpression *>(expr.get());
 
                 auto function_name = agg_expression->aggregate_function_.GetFuncName();
@@ -53,36 +56,81 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
 
                 if (String(function_name) == String("COUNT")) {
                     LOG_TRACE("PhysicalAggregate::Execute:: COUNT");
-                    UpdateBlockData(merge_aggregate_op_state);
+                    UpdateBlockData(merge_aggregate_op_state, col_idx);
                 } else if (String(function_name) == String("MIN")) {
                     LOG_TRACE("PhysicalAggregate::Execute:: MIN");
-                    IntegerT input_int = GetDataFromValueAtInputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, 0);
-                    IntegerT out_int = GetDataFromValueAtOutputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, 0, 0);
+                    IntegerT input_int = GetDataFromValueAtInputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, col_idx, 0);
+                    IntegerT out_int = GetDataFromValueAtOutputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, col_idx, 0);
                     IntegerT new_int = MinValue(input_int, out_int);
-                    WriteIntegerAtPosition(merge_aggregate_op_state, 0, 0, 0, new_int);
+                    WriteIntegerAtPosition(merge_aggregate_op_state, 0, col_idx, 0, new_int);
                 } else if (String(function_name) == String("MAX")) {
                     LOG_TRACE("PhysicalAggregate::Execute:: MAX");
 
-                    IntegerT input_int = GetDataFromValueAtInputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, 0);
-                    IntegerT out_int = GetDataFromValueAtOutputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, 0, 0);
+                    IntegerT input_int = GetDataFromValueAtInputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, col_idx, 0);
+                    IntegerT out_int = GetDataFromValueAtOutputBlockPosition<IntegerT>(merge_aggregate_op_state, 0, col_idx, 0);
                     IntegerT new_int = MaxValue(input_int, out_int);
-                    WriteIntegerAtPosition(merge_aggregate_op_state, 0, 0, 0, new_int);
+                    WriteIntegerAtPosition(merge_aggregate_op_state, 0, col_idx, 0, new_int);
                 } else if (String(function_name) == String("SUM")) {
-                    UpdateBlockData(merge_aggregate_op_state);
+                    UpdateBlockData(merge_aggregate_op_state, col_idx);
                 }
+
+                ++col_idx;
             }
         }
         return false;
     } else {
         LOG_TRACE("PhysicalAggregate::Input is complete");
-        merge_aggregate_op_state->data_block_array_.back()->Finalize();
+        for (auto &output_block : merge_aggregate_op_state->data_block_array_) {
+            output_block->Finalize();
+        }
         merge_aggregate_op_state->SetComplete();
         return true;
     }
 }
 
-void PhysicalMergeAggregate::UpdateBlockData(MergeAggregateOperatorState *merge_aggregate_op_state) {
-    Value input_value = merge_aggregate_op_state->input_data_block_->GetValue(0, 0);
+bool PhysicalMergeAggregate::SimpleMergeAggregateExecute(Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks) {
+
+    // for (SizeT block_idx = 0; block_idx < input_blocks.size(); ++block_idx) {
+    //     DataBlock *input_data_block = input_blocks[block_idx].get();
+    //     if (output_blocks.size() == 0) {
+    //         output_blocks.emplace_back(Move(input_blocks[block_idx]));
+    //     } else {
+    //         auto agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
+    //
+    //         for (SizeT col_idx = 0; const auto &expr : agg_op->aggregates_) {
+    //             auto agg_expression = static_cast<AggregateExpression *>(expr.get());
+    //
+    //             auto function_name = agg_expression->aggregate_function_.GetFuncName();
+    //
+    //             auto function_return_type = agg_expression->aggregate_function_.return_type_;
+    //
+    //             if (String(function_name) == String("COUNT")) {
+    //                 LOG_TRACE("PhysicalAggregate::Execute:: COUNT");
+    //                 // UpdateBlockData(merge_aggregate_op_state);
+    //             } else if (String(function_name) == String("MIN")) {
+    //                 LOG_TRACE("PhysicalAggregate::Execute:: MIN");
+    //                 IntegerT input_int = GetDataFromValueAtInputBlockPosition2<IntegerT>(input_blocks, block_idx, 0, col_idx);
+    //                 IntegerT out_int = GetDataFromValueAtOutputBlockPosition2<IntegerT>(output_blocks, block_idx, 0, col_idx);
+    //                 IntegerT new_int = MinValue(input_int, out_int);
+    //                 WriteIntegerAtPosition2(output_blocks, block_idx, 0, col_idx, new_int);
+    //             } else if (String(function_name) == String("MAX")) {
+    //                 LOG_TRACE("PhysicalAggregate::Execute:: MAX");
+    //
+    //                 IntegerT input_int = GetDataFromValueAtInputBlockPosition2<IntegerT>(input_blocks, block_idx, 0, col_idx);
+    //                 IntegerT out_int = GetDataFromValueAtOutputBlockPosition2<IntegerT>(output_blocks, block_idx, 0, col_idx);
+    //                 IntegerT new_int = MaxValue(input_int, out_int);
+    //                 WriteIntegerAtPosition2(output_blocks, block_idx, 0, col_idx, new_int);
+    //             } else if (String(function_name) == String("SUM")) {
+    //                 // UpdateBlockData(merge_aggregate_op_state);
+    //             }
+    //         }
+    //     }
+    // }
+    return false;
+}
+
+void PhysicalMergeAggregate::UpdateBlockData(MergeAggregateOperatorState *merge_aggregate_op_state, SizeT col_idx) {
+    Value input_value = merge_aggregate_op_state->input_data_block_->GetValue(col_idx, 0);
     DataType input_value_type = input_value.type();
     if (!input_value_type.IsNumeric()) {
         Error<NotImplementException>("input_value_type not Implement");
@@ -91,17 +139,17 @@ void PhysicalMergeAggregate::UpdateBlockData(MergeAggregateOperatorState *merge_
     switch (input_value_type.type()) {
         case kBigInt: {
             auto new_big_int = AddData<BigIntT>(input_value, merge_aggregate_op_state);
-            merge_aggregate_op_state->data_block_array_[0]->SetValue(0, 0, Value::MakeBigInt(new_big_int));
+            merge_aggregate_op_state->data_block_array_[0]->SetValue(col_idx, 0, Value::MakeBigInt(new_big_int));
             return;
         }
         case kInteger: {
             auto new_int = AddData<BigIntT>(input_value, merge_aggregate_op_state);
-            merge_aggregate_op_state->data_block_array_[0]->SetValue(0, 0, Value::MakeInt(new_int));
+            merge_aggregate_op_state->data_block_array_[0]->SetValue(col_idx, 0, Value::MakeInt(new_int));
             return;
         }
         case kDouble: {
             auto new_double = AddData<DoubleT>(input_value, merge_aggregate_op_state);
-            merge_aggregate_op_state->data_block_array_[0]->SetValue(0, 0, Value::MakeDouble(new_double));
+            merge_aggregate_op_state->data_block_array_[0]->SetValue(col_idx, 0, Value::MakeDouble(new_double));
             return;
         }
         default:
