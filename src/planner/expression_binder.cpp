@@ -280,6 +280,31 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         }
     }
 
+    // covert avg function expr to (sum / count) function expr
+
+    if (function_set_ptr->name() == "AVG") {
+        Vector<String> col_names{};
+        ColumnExpr *col_expr = nullptr;
+        FunctionExpr *div_function_expr = new FunctionExpr();
+        FunctionExpr *sum_function_expr = new FunctionExpr();
+        FunctionExpr *count_function_expr = new FunctionExpr();
+        Vector<ParsedExpr *> *arguments = new Vector<ParsedExpr *>();
+        if (expr.arguments_->size() == 1) {
+            if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
+                col_expr = (ColumnExpr *)(*expr.arguments_)[0];
+                col_names = col_expr->names_;
+            }
+            sum_function_expr->func_name_ = String("sum");
+            sum_function_expr->arguments_->reserve(1);
+            count_function_expr->func_name_= String("count");
+            sum_function_expr->arguments_->reserve(1);
+            *count_function_expr->arguments_->emplace_back(col_expr);
+            arguments->emplace_back(sum_function_expr);
+            arguments->emplace_back(count_function_expr);
+            div_function_expr->arguments_=arguments;
+        }
+    }
+
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.arguments_->size());
     for (const auto *arg_expr : *expr.arguments_) {
