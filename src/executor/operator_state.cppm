@@ -152,6 +152,9 @@ export struct LimitOperatorState : public OperatorState {
 // Merge Limit
 export struct MergeLimitOperatorState : public OperatorState {
     inline explicit MergeLimitOperatorState() : OperatorState(PhysicalOperatorType::kMergeLimit) {}
+
+    Vector<UniquePtr<DataBlock>> input_data_blocks_{}; // Since merge knn is the first op, no previous operator state. This ptr is to get input data.
+    bool input_complete_{false};
 };
 
 // Merge Top

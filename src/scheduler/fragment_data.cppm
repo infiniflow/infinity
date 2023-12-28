@@ -45,7 +45,7 @@ export struct FragmentError : public FragmentDataBase {
 export struct FragmentData : public FragmentDataBase {
     UniquePtr<DataBlock> data_block_{};
     i64 task_id_{-1};
-    SizeT data_idx_{u64_max};
+    Optional<SizeT> data_idx_{};
     SizeT data_count_{u64_max};
 
     FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, SizeT data_idx, SizeT data_count)
