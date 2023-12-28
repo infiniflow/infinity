@@ -110,6 +110,12 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             root = sort;
         }
 
+        if (limit_expression_ != nullptr) {
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_);
+            limit->set_left_node(root);
+            root = limit;
+        }
+
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
         project->set_left_node(root);
         root = project;

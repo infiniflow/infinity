@@ -26,18 +26,32 @@ class BlockingQueue {
 public:
     explicit BlockingQueue(SizeT capacity = DEFAULT_BLOCKING_QUEUE_SIZE) : capacity_(capacity) {}
 
-    void Enqueue(T& task) {
+    void NotAllowEnqueue() {
+        allow_enqueue_ = false;
+    }
+
+    bool Enqueue(T& task) {
+        if (!allow_enqueue_) {
+            return false;
+        }
+
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(task);
         empty_cv_.notify_one();
+        return true;
     }
 
-    void Enqueue(T&& task) {
+    bool Enqueue(T&& task) {
+        if (!allow_enqueue_) {
+            return false;
+        }
+
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(Forward<T>(task));
         empty_cv_.notify_one();
+        return true;
     }
 
     void EnqueueBulk(List<T> &input_queue) {
@@ -99,6 +113,7 @@ public:
     }
 
 protected:
+    atomic_bool allow_enqueue_{true};
     mutable Mutex queue_mutex_{};
     CondVar full_cv_{};
     CondVar empty_cv_{};

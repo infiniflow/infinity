@@ -115,6 +115,8 @@ import logical_match;
 import logical_fusion;
 
 import parser;
+import value;
+import value_expression;
 import explain_physical_plan;
 
 import infinity_exception;
@@ -543,11 +545,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
         return physical_agg_op;
     } else {
         return MakeUnique<PhysicalMergeAggregate>(query_context_ptr_->GetNextNodeID(),
-                                            logical_aggregate->base_table_ref_,
-                                            Move(physical_agg_op),
-                                            logical_aggregate->GetOutputNames(),
-                                            logical_aggregate->GetOutputTypes(),
-                                            logical_operator->load_metas());
+                                                  logical_aggregate->base_table_ref_,
+                                                  Move(physical_agg_op),
+                                                  logical_aggregate->GetOutputNames(),
+                                                  logical_aggregate->GetOutputTypes(),
+                                                  logical_operator->load_metas());
     }
 }
 
@@ -638,11 +640,29 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
 
     SharedPtr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
     UniquePtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
-                                     Move(input_physical_operator),
-                                     logical_limit->limit_expression_,
-                                     logical_limit->offset_expression_,
-                                     logical_operator->load_metas());
+    if (input_physical_operator->TaskletCount() <= 1) {
+        return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
+                                         Move(input_physical_operator),
+                                         logical_limit->limit_expression_,
+                                         logical_limit->offset_expression_,
+                                         logical_operator->load_metas());
+    } else {
+        i64 child_limit = (static_pointer_cast<ValueExpression>(logical_limit->limit_expression_))->GetValue().value_.big_int;
+
+        if (logical_limit->offset_expression_ != nullptr) {
+            child_limit += (static_pointer_cast<ValueExpression>(logical_limit->offset_expression_))->GetValue().value_.big_int;
+        }
+        auto child_limit_op = MakeUnique<PhysicalLimit>(logical_operator->node_id(),
+                                                        Move(input_physical_operator),
+                                                        MakeShared<ValueExpression>(Value::MakeBigInt(child_limit)),
+                                                        nullptr,
+                                                        logical_operator->load_metas());
+        return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
+                                              Move(child_limit_op),
+                                              logical_limit->limit_expression_,
+                                              logical_limit->offset_expression_,
+                                              logical_operator->load_metas());
+    }
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {

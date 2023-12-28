@@ -271,7 +271,7 @@ void DataBlock::AppendWith(const DataBlock *other) {
     }
 }
 
-void DataBlock::AppendWith(const SharedPtr<DataBlock> &other, SizeT from, SizeT count) {
+void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
     if (other->column_count() != this->column_count()) {
         Error<StorageException>(
             Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
