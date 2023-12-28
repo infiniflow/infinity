@@ -116,16 +116,14 @@ inline bool SubFunction::Run(TimeT left, IntervalT right, TimeT &result) {
 
 // DateTime - Interval
 template <>
-inline bool SubFunction::Run(DateTimeT, IntervalT, DateTimeT &) {
-    Error<NotImplementException>("Not implement");
-    return false;
+inline bool SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
+    return DateTimeT::Subtract(left, right, result);
 }
 
 // TimestampT - Interval
 template <>
-inline bool SubFunction::Run(TimestampT, IntervalT, TimestampT &) {
-    Error<NotImplementException>("Not implement");
-    return false;
+inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
+    return TimestampT::Subtract(left, right, result);
 }
 
 // Mixed Type - i64

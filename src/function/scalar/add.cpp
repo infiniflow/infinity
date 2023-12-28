@@ -132,9 +132,8 @@ inline bool AddFunction::Run(IntervalT left, TimeT right, TimeT &result) {
 
 // DateTime + Interval
 template <>
-inline bool AddFunction::Run(DateTimeT, IntervalT, DateTimeT &) {
-    Error<NotImplementException>("Not implemented: DateTimeT + IntervalT");
-    return false;
+inline bool AddFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
+    return DateTimeT::Add(left, right, result);
 }
 
 // Interval + DateTime
@@ -145,9 +144,8 @@ inline bool AddFunction::Run(IntervalT left, DateTimeT right, DateTimeT &result)
 
 // TimestampT + Interval
 template <>
-inline bool AddFunction::Run(TimestampT, IntervalT, TimestampT &) {
-    Error<NotImplementException>("Not implemented: TimestampT + IntervalT");
-    return false;
+inline bool AddFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
+    return TimestampT::Add(left, right, result);
 }
 
 // Interval + TimestampT
