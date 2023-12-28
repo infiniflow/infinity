@@ -17,7 +17,7 @@
 namespace infinity {
 
 void DateTimeType::FromString(const char *datetime_ptr, size_t length) {
-    // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS[.millisecond]"
+    // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS"
     size_t date_length;
     date.FromString(datetime_ptr, length, date_length);
     // skip space
@@ -84,31 +84,23 @@ int64_t DateTimeType::GetDateTimePart(DateTimeType input, TimeUnit unit) {
     return -1;
 }
 
-bool DateTimeType::YMDHMSM2DateTime(int32_t year,
-                                    int32_t month,
-                                    int32_t day,
-                                    int32_t hour,
-                                    int32_t minute,
-                                    int32_t second,
-                                    int32_t millisecond,
-                                    DateTimeType &datetime) {
-    return TimeType::HMSM2Time(hour, minute, second, millisecond, datetime.time) and DateType::YMD2Date(year, month, day, datetime.date);
+bool DateTimeType::YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime) {
+    return TimeType::HMS2Time(hour, minute, second, datetime.time) and DateType::YMD2Date(year, month, day, datetime.date);
 }
 
-bool DateTimeType::DateTime2YMDHMSM(int32_t days,
-                                    int32_t milliseconds,
-                                    int32_t &year,
-                                    int32_t &month,
-                                    int32_t &day,
-                                    int32_t &hour,
-                                    int32_t &minute,
-                                    int32_t &second,
-                                    int32_t &millisecond) {
-    return TimeType::Time2HMSM(milliseconds, hour, minute, second, millisecond) and DateType::Date2YMD(days, year, month, day);
+bool DateTimeType::DateTime2YMDHMS(int32_t days,
+                                   int32_t seconds,
+                                   int32_t &year,
+                                   int32_t &month,
+                                   int32_t &day,
+                                   int32_t &hour,
+                                   int32_t &minute,
+                                   int32_t &second) {
+    return TimeType::Time2HMS(seconds, hour, minute, second) and DateType::Date2YMD(days, year, month, day);
 }
 
-bool DateTimeType::IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, int32_t millisecond) {
-    return TimeType::IsTimeValid(hour, minute, second, millisecond) and DateType::IsDateValid(year, month, day);
+bool DateTimeType::IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second) {
+    return TimeType::IsTimeValid(hour, minute, second) and DateType::IsDateValid(year, month, day);
 }
 
 } // namespace infinity

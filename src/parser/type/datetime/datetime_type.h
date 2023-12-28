@@ -24,7 +24,7 @@ namespace infinity {
 struct DateTimeType {
     DateTimeType() = default;
 
-    // NOTICE: time_value is in milliseconds
+    // NOTICE: time_value is in seconds
     explicit DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value){};
 
     inline void Reset() {
@@ -34,7 +34,7 @@ struct DateTimeType {
 
     inline void FromString(const std::string &datetime_str) { FromString(datetime_str.c_str(), datetime_str.length()); }
 
-    // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS[.millisecond]"
+    // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS"
     void FromString(const char *datetime_ptr, size_t length);
 
     [[nodiscard]] inline std::string ToString() const { return date.ToString() + " " + time.ToString(); }
@@ -64,26 +64,12 @@ struct DateTimeType {
     static int64_t GetDateTimePart(DateTimeType input, TimeUnit unit);
 
 private:
-    static bool YMDHMSM2DateTime(int32_t year,
-                                 int32_t month,
-                                 int32_t day,
-                                 int32_t hour,
-                                 int32_t minute,
-                                 int32_t second,
-                                 int32_t millisecond,
-                                 DateTimeType &datetime);
+    static bool YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime);
 
-    static bool DateTime2YMDHMSM(int32_t days,
-                                 int32_t milliseconds,
-                                 int32_t &year,
-                                 int32_t &month,
-                                 int32_t &day,
-                                 int32_t &hour,
-                                 int32_t &minute,
-                                 int32_t &second,
-                                 int32_t &millisecond);
+    static bool
+    DateTime2YMDHMS(int32_t days, int32_t seconds, int32_t &year, int32_t &month, int32_t &day, int32_t &hour, int32_t &minute, int32_t &second);
 
-    static bool IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, int32_t millisecond);
+    static bool IsDateTimeValid(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second);
 
 public:
     // used in iresearch, need to be public

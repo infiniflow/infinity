@@ -20,6 +20,7 @@
 
 namespace infinity {
 
+// Time format: HH:MM:SS
 struct TimeType {
     friend struct DateTimeType;
 
@@ -59,15 +60,15 @@ struct TimeType {
 private:
     static bool ConvertFromString(const char *date_ptr, size_t length, TimeType &time);
 
-    static bool HMSM2Time(int32_t hour, int32_t minute, int32_t second, int32_t millisecond, TimeType &time);
+    static bool HMS2Time(int32_t hour, int32_t minute, int32_t second, TimeType &time);
 
-    static bool Time2HMSM(int32_t milliseconds, int32_t &hour, int32_t &minute, int32_t &second, int32_t &millisecond);
+    static bool Time2HMS(int32_t milliseconds, int32_t &hour, int32_t &minute, int32_t &second);
 
-    static bool IsTimeValid(int32_t hour, int32_t minute, int32_t second, int32_t millisecond);
+    static bool IsTimeValid(int32_t hour, int32_t minute, int32_t second);
 
 public:
     // used in iresearch, need to be public
-    // value means the number of milliseconds since midnight in the range [0, 86'400'000).
+    // value means the number of seconds since midnight in the range 0 to 86399
     int32_t value{};
 };
 
