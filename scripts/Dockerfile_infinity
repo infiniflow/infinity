@@ -1,0 +1,5 @@
+FROM debian:stable-slim
+
+COPY cmake-build-release/src/infinity /usr/bin
+
+ENTRYPOINT [ "/usr/bin/infinity" ]
