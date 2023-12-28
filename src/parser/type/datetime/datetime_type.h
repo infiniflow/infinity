@@ -63,6 +63,8 @@ struct DateTimeType {
 
     static int64_t GetDateTimePart(DateTimeType input, TimeUnit unit);
 
+    static int64_t GetEpochTime(const DateTimeType &dt);
+
 private:
     static bool YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime);
 

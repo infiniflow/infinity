@@ -84,6 +84,11 @@ int64_t DateTimeType::GetDateTimePart(DateTimeType input, TimeUnit unit) {
     return -1;
 }
 
+int64_t DateTimeType::GetEpochTime(const DateTimeType &dt) {
+    constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
+    return dt.date.value * TotalSecondsInDay + dt.time.value;
+}
+
 bool DateTimeType::YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime) {
     return TimeType::HMS2Time(hour, minute, second, datetime.time) and DateType::YMD2Date(year, month, day, datetime.date);
 }
