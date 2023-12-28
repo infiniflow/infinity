@@ -23,8 +23,10 @@ import physical_operator_type;
 import load_meta;
 import base_table_ref;
 import infinity_exception;
+import value;
 
 export module physical_merge_aggregate;
+#include "../../../../../../../usr/x86_64-linux-gnu/include/complex.h"
 
 namespace infinity {
 
@@ -53,6 +55,32 @@ public:
         Error<NotImplementException>("TaskletCount not Implement");
         return 0;
     }
+
+    void UpdateBlockData(MergeAggregateOperatorState *merge_aggregate_op_state);
+
+    template <typename T>
+    T AddData(Value input_value, MergeAggregateOperatorState *merge_aggregate_op_state);
+
+    template <typename T>
+    T GetDataFromValueAtInputBlockPosition(MergeAggregateOperatorState *op_state, SizeT row, SizeT col) {
+        Value value = op_state->input_data_block_->GetValue(row, col);
+        return value.GetValue<T>();
+    }
+
+    template <typename T>
+    T GetDataFromValueAtOutputBlockPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT row, SizeT col) {
+        Value value = op_state->data_block_array_[block_index]->GetValue(row, col);
+        return value.GetValue<T>();
+    }
+
+    void WriteIntegerAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT row, SizeT col, IntegerT integer) {
+        op_state->data_block_array_[block_index]->SetValue(row, col, Value::MakeInt(integer));
+    }
+
+    IntegerT MinValue(IntegerT a, IntegerT b) { return (a < b) ? a : b; }
+
+    IntegerT MaxValue(IntegerT a, IntegerT b) { return (a > b) ? a : b; }
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

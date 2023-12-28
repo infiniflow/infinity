@@ -605,25 +605,6 @@ bool PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table,
         LOG_TRACE("No input, no aggregate result");
         return true;
     }
-    // Loop blocks
-
-    //    ExpressionEvaluator evaluator;
-    //    //evaluator.Init(input_table_->data_blocks_);
-    //    for (SizeT expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
-    //
-    //        ExpressionEvaluator evaluator;
-    //        evaluator.Init(aggregates_[])
-    //        Vector<SharedPtr<ColumnVector>> blocks_column;
-    //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-    //        evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], blocks_column[expr_idx]);
-    //        if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
-    //            // column vector in blocks column might be changed to the column vector from column reference.
-    //            // This check and assignment is to make sure the right column vector are assign to output_data_block
-    //            output_data_block->column_vectors[expr_idx] = blocks_column[0];
-    //        }
-    //    }
-    //
-    //    output_data_block->Finalize();
 
     for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
         DataBlock *input_data_block = pre_operator_state->data_block_array_[block_idx].get();
@@ -650,6 +631,8 @@ bool PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table,
     if (pre_operator_state->Complete()) {
         aggregate_operator_state->SetComplete();
     }
+
+    LOG_TRACE("Physical aggregate");
     return true;
 }
 

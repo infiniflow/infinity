@@ -674,7 +674,20 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kInvalid: {
             Error<SchedulerException>("Unexpected operator type");
         }
-        case PhysicalOperatorType::kAggregate:
+        case PhysicalOperatorType::kAggregate: {
+            if (fragment_type_ != FragmentType::kParallelStream) {
+                Error<SchedulerException>(Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            if ((i64)tasks_.size() != parallel_count) {
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
+            }
+            break;
+        }
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kTop: {
@@ -712,6 +725,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate:
+        case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:

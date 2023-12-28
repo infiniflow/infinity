@@ -114,6 +114,12 @@ bool QueueSourceState::GetData() {
             }
             break;
         }
+        case PhysicalOperatorType::kMergeAggregate: {
+            MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
+            merge_aggregate_op_state->input_data_block_ = Move(fragment_data->data_block_);
+            merge_aggregate_op_state->input_complete_ = completed;
+            break;
+        }
         default: {
             Error<ExecutorException>("Not support operator type");
             break;

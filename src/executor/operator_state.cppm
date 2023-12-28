@@ -60,6 +60,10 @@ export struct AggregateOperatorState : public OperatorState {
 // Merge Aggregate
 export struct MergeAggregateOperatorState : public OperatorState {
     inline explicit MergeAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeAggregate) {}
+
+    /// Since merge agg is the first op, no previous operator state. This ptr is to get input data.
+    UniquePtr<DataBlock> input_data_block_{nullptr};
+    bool input_complete_{false};
 };
 
 // Merge Parallel Aggregate

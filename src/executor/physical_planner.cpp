@@ -531,8 +531,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
         input_physical_operator = BuildPhysicalOperator(input_logical_node);
     }
 
-    SizeT tasklet_count = input_physical_operator->TaskletCount();
-
     auto physical_agg_op = MakeUnique<PhysicalAggregate>(logical_aggregate->node_id(),
                                                          Move(input_physical_operator),
                                                          logical_aggregate->groups_,
@@ -540,6 +538,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                          logical_aggregate->aggregates_,
                                                          logical_aggregate->aggregate_index_,
                                                          logical_operator->load_metas());
+
+    SizeT tasklet_count = input_physical_operator->TaskletCount();
 
     if (tasklet_count == 1) {
         return physical_agg_op;
