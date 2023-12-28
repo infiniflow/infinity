@@ -53,8 +53,6 @@ public:
 
     bool Execute(QueryContext *query_context, SourceState *source_state);
 
-    bool ReadyToExec(SourceState *source_state);
-
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }

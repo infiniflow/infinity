@@ -24,30 +24,10 @@ namespace infinity {
 
 class FragmentContext;
 
-// Task type:
-// DDL task
-// DML task
-// Query task
-// Read data from queue or file system
-
-enum class FragmentSourceType {
-    kNone,
-    kScan,
-    kQueue,
-};
-
-enum class FragmentSinkType {
-    kGlobalMaterialize,
-    kLocalMaterialize,
-    kStream,
-};
-
-enum class FragmentTaskStatus {
-    kRunning,
-    kCancelled,
-    kFinished,
-    kReady,
+export enum class FragmentTaskStatus {
     kPending,
+    kRunning,
+    kFinished,
     kError,
 };
 
@@ -60,8 +40,6 @@ public:
         Init();
     }
 
-    inline void SetTerminator() { is_terminator_ = true; }
-
     [[nodiscard]] inline bool IsTerminator() const { return is_terminator_; }
 
     void Init();
@@ -70,15 +48,24 @@ public:
 
     inline void SetLastWorkID(i64 worker_id) { last_worker_id_ = worker_id; }
 
-    // [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
+    [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
     u64 FragmentId() const;
 
     [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
-    [[nodiscard]] bool Ready() const;
-
     [[nodiscard]] bool IsComplete() const;
+
+    bool TryIntoWorkerLoop() {
+        UniqueLock<Mutex> lock(mutex_);
+        if (status_ == FragmentTaskStatus::kPending) {
+            status_ = FragmentTaskStatus::kRunning;
+            return true;
+        }
+        return false;
+    }
+
+    bool QuitFromWorkerLoop();
 
     [[nodiscard]] TaskBinding TaskBinding() const;
 
@@ -88,13 +75,9 @@ public:
 
     inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
 
-    [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
-
     FragmentContext *fragment_context() const;
 
 public:
-    FragmentTaskStatus status_{FragmentTaskStatus::kReady};
-
     UniquePtr<SourceState> source_state_{};
 
     Vector<UniquePtr<OperatorState>> operator_states_{};
@@ -102,9 +85,12 @@ public:
     UniquePtr<SinkState> sink_state_{};
 
 private:
+    Mutex mutex_{};
+    FragmentTaskStatus status_{FragmentTaskStatus::kPending};
+
     void *fragment_context_{};
     bool is_terminator_{false};
-    [[maybe_unused]] i64 last_worker_id_{-1};
+    i64 last_worker_id_{-1};
     i64 task_id_{-1};
     i64 operator_count_{0};
 };

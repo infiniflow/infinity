@@ -102,7 +102,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get());
 
     // Schedule the query tasks
-    query_context_ptr->scheduler()->Schedule(query_context_ptr.get(), plan_fragment.get());
+    query_context_ptr->scheduler()->Schedule(plan_fragment.get());
 
     // Initialize query result
     QueryResult query_result;

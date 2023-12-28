@@ -90,13 +90,13 @@ void FragmentTask::OnExecute(i64) {
 
         if (err_msg.get() != nullptr) {
             sink_state_->error_message_ = Move(err_msg);
-            this->set_status(FragmentTaskStatus::kError);
+            status_ = FragmentTaskStatus::kError;
         }
     }
 
     if (source_complete && source_state_->error_message_.get() != nullptr) {
         sink_state_->error_message_ = Move(source_state_->error_message_);
-        this->set_status(FragmentTaskStatus::kError);
+        status_ = FragmentTaskStatus::kError;
     }
 
     if (execute_success or sink_state_->error_message_.get() != nullptr) {
@@ -110,13 +110,29 @@ u64 FragmentTask::FragmentId() const {
     return fragment_context->fragment_ptr()->FragmentID();
 }
 
-bool FragmentTask::Ready() const {
-    FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    PhysicalSource *source_op = fragment_context->GetSourceOperator();
-    return source_op->ReadyToExec(source_state_.get());
+// Finished **OR** Error
+bool FragmentTask::IsComplete() const {
+    return status_ == FragmentTaskStatus::kError || status_ == FragmentTaskStatus::kFinished;
 }
 
-bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() or status() == FragmentTaskStatus::kError; }
+// Stream fragment source has no data
+bool FragmentTask::QuitFromWorkerLoop() {
+    auto fragment_context = static_cast<FragmentContext *>(fragment_context_);
+    if (fragment_context->ContextType() != FragmentType::kParallelStream) {
+        return false;
+    }
+    if (source_state_->state_type_ != SourceStateType::kQueue) {
+        Error<SchedulerException>("SourceStateType is not kQueue");
+    }
+    auto *queue_state = static_cast<QueueSourceState *>(source_state_.get());
+
+    UniqueLock<Mutex> lock(mutex_);
+    if (status_ == FragmentTaskStatus::kRunning && queue_state->source_queue_.Empty()) {
+        status_ = FragmentTaskStatus::kPending;
+        return true;
+    }
+    return false;
+}
 
 TaskBinding FragmentTask::TaskBinding() const {
     struct TaskBinding binding {};
@@ -127,6 +143,9 @@ TaskBinding FragmentTask::TaskBinding() const {
 }
 
 void FragmentTask::CompleteTask() {
+    if (status_ == FragmentTaskStatus::kRunning) {
+        status_ = FragmentTaskStatus::kFinished;
+    }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(Format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
     fragment_context->TryFinishFragment();

@@ -101,8 +101,6 @@ public:
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
-    Vector<PlanFragment *> GetSchedulableFragments();
-
 private:
     bool TryStartFragment() {
         if (fragment_status_ != FragmentStatus::kNotStart) {

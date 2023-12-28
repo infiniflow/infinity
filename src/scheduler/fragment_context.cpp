@@ -461,45 +461,23 @@ void FragmentContext::TryFinishFragment() {
         return;
     }
     auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
-    if (!parent_fragment_ctx->TryStartFragment()) {
+    auto *scheduler = query_context_->scheduler();
+    if (parent_fragment_ctx->TryStartFragment()) {
+        // All child fragment are finished.
+        scheduler->ScheduleFragment(parent_plan_fragment);
         return;
     }
 
-    // All child fragment are finished.
-    Vector<PlanFragment *> fragments = parent_fragment_ctx->GetSchedulableFragments();
-    auto *scheduler = query_context_->scheduler();
-    scheduler->ScheduleFragments(Move(fragments));
-}
-
-Vector<PlanFragment *> FragmentContext::GetSchedulableFragments() {
-    Vector<PlanFragment *> result;
-    StdFunction<void(FragmentContext *)> RecursiveScheduleFragment = [&result, &RecursiveScheduleFragment](FragmentContext *fragment_ctx) {
-        switch (fragment_ctx->fragment_status_) {
-            case FragmentStatus::kNotStart: {
-                fragment_ctx->fragment_status_ = FragmentStatus::kStart;
-                result.emplace_back(fragment_ctx->fragment_ptr_);
-
-                // Recursive schedule parent if current fragment is **STREAM**.
-                if (fragment_ctx->fragment_type_ == FragmentType::kParallelStream) {
-                    auto *parent_plan_fragment = fragment_ctx->fragment_ptr_->GetParent();
-                    if (parent_plan_fragment == nullptr) {
-                        return;
-                    }
-                    auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
-                    RecursiveScheduleFragment(parent_fragment_ctx);
-                }
-                return;
-            }
-            case FragmentStatus::kStart: {
-                return;
-            }
-            default: {
-                Error<SchedulerException>("Bug: Parent fragment has error stauts.");
-            }
+    if (parent_fragment_ctx->fragment_type_ != FragmentType::kParallelStream) {
+        return;
+    }
+    Vector<FragmentTask *> task_ptrs;
+    for (auto &task : parent_fragment_ctx->Tasks()) {
+        if (task->TryIntoWorkerLoop()) {
+            task_ptrs.emplace_back(task.get());
         }
-    };
-    RecursiveScheduleFragment(this);
-    return result;
+    }
+    scheduler->ScheduleTasks(task_ptrs);
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }

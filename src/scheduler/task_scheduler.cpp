@@ -72,15 +72,6 @@ void TaskScheduler::UnInit() {
     }
 }
 
-void TaskScheduler::Schedule(QueryContext *query_context, PlanFragment *plan_fragment) {
-    if (!initialized_) {
-        Error<SchedulerException>("Scheduler isn't initialized");
-    }
-
-    Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
-    ScheduleFragments(Move(fragments));
-}
-
 Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
     Vector<PlanFragment *> leaf_fragments;
     StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
@@ -95,19 +86,17 @@ Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragm
     // Traverse the tree to get all leaf fragments
     TraversePlanFragmentTree(plan_fragment);
 
-    // Add all stream's parent
-    Vector<PlanFragment *> start_fragments;
-    for (auto *leaf_fragment : leaf_fragments) {
-        auto *fragment_ctx = leaf_fragment->GetContext();
-        auto fragments = fragment_ctx->GetSchedulableFragments();
-        start_fragments.insert(start_fragments.end(), fragments.begin(), fragments.end());
-    }
-    return start_fragments;
+    return leaf_fragments;
 }
 
-void TaskScheduler::ScheduleFragments(Vector<PlanFragment *> plan_fragments) {
+void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
+    if (!initialized_) {
+        Error<SchedulerException>("Scheduler isn't initialized");
+    }
+
+    Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
     u64 worker_id = 0;
-    for (auto *plan_fragment : plan_fragments) {
+    for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
             worker_array_[worker_id].queue_->Enqueue(task.get());
@@ -115,6 +104,25 @@ void TaskScheduler::ScheduleFragments(Vector<PlanFragment *> plan_fragments) {
             ++worker_id;
             worker_id %= worker_count_;
         }
+    }
+}
+
+void TaskScheduler::ScheduleFragment(PlanFragment * plan_fragment) {
+    Vector<FragmentTask *> task_ptrs;
+    auto &tasks = plan_fragment->GetContext()->Tasks();
+    for (auto &task : tasks) {
+        task_ptrs.emplace_back(task.get());
+    }
+    ScheduleTasks(task_ptrs);
+}
+
+void TaskScheduler::ScheduleTasks(Vector<FragmentTask *> fragment_tasks) {
+    u64 worker_id = 0;
+    for (auto *task : fragment_tasks) {
+        ScheduleTask(task, worker_id);
+        ++worker_workloads_[worker_id];
+        ++worker_id;
+        worker_id %= worker_count_;
     }
 }
 
@@ -138,10 +146,13 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         }
 
         fragment_task->OnExecute(worker_id);
-        // fragment_task->SetLastWorkID(worker_id);
+        fragment_task->SetLastWorkID(worker_id);
         if (fragment_task->IsComplete()) {
             --worker_workloads_[worker_id];
             fragment_task->CompleteTask();
+            iter = task_lists.erase(iter);
+        } else if (fragment_task->QuitFromWorkerLoop()) {
+            --worker_workloads_[worker_id];
             iter = task_lists.erase(iter);
         } else {
             ++iter;
