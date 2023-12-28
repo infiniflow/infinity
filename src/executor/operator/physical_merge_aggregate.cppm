@@ -81,6 +81,8 @@ public:
 
     IntegerT MaxValue(IntegerT a, IntegerT b) { return (a > b) ? a : b; }
 
+    void SimpleMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state) ;
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
