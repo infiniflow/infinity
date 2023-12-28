@@ -58,8 +58,8 @@ sudo systemctl start infinity
 #### Deploy using Docker on Linux x86_64 and MacOS x86_64
 
 ```bash
-docker pull infiniflow/infinity
-docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity ./opt/bin/infinity
+docker pull infiniflow/infinity:nightly
+docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity:nightly
 ```
 
 
