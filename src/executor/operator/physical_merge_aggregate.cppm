@@ -73,31 +73,13 @@ public:
         return value.GetValue<T>();
     }
 
-    // template <typename T>
-    // T GetDataFromValueAtInputBlockPosition2(const Vector<UniquePtr<DataBlock>> &input_blocks, SizeT block_index, SizeT row, SizeT col) {
-    //     Value value = input_blocks[block_index]->GetValue(col, row);
-    //     return value.GetValue<T>();
-    // }
-    //
-    // template <typename T>
-    // T GetDataFromValueAtOutputBlockPosition2(const Vector<UniquePtr<DataBlock>> &output_blocks, SizeT block_index, SizeT row, SizeT col) {
-    //     Value value = output_blocks[block_index]->GetValue(col, row);
-    //     return value.GetValue<T>();
-    // }
-
     void WriteIntegerAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, IntegerT integer) {
         op_state->data_block_array_[block_index]->SetValue(col_idx, row_idx, Value::MakeInt(integer));
     }
 
-    // void WriteIntegerAtPosition2(Vector<UniquePtr<DataBlock>> &output_blocks, SizeT block_index, SizeT row, SizeT col, IntegerT integer) {
-    //     output_blocks[block_index]->SetValue(col, row, Value::MakeInt(integer));
-    // }
-
     IntegerT MinValue(IntegerT a, IntegerT b) { return (a < b) ? a : b; }
 
     IntegerT MaxValue(IntegerT a, IntegerT b) { return (a > b) ? a : b; }
-
-    bool SimpleMergeAggregateExecute(Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks);
 
 private:
     SharedPtr<Vector<String>> output_names_{};
