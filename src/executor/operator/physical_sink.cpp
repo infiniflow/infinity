@@ -36,7 +36,7 @@ void PhysicalSink::Init() {}
 
 bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 
-bool PhysicalSink::Execute(QueryContext *, SinkState *sink_state) {
+bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
             Error<ExecutorException>("Invalid sinker type");
@@ -68,7 +68,7 @@ bool PhysicalSink::Execute(QueryContext *, SinkState *sink_state) {
         }
         case SinkStateType::kQueue: {
             QueueSinkState *queue_sink_state = static_cast<QueueSinkState *>(sink_state);
-            FillSinkStateFromLastOperatorState(queue_sink_state, queue_sink_state->prev_op_state_);
+            FillSinkStateFromLastOperatorState(fragment_context, queue_sink_state, queue_sink_state->prev_op_state_);
             break;
         }
     }
@@ -345,7 +345,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_context, QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
     if (queue_sink_state->error_message_.get() != nullptr) {
         LOG_TRACE(Format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
         auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
@@ -355,7 +355,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
         return;
     }
 
-    if (!task_operator_state->Complete() && queue_sink_state->IsMaterialize()) {
+    if (!task_operator_state->Complete() && fragment_context->IsMaterialize()) {
         LOG_TRACE("Task not completed");
         return;
     }
@@ -373,7 +373,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(QueueSinkState *queue_sink
                                                       queue_sink_state->task_id_,
                                                       idx,
                                                       output_data_block_count);
-        if (task_operator_state->Complete() && !queue_sink_state->IsMaterialize()) {
+        if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
             fragment_data->data_idx_ = None;
         }
 

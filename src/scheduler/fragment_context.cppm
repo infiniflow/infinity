@@ -18,7 +18,6 @@ import stl;
 import fragment_task;
 import query_context;
 import profiler;
-import operator_state;
 import physical_operator;
 import physical_source;
 import physical_sink;
@@ -30,6 +29,23 @@ import create_index_data;
 export module fragment_context;
 
 namespace infinity {
+
+class PlanFragment;
+
+//class KnnScanSharedData;
+
+// enum class FragmentStatus {
+//     kNotStart,
+//     k
+//     kStart,
+//     kFinish,
+// };
+export enum class FragmentType {
+    kInvalid,
+    kSerialMaterialize,
+    kParallelMaterialize,
+    kParallelStream,
+};
 
 class PlanFragment;
 
@@ -63,6 +79,9 @@ public:
     void CreateTasks(i64 parallel_count, i64 operator_count);
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
+
+    [[nodiscard]] inline bool IsMaterialize() const { return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize; }
+
 
     inline SharedPtr<DataTable> GetResult() {
         UniqueLock<Mutex> lk(locker_);

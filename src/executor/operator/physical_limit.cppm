@@ -45,7 +45,7 @@ public:
 
 export class AtomicCounter : public LimitCounter {
 public:
-    AtomicCounter(const i64 &offset, const i64 &limit) : offset_(offset), limit_(limit) {}
+    AtomicCounter(i64 offset, i64 limit) : offset_(offset), limit_(limit) {}
 
     SizeT Offset(SizeT row_count);
 
@@ -60,7 +60,7 @@ private:
 
 export class UnSyncCounter : public LimitCounter {
 public:
-    UnSyncCounter(const i64 &offset, const i64 &limit) : offset_(offset), limit_(limit) {}
+    UnSyncCounter(i64 offset, i64 limit) : offset_(offset), limit_(limit) {}
 
     SizeT Offset(SizeT row_count);
 
@@ -88,7 +88,7 @@ public:
     static bool Execute(QueryContext *query_context,
                         const Vector<UniquePtr<DataBlock>> &input_blocks,
                         Vector<UniquePtr<DataBlock>> &output_blocks,
-                        SharedPtr<LimitCounter> counter);
+                        LimitCounter *counter);
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -96,7 +96,9 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override;
+    SizeT TaskletCount() override {
+        return left_->TaskletCount();
+    }
 
     inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
 
@@ -106,7 +108,7 @@ private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
 
-    SharedPtr<LimitCounter> counter_;
+    UniquePtr<LimitCounter> counter_;
 };
 
 } // namespace infinity

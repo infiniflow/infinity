@@ -42,14 +42,18 @@ PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
     if (offset_expr_ != nullptr) {
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
-    counter_ = MakeShared<UnSyncCounter>(offset, limit);
+    counter_ = MakeUnique<UnSyncCounter>(offset, limit);
 }
 
 void PhysicalMergeLimit::Init() {}
 
 bool PhysicalMergeLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
     MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)operator_state;
-    auto result = PhysicalLimit::Execute(query_context, limit_op_state->input_data_blocks_, limit_op_state->data_block_array_, counter_);
+
+    if (limit_op_state->input_data_blocks_.empty()) {
+        return false;
+    }
+    auto result = PhysicalLimit::Execute(query_context, limit_op_state->input_data_blocks_, limit_op_state->data_block_array_, counter_.get());
 
     if (counter_->IsLimitOver() || limit_op_state->input_complete_) {
         limit_op_state->input_complete_ = true;

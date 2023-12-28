@@ -40,7 +40,7 @@ namespace infinity {
 
 SizeT AtomicCounter::Offset(SizeT row_count) {
     auto success = false;
-    SizeT result;
+    SizeT result = 0;
 
     while (!success) {
         i64 current_offset = offset_;
@@ -63,7 +63,7 @@ SizeT AtomicCounter::Offset(SizeT row_count) {
 
 SizeT AtomicCounter::Limit(SizeT row_count) {
     auto success = false;
-    SizeT result;
+    SizeT result = 0;
 
     while (!success) {
         i64 current_limit = limit_;
@@ -150,16 +150,10 @@ PhysicalLimit::PhysicalLimit(u64 id,
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
 
-    counter_ = MakeShared<UnSyncCounter>(offset, limit);
+    counter_ = MakeUnique<UnSyncCounter>(offset, limit);
 }
 
 void PhysicalLimit::Init() {}
-
-SizeT PhysicalLimit::TaskletCount() {
-    i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
-
-    return limit / DEFAULT_BLOCK_CAPACITY;
-}
 
 //    offset     limit + offset
 //    left       right
@@ -167,7 +161,7 @@ SizeT PhysicalLimit::TaskletCount() {
 bool PhysicalLimit::Execute(QueryContext *query_context,
                             const Vector<UniquePtr<DataBlock>> &input_blocks,
                             Vector<UniquePtr<DataBlock>> &output_blocks,
-                            SharedPtr<LimitCounter> counter) {
+                            LimitCounter *counter) {
     SizeT input_row_count = 0;
 
     for (SizeT block_id = 0; block_id < input_blocks.size(); block_id++) {
@@ -190,7 +184,6 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
 
         if (offset > max_offset) {
             offset -= max_offset;
-            continue;
         } else {
             block_start_idx = block_id;
             break;
@@ -226,7 +219,7 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
 }
 
 bool PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    auto result = Execute(query_context, operator_state->prev_op_state_->data_block_array_, operator_state->data_block_array_, counter_);
+    auto result = Execute(query_context, operator_state->prev_op_state_->data_block_array_, operator_state->data_block_array_, counter_.get());
 
     operator_state->prev_op_state_->data_block_array_.clear();
     if (counter_->IsLimitOver() || operator_state->prev_op_state_->Complete()) {

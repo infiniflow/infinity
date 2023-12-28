@@ -49,8 +49,7 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
-        return 0;
+        return left_->TaskletCount();
     }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
