@@ -119,6 +119,10 @@ public:
 
     [[nodiscard]] ptr_t GetState() const { return state_data_.get(); }
 
+    [[nodiscard]] String GetFuncName() const {
+        return name_;
+    }
+
 public:
     AggregateInitializeFuncType init_func_;
     AggregateUpdateFuncType update_func_;
