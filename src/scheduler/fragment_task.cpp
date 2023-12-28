@@ -111,9 +111,7 @@ u64 FragmentTask::FragmentId() const {
 }
 
 // Finished **OR** Error
-bool FragmentTask::IsComplete() const {
-    return status_ == FragmentTaskStatus::kError || status_ == FragmentTaskStatus::kFinished;
-}
+bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
 
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {

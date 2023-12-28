@@ -99,32 +99,44 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
-            worker_array_[worker_id].queue_->Enqueue(task.get());
-            ++worker_workloads_[worker_id];
+            ScheduleTask(task.get(), worker_id);
             ++worker_id;
             worker_id %= worker_count_;
         }
     }
 }
 
-void TaskScheduler::ScheduleFragment(PlanFragment * plan_fragment) {
+void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
     Vector<FragmentTask *> task_ptrs;
     auto &tasks = plan_fragment->GetContext()->Tasks();
     for (auto &task : tasks) {
         task_ptrs.emplace_back(task.get());
     }
-    ScheduleTasks(task_ptrs);
-}
-
-void TaskScheduler::ScheduleTasks(Vector<FragmentTask *> fragment_tasks) {
     u64 worker_id = 0;
-    for (auto *task : fragment_tasks) {
-        ScheduleTask(task, worker_id);
-        ++worker_workloads_[worker_id];
+    for (auto *task_ptr : task_ptrs) {
+        ScheduleTask(task_ptr, worker_id);
         ++worker_id;
         worker_id %= worker_count_;
     }
 }
+
+void TaskScheduler::ScheduleTasks(Vector<FragmentTask *> fragment_tasks) {
+    // u64 worker_id = 0;
+    for (auto *task_ptr : fragment_tasks) {
+        i64 last_worker_id = task_ptr->LastWorkerID();
+        if (last_worker_id == -1) {
+            Error<SchedulerException>("Task is not scheduled before");
+        }
+        ScheduleTask(task_ptr, last_worker_id);
+    }
+}
+
+void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
+    task->set_status(FragmentTaskStatus::kRunning);
+    ++worker_workloads_[worker_id];
+    worker_array_[worker_id].queue_->Enqueue(task);
+}
+
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     List<FragmentTask *> task_lists;
@@ -147,6 +159,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
 
         fragment_task->OnExecute(worker_id);
         fragment_task->SetLastWorkID(worker_id);
+
         if (fragment_task->IsComplete()) {
             --worker_workloads_[worker_id];
             fragment_task->CompleteTask();

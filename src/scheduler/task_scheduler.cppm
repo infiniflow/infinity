@@ -59,14 +59,11 @@ private:
     // void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
     // void ScheduleRoundRobin(const Vector<FragmentTask *> &tasks);
 
-    inline void ScheduleTask(FragmentTask *task, u64 worker_id) {
-        task->set_status(FragmentTaskStatus::kRunning);
-        worker_array_[worker_id].queue_->Enqueue(task);
-    }
+    void ScheduleTask(FragmentTask *task, u64 worker_id);
 
-    inline u64 ProposedWorkerID(u64 object_id) const {
-        return (object_id) % worker_count_;
-    }
+    // inline u64 ProposedWorkerID(u64 object_id) const {
+    //     return (object_id) % worker_count_;
+    // }
 
     void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
 

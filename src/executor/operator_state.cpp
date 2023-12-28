@@ -42,6 +42,11 @@ bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     source_queue_.Dequeue(fragment_data_base);
 
+    OperatorState *next_op_state1 = this->next_op_state_;
+    if (next_op_state1->operator_type_ == PhysicalOperatorType::kFusion) {
+        int a = 1;
+    }
+
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
