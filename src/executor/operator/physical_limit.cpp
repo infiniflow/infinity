@@ -92,7 +92,7 @@ bool AtomicCounter::IsLimitOver() {
 }
 
 SizeT UnSyncCounter::Offset(SizeT row_count) {
-    SizeT result;
+    SizeT result = 0;
 
     if (offset_ <= 0) {
         return 0;
@@ -111,7 +111,7 @@ SizeT UnSyncCounter::Offset(SizeT row_count) {
 }
 
 SizeT UnSyncCounter::Limit(SizeT row_count) {
-    SizeT result;
+    SizeT result = 0;
 
     if (limit_ <= 0) {
         return 0;

@@ -54,8 +54,8 @@ public:
     bool IsLimitOver();
 
 private:
-    ai64 offset_;
-    ai64 limit_;
+    ai64 offset_{};
+    ai64 limit_{};
 };
 
 export class UnSyncCounter : public LimitCounter {
@@ -69,8 +69,8 @@ public:
     bool IsLimitOver();
 
 private:
-    i64 offset_;
-    i64 limit_;
+    i64 offset_{};
+    i64 limit_{};
 };
 
 export class PhysicalLimit : public PhysicalOperator {
@@ -108,7 +108,7 @@ private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
 
-    UniquePtr<LimitCounter> counter_;
+    UniquePtr<LimitCounter> counter_{};
 };
 
 } // namespace infinity

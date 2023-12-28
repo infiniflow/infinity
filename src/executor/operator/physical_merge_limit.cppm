@@ -56,7 +56,7 @@ private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};
 
-    UniquePtr<LimitCounter> counter_;
+    UniquePtr<LimitCounter> counter_{};
 };
 
 } // namespace infinity
