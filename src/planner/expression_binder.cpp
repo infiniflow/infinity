@@ -64,6 +64,7 @@ namespace infinity {
 
 SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     // Call implemented BuildExpression
+
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
@@ -286,23 +287,40 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         Vector<String> col_names{};
         ColumnExpr *col_expr = nullptr;
         FunctionExpr *div_function_expr = new FunctionExpr();
-        FunctionExpr *sum_function_expr = new FunctionExpr();
-        FunctionExpr *count_function_expr = new FunctionExpr();
-        Vector<ParsedExpr *> *arguments = new Vector<ParsedExpr *>();
+        div_function_expr->func_name_ = String("div");
+        div_function_expr->arguments_ = new Vector<ParsedExpr*>();
+
         if (expr.arguments_->size() == 1) {
             if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
                 col_expr = (ColumnExpr *)(*expr.arguments_)[0];
                 col_names = col_expr->names_;
             }
+            FunctionExpr *sum_function_expr = new FunctionExpr();
             sum_function_expr->func_name_ = String("sum");
-            sum_function_expr->arguments_->reserve(1);
+            sum_function_expr->arguments_ = new Vector<ParsedExpr*>();
+            ColumnExpr* column_expr_for_sum = new ColumnExpr();
+            column_expr_for_sum->names_.emplace_back(col_names[0]);
+            sum_function_expr->arguments_->emplace_back(column_expr_for_sum);
+
+            FunctionExpr *count_function_expr = new FunctionExpr();
             count_function_expr->func_name_= String("count");
-            sum_function_expr->arguments_->reserve(1);
-            *count_function_expr->arguments_->emplace_back(col_expr);
-            arguments->emplace_back(sum_function_expr);
-            arguments->emplace_back(count_function_expr);
-            div_function_expr->arguments_=arguments;
+            count_function_expr->arguments_ = new Vector<ParsedExpr*>();
+            ColumnExpr* column_expr_for_count = new ColumnExpr();
+            column_expr_for_sum->names_.emplace_back(col_names[0]);
+            count_function_expr->arguments_->emplace_back(column_expr_for_count);
+
+            div_function_expr->arguments_->emplace_back(sum_function_expr);
+            div_function_expr->arguments_->emplace_back(count_function_expr);
         }
+
+        // Vector<SharedPtr<BaseExpression>> arguments;
+        // arguments.reserve(div_function_expr->arguments_->size());
+        // for (const auto *arg_expr : *div_function_expr->arguments_) {
+        //     // The argument expression isn't root expression.
+        //     // SharedPtr<BaseExpression> expr_ptr
+        //     auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
+        //     arguments.emplace_back(expr_ptr);
+        // }
     }
 
     Vector<SharedPtr<BaseExpression>> arguments;

@@ -684,7 +684,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
+                auto sink_state = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
+
+                tasks_[task_id]->sink_state_ = Move(sink_state);
             }
             break;
         }
