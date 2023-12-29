@@ -112,30 +112,32 @@ EXPLAIN LOGICAL SELECT MIN(c1 + 1), AVG(c2) FROM t1;
 ----
  PROJECT (4)
   - table index: #4
-  - expressions: [min((c1 + 1)) (#0), avg(c2) (#1)]
+  - expressions: [min((c1 + 1)) (#0), sum(c2) (#1) / count(c2) (#2)]
  -> AGGREGATE (3)
     - aggregate table index: #3
-    - aggregate: [MIN(CAST(c1 (#0) AS BigInt) + 1), AVG(c2 (#1))]
+    - aggregate: [MIN(CAST(c1 (#0) AS BigInt) + 1), SUM(c2 (#1)), COUNT(c2 (#1))]
    -> TABLE SCAN (2)
       - table name: t1(default.t1)
       - table index: #1
       - output columns: [c1, c2, __rowid]
+
 
 query I
 EXPLAIN LOGICAL SELECT Min(c1 + 1), AVG(c2) FROM t1 GROUP BY c1;
 ----
  PROJECT (4)
   - table index: #4
-  - expressions: [min((c1 + 1)) (#1), avg(c2) (#2)]
+  - expressions: [min((c1 + 1)) (#1), sum(c2) (#2) / count(c2) (#3)]
  -> AGGREGATE (3)
     - aggregate table index: #3
-    - aggregate: [MIN(CAST(c1 (#0) AS BigInt) + 1), AVG(c2 (#1))]
+    - aggregate: [MIN(CAST(c1 (#0) AS BigInt) + 1), SUM(c2 (#1)), COUNT(c2 (#1))]
     - group by table index: #2
     - group by: [c1 (#0)]
    -> TABLE SCAN (2)
       - table name: t1(default.t1)
       - table index: #1
       - output columns: [c1, c2, __rowid]
+
 
 query I
 EXPLAIN LOGICAL DELETE FROM t1 WHERE c1=1;

@@ -32,6 +32,58 @@ namespace infinity {
 SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     String expr_name = expr.GetName();
 
+    // Covert avg function expr to (sum / count) function expr
+    if (expr.type_ == ParsedExprType::kFunction) {
+        auto special_function = TryBuildSpecialFuncExpr((FunctionExpr &)expr, bind_context_ptr, depth);
+
+        if (special_function.has_value()) {
+            return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+        }
+
+        SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), (FunctionExpr &)expr);
+
+        CheckFuncType(function_set_ptr->type_);
+        if (IsEqual(function_set_ptr->name(), String("AVG"))) {
+            auto &fun_expr = (FunctionExpr &)expr;
+            Vector<String> col_names{};
+            FunctionExpr *div_function_expr = new FunctionExpr();
+            div_function_expr->func_name_ = String("/");
+            div_function_expr->arguments_ = new Vector<ParsedExpr *>();
+
+            if (fun_expr.arguments_->size() == 1) {
+                if ((*fun_expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
+                    ColumnExpr *col_expr = (ColumnExpr *)(*fun_expr.arguments_)[0];
+                    col_names = Move(col_expr->names_);
+
+                    fun_expr.func_name_ = "/";
+                    delete fun_expr.arguments_;
+                    fun_expr.arguments_ = nullptr;
+                }
+
+                FunctionExpr *sum_function_expr = new FunctionExpr();
+                sum_function_expr->func_name_ = String("sum");
+                sum_function_expr->arguments_ = new Vector<ParsedExpr *>();
+                ColumnExpr *column_expr_for_sum = new ColumnExpr();
+                column_expr_for_sum->names_.emplace_back(col_names[0]);
+                sum_function_expr->arguments_->emplace_back(column_expr_for_sum);
+
+                FunctionExpr *count_function_expr = new FunctionExpr();
+                count_function_expr->func_name_ = String("count");
+                count_function_expr->arguments_ = new Vector<ParsedExpr *>();
+                ColumnExpr *column_expr_for_count = new ColumnExpr();
+                column_expr_for_count->names_.emplace_back(col_names[0]);
+                count_function_expr->arguments_->emplace_back(column_expr_for_count);
+
+                div_function_expr->arguments_->emplace_back(sum_function_expr);
+                div_function_expr->arguments_->emplace_back(count_function_expr);
+
+                auto div_func_name = div_function_expr->GetName();
+
+                return ExpressionBinder::BuildExpression(*div_function_expr, bind_context_ptr, depth, root);
+            }
+        }
+    }
+
     // If the expr isn't from aggregate function and coming from group by lists.
     if (!this->binding_agg_func_ && bind_context_ptr->group_index_by_name_.contains(expr_name)) {
         i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
@@ -94,8 +146,13 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            Error<PlannerException>("Aggregate function is called in another aggregate function.");
+            Error<PlannerException>(Format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name()));
         } else {
+            // if (IsEqual(function_set_ptr->name(),String("AVG"))) {
+            //     this->binding_agg_func_ = false;
+            // }else {
+            //     this->binding_agg_func_ = true;
+            // }
             this->binding_agg_func_ = true;
         }
     }

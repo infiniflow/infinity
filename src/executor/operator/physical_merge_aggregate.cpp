@@ -42,9 +42,9 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
     if (merge_aggregate_op_state->input_complete_) {
 
         LOG_TRACE("PhysicalMergeAggregate::Input is complete");
-        // for (auto &output_block : merge_aggregate_op_state->data_block_array_) {
-        //     output_block->Finalize();
-        // }
+        for (auto &output_block : merge_aggregate_op_state->data_block_array_) {
+            output_block->Finalize();
+        }
 
         merge_aggregate_op_state->SetComplete();
         return true;
@@ -83,6 +83,7 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                 IntegerT new_int = MaxValue(input_int, out_int);
                 WriteIntegerAtPosition(merge_aggregate_op_state, 0, col_idx, 0, new_int);
             } else if (String(function_name) == String("SUM")) {
+                LOG_TRACE("PhysicalAggregate::Execute:: COUNT");
                 UpdateBlockData(merge_aggregate_op_state, col_idx);
             }
 

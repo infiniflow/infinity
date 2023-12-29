@@ -6,6 +6,7 @@ from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
 from generate_sort import generate as generate3
 from generate_limit import generate as generate4
+from generate_aggregate import generate as generate5
 
 
 def python_skd_test(python_test_dir: str):
@@ -108,6 +109,7 @@ if __name__ == "__main__":
     generate2(args.generate_if_exists, args.copy)
     generate3(args.generate_if_exists, args.copy)
     generate4(args.generate_if_exists, args.copy)
+    generate5(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
     python_skd_test(python_test_dir)
     test_process(args.path, args.test, args.data, args.copy)
