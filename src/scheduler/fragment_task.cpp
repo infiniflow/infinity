@@ -120,7 +120,8 @@ bool FragmentTask::QuitFromWorkerLoop() {
         return false;
     }
     if (source_state_->state_type_ != SourceStateType::kQueue) {
-        Error<SchedulerException>("SourceStateType is not kQueue");
+        return false;
+        // Error<SchedulerException>("SourceStateType is not kQueue");
     }
     auto *queue_state = static_cast<QueueSourceState *>(source_state_.get());
 
