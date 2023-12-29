@@ -146,9 +146,20 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<Function
     //            }
     //        }
     //    }
+    bool result_is_constant = true;
+    for (auto &child_state : result->Children()) {
+        if (auto &column_ptr = child_state->OutputColumnVector(); !column_ptr || column_ptr->vector_type() != ColumnVectorType::kConstant) {
+            result_is_constant = false;
+            break;
+        }
+    }
 
     result->column_vector_ = MakeShared<ColumnVector>(function_expr_data_type);
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    if (result_is_constant) {
+        result->column_vector_->Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
+    } else {
+        result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    }
 
     //    result->output_data_block_.Init({function_expr->Type()});
     return result;

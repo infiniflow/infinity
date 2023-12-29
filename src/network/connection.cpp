@@ -222,8 +222,18 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 break;
             }
             case LogicalType::kTime: {
-                object_id = 1266;
-                object_width = 12;
+                object_id = 1083;
+                object_width = 8;
+                break;
+            }
+            case LogicalType::kDateTime: {
+                object_id = 1114;
+                object_width = 8;
+                break;
+            }
+            case LogicalType::kTimestamp: {
+                object_id = 1114;
+                object_width = 8;
                 break;
             }
             case LogicalType::kInterval: {

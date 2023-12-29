@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e -o pipefail
+
 echo
 echo "running script $0"
 echo "current working directory : $PWD"

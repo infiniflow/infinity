@@ -14,11 +14,17 @@
 
 #pragma once
 
+#include "datetime_type.h"
 #include "parser_assert.h"
 #include <string>
 
 namespace infinity {
-
+struct TimestampType : public DateTimeType {
+    TimestampType() = default;
+    explicit TimestampType(int32_t date_value, int32_t time_value) : DateTimeType(date_value, time_value){};
+    ~TimestampType() = default;
+};
+/*
 struct TimestampType {
     TimestampType() = default;
 
@@ -37,5 +43,5 @@ struct TimestampType {
     int32_t date{};
     int32_t time{};
 };
-
+*/
 } // namespace infinity

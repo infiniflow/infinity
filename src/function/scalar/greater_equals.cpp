@@ -120,9 +120,9 @@ void RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     //    GenerateGreaterEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
     GenerateGreaterEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    //    GenerateGreaterEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    //    GenerateGreaterEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    //    GenerateGreaterEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateGreaterEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateGreaterEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateGreaterEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateGreaterEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
     //    GenerateGreaterEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));

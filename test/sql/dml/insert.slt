@@ -33,3 +33,29 @@ SELECT * FROM products;
 # Clean up
 statement ok
 DROP TABLE products;
+
+statement ok
+DROP TABLE IF EXISTS date1;
+
+statement ok
+CREATE TABLE date1 (d DATE);
+
+statement ok
+INSERT INTO date1 VALUES (DATE '1970-1-1');
+
+query I
+SELECT * FROM date1;
+----
+1970-01-01
+
+statement ok
+INSERT INTO date1 VALUES (DATE '2222/11/11');
+
+query I
+SELECT * FROM date1;
+----
+1970-01-01
+2222-11-11
+
+statement ok
+DROP TABLE date1;
