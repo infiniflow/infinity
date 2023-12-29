@@ -115,12 +115,16 @@ void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
             task_ptrs.emplace_back(task.get());
         }
     }
-
+    last_cpu_id_ = 0; // FIXME
     u64 &worker_id = last_cpu_id_;
     for (auto *task_ptr : task_ptrs) {
-        ScheduleTask(task_ptr, worker_id);
-        ++worker_id;
-        worker_id %= worker_count_;
+        if (task_ptr->LastWorkerID() == -1) {
+            ScheduleTask(task_ptr, worker_id);
+            ++worker_id;
+            worker_id %= worker_count_;
+        } else {
+            ScheduleTask(task_ptr, task_ptr->LastWorkerID());
+        }
     }
 }
 
