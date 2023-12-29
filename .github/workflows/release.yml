@@ -103,6 +103,7 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v5
       with:
+        context: .
         push: true
         tags: infiniflow/infinity:${{ env.RELEASE_TAG }}
         file: scripts/Dockerfile_infinity
