@@ -60,7 +60,7 @@ void FragmentTask::OnExecute(i64) {
 
     bool execute_success{false};
     bool source_complete = source_op->Execute(fragment_context->query_context(), source_state_.get());
-    if (source_state_->error_message_.get() == nullptr) {
+    if(source_state_->error_message_.get() == nullptr) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -120,8 +120,8 @@ bool FragmentTask::QuitFromWorkerLoop() {
         return false;
     }
     if (source_state_->state_type_ != SourceStateType::kQueue) {
+        // fragment's source is not from queue
         return false;
-        // Error<SchedulerException>("SourceStateType is not kQueue");
     }
     auto *queue_state = static_cast<QueueSourceState *>(source_state_.get());
 

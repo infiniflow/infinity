@@ -26,7 +26,7 @@ namespace infinity {
 class QueryContext;
 class PlanFragment;
 
-using FragmentTaskBlockQueue = BlockingQueue<FragmentTask *>;
+using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
 
 struct Worker {
     Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
