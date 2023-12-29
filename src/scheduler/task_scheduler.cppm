@@ -46,11 +46,11 @@ public:
 
     void UnInit();
 
-    void Schedule(PlanFragment * plan_fragment);
+    // Schedule start fragments
+    void Schedule(PlanFragment * plan_fragment_root);
 
-    void ScheduleFragment(PlanFragment * plan_fragment);
-
-    void ScheduleTasks(Vector<FragmentTask *> fragment_tasks);
+    // `plan_fragment` can be scheduled because all of its dependencies are met.
+    void ScheduleFragment(PlanFragment *plan_fragment);
 
 private:
     Vector<PlanFragment *> GetStartFragments(PlanFragment* plan_fragment);

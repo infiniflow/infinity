@@ -461,23 +461,14 @@ void FragmentContext::TryFinishFragment() {
         return;
     }
     auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
-    auto *scheduler = query_context_->scheduler();
-    if (parent_fragment_ctx->TryStartFragment()) {
-        // All child fragment are finished.
-        scheduler->ScheduleFragment(parent_plan_fragment);
-        return;
-    }
 
-    if (parent_fragment_ctx->fragment_type_ != FragmentType::kParallelStream) {
+    if (!parent_fragment_ctx->TryStartFragment() && parent_fragment_ctx->fragment_type_ != FragmentType::kParallelStream) {
         return;
     }
-    Vector<FragmentTask *> task_ptrs;
-    for (auto &task : parent_fragment_ctx->Tasks()) {
-        if (task->TryIntoWorkerLoop()) {
-            task_ptrs.emplace_back(task.get());
-        }
-    }
-    scheduler->ScheduleTasks(task_ptrs);
+    // All child fragment are finished.
+    auto *scheduler = query_context_->scheduler();
+    scheduler->ScheduleFragment(parent_plan_fragment);
+    return;
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }

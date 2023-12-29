@@ -95,7 +95,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     }
 
     Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
-    u64 worker_id = 0;
+    last_cpu_id_ = 0; // FIXME
+    u64 &worker_id = last_cpu_id_;
     for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
@@ -110,24 +111,16 @@ void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
     Vector<FragmentTask *> task_ptrs;
     auto &tasks = plan_fragment->GetContext()->Tasks();
     for (auto &task : tasks) {
-        task_ptrs.emplace_back(task.get());
+        if (task->TryIntoWorkerLoop()) {
+            task_ptrs.emplace_back(task.get());
+        }
     }
-    u64 worker_id = 0;
+
+    u64 &worker_id = last_cpu_id_;
     for (auto *task_ptr : task_ptrs) {
         ScheduleTask(task_ptr, worker_id);
         ++worker_id;
         worker_id %= worker_count_;
-    }
-}
-
-void TaskScheduler::ScheduleTasks(Vector<FragmentTask *> fragment_tasks) {
-    // u64 worker_id = 0;
-    for (auto *task_ptr : fragment_tasks) {
-        i64 last_worker_id = task_ptr->LastWorkerID();
-        if (last_worker_id == -1) {
-            Error<SchedulerException>("Task is not scheduled before");
-        }
-        ScheduleTask(task_ptr, last_worker_id);
     }
 }
 
@@ -148,7 +141,9 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         } else {
             task_queue->TryDequeueBulk(dequeue_output);
         }
-        task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+        if (!dequeue_output.empty()) {
+            task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+        }
         if (iter == task_lists.end()) {
             iter = task_lists.begin();
         }
