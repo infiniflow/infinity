@@ -338,6 +338,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = Move(insert_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *create_index_prepare_output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
+            message_sink_state->message_ = Move(create_index_prepare_output_state->result_msg_);
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            auto *create_index_do_output_state = static_cast<CreateIndexDoOperatorState *>(task_operator_state);
+            message_sink_state->message_ = Move(create_index_do_output_state->result_msg_);
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;

@@ -245,14 +245,13 @@ export struct CreateIndexPrepareOperatorState : public OperatorState {
 export struct CreateIndexDoOperatorState : public OperatorState {
     inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
 
-    bool input_complete_ = false;
+    UniquePtr<String> result_msg_{};
     CreateIndexSharedData *create_index_shared_data_;
 };
 
 export struct CreateIndexFinishOperatorState : public OperatorState {
     inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
 
-    bool input_complete_ = false;
     UniquePtr<String> error_message_{};
 };
 

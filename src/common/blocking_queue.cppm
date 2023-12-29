@@ -102,6 +102,16 @@ public:
         full_cv_.notify_one();
     }
 
+    bool TryDequeueBulk(Vector<T> &output_array) {
+        UniqueLock<Mutex> lock(queue_mutex_);
+        if (queue_.empty()) {
+            return false;
+        }
+        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
+        queue_.clear();
+        full_cv_.notify_one();
+    }
+
     [[nodiscard]] SizeT Size() const {
         LockGuard<Mutex> lock(queue_mutex_);
         return queue_.size();

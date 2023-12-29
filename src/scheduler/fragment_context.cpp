@@ -47,7 +47,7 @@ import physical_merge_knn;
 import merge_knn_data;
 import create_index_data;
 import logger;
-
+import task_scheduler;
 import plan_fragment;
 
 module fragment_context;
@@ -326,10 +326,7 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     }
 }
 
-void FragmentContext::BuildTask(QueryContext *query_context,
-                                FragmentContext *parent_context,
-                                PlanFragment *fragment_ptr,
-                                Vector<FragmentTask *> &task_array) {
+void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr) {
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
@@ -419,7 +416,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     if (fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : fragment_ptr->Children()) {
-            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), task_array);
+            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get());
         }
     }
     switch (fragment_operators[0]->operator_type()) {
@@ -430,7 +427,6 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             if (explain_op->explain_type() == ExplainType::kPipeline) {
                 CollectTasks(result, fragment_ptr->Children()[0].get());
                 explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
-                task_array.clear();
                 break;
             }
         }
@@ -438,26 +434,41 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             break;
     }
 
-    for (const auto &task : tasks) {
-        task_array.emplace_back(task.get());
-    }
-
     fragment_ptr->SetContext(Move(fragment_context));
 }
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
-    : fragment_ptr_(fragment_ptr), fragment_type_(fragment_ptr->GetFragmentType()), query_context_(query_context){};
+    : fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
+      fragment_status_(FragmentStatus::kNotStart), unfinished_child_n_(fragment_ptr->Children().size()) {}
 
-void FragmentContext::FinishTask() {
-    u64 unfinished_task = task_n_.fetch_sub(1);
-    auto sink_op = GetSinkOperator();
-
-    if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
-        LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
-        Complete();
-    } else {
-        LOG_TRACE(Format("Not all tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+void FragmentContext::TryFinishFragment() {
+    if (!TryFinishFragmentInner()) {
+        LOG_TRACE(Format("{} tasks in fragment are not completed: {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        return;
     }
+    LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+    fragment_status_ = FragmentStatus::kFinish;
+
+    auto *sink_op = GetSinkOperator();
+    if (sink_op->sink_type() == SinkType::kResult) {
+        Complete();
+        return;
+    }
+
+    // Try to schedule parent fragment
+    auto *parent_plan_fragment = fragment_ptr_->GetParent();
+    if (parent_plan_fragment == nullptr) {
+        return;
+    }
+    auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+
+    if (!parent_fragment_ctx->TryStartFragment() && parent_fragment_ctx->fragment_type_ != FragmentType::kParallelStream) {
+        return;
+    }
+    // All child fragment are finished.
+    auto *scheduler = query_context_->scheduler();
+    scheduler->ScheduleFragment(parent_plan_fragment);
+    return;
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }
@@ -561,8 +572,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
         case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kFusion:
-        case PhysicalOperatorType::kCreateIndexFinish: {
+        case PhysicalOperatorType::kFusion: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should be serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -581,7 +591,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                     Format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
             for (auto &task : tasks_) {
-                task->source_state_ = MakeUnique<QueueSourceState>();
+                task->source_state_ = MakeUnique<EmptySourceState>();
             }
             break;
         }
@@ -634,6 +644,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateIndexPrepare:
+        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -754,9 +765,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kKnnScan:
-        case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexDo: {
+        case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     Format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -835,6 +844,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -848,6 +858,16 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+                Error<SchedulerException>(
+                    Format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+            for (auto &task : tasks_) {
+                task->sink_state_ = MakeUnique<MessageSinkState>();
+            }
             break;
         }
         case PhysicalOperatorType::kCommand:
