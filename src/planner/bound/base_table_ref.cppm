@@ -53,6 +53,23 @@ public:
         replace_field<SharedPtr<DataType>>(*column_types_, indices);
     };
 
+    void RetainColumnByIds(Vector<SizeT> &&ids) {
+        if (ids.empty()) {
+            return;
+        }
+        Vector<SizeT> indices;
+        indices.reserve(ids.size());
+
+        std::sort(ids.begin(), ids.end());
+        for (SizeT i = 0, ids_i = 0; i < column_ids_.size() && ids_i < ids.size(); ++i) {
+            if (column_ids_[i] == ids[ids_i]) {
+                indices.push_back(i);
+                ids_i ++;
+            }
+        }
+        RetainColumnByIndices(Move(indices));
+    }
+
     SharedPtr<String> schema_name() const { return table_entry_ptr_->table_collection_meta_->db_entry_->db_name_; }
 
     SharedPtr<String> table_name() const { return table_entry_ptr_->table_collection_name_; }

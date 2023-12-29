@@ -112,27 +112,27 @@ void CleanScan::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto table_scan = dynamic_cast<LogicalTableScan &>(op);
-            Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
+            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
-            table_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            table_scan.base_table_ref_->RetainColumnByIds(Move(project_ids));
             table_scan.add_row_id_ = true;
             break;
         }
         case LogicalNodeType::kKnnScan: {
             auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
-            Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
+            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
-            knn_scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            knn_scan.base_table_ref_->RetainColumnByIds(Move(project_ids));
             break;
         }
         case LogicalNodeType::kMatch: {
             auto match = dynamic_cast<LogicalMatch &>(op);
-            Vector<SizeT> project_indices = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
+            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
 
             scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
-            match.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            match.base_table_ref_->RetainColumnByIds(Move(project_ids));
             break;
         }
         case LogicalNodeType::kLimit:
