@@ -91,4 +91,33 @@ inline std::string ToLower(std::string const &s) {
     return result;
 }
 
+inline bool IsUTF8Sep(const uint8_t c) { return c < 128 && !std::isalnum(c); }
+
+template <typename T>
+inline uint32_t GetLeadingZeroBits(T x) {
+    if constexpr (sizeof(T) <= sizeof(unsigned int)) {
+        return __builtin_clz(x);
+    } else if constexpr (sizeof(T) <= sizeof(unsigned long int)) {
+        return __builtin_clzl(x);
+    } else {
+        return __builtin_clzll(x);
+    }
+}
+
+template <typename T>
+inline uint32_t BitScanReverse(T x) {
+    return (std::max<size_t>(sizeof(T), sizeof(unsigned int))) * 8 - 1 - GetLeadingZeroBits(x);
+}
+
+/// return UTF-8 code point sequence length
+inline uint32_t UTF8SeqLength(const uint8_t first_octet) {
+    if (first_octet < 0x80 || first_octet >= 0xF8)
+        return 1;
+
+    const uint32_t bits = 8;
+    const auto first_zero = BitScanReverse(static_cast<uint8_t>(~first_octet));
+
+    return bits - 1 - first_zero;
+}
+
 } // namespace infinity
