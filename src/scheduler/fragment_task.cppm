@@ -73,7 +73,10 @@ public:
 
     String PhysOpsToString();
 
-    inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
+    inline void set_status(FragmentTaskStatus new_status) { 
+        UniqueLock<Mutex> lock(mutex_);
+        status_ = new_status;
+    }
 
     FragmentContext *fragment_context() const;
 

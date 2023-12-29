@@ -142,6 +142,7 @@ TaskBinding FragmentTask::TaskBinding() const {
 }
 
 void FragmentTask::CompleteTask() {
+    UniqueLock<Mutex> lock(mutex_);
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
     }
