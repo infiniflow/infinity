@@ -13,12 +13,12 @@
 // limitations under the License.
 
 module;
-
+#include <type_traits>
 import stl;
 import function;
 import function_data;
 import column_vector;
-
+import vector_buffer;
 import infinity_exception;
 import base_expression;
 import parser;
@@ -43,6 +43,21 @@ public:
         // Loop execute state update according to the input column vector
 
         switch (input_column_vector->vector_type()) {
+            case ColumnVectorType::kCompactBit: {
+                if constexpr (!std::is_same_v<InputType, BooleanT>) {
+                    Error<TypeException>("kCompactBit column vector only support Boolean type");
+                } else {
+                    // only for count, min, max
+                    SizeT row_count = input_column_vector->Size();
+                    BooleanT value;
+                    const VectorBuffer *buffer = input_column_vector->buffer_.get();
+                    for (SizeT idx = 0; idx < row_count; ++idx) {
+                        value = buffer->GetCompactBit(idx);
+                        ((AggregateState *)state)->Update(&value, 0);
+                    }
+                }
+                break;
+            }
             case ColumnVectorType::kFlat: {
                 SizeT row_count = input_column_vector->Size();
                 auto *input_ptr = (InputType *)(input_column_vector->data());
@@ -52,6 +67,15 @@ public:
                 break;
             }
             case ColumnVectorType::kConstant: {
+                if (input_column_vector->data_type()->type() == LogicalType::kBoolean) {
+                    if constexpr (!std::is_same_v<InputType, BooleanT>) {
+                        Error<TypeException>("types do not match");
+                    } else {
+                        BooleanT value = input_column_vector->buffer_->GetCompactBit(0);
+                        ((AggregateState *)state)->Update(&value, 0);
+                    }
+                    break;
+                }
                 auto *input_ptr = (InputType *)(input_column_vector->data());
                 ((AggregateState *)state)->Update(input_ptr, 0);
                 break;

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 module;
-
 #include <cmath>
+#include <type_traits>
 
 import stl;
 import new_catalog;
@@ -32,7 +32,12 @@ namespace infinity {
 struct InEqualsFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = (left != right);
+        if constexpr (std::is_same_v<std::remove_cv_t<TA>, u8> && std::is_same_v<std::remove_cv_t<TB>, u8> &&
+                      std::is_same_v<std::remove_cv_t<TC>, u8>) {
+            result = (left ^ right);
+        } else {
+            result = (left != right);
+        }
     }
 };
 

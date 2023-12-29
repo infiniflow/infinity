@@ -1,0 +1,130 @@
+statement ok
+DROP TABLE IF EXISTS boolean1;
+
+statement ok
+CREATE TABLE boolean1 (i INTEGER, b1 BOOLEAN, b2 BOOLEAN);
+
+statement ok
+INSERT INTO boolean1 VALUES (1, TRUE, FALSE), (2, FALSE, TRUE), (3, TRUE, TRUE), (4, FALSE, FALSE), (5, TRUE, FALSE),
+ (6, FALSE, TRUE), (7, TRUE, TRUE), (8, FALSE, FALSE), (9, TRUE, FALSE), (10, FALSE, TRUE);
+
+query I
+SELECT * FROM boolean1;
+----
+1 true false
+2 false true
+3 true true
+4 false false
+5 true false
+6 false true
+7 true true
+8 false false
+9 true false
+10 false true
+
+query II
+SELECT * FROM boolean1 WHERE b1;
+----
+1 true false
+3 true true
+5 true false
+7 true true
+9 true false
+
+query III
+SELECT * FROM boolean1 WHERE b1 and b2;
+----
+3 true true
+7 true true
+
+query IV
+SELECT * FROM boolean1 WHERE b1 and not b2;
+----
+1 true false
+5 true false
+9 true false
+
+query V
+SELECT * FROM boolean1 WHERE (i > 5) and (not b1);
+----
+6 false true
+8 false false
+10 false true
+
+query VI
+SELECT * FROM boolean1 WHERE (i > 5) and (not b1) and (not b2);
+----
+8 false false
+
+query VII
+SELECT * FROM boolean1 WHERE b1 = b2;
+----
+3 true true
+4 false false
+7 true true
+8 false false
+
+query VIII
+SELECT * FROM boolean1 WHERE b1 <> b2;
+----
+1 true false
+2 false true
+5 true false
+6 false true
+9 true false
+10 false true
+
+statement ok
+DROP TABLE boolean1;
+
+statement ok
+DROP TABLE IF EXISTS boolean2;
+
+statement ok
+CREATE TABLE boolean2 (i INTEGER, b1 BOOLEAN, b2 BOOLEAN);
+
+statement ok
+INSERT INTO boolean2 VALUES (1, TRUE, FALSE), (2, FALSE, TRUE);
+
+query I
+SELECT * FROM boolean2;
+----
+1 true false
+2 false true
+
+query II
+SELECT * FROM boolean2 WHERE b1;
+----
+1 true false
+
+query III
+SELECT * FROM boolean2 WHERE b2;
+----
+2 false true
+
+query IV
+SELECT * FROM boolean2 WHERE b1 and not b2;
+----
+1 true false
+
+query V
+SELECT * FROM boolean2 WHERE (not b1) and b2;
+----
+2 false true
+
+query VI
+SELECT * FROM boolean2 WHERE (not b1) and (not b2);
+----
+
+query VII
+SELECT * FROM boolean2 WHERE b1 = b2;
+----
+
+query VIII
+SELECT * FROM boolean2 WHERE b1 <> b2;
+----
+1 true false
+2 false true
+
+statement ok
+DROP TABLE boolean2;

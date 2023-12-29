@@ -78,6 +78,9 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
         return static_cast<const_ptr_t>(inline_col_.GetData()) + data_type.Size() * row_idx;
     } else {
         switch (data_type.type()) {
+            case LogicalType::kBoolean: {
+                Error<ExecutorException>("Can't return a pointer for compact Boolean type");
+            }
             case LogicalType::kVarchar:
             case LogicalType::kArray:
             case LogicalType::kTuple:
@@ -145,6 +148,9 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
         return static_cast<ptr_t>(inline_col_.GetDataMut()) + data_type.Size() * row_idx;
     } else {
         switch (data_type.type()) {
+            case LogicalType::kBoolean: {
+                Error<ExecutorException>("Can't return a pointer for compact Boolean type");
+            }
             case kVarchar:
             case kArray:
             case kTuple:

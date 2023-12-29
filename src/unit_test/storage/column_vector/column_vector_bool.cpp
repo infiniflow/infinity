@@ -37,7 +37,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
@@ -45,9 +45,9 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.data_type_size_, 1);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kCompactBit);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kCompactBit);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -102,7 +102,7 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     //    EXPECT_THROW(column_vector.Initialize(), TypeException);
     //    column_vector.SetVectorType(ColumnVectorType::kFlat);
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), TypeException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
@@ -110,9 +110,9 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
     EXPECT_THROW(column_vector.GetValue(0), TypeException);
     EXPECT_EQ(column_vector.data_type_size_, 1);
     EXPECT_NE(column_vector.data(), nullptr);
-    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
+    EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kCompactBit);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kCompactBit);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -157,7 +157,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kCompactBit);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -199,7 +199,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kStandard);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kCompactBit);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);

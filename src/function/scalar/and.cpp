@@ -14,6 +14,7 @@
 
 module;
 
+#include <type_traits>
 import stl;
 import new_catalog;
 
@@ -30,7 +31,15 @@ namespace infinity {
 struct AndFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = left and right;
+        if constexpr (std::is_same_v<std::remove_cv_t<TA>, u8> && std::is_same_v<std::remove_cv_t<TB>, u8> &&
+                      std::is_same_v<std::remove_cv_t<TC>, u8>) {
+            result = left & right;
+        } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT> &&
+                             std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
+            result = left and right;
+        } else {
+            Error<TypeException>("AND function accepts only u8 and BooleanT.");
+        }
     }
 };
 

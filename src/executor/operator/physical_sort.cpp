@@ -101,7 +101,16 @@ public:
 
             switch (type.type()) {
                 case kBoolean: {
-                    COMPARE(BooleanT)
+                    auto bool_left = left_result_vector->buffer_->GetCompactBit(left_index.offset);
+                    auto bool_right = right_result_vector->buffer_->GetCompactBit(left_index.offset);
+                    if (bool_left == bool_right) {
+                        continue;
+                    }
+                    if (order_type == OrderType::kAsc) {
+                        return bool_left < bool_right;
+                    } else {
+                        return bool_left > bool_right;
+                    }
                 }
                 case kTinyInt: {
                     COMPARE(TinyIntT)

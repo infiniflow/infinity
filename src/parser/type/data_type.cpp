@@ -26,7 +26,10 @@ namespace infinity {
 
 DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info_ptr) : type_(logical_type), type_info_(std::move(type_info_ptr)) {
     switch (logical_type) {
-        case kBoolean:
+        case kBoolean: {
+            plain_type_ = false;
+            break;
+        }
         case kTinyInt:
         case kSmallInt:
         case kInteger:
