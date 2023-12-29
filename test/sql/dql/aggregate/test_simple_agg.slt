@@ -22,7 +22,7 @@ SELECT SUM(c2) FROM simple_agg
 query I
 SELECT AVG(c1) FROM simple_agg
 ----
-2.000000
+2
 
 query II
 SELECT AVG(c2) FROM simple_agg
@@ -53,6 +53,51 @@ query I
 SELECT COUNT(c1) FROM simple_agg
 ----
 3
+
+query III
+SELECT SUM(c1)+SUM(c1) FROM simple_agg;
+----
+12
+
+query III
+SELECT MAX(c1)+SUM(c1) FROM simple_agg;
+----
+9
+
+query III
+SELECT MAX(c1)+SUM(c2) FROM simple_agg;
+----
+9.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18.000000
+
+query III
+SELECT MAX(c1)-SUM(c2) FROM simple_agg;
+----
+-3.000000
+
+query III
+SELECT MAX(c1)/SUM(c2) FROM simple_agg;
+----
+0.500000
+
+query III
+SELECT MAX(c1)/AVG(c2) FROM simple_agg;
+----
+1.500000
+
+query III
+SELECT MAX(c1)*AVG(c2) FROM simple_agg;
+----
+6.000000
 
 
 statement ok

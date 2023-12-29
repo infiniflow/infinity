@@ -281,48 +281,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         }
     }
 
-    // covert avg function expr to (sum / count) function expr
-
-    if (function_set_ptr->name() == "AVG") {
-        Vector<String> col_names{};
-        ColumnExpr *col_expr = nullptr;
-        FunctionExpr *div_function_expr = new FunctionExpr();
-        div_function_expr->func_name_ = String("div");
-        div_function_expr->arguments_ = new Vector<ParsedExpr*>();
-
-        if (expr.arguments_->size() == 1) {
-            if ((*expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
-                col_expr = (ColumnExpr *)(*expr.arguments_)[0];
-                col_names = col_expr->names_;
-            }
-            FunctionExpr *sum_function_expr = new FunctionExpr();
-            sum_function_expr->func_name_ = String("sum");
-            sum_function_expr->arguments_ = new Vector<ParsedExpr*>();
-            ColumnExpr* column_expr_for_sum = new ColumnExpr();
-            column_expr_for_sum->names_.emplace_back(col_names[0]);
-            sum_function_expr->arguments_->emplace_back(column_expr_for_sum);
-
-            FunctionExpr *count_function_expr = new FunctionExpr();
-            count_function_expr->func_name_= String("count");
-            count_function_expr->arguments_ = new Vector<ParsedExpr*>();
-            ColumnExpr* column_expr_for_count = new ColumnExpr();
-            column_expr_for_sum->names_.emplace_back(col_names[0]);
-            count_function_expr->arguments_->emplace_back(column_expr_for_count);
-
-            div_function_expr->arguments_->emplace_back(sum_function_expr);
-            div_function_expr->arguments_->emplace_back(count_function_expr);
-        }
-
-        // Vector<SharedPtr<BaseExpression>> arguments;
-        // arguments.reserve(div_function_expr->arguments_->size());
-        // for (const auto *arg_expr : *div_function_expr->arguments_) {
-        //     // The argument expression isn't root expression.
-        //     // SharedPtr<BaseExpression> expr_ptr
-        //     auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
-        //     arguments.emplace_back(expr_ptr);
-        // }
-    }
-
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.reserve(expr.arguments_->size());
     for (const auto *arg_expr : *expr.arguments_) {

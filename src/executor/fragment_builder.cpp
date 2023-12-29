@@ -188,7 +188,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
             current_fragment_ptr->AddChild(Move(next_plan_fragment));
-
             if (phys_op->right() != nullptr) {
                 auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
                 next_plan_fragment->SetSinkNode(query_context_ptr_,
