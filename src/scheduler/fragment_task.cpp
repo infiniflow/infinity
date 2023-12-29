@@ -111,7 +111,10 @@ u64 FragmentTask::FragmentId() const {
 }
 
 // Finished **OR** Error
-bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
+bool FragmentTask::IsComplete() {
+    UniqueLock<Mutex> lock(mutex_);
+    return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError;
+}
 
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {
@@ -142,7 +145,6 @@ TaskBinding FragmentTask::TaskBinding() const {
 }
 
 void FragmentTask::CompleteTask() {
-    UniqueLock<Mutex> lock(mutex_);
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
     }

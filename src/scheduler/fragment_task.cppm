@@ -54,7 +54,7 @@ public:
 
     [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
-    [[nodiscard]] bool IsComplete() const;
+    [[nodiscard]] bool IsComplete();
 
     bool TryIntoWorkerLoop() {
         UniqueLock<Mutex> lock(mutex_);
