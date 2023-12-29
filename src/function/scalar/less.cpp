@@ -120,9 +120,9 @@ void RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     //    GenerateLessFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
     GenerateLessFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    //    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    //    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    //    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateLessFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
     //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));

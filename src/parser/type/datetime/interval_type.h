@@ -33,7 +33,7 @@ struct IntervalType {
 
     inline explicit IntervalType(int32_t v) : value(v) {}
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 
     inline void Reset() {
         unit = TimeUnit::kInvalidUnit;

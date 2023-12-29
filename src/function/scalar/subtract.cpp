@@ -108,18 +108,22 @@ inline bool SubFunction::Run(DateT left, IntervalT right, DateT &result) {
     return DateT::Subtract(left, right, result);
 }
 
+// TimeT - Interval
+template <>
+inline bool SubFunction::Run(TimeT left, IntervalT right, TimeT &result) {
+    return TimeT::Subtract(left, right, result);
+}
+
 // DateTime - Interval
 template <>
-inline bool SubFunction::Run(DateTimeT, IntervalT, DateTimeT &) {
-    Error<NotImplementException>("Not implement");
-    return false;
+inline bool SubFunction::Run(DateTimeT left, IntervalT right, DateTimeT &result) {
+    return DateTimeT::Subtract(left, right, result);
 }
 
 // TimestampT - Interval
 template <>
-inline bool SubFunction::Run(TimestampT, IntervalT, TimestampT &) {
-    Error<NotImplementException>("Not implement");
-    return false;
+inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &result) {
+    return TimestampT::Subtract(left, right, result);
 }
 
 // Mixed Type - i64
@@ -216,6 +220,12 @@ void RegisterSubtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                               {DataType(LogicalType::kDate)},
                                               &ScalarFunction::BinaryFunctionWithFailure<DateT, IntervalT, DateT, SubFunction>);
     function_set_ptr->AddFunction(sub_function_date_interval);
+
+    ScalarFunction sub_function_time_interval(func_name,
+                                              {DataType(LogicalType::kTime), DataType(LogicalType::kInterval)},
+                                              {DataType(LogicalType::kTime)},
+                                              &ScalarFunction::BinaryFunctionWithFailure<TimeT, IntervalT, TimeT, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_time_interval);
 
     ScalarFunction sub_function_datetime_interval(func_name,
                                                   {DataType(LogicalType::kDateTime), DataType(LogicalType::kInterval)},

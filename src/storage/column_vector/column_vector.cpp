@@ -694,16 +694,16 @@ String ColumnVector::ToString(SizeT row_index) const {
             }
         }
         case kDate: {
-            Error<TypeException>("Not implemented");
+            return ((DateT *)data_ptr_)[row_index].ToString();
         }
         case kTime: {
-            Error<TypeException>("Not implemented");
+            return ((TimeT *)data_ptr_)[row_index].ToString();
         }
         case kDateTime: {
-            Error<TypeException>("Not implemented");
+            return ((DateTimeT *)data_ptr_)[row_index].ToString();
         }
         case kTimestamp: {
-            Error<TypeException>("Not implemented");
+            return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
         case kInterval: {
             Error<TypeException>("Not implemented");

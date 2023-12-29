@@ -14,7 +14,7 @@
 
 #include "date_type.h"
 #include "parser_assert.h"
-#include "spdlog/fmt/fmt.h"
+#include <format>
 
 namespace infinity {
 
@@ -94,7 +94,14 @@ static const int32_t CUMULATIVE_YEAR_DAYS[401] = {
     144636, 145001, 145366, 145732, 146097};
 
 void DateType::FromString(const char *date_ptr, size_t length) {
-    if (!ConvertFromString(date_ptr, length, *this)) {
+    size_t end_length_unused;
+    if (!ConvertFromString(date_ptr, length, *this, end_length_unused)) {
+        ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).");
+    }
+}
+
+void DateType::FromString(const char *date_ptr, size_t length, size_t &end_length) {
+    if (!ConvertFromString(date_ptr, length, *this, end_length)) {
         ParserError("Invalid date format (YYYY-MM-DD or YYYY/MM/DD).");
     }
 }
@@ -102,12 +109,13 @@ void DateType::FromString(const char *date_ptr, size_t length) {
 std::string DateType::ToString() const {
     int32_t year{0}, month{0}, day{0};
     if (!Date2YMD(value, year, month, day)) {
-        ParserError(fmt::format("Invalid date: {}-{}-{}", year, month, day));
+        ParserError(std::format("Invalid date: {}-{}-{}", year, month, day));
     }
-    return fmt::format("{}-{:02d}-{:02d}", year, month, day);
+    // TODO: format for negative year?
+    return std::format("{:04d}-{:02d}-{:02d}", year, month, day);
 }
 
-bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &date) {
+bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &date, size_t &end_length) {
     // trim the string
     size_t pos{0};
 
@@ -118,6 +126,11 @@ bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &
 
     // Get year
     int32_t year{0};
+    bool negative_year{false};
+    if (date_ptr[pos] == '-') {
+        negative_year = true;
+        ++pos;
+    }
     while (pos < length && std::isdigit(date_ptr[pos])) {
         if (std::isspace(date_ptr[pos])) {
             ++pos;
@@ -131,6 +144,9 @@ bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &
             continue;
         }
         break;
+    }
+    if (negative_year) {
+        year = -year;
     }
     if (date_ptr[pos] != '-' && date_ptr[pos] != '/') {
         return false;
@@ -174,10 +190,7 @@ bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &
         }
         break;
     }
-
-    if (pos > length) {
-        return false;
-    }
+    end_length = pos;
 
     return YMD2Date(year, month, day, date);
 }
@@ -332,26 +345,32 @@ bool DateType::Add(DateType input, IntervalType interval, DateType &output) {
             if (!Date2YMD(input.value, year, month, day)) {
                 return false;
             }
-            year += interval.value / 12;
-            month += interval.value % 12;
+            month += interval.value;
+            if (month > 12) {
+                year += (month - 1) / 12;
+                month = 1 + ((month - 1) % 12);
+            } else if (month < 1) {
+                year += (month - 12) / 12;
+                month = 12 + ((month - 12) % 12);
+            }
+            // TODO: 2020-01-30 + 1 month = 2020-02-30 ?
+            day = std::min(day, (IsLeapYear(year) ? LEAP_DAYS[month] : NORMAL_DAYS[month]));
             return YMD2Date(year, month, day, output);
         }
         case kDay: {
-            input.value += interval.value;
-            output = input;
+            output.value = input.value + interval.value;
             return true;
         }
         case kHour: {
-            input.value += interval.value / DAY_HOUR;
-            output = input;
+            output.value = input.value + (interval.value / DAY_HOUR);
             return true;
         }
         case kMinute: {
-            input.value += interval.value / DAY_MINUTE;
+            output.value = input.value + (interval.value / DAY_MINUTE);
             return true;
         }
         case kSecond: {
-            input.value += interval.value / DAY_SECOND;
+            output.value = input.value + (interval.value / DAY_SECOND);
             return true;
         }
         case kInvalidUnit: {
@@ -362,47 +381,8 @@ bool DateType::Add(DateType input, IntervalType interval, DateType &output) {
 }
 
 bool DateType::Subtract(DateType input, IntervalType interval, DateType &output) {
-    switch (interval.unit) {
-        case kYear: {
-            int32_t year{0}, month{0}, day{0};
-            if (!Date2YMD(input.value, year, month, day)) {
-                return false;
-            }
-            year -= interval.value;
-            return YMD2Date(year, month, day, output);
-        }
-        case kMonth: {
-            int32_t year{0}, month{0}, day{0};
-            if (!Date2YMD(input.value, year, month, day)) {
-                return false;
-            }
-            year -= interval.value / 12;
-            month -= interval.value % 12;
-            return YMD2Date(year, month, day, output);
-        }
-        case kDay: {
-            input.value -= interval.value;
-            output = input;
-            return true;
-        }
-        case kHour: {
-            input.value -= interval.value / DAY_HOUR;
-            output = input;
-            return true;
-        }
-        case kMinute: {
-            input.value -= interval.value / DAY_MINUTE;
-            return true;
-        }
-        case kSecond: {
-            input.value -= interval.value / DAY_SECOND;
-            return true;
-        }
-        case kInvalidUnit: {
-            ParserError("Invalid interval unit.");
-        }
-    }
-    return false;
+    interval.value = -interval.value;
+    return Add(input, interval, output);
 }
 
 int64_t DateType::GetDatePart(DateType input, TimeUnit unit) {

@@ -23,3 +23,107 @@ DROP TABLE select1;
 
 statement ok
 DROP TABLE select2;
+
+statement ok
+DROP TABLE IF EXISTS date1selectwhere;
+
+statement ok
+CREATE TABLE date1selectwhere (i INTEGER, d1 DATE, d2 DATE);
+
+statement ok
+INSERT INTO date1selectwhere VALUES (1, DATE '1970-1-1', DATE '2970-1-1');
+
+statement ok
+INSERT INTO date1selectwhere VALUES (11, DATE '1870-11-1', DATE '2570-1-1');
+
+statement ok
+INSERT INTO date1selectwhere VALUES (111, DATE '6570-11-1', DATE '5570-6-21');
+
+query I
+SELECT * FROM date1selectwhere;
+----
+1 1970-01-01 2970-01-01
+11 1870-11-01 2570-01-01
+111 6570-11-01 5570-06-21
+
+query II
+SELECT * FROM date1selectwhere WHERE d1 < d2;
+----
+1 1970-01-01 2970-01-01
+11 1870-11-01 2570-01-01
+
+query III
+SELECT * FROM date1selectwhere WHERE d2 >= DATE '2970-1-1';
+----
+1 1970-01-01 2970-01-01
+111 6570-11-01 5570-06-21
+
+query IV
+SELECT * FROM date1selectwhere WHERE d1 = DATE '1970-1-1' + INTERVAL -100 YEAR + INTERVAL 10 MONTH;
+----
+11 1870-11-01 2570-01-01
+
+query V
+SELECT * FROM date1selectwhere WHERE i <= 22 - 11 AND d1 < DATE '1900-1-1';
+----
+11 1870-11-01 2570-01-01
+
+statement ok
+INSERT INTO date1selectwhere VALUES (2222, DATE '2022-1-31', DATE '2023-1-31');
+
+# add 1 month, date should remain valid
+query VI
+SELECT i, d1 + INTERVAL 1 MONTH, d2 + INTERVAL 1 MONTH FROM date1selectwhere WHERE i = 2222;
+----
+2222 2022-02-28 2023-02-28
+
+statement ok
+DROP TABLE date1selectwhere;
+
+statement ok
+DROP TABLE IF EXISTS datetimeselectwhere;
+
+statement ok
+CREATE TABLE datetimeselectwhere (t TIME, dt DATETIME, ts TIMESTAMP);
+
+statement ok
+INSERT INTO datetimeselectwhere VALUES (TIME '0:0:0', DATETIME '1970-1-1 0:0:0', TIMESTAMP '2970-1-31 0:0:0');
+
+statement ok
+INSERT INTO datetimeselectwhere VALUES (TIME '23:59:59', DATETIME '2570-1-31 23:59:59', TIMESTAMP '1870-11-1 0:0:0');
+
+statement ok
+INSERT INTO datetimeselectwhere VALUES (TIME '12:0:0', DATETIME '5570-8-31 0:0:0', TIMESTAMP '6570-12-31 12:0:0');
+
+query I
+SELECT * FROM datetimeselectwhere;
+----
+00:00:00 1970-01-01 00:00:00 2970-01-31 00:00:00
+23:59:59 2570-01-31 23:59:59 1870-11-01 00:00:00
+12:00:00 5570-08-31 00:00:00 6570-12-31 12:00:00
+
+query II
+SELECT dt + INTERVAL 10 SECONDS FROM datetimeselectwhere;
+----
+1970-01-01 00:00:10
+2570-02-01 00:00:09
+5570-08-31 00:00:10
+
+# add 1 month, date should remain valid
+query III
+SELECT ts + INTERVAL 1 MONTH FROM datetimeselectwhere WHERE t < TIME '12:0:0';
+----
+2970-02-28 00:00:00
+
+query IV
+SELECT EXTRACT('hour' FROM t + (INTERVAL 3 HOURS)) FROM datetimeselectwhere WHERE ts - INTERVAL 12 HOURS = TIMESTAMP '6570-12-31 0:0:0';
+----
+15
+
+query V
+SELECT EXTRACT('year' FROM ts + (INTERVAL 1 DAY)) FROM datetimeselectwhere WHERE EXTRACT('hour' FROM t) = 12;
+----
+6571
+
+statement ok
+DROP TABLE datetimeselectwhere;

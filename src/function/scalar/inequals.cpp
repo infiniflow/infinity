@@ -121,10 +121,10 @@ void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     GenerateInEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
     //    GenerateInEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-    //    GenerateInEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    //    GenerateInEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    //    GenerateInEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    //    GenerateInEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateInEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateInEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateInEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateInEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateInEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
     //    GenerateInEqualsFunction<IntervalT>(function_set_ptr, DataType(LogicalType::kInterval));
 

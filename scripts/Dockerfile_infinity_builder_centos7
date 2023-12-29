@@ -1,5 +1,6 @@
 # NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You should prepare the following files:
+# NOTICE: You should prepare the following files
+# NOTICE: You can use the download_deps_infinity_builder_centos7.sh script to download them
 # bison-3.8.2.tar.xz
 # binutils-2.41.tar.xz
 # gcc-13.2.0.tar.xz
@@ -66,14 +67,14 @@ RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-pr
     cd /root && tar xf llvm-project-17.0.6.src.tar.xz \
     && cd llvm-project-17.0.6.src && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
         -DCMAKE_JOB_POOLS:STRING=link_pool=1 \
+        -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
         -DGCC_INSTALL_PREFIX=/usr/local \
         -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb" \
         -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 ../llvm \
-    && ninja -j6 install/strip \
+    && ninja -j12 install/strip \
     && ldconfig && cd /root && rm -rf llvm-project-17.0.6.src
 
 # Install boost-1.81.0

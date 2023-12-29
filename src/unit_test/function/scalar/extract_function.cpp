@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
+#include <iomanip>
 
 import infinity_exception;
 
@@ -80,7 +81,7 @@ TEST_F(ExtractFunctionTest, extract_year_test) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kDate);
             std::stringstream ss;
-            ss << i + 1 << "-01-01";
+            ss << std::setfill('0') << std::setw(4) << i + 1 << "-01-01";
             EXPECT_EQ(v.value_.date.ToString(), ss.str());
         }
 

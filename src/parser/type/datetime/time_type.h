@@ -14,21 +14,61 @@
 
 #pragma once
 
+#include "interval_type.h"
 #include "parser_assert.h"
 #include <string>
 
 namespace infinity {
 
+// Time format: HH:MM:SS
 struct TimeType {
+    friend struct DateTimeType;
+
     TimeType() = default;
 
     explicit TimeType(int32_t time_value) : value(time_value){};
 
-    [[nodiscard]] inline std::string ToString() const {
-        ParserError("ToString() isn't implemented");
-        return std::string();
-    }
+    // keep compatible with iresearch
+    operator int32_t() const { return value; }
 
+    inline void FromString(const std::string &time_str) { FromString(time_str.c_str(), time_str.length()); }
+
+    void FromString(const char *time_ptr, size_t length);
+
+    [[nodiscard]] std::string ToString() const;
+
+    inline bool operator==(const TimeType &other) const { return this->value == other.value; }
+
+    inline bool operator>=(const TimeType &other) const { return this->value >= other.value; }
+
+    inline bool operator>(const TimeType &other) const { return this->value > other.value; }
+
+    inline bool operator<=(const TimeType &other) const { return this->value <= other.value; }
+
+    inline bool operator<(const TimeType &other) const { return this->value < other.value; }
+
+    static bool Add(TimeType input, IntervalType interval, TimeType &output);
+
+    static bool Subtract(TimeType input, IntervalType interval, TimeType &output);
+
+    static bool Add(TimeType input, IntervalType interval, TimeType &output, int32_t &overflow_days);
+
+    static bool Subtract(TimeType input, IntervalType interval, TimeType &output, int32_t &overflow_days);
+
+    static int64_t GetTimePart(TimeType input, TimeUnit unit);
+
+private:
+    static bool ConvertFromString(const char *date_ptr, size_t length, TimeType &time);
+
+    static bool HMS2Time(int32_t hour, int32_t minute, int32_t second, TimeType &time);
+
+    static bool Time2HMS(int32_t milliseconds, int32_t &hour, int32_t &minute, int32_t &second);
+
+    static bool IsTimeValid(int32_t hour, int32_t minute, int32_t second);
+
+public:
+    // used in iresearch, need to be public
+    // value means the number of seconds since midnight in the range 0 to 86399
     int32_t value{};
 };
 
