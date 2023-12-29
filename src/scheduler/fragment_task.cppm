@@ -22,30 +22,12 @@ export module fragment_task;
 
 namespace infinity {
 
-// Task type:
-// DDL task
-// DML task
-// Query task
-// Read data from queue or file system
+class FragmentContext;
 
-enum class FragmentSourceType {
-    kNone,
-    kScan,
-    kQueue,
-};
-
-enum class FragmentSinkType {
-    kGlobalMaterialize,
-    kLocalMaterialize,
-    kStream,
-};
-
-enum class FragmentTaskStatus {
-    kRunning,
-    kCancelled,
-    kFinished,
-    kReady,
+export enum class FragmentTaskStatus {
     kPending,
+    kRunning,
+    kFinished,
     kError,
 };
 
@@ -58,18 +40,8 @@ public:
         Init();
     }
 
-    inline void SetTerminator() { is_terminator_ = true; }
-
     [[nodiscard]] inline bool IsTerminator() const { return is_terminator_; }
 
-    // Set source
-    // Scan source
-    //    void
-    //    AddSourceSegment(const SegmentEntry* segment_entry_ptr);
-    //
-    //    // Input queue
-    //    void
-    //    AddQueue(const BatchBlockingQueue);
     void Init();
 
     void OnExecute(i64 worker_id);
@@ -78,29 +50,34 @@ public:
 
     [[nodiscard]] inline i64 LastWorkerID() const { return last_worker_id_; }
 
-    [[nodiscard]] inline i64 TaskID() const { return task_id_; }
+    u64 FragmentId() const;
 
-    [[nodiscard]] bool Ready() const;
+    [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
     [[nodiscard]] bool IsComplete() const;
 
+    bool TryIntoWorkerLoop() {
+        UniqueLock<Mutex> lock(mutex_);
+        if (status_ == FragmentTaskStatus::kPending) {
+            status_ = FragmentTaskStatus::kRunning;
+            return true;
+        }
+        return false;
+    }
+
+    bool QuitFromWorkerLoop();
+
     [[nodiscard]] TaskBinding TaskBinding() const;
 
-    void TryCompleteFragment();
+    void CompleteTask();
 
     String PhysOpsToString();
 
-    inline void set_status(FragmentTaskStatus new_status) {
-        status_ = new_status;
-    }
+    inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
 
-    [[nodiscard]] inline FragmentTaskStatus status() const {
-        return status_;
-    }
+    FragmentContext *fragment_context() const;
 
 public:
-    FragmentTaskStatus status_{FragmentTaskStatus::kReady};
-
     UniquePtr<SourceState> source_state_{};
 
     Vector<UniquePtr<OperatorState>> operator_states_{};
@@ -108,6 +85,9 @@ public:
     UniquePtr<SinkState> sink_state_{};
 
 private:
+    Mutex mutex_{};
+    FragmentTaskStatus status_{FragmentTaskStatus::kPending};
+
     void *fragment_context_{};
     bool is_terminator_{false};
     i64 last_worker_id_{-1};

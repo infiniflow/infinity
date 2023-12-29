@@ -94,6 +94,9 @@ export {
     template <typename S, typename T, typename H = std::hash<S>>
     using HashMap = std::unordered_map<S, T, H>;
 
+    template <typename S, typename T, typename H = std::hash<S>>
+    using MultiHashMap = std::unordered_multimap<S, T, H>;
+
     template <typename S>
     using HashSet = std::unordered_set<S>;
 

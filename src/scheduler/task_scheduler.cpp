@@ -59,179 +59,164 @@ void TaskScheduler::Init(const Config *config_ptr) {
         Error<SchedulerException>("No cpu is used in scheduler");
     }
 
-    // Start coordinator
-    ready_queue_ = MakeUnique<FragmentTaskBlockQueue>();
-    coordinator_ = MakeUnique<Thread>(&TaskScheduler::CoordinatorLoop, this, ready_queue_.get(), 0);
-
-    ThreadUtil::pin(*coordinator_, 0);
-
     initialized_ = true;
 }
 
 void TaskScheduler::UnInit() {
     initialized_ = false;
     UniquePtr<FragmentTask> terminate_task = MakeUnique<FragmentTask>(true);
-    ready_queue_->Enqueue(terminate_task.get());
-    coordinator_->join();
+
     for (const auto &worker : worker_array_) {
         worker.queue_->Enqueue(terminate_task.get());
         worker.thread_->join();
     }
 }
 
-void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
+    Vector<PlanFragment *> leaf_fragments;
+    StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
+        if (root->Children().empty()) {
+            leaf_fragments.emplace_back(root);
+            return;
+        }
+        for (auto &child : root->Children()) {
+            TraversePlanFragmentTree(child.get());
+        }
+    };
+    // Traverse the tree to get all leaf fragments
+    TraversePlanFragmentTree(plan_fragment);
+
+    return leaf_fragments;
+}
+
+void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     if (!initialized_) {
         Error<SchedulerException>("Scheduler isn't initialized");
     }
 
-    //    Vector<UniquePtr<PlanFragment>>& children = plan_fragment->Children();
-    //    if(!children.empty()) {
-    //        SchedulerError("Only support one fragment query")
-    //    }
-    // 1. Recursive traverse the fragment tree
-    // 2. Check the fragment
-    //    if the first op is SCAN op, then get all block entry and create the source type is kScan.
-    //    if the first op isn't SCAN op, fragment task source type is kQueue and a task_result_queue need to be created.
-    //    According to the fragment output type to set the correct fragment task sink type.
-    //    Set the queue of parent fragment task.
-    if (plan_fragment->GetOperators().empty()) {
-        Error<SchedulerException>("Empty fragment");
-    }
-    auto *last_operator = plan_fragment->GetOperators()[0];
-    switch (last_operator->operator_type()) {
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            ScheduleRoundRobin(query_context, tasks, plan_fragment);
-            break;
-        }
-        default: {
-            ScheduleOneWorkerIfPossible(query_context, tasks, plan_fragment);
-            break;
+    Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
+    last_cpu_id_ = 0; // FIXME
+    u64 &worker_id = last_cpu_id_;
+    for (auto *plan_fragment : fragments) {
+        auto &tasks = plan_fragment->GetContext()->Tasks();
+        for (auto &task : tasks) {
+            ScheduleTask(task.get(), worker_id);
+            ++worker_id;
+            worker_id %= worker_count_;
         }
     }
 }
 
-void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
-    u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
-    for (const auto &fragment_task : tasks) {
-        ScheduleTask(fragment_task, worker_id);
+void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
+    Vector<FragmentTask *> task_ptrs;
+    auto &tasks = plan_fragment->GetContext()->Tasks();
+    for (auto &task : tasks) {
+        if (task->TryIntoWorkerLoop()) {
+            task_ptrs.emplace_back(task.get());
+        }
     }
-}
-
-void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    // Schedule worker 0 if possible
-    u64 scheduled_worker = u64_max;
-    u64 min_load_worker{0};
-    u64 min_work_load{u64_max};
-    for(u64 proposed_worker = 0; proposed_worker < worker_count_; ++ proposed_worker) {
-        u64 current_work_load = worker_workloads_[proposed_worker];
-        if(current_work_load < 1) {
-            scheduled_worker = proposed_worker;
-            break;
+    last_cpu_id_ = 0; // FIXME
+    u64 &worker_id = last_cpu_id_;
+    for (auto *task_ptr : task_ptrs) {
+        if (task_ptr->LastWorkerID() == -1) {
+            ScheduleTask(task_ptr, worker_id);
+            ++worker_id;
+            worker_id %= worker_count_;
         } else {
-            if(current_work_load < min_work_load) {
-                min_load_worker = proposed_worker;
-                min_work_load = current_work_load;
-            }
-        }
-    }
-
-    if(scheduled_worker == u64_max) {
-        scheduled_worker = min_load_worker;
-    }
-
-    worker_workloads_[scheduled_worker] += tasks.size();
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
-                     tasks.size(),
-                     query_context->query_id(),
-                     scheduled_worker));
-    for (const auto &fragment_task : tasks) {
-        ScheduleTask(fragment_task, scheduled_worker);
-    }
-}
-
-void TaskScheduler::ScheduleRoundRobin(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
-    u64 worker_id = 0;
-    for (const auto &fragment_task : tasks) {
-        ScheduleTask(fragment_task, worker_id);
-        worker_id++;
-        worker_id %= worker_count_;
-    }
-}
-
-void TaskScheduler::ToReadyQueue(FragmentTask *task) {
-    if (!initialized_) {
-        Error<SchedulerException>("Scheduler isn't initialized");
-    }
-}
-
-void TaskScheduler::CoordinatorLoop(FragmentTaskBlockQueue *ready_queue, i64 cpu_id) {
-    FragmentTask *fragment_task{nullptr};
-    bool running{true};
-    u64 current_cpu_id{0};
-    HashSet<u64> fragment_task_ptr;
-    while (running) {
-        ready_queue->Dequeue(fragment_task);
-        if (auto iter = fragment_task_ptr.find(u64(fragment_task)); iter == fragment_task_ptr.end()) {
-            fragment_task_ptr.emplace(u64(fragment_task));
-        }
-
-        if (fragment_task->IsTerminator()) {
-            running = false;
-            continue;
-        }
-
-        if (!fragment_task->Ready()) {
-            ready_queue->Enqueue(fragment_task);
-            continue;
-        }
-
-        if (fragment_task->LastWorkerID() == -1) {
-            // Select an available worker to dispatch
-            u64 to_use_cpu_id = current_cpu_id;
-            ++current_cpu_id;
-            to_use_cpu_id %= worker_count_;
-            worker_array_[to_use_cpu_id].queue_->Enqueue(fragment_task);
-        } else {
-            // Dispatch to the same worker
-            worker_array_[fragment_task->LastWorkerID()].queue_->Enqueue(fragment_task);
+            ScheduleTask(task_ptr, task_ptr->LastWorkerID());
         }
     }
 }
+
+void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
+    task->set_status(FragmentTaskStatus::kRunning);
+    ++worker_workloads_[worker_id];
+    worker_array_[worker_id].queue_->Enqueue(task);
+}
+
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
-    FragmentTask *fragment_task{nullptr};
-    Vector<FragmentTask *> task_list;
-    task_list.reserve(DEFAULT_BLOCKING_QUEUE_SIZE);
-    bool running{true};
-    while (running) {
-        task_queue->DequeueBulk(task_list);
-        SizeT list_size = task_list.size();
-        for (SizeT idx = 0; idx < list_size; ++idx) {
-            fragment_task = task_list[idx];
-
-            if (fragment_task->IsTerminator()) {
-                running = false;
-                break;
-            }
-
-            if (!fragment_task->Ready()) {
-                ready_queue_->Enqueue(fragment_task);
-                continue;
-            }
-
-            fragment_task->OnExecute(worker_id);
-            fragment_task->SetLastWorkID(worker_id);
-            if (!fragment_task->IsComplete()) {
-                ready_queue_->Enqueue(fragment_task);
-            } else {
-                --worker_workloads_[worker_id];
-                fragment_task->TryCompleteFragment();
-            }
+    List<FragmentTask *> task_lists;
+    auto iter = task_lists.end();
+    while (true) {
+        Vector<FragmentTask *> dequeue_output;
+        if (task_lists.empty()) {
+            task_queue->DequeueBulk(dequeue_output);
+        } else {
+            task_queue->TryDequeueBulk(dequeue_output);
         }
-        task_list.clear();
+        if (!dequeue_output.empty()) {
+            task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+        }
+        if (iter == task_lists.end()) {
+            iter = task_lists.begin();
+        }
+        auto &fragment_task = *iter;
+        if (fragment_task->IsTerminator()) {
+            break;
+        }
+
+        fragment_task->OnExecute(worker_id);
+        fragment_task->SetLastWorkID(worker_id);
+
+        if (fragment_task->IsComplete()) {
+            --worker_workloads_[worker_id];
+            fragment_task->CompleteTask();
+            iter = task_lists.erase(iter);
+        } else if (fragment_task->QuitFromWorkerLoop()) {
+            --worker_workloads_[worker_id];
+            iter = task_lists.erase(iter);
+        } else {
+            ++iter;
+        }
     }
 }
+
+// void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+//     LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
+//     u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
+//     for (const auto &fragment_task : tasks) {
+//         ScheduleTask(fragment_task, worker_id);
+//     }
+// }
+
+// void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
+//     // Schedule worker 0 if possible
+//     u64 scheduled_worker = u64_max;
+//     u64 min_load_worker{0};
+//     u64 min_work_load{u64_max};
+//     for (u64 proposed_worker = 0; proposed_worker < worker_count_; ++proposed_worker) {
+//         u64 current_work_load = worker_workloads_[proposed_worker];
+//         if (current_work_load < 1) {
+//             scheduled_worker = proposed_worker;
+//             break;
+//         } else {
+//             if (current_work_load < min_work_load) {
+//                 min_load_worker = proposed_worker;
+//                 min_work_load = current_work_load;
+//             }
+//         }
+//     }
+
+//     if (scheduled_worker == u64_max) {
+//         scheduled_worker = min_load_worker;
+//     }
+
+//     worker_workloads_[scheduled_worker] += tasks.size();
+//     LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
+//                      tasks.size(),
+//                      query_context->query_id(),
+//                      scheduled_worker));
+//     for (const auto &fragment_task : tasks) {
+//         ScheduleTask(fragment_task, scheduled_worker);
+//     }
+// }
+
+// void TaskScheduler::ScheduleRoundRobin(const Vector<FragmentTask *> &tasks) {
+//     for (const auto &fragment_task : tasks) {
+//         ScheduleTask(fragment_task, last_cpu_id_++);
+//         last_cpu_id_ %= worker_count_;
+//     }
+// }
 
 } // namespace infinity

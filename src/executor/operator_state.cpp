@@ -92,16 +92,6 @@ bool QueueSourceState::GetData() {
             fusion_op_state->input_complete_ = completed;
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *create_index_do_op_state = static_cast<CreateIndexDoOperatorState *>(next_op_state);
-            create_index_do_op_state->input_complete_ = completed;
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
-            create_index_finish_op_state->input_complete_ = completed;
-            break;
-        }
         case PhysicalOperatorType::kMergeLimit: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
