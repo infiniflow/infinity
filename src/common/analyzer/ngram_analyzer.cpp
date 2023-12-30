@@ -65,7 +65,7 @@ int NGramAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         offset++;
     }
 
-    return 1;
+    return offset;
 }
 
 } // namespace infinity
