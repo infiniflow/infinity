@@ -1,0 +1,22 @@
+# https://docs.mergify.com/merge-queue/lifecycle/
+# The merge queue tests pull requests against the latest version of the base branch. Therefore, if a new commit is pushed to the base branch, Mergify resets the process and starts over with the updated base branch.
+
+# https://docs.mergify.com/configuration/file-format/
+pull_request_rules:
+  - name: "Automatic queue when CI passes and approved"
+    conditions:
+      # Mergify receives an PR event(`opened``, `reopened`` and etc.), does some actions(`queue` here) if following conditions are all true.
+      - "#approved-reviews-by>=2"
+      - "check-success=tests"
+    actions:
+      queue:
+queue_rules:
+  - name: default
+    queue_conditions:
+      # Mergify receives `queue` or `requeue` command, queues the PR if following conditions are all true.
+      - "#approved-reviews-by>=1"
+      - "check-success=tests"
+    merge_conditions:
+      - "check-success=tests"
+    merge_method: squash
+    update_method: rebase
