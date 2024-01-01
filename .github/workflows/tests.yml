@@ -24,6 +24,7 @@ jobs:
     #- uses: hmarr/debug-action@v2
 
     - name: Show PR labels
+      if: ${{ !cancelled() && !failure() }}
       run: |
         echo "Workflow triggered by ${{ github.event_name }}"
         if [[ ${{ github.event_name }} == 'pull_request' ]]; then
@@ -31,56 +32,74 @@ jobs:
         fi
 
     - name: Ensure workspace ownership
+      if: ${{ !cancelled() && !failure() }}
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
 
     - name: Check out code
+      if: ${{ !cancelled() && !failure() }}
       uses: actions/checkout@v3
       with:
         ssh-key: ${{ secrets.MY_DEPLOY_KEY }}
 
     - name: Start builder container
+      if: ${{ !cancelled() && !failure() }}
       run: |
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
         sudo docker rm -f infinity_build && sudo docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
-    
+
     - name: Build debug version
+      if: ${{ !cancelled() && !failure() }}
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
 
+    - name: Unit test debug version
+      if: ${{ !cancelled() && !failure() }}
+      run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/test_main"
+
     - name: Install pysdk
+      if: ${{ !cancelled() && !failure() }}
       run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
     - name: Start infinity debug version
+      if: ${{ !cancelled() && !failure() }}
       run: |
         # Run a command in the background
         sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
     - name: pysdk & sqllogictest debug version
+      if: ${{ !cancelled() && !failure() }}
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
     - name: Stop infinity debug
+      if: ${{ !cancelled() }} # always run this step even if previous steps failed
       run: sudo kill $(pidof cmake-build-debug/src/infinity)
-      if: always() # always run this step even if previous steps failed
 
     - name: Collect infinity debug output
       # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
+      if: ${{ !cancelled() }} # always run this step even if previous steps failed
       run: cat debug.log 2>/dev/null || true
-      if: always() # always run this step even if previous steps failed
 
     - name: Build release version
+      if: ${{ !cancelled() && !failure() }}
       run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
+    - name: Unit test release version
+      if: ${{ !cancelled() && !failure() }}
+      run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/test_main"
+
     - name: Start infinity release version
+      if: ${{ !cancelled() && !failure() }}
       run: |
         sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
     - name: pysdk & sqllogictest release version
+      if: ${{ !cancelled() && !failure() }}
       run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
     - name: Stop infinity release
+      if: ${{ !cancelled() }} # always run this step even if previous steps failed
       run: sudo kill $(pidof cmake-build-release/src/infinity)
-      if: always() # always run this step even if previous steps failed
 
     - name: Collect infinity release output
       # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
+      if: ${{ !cancelled() }} # always run this step even if previous steps failed
       run: cat release.log 2>/dev/null || true
-      if: always() # always run this step even if previous steps failed
