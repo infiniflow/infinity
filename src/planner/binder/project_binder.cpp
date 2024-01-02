@@ -46,9 +46,6 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
         if (IsEqual(function_set_ptr->name(), String("AVG"))) {
             auto &fun_expr = (FunctionExpr &)expr;
             Vector<String> col_names{};
-            FunctionExpr *div_function_expr = new FunctionExpr();
-            div_function_expr->func_name_ = String("/");
-            div_function_expr->arguments_ = new Vector<ParsedExpr *>();
 
             if (fun_expr.arguments_->size() == 1) {
                 if ((*fun_expr.arguments_)[0]->type_ == ParsedExprType::kColumn) {
@@ -56,30 +53,30 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
                     col_names = Move(col_expr->names_);
 
                     fun_expr.func_name_ = "/";
+                    delete col_expr;
                     delete fun_expr.arguments_;
                     fun_expr.arguments_ = nullptr;
+                    fun_expr.arguments_ = new Vector<ParsedExpr *>();
+
+                    FunctionExpr *sum_function_expr = new FunctionExpr();
+                    sum_function_expr->func_name_ = String("sum");
+                    sum_function_expr->arguments_ = new Vector<ParsedExpr *>();
+                    ColumnExpr *column_expr_for_sum = new ColumnExpr();
+                    column_expr_for_sum->names_.emplace_back(col_names[0]);
+                    sum_function_expr->arguments_->emplace_back(column_expr_for_sum);
+
+                    FunctionExpr *count_function_expr = new FunctionExpr();
+                    count_function_expr->func_name_ = String("count");
+                    count_function_expr->arguments_ = new Vector<ParsedExpr *>();
+                    ColumnExpr *column_expr_for_count = new ColumnExpr();
+                    column_expr_for_count->names_.emplace_back(col_names[0]);
+                    count_function_expr->arguments_->emplace_back(column_expr_for_count);
+
+                    fun_expr.arguments_->emplace_back(sum_function_expr);
+                    fun_expr.arguments_->emplace_back(count_function_expr);
+
+                    return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
                 }
-
-                FunctionExpr *sum_function_expr = new FunctionExpr();
-                sum_function_expr->func_name_ = String("sum");
-                sum_function_expr->arguments_ = new Vector<ParsedExpr *>();
-                ColumnExpr *column_expr_for_sum = new ColumnExpr();
-                column_expr_for_sum->names_.emplace_back(col_names[0]);
-                sum_function_expr->arguments_->emplace_back(column_expr_for_sum);
-
-                FunctionExpr *count_function_expr = new FunctionExpr();
-                count_function_expr->func_name_ = String("count");
-                count_function_expr->arguments_ = new Vector<ParsedExpr *>();
-                ColumnExpr *column_expr_for_count = new ColumnExpr();
-                column_expr_for_count->names_.emplace_back(col_names[0]);
-                count_function_expr->arguments_->emplace_back(column_expr_for_count);
-
-                div_function_expr->arguments_->emplace_back(sum_function_expr);
-                div_function_expr->arguments_->emplace_back(count_function_expr);
-
-                auto div_func_name = div_function_expr->GetName();
-
-                return ExpressionBinder::BuildExpression(*div_function_expr, bind_context_ptr, depth, root);
             }
         }
     }
