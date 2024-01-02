@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+#include <cppjieba/Jieba.hpp>
 
 import stl;
 import term;
@@ -33,16 +34,23 @@ public:
         convert_to_placeholder_ = convert_to_placeholder;
     }
 
-    int Analyze(const Term &input, TermList &output) {
+    int Analyze(const Term &input, TermList &output, bool jieba_specialize = false) {
         void *array[2] = {&output, this};
-        return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
+        if (jieba_specialize)
+            return AnalyzeImpl(input, &array, &Analyzer::AppendTermListForJieba);
+        else
+            return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
     }
 
 protected:
     typedef void (
         *HookType)(void *data, const char *text, const u32 len, const u32 offset, const u8 and_or_bit, const u8 level, const bool is_special_char);
 
-    virtual int AnalyzeImpl(const Term &input, void *data, HookType func) = 0;
+    typedef void (*HookTypeForJieba)(void *data, cppjieba::Word &cut_words);
+
+    virtual int AnalyzeImpl(const Term &input, void *data, HookType func) { return -1; }
+
+    virtual int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) { return -1; }
 
     static void
     AppendTermList(void *data, const char *text, const u32 len, const u32 offset, const u8 and_or_bit, const u8 level, const bool is_special_char) {
@@ -58,6 +66,12 @@ protected:
         } else {
             output->Add(text, len, offset, and_or_bit, level);
         }
+    }
+
+    static void AppendTermListForJieba(void *data, cppjieba::Word &cut_word) {
+        void **parameters = (void **)data;
+        TermList *output = (TermList *)parameters[0];
+        output->Add(cut_word);
     }
 
     Tokenizer tokenizer_;

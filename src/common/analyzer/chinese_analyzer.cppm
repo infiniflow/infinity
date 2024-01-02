@@ -32,13 +32,14 @@ public:
 
     ~ChineseAnalyzer();
 
+    bool Load();
+
 protected:
     inline void Parse(const String &input) { jieba_->CutForSearch(input, cut_words_, true); }
-    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+    int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) override;
 
 private:
     void LoadStopwordsDict(const String &stopwords_path);
-    bool Load();
     bool Accept_token(const String &term) { return !stopwords_.contains(term); }
 
 private:
