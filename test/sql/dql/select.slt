@@ -2,6 +2,12 @@ statement ok
 DROP TABLE IF EXISTS select1;
 
 statement ok
+DROP TABLE IF EXISTS select2;
+
+statement ok
+DROP TABLE IF EXISTS select3;
+
+statement ok
 CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR, age INTEGER);
 
 statement ok

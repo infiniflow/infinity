@@ -136,11 +136,6 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
         if (this->binding_agg_func_) {
             Error<PlannerException>(Format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name()));
         } else {
-            // if (IsEqual(function_set_ptr->name(),String("AVG"))) {
-            //     this->binding_agg_func_ = false;
-            // }else {
-            //     this->binding_agg_func_ = true;
-            // }
             this->binding_agg_func_ = true;
         }
     }

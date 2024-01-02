@@ -619,12 +619,11 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         SizeT expression_count = aggregates_count;
         // calculate every columns value
         for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+            LOG_TRACE("Physical aggregate Execute");
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
         output_data_block->Finalize();
     }
-
-    LOG_TRACE("Physical aggregate");
     return true;
 }
 
