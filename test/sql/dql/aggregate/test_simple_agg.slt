@@ -22,7 +22,7 @@ SELECT SUM(c2) FROM simple_agg
 query I
 SELECT AVG(c1) FROM simple_agg
 ----
-2
+2.000000
 
 query II
 SELECT AVG(c2) FROM simple_agg

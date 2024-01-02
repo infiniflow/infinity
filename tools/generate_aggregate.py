@@ -5,7 +5,7 @@ import argparse
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
-    row_n = 8000
+    row_n = 9000
     sort_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql"
 
@@ -39,12 +39,17 @@ def generate(generate_if_exists: bool, copy_dir: str):
             )
         )
 
-
-        sequence = np.arange(1, 8001)
+        sequence = np.arange(1, row_n+1)
 
         for i in sequence:
             agg_file.write(str(i) + "," + str(i))
             agg_file.write("\n")
+
+
+        slt_file.write("\n")
+        slt_file.write("statement ok\n")
+        slt_file.write("SELECT c1 FROM {};\n".format(table_name))
+        slt_file.write("\n")
 
 
         # select max(c1) from test_simple_agg_big
@@ -53,7 +58,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT max(c1) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        slt_file.write(str(8000))
+        slt_file.write(str(row_n))
         slt_file.write("\n")
 
         # select min(c2) from test_simple_agg_big
@@ -77,20 +82,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
         # select avg(c1) from test_simple_agg_big
-
-        # slt_file.write("\n")
-        # slt_file.write("query I\n")
-        # slt_file.write("SELECT AVG(c1) FROM {};\n".format(table_name))
-        # slt_file.write("----\n")
-        # slt_file.write(str(np.mean(sequence)))
-        # slt_file.write("\n")
+        slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT AVG(c1) FROM {};\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write(str(np.mean(sequence))+"00000")
+        slt_file.write("\n")
 
         # select count(c1) from test_simple_agg_big
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write("SELECT count(c1) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        slt_file.write(str(8000))
+        slt_file.write(str(row_n))
         slt_file.write("\n")
 
 

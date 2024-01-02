@@ -53,7 +53,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kTinyInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
@@ -61,7 +61,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(TinyInt, TinyInt)->TinyInt", func.ToString().c_str());
+        EXPECT_STREQ("/(TinyInt, TinyInt)->Double", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
@@ -98,8 +98,8 @@ TEST_F(DivFunctionsTest, div_func) {
             } else {
                 Value v = result->GetValue(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
-                EXPECT_EQ(v.type_.type(), LogicalType::kTinyInt);
-                EXPECT_EQ(v.value_.tiny_int, 1);
+                EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+                EXPECT_EQ(v.value_.float64, 1);
             }
         }
     }
@@ -108,7 +108,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kSmallInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
@@ -116,7 +116,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(SmallInt, SmallInt)->SmallInt", func.ToString().c_str());
+        EXPECT_STREQ("/(SmallInt, SmallInt)->Double", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
@@ -152,8 +152,8 @@ TEST_F(DivFunctionsTest, div_func) {
             } else {
                 Value v = result->GetValue(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
-                EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
-                EXPECT_EQ(v.value_.small_int, 2);
+                EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+                EXPECT_EQ(v.value_.float64, 2);
             }
         }
     }
@@ -162,7 +162,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kInteger);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
@@ -170,7 +170,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(Integer, Integer)->Integer", func.ToString().c_str());
+        EXPECT_STREQ("/(Integer, Integer)->Double", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
@@ -206,8 +206,8 @@ TEST_F(DivFunctionsTest, div_func) {
             } else {
                 Value v = result->GetValue(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
-                EXPECT_EQ(v.type_.type(), LogicalType::kInteger);
-                EXPECT_EQ(v.value_.integer, 3);
+                EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+                EXPECT_EQ(v.value_.float64, 3);
             }
         }
     }
@@ -216,7 +216,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
@@ -224,7 +224,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(BigInt, BigInt)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("/(BigInt, BigInt)->Double", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
@@ -260,8 +260,8 @@ TEST_F(DivFunctionsTest, div_func) {
             } else {
                 Value v = result->GetValue(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
-                EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
-                EXPECT_EQ(v.value_.big_int, 4);
+                EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+                EXPECT_EQ(v.value_.float64, 4);
             }
         }
     }
@@ -270,7 +270,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         DataType data_type(LogicalType::kHugeInt);
-        DataType result_type(LogicalType::kHugeInt);
+        DataType result_type(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c2", 1, 0);
 
@@ -278,7 +278,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(HugeInt, HugeInt)->HugeInt", func.ToString().c_str());
+        EXPECT_STREQ("/(HugeInt, HugeInt)->Double", func.ToString().c_str());
 
         // TODO: need to complete it.
     }
@@ -287,7 +287,7 @@ TEST_F(DivFunctionsTest, div_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kFloat);
-        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kFloat);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDouble);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type, "t1", 1, "c2", 1, 0);
 
@@ -295,7 +295,7 @@ TEST_F(DivFunctionsTest, div_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("/(Float, Float)->Float", func.ToString().c_str());
+        EXPECT_STREQ("/(Float, Float)->Double", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
@@ -331,8 +331,8 @@ TEST_F(DivFunctionsTest, div_func) {
             } else {
                 Value v = result->GetValue(i);
                 EXPECT_TRUE(result->nulls_ptr_->IsTrue(i));
-                EXPECT_EQ(v.type_.type(), LogicalType::kFloat);
-                EXPECT_FLOAT_EQ(v.value_.float32, 5);
+                EXPECT_EQ(v.type_.type(), LogicalType::kDouble);
+                EXPECT_FLOAT_EQ(v.value_.float64, 5);
             }
         }
     }
