@@ -98,12 +98,12 @@ void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
     }
 }
 
-int ChineseAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
+int ChineseAnalyzer::AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) {
     Parse(input.text_);
     for (u32 i = 0; i < cut_words_.size(); ++i) {
         if (!Accept_token(cut_words_[i].word))
             continue;
-        func(data, cut_words_[i].word.c_str(), cut_words_[i].word.length(), cut_words_[i].offset, Term::AND, 0, false);
+        func(data, cut_words_[i]);
     }
     return cut_words_.back().offset + 1;
 }

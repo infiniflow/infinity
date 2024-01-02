@@ -14,6 +14,8 @@
 
 module;
 
+#include <cppjieba/Jieba.hpp>
+
 import stl;
 
 export module term;
@@ -58,6 +60,12 @@ public:
         back().text_.assign(text, len);
         back().word_offset_ = offset;
         back().SetStats(and_or_bit, level);
+    }
+
+    void Add(cppjieba::Word &cut_word) {
+        push_back(global_temporary_);
+        std::swap(back().text_, cut_word.word);
+        back().word_offset_ = cut_word.offset;
     }
 
 private:

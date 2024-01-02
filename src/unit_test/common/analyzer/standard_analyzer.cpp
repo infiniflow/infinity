@@ -17,6 +17,7 @@
 import stl;
 import term;
 import standard_analyzer;
+import chinese_analyzer;
 using namespace infinity;
 
 class StandardAnalyzerTest : public BaseTest {};
@@ -112,3 +113,18 @@ TEST_F(StandardAnalyzerTest, test5) {
     //    ASSERT_EQ(term_list[3].text_, PLACE_HOLDER);
     //    ASSERT_EQ(term_list[3].word_offset_, 3U);
 }
+
+/*
+TEST_F(StandardAnalyzerTest, test6) {
+    static const std::string ROOT_PATH = "../../../resource";
+
+    ChineseAnalyzer analyzer(ROOT_PATH);
+    analyzer.Load();
+    TermList term_list;
+    String input("南京市长江大桥，。。");
+    analyzer.Analyze(input, term_list, true);
+    for (unsigned i = 0; i < term_list.size(); ++i) {
+        std::cout << term_list[i].text_ << std::endl;
+    }
+}
+*/
