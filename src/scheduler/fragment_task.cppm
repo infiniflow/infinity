@@ -31,6 +31,19 @@ export enum class FragmentTaskStatus {
     kError,
 };
 
+export String FragmentTaskStatus2String(FragmentTaskStatus status) {
+    switch (status) {
+        case FragmentTaskStatus::kPending:
+            return String("Pending");
+        case FragmentTaskStatus::kRunning:
+            return String("Running");
+        case FragmentTaskStatus::kFinished:
+            return String("Finished");
+        case FragmentTaskStatus::kError:
+            return String("Error");
+    }
+}
+
 export class FragmentTask {
 public:
     explicit FragmentTask(bool terminator = true) : is_terminator_(terminator) {}
@@ -54,7 +67,7 @@ public:
 
     [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
-    [[nodiscard]] bool IsComplete() const;
+    [[nodiscard]] bool IsComplete();
 
     bool TryIntoWorkerLoop() {
         UniqueLock<Mutex> lock(mutex_);
@@ -73,7 +86,12 @@ public:
 
     String PhysOpsToString();
 
-    inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
+    inline void set_status(FragmentTaskStatus new_status) { 
+        UniqueLock<Mutex> lock(mutex_);
+        status_ = new_status;
+    }
+
+    [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
 
     FragmentContext *fragment_context() const;
 

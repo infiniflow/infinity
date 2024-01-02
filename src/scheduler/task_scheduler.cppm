@@ -52,6 +52,8 @@ public:
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);
 
+    void DumpPlanFragment(PlanFragment *plan_fragment);
+
 private:
     Vector<PlanFragment *> GetStartFragments(PlanFragment* plan_fragment);
 

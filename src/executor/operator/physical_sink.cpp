@@ -370,13 +370,13 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         return;
     }
     SizeT output_data_block_count = task_operator_state->data_block_array_.size();
-    if (output_data_block_count == 0) {
-        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-            next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
-        }
-        return;
-        // Error<ExecutorException>("No output from last operator.");
-    }
+    // if (output_data_block_count == 0) {
+    //     for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+    //         next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
+    //     }
+    //     return;
+    //     // Error<ExecutorException>("No output from last operator.");
+    // }
     for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
         auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
                                                       Move(task_operator_state->data_block_array_[idx]),
