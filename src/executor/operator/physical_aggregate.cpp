@@ -63,7 +63,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 #if 0
     groupby_columns.reserve(group_count);
 
-    Vector<DataType> types;s
+    Vector<DataType> types;
     types.reserve(group_count);
 
     for(i64 idx = 0; auto& expr: groups_) {
