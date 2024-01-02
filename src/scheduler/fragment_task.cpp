@@ -15,6 +15,7 @@
 module;
 
 #include <sstream>
+#include <thread>
 
 import fragment_context;
 import profiler;
@@ -44,6 +45,7 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64) {
+    LOG_TRACE(Format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -130,6 +132,7 @@ bool FragmentTask::QuitFromWorkerLoop() {
 
     UniqueLock<Mutex> lock(mutex_);
     if (status_ == FragmentTaskStatus::kRunning && queue_state->source_queue_.Empty()) {
+        LOG_TRACE(Format("Task: {} of Fragment: {} is quit from worker loop", task_id_, FragmentId()));
         status_ = FragmentTaskStatus::kPending;
         return true;
     }

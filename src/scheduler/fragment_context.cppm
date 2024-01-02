@@ -46,6 +46,19 @@ export enum class FragmentType {
     kParallelStream,
 };
 
+export String FragmentType2String(FragmentType type) {
+    switch (type) {
+        case FragmentType::kInvalid:
+            return String("Invalid");
+        case FragmentType::kSerialMaterialize:
+            return String("SerialMaterialize");
+        case FragmentType::kParallelMaterialize:
+            return String("ParallelMaterialize");
+        case FragmentType::kParallelStream:
+            return String("ParallelStream");
+    }
+}
+
 class PlanFragment;
 
 export class FragmentContext {

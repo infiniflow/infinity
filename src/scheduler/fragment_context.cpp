@@ -443,7 +443,7 @@ FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query
 
 void FragmentContext::TryFinishFragment() {
     if (!TryFinishFragmentInner()) {
-        LOG_TRACE(Format("{} tasks in fragment are not completed: {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        LOG_TRACE(Format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
         if (fragment_type_ != FragmentType::kParallelStream) {
             return;
         }
@@ -453,6 +453,7 @@ void FragmentContext::TryFinishFragment() {
         }
 
         auto *scheduler = query_context_->scheduler();
+        LOG_TRACE(Format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
         scheduler->ScheduleFragment(parent_plan_fragment);
     } else {
         LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
@@ -474,6 +475,7 @@ void FragmentContext::TryFinishFragment() {
         // All child fragment are finished.
 
         auto *scheduler = query_context_->scheduler();
+        LOG_TRACE(Format("Schedule fragment: {} because fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
         scheduler->ScheduleFragment(parent_plan_fragment);
     }
 }

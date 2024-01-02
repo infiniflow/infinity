@@ -16,7 +16,6 @@ module;
 
 #include <list>
 #include <sched.h>
-#include <vector>
 
 import stl;
 import config;
@@ -31,6 +30,7 @@ import plan_fragment;
 import fragment_context;
 import default_values;
 import physical_operator_type;
+import physical_operator;
 
 module task_scheduler;
 
@@ -171,6 +171,25 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         }
     }
 }
+
+void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
+    StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
+        LOG_TRACE(Format("Fragment id: {}, type: {}", fragment->FragmentID(), FragmentType2String(fragment->GetFragmentType())));
+        auto *fragment_ctx = fragment->GetContext();
+        for (auto &task : fragment_ctx->Tasks()) {
+            LOG_TRACE(Format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+        }
+        for (auto iter = fragment_ctx->GetOperators().begin(); iter != fragment_ctx->GetOperators().end(); ++iter) {
+            LOG_TRACE(Format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+        }
+        for (auto &child : fragment->Children()) {
+            TraverseFragmentTree(child.get());
+        }
+    };
+    TraverseFragmentTree(root);
+    LOG_TRACE("");
+}
+
 
 // void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
 //     LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));

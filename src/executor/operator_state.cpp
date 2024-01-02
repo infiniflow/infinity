@@ -16,6 +16,8 @@ module;
 
 import data_block;
 import stl;
+import third_party;
+import logger;
 import physical_operator_type;
 import fragment_data;
 import infinity_exception;
@@ -95,6 +97,7 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeLimit: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
+            LOG_TRACE(Format("Get data, data_count: {}, row_count: {}", fragment_data->data_count_, fragment_data->data_block_->row_count()));
             limit_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
             if (!limit_op_state->input_complete_) {
                 limit_op_state->input_complete_ = completed;
