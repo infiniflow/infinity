@@ -37,7 +37,7 @@ public:
 private:
     SharedPtr<BaseExpression> VisitReplace(const SharedPtr<ColumnExpression> &expression) final;
 
-    Vector<ColumnBinding> scan_bindings_;
+    HashMap<SizeT, Vector<ColumnBinding>> scan_bindings_{};
     HashMap<SizeT, SharedPtr<Vector<SharedPtr<DataType>>>> column_types_{};
 
     HashSet<ColumnBinding> unloaded_bindings_;

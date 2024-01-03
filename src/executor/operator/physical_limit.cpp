@@ -100,7 +100,7 @@ SizeT UnSyncCounter::Offset(SizeT row_count) {
     i64 last_offset = offset_ - row_count;
 
     if (last_offset > 0) {
-        result = row_count;
+        result = row_count - 1;
         offset_ = last_offset;
     } else {
         result = offset_;
@@ -180,10 +180,10 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
         if (input_blocks[block_id]->row_count() == 0) {
             continue;
         }
-        SizeT max_offset = input_blocks[block_id]->row_count() - 1;
+        SizeT row_count = input_blocks[block_id]->row_count();
 
-        if (offset > max_offset) {
-            offset -= max_offset;
+        if (offset > row_count) {
+            offset -= row_count;
         } else {
             block_start_idx = block_id;
             break;

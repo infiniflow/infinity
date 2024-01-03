@@ -61,7 +61,7 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
         auto scan_bindings = op.GetColumnBindings();
 
         column_types_.insert({table_idx, column_types});
-        scan_bindings_.insert(scan_bindings_.begin(), scan_bindings.begin(), scan_bindings.end());
+        scan_bindings_.insert({table_idx, scan_bindings});
         unloaded_bindings_.insert(scan_bindings.begin(), scan_bindings.end());
         return;
     }
@@ -77,15 +77,17 @@ SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr
         return expression;
     }
 
-    for (SizeT idx = 0; idx < scan_bindings_.size(); ++idx) {
-        auto scan_binding = scan_bindings_[idx];
+    for (SizeT i = 0; i < scan_bindings_.size(); ++i) {
+        for (SizeT idx = 0; idx < scan_bindings_[i].size(); ++idx) {
+            auto scan_binding = scan_bindings_[i][idx];
 
-        if (expression->binding() == scan_binding && unloaded_bindings_.contains(scan_binding)) {
-            auto types = column_types_[scan_binding.table_idx].get();
-            auto load_meta = LoadMeta(scan_binding, idx, (*types)[idx]);
+            if (expression->binding() == scan_binding && unloaded_bindings_.contains(scan_binding)) {
+                auto types = column_types_[scan_binding.table_idx].get();
+                auto load_meta = LoadMeta(scan_binding, idx, (*types)[idx]);
 
-            load_metas_.push_back(load_meta);
-            unloaded_bindings_.erase(scan_binding);
+                load_metas_.push_back(load_meta);
+                unloaded_bindings_.erase(scan_binding);
+            }
         }
     }
     return expression;
@@ -98,7 +100,7 @@ Vector<SizeT> LoadedColumn(const Vector<LoadMeta> *load_metas, BaseTableRef *tab
         auto binding = (*load_metas)[i].binding_;
 
         if (binding.table_idx == table_ref->table_index_) {
-            column_ids.push_back(binding.column_idx);
+            column_ids.push_back((*load_metas)[i].index_);
         }
     }
     return column_ids;
@@ -112,27 +114,27 @@ void CleanScan::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto table_scan = dynamic_cast<LogicalTableScan &>(op);
-            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
+            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
-            table_scan.base_table_ref_->RetainColumnByIds(Move(project_ids));
+            table_scan.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
             table_scan.add_row_id_ = true;
             break;
         }
         case LogicalNodeType::kKnnScan: {
             auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
-            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
+            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
-            knn_scan.base_table_ref_->RetainColumnByIds(Move(project_ids));
+            knn_scan.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
             break;
         }
         case LogicalNodeType::kMatch: {
             auto match = dynamic_cast<LogicalMatch &>(op);
-            Vector<SizeT> project_ids = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
+            Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
 
             scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
-            match.base_table_ref_->RetainColumnByIds(Move(project_ids));
+            match.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
             break;
         }
         case LogicalNodeType::kLimit:
