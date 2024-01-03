@@ -54,9 +54,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
 
-BufferHandle SegmentColumnIndexEntry::GetIndex() {
-    return buffer_->Load();
-}
+BufferHandle SegmentColumnIndexEntry::GetIndex() { return buffer_->Load(); }
 
 void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { Error<NotImplementException>("Not implemented"); }
 
@@ -84,18 +82,18 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-Json SegmentColumnIndexEntry::Serialize(SegmentColumnIndexEntry *segment_column_index_entry) {
-    if (segment_column_index_entry->deleted_) {
+Json SegmentColumnIndexEntry::Serialize() {
+    if (this->deleted_) {
         Error<StorageException>("Segment Column index entry can't be deleted.");
     }
 
     Json index_entry_json;
     {
-        SharedLock<RWMutex> lck(segment_column_index_entry->rw_locker_);
-        index_entry_json["segment_id"] = segment_column_index_entry->segment_id_;
-        index_entry_json["min_ts"] = segment_column_index_entry->min_ts_;
-        index_entry_json["max_ts"] = segment_column_index_entry->max_ts_;
-        index_entry_json["checkpoint_ts"] = segment_column_index_entry->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        index_entry_json["segment_id"] = this->segment_id_;
+        index_entry_json["min_ts"] = this->min_ts_;
+        index_entry_json["max_ts"] = this->max_ts_;
+        index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
     }
 
     return index_entry_json;

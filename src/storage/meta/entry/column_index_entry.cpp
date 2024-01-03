@@ -63,32 +63,32 @@ void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColum
     this->index_by_segment_.emplace(segment_id, Move(index_entry));
 }
 
-Json ColumnIndexEntry::Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts) {
-    if (column_index_entry->deleted_) {
+Json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
+    if (this->deleted_) {
         Error<StorageException>("Column index entry can't be deleted.");
     }
 
     Json json;
     Vector<SegmentColumnIndexEntry *> segment_column_index_entry_candidates;
     {
-        SharedLock<RWMutex> lck(column_index_entry->rw_locker_);
+        SharedLock<RWMutex> lck(this->rw_locker_);
 
-        json["txn_id"] = column_index_entry->txn_id_.load();
-        json["begin_ts"] = column_index_entry->begin_ts_;
-        json["commit_ts"] = column_index_entry->commit_ts_.load();
-        json["deleted"] = column_index_entry->deleted_;
-        json["column_id"] = column_index_entry->column_id_;
-        json["index_dir"] = *column_index_entry->index_dir();
-        json["index_base"] = column_index_entry->index_base_->Serialize();
+        json["txn_id"] = this->txn_id_.load();
+        json["begin_ts"] = this->begin_ts_;
+        json["commit_ts"] = this->commit_ts_.load();
+        json["deleted"] = this->deleted_;
+        json["column_id"] = this->column_id_;
+        json["index_dir"] = *this->index_dir();
+        json["index_base"] = this->index_base_->Serialize();
 
-        for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment_) {
+        for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
             segment_column_index_entry_candidates.emplace_back((SegmentColumnIndexEntry *)index_entry.get());
         }
     }
 
     for (const auto &segment_column_index_entry : segment_column_index_entry_candidates) {
         segment_column_index_entry->Flush(max_commit_ts);
-        json["index_by_segment"].push_back(SegmentColumnIndexEntry::Serialize(segment_column_index_entry));
+        json["index_by_segment"].push_back(segment_column_index_entry->Serialize());
     }
 
     return json;

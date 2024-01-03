@@ -154,13 +154,8 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     this->entry_list_.erase(this->entry_list_.begin());
 
                     // Append new one
-                    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(this->db_entry_dir_,
-                                                                               table_collection_name_ptr,
-                                                                               columns,
-                                                                               table_entry_type,
-                                                                               this,
-                                                                               txn_id,
-                                                                               begin_ts);
+                    UniquePtr<TableEntry> table_entry =
+                        MakeUnique<TableEntry>(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
                     table_entry_ptr = table_entry.get();
                     this->entry_list_.emplace_front(Move(table_entry));
                     return {table_entry_ptr, Status::OK()};
@@ -175,11 +170,8 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
     }
 }
 
-Tuple<TableEntry *, Status> TableMeta::DropNewEntry(u64 txn_id,
-                                                    TxnTimeStamp begin_ts,
-                                                    TxnManager *,
-                                                    const String &table_name,
-                                                    ConflictType conflict_type) {
+Tuple<TableEntry *, Status>
+TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const String &table_name, ConflictType conflict_type) {
 
     TableEntry *table_entry_ptr{nullptr};
 
@@ -213,13 +205,8 @@ Tuple<TableEntry *, Status> TableMeta::DropNewEntry(u64 txn_id,
             }
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
-            UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(this->db_entry_dir_,
-                                                                       this->table_name_,
-                                                                       dummy_columns,
-                                                                       TableEntryType::kTableEntry,
-                                                                       this,
-                                                                       txn_id,
-                                                                       begin_ts);
+            UniquePtr<TableEntry> table_entry =
+                MakeUnique<TableEntry>(this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
             table_entry_ptr = table_entry.get();
             table_entry_ptr->deleted_ = true;
             this->entry_list_.emplace_front(Move(table_entry));
@@ -315,29 +302,25 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_t
     return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
 }
 
-const SharedPtr<String>& TableMeta::db_name_ptr() const {
-    return db_entry_->db_name_ptr();
-}
+const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 
-SharedPtr<String> TableMeta::ToString(TableMeta *table_meta) {
-    SharedLock<RWMutex> r_locker(table_meta->rw_locker_);
-    SharedPtr<String> res = MakeShared<String>(Format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ",
-                                                      *table_meta->db_entry_dir_,
-                                                      *table_meta->table_name_,
-                                                      table_meta->entry_list_.size()));
+SharedPtr<String> TableMeta::ToString() {
+    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    SharedPtr<String> res =
+        MakeShared<String>(Format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, entry_list_.size()));
     return res;
 }
 
-Json TableMeta::Serialize(TableMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+Json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
     Vector<TableEntry *> table_candidates;
     {
-        SharedLock<RWMutex> lck(table_meta->rw_locker_);
-        json_res["db_entry_dir"] = *table_meta->db_entry_dir_;
-        json_res["table_name"] = *table_meta->table_name_;
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["db_entry_dir"] = *this->db_entry_dir_;
+        json_res["table_name"] = *this->table_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        table_candidates.reserve(table_meta->entry_list_.size());
-        for (auto &table_entry : table_meta->entry_list_) {
+        table_candidates.reserve(this->entry_list_.size());
+        for (auto &table_entry : this->entry_list_) {
             if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 table_candidates.push_back((TableEntry *)table_entry.get());
@@ -345,7 +328,7 @@ Json TableMeta::Serialize(TableMeta *table_meta, TxnTimeStamp max_commit_ts, boo
         }
     }
     for (TableEntry *table_entry : table_candidates) {
-        json_res["table_entries"].emplace_back(TableEntry::Serialize(table_entry, max_commit_ts, is_full_checkpoint));
+        json_res["table_entries"].emplace_back(table_entry->Serialize(max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }

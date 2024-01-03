@@ -263,23 +263,23 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
     return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
 }
 
-SharedPtr<String> DBMeta::ToString(DBMeta *db_meta) {
-    SharedLock<RWMutex> r_locker(db_meta->rw_locker_);
+SharedPtr<String> DBMeta::ToString() {
+    SharedLock<RWMutex> r_locker(this->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(
-        Format("DBMeta, data_dir: {}, db name: {}, entry count: ", *db_meta->data_dir_, *db_meta->db_name_, db_meta->entry_list_.size()));
+        Format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list_.size()));
     return res;
 }
 
-Json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+Json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
     Vector<DBEntry *> db_candidates;
     {
-        SharedLock<RWMutex> lck(db_meta->rw_locker_);
-        json_res["data_dir"] = *db_meta->data_dir_;
-        json_res["db_name"] = *db_meta->db_name_;
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["data_dir"] = *this->data_dir_;
+        json_res["db_name"] = *this->db_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        db_candidates.reserve(db_meta->entry_list_.size());
-        for (auto &db_entry : db_meta->entry_list_) {
+        db_candidates.reserve(this->entry_list_.size());
+        for (auto &db_entry : this->entry_list_) {
             if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
@@ -287,7 +287,7 @@ Json DBMeta::Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full
         }
     }
     for (DBEntry *db_entry : db_candidates) {
-        json_res["db_entries"].emplace_back(DBEntry::Serialize(db_entry, max_commit_ts, is_full_checkpoint));
+        json_res["db_entries"].emplace_back(db_entry->Serialize(max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }

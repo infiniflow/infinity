@@ -251,18 +251,18 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
     }
 }
 
-SharedPtr<String> TableIndexMeta::ToString(TableIndexMeta *) { throw StorageException("Not implemented"); }
+SharedPtr<String> TableIndexMeta::ToString() { throw StorageException("Not implemented"); }
 
-Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts) {
+Json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     Json json_res;
 
     Vector<TableIndexEntry *> table_index_entry_candidates;
     {
-        SharedLock<RWMutex> lck(table_index_meta->rw_locker_);
-        json_res["index_name"] = *table_index_meta->index_name_;
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["index_name"] = *this->index_name_;
 
-        table_index_entry_candidates.reserve(table_index_meta->entry_list_.size());
-        for (const auto &base_entry : table_index_meta->entry_list_) {
+        table_index_entry_candidates.reserve(this->entry_list_.size());
+        for (const auto &base_entry : this->entry_list_) {
             if (base_entry->entry_type_ == EntryType::kDummy) {
                 continue;
             }
@@ -277,7 +277,7 @@ Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp ma
     }
 
     for (const auto &table_index_entry : table_index_entry_candidates) {
-        json_res["index_entries"].emplace_back(TableIndexEntry::Serialize(table_index_entry, max_commit_ts));
+        json_res["index_entries"].emplace_back(table_index_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }

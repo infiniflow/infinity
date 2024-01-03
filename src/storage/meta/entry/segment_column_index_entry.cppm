@@ -47,7 +47,7 @@ public:
 
     [[nodiscard]] BufferHandle GetIndex();
 
-    static Json Serialize(SegmentColumnIndexEntry *segment_column_index_entry);
+    Json Serialize();
 
     static UniquePtr<SegmentColumnIndexEntry>
     Deserialize(const Json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);

@@ -33,12 +33,12 @@ IrsIndexEntry::IrsIndexEntry(TableIndexEntry *, SharedPtr<String> index_dir, u64
     begin_ts_ = begin_ts;
 }
 
-Json IrsIndexEntry::Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp) {
+Json IrsIndexEntry::Serialize(TxnTimeStamp) {
     Json json;
-    json["txn_id"] = index_def_entry->txn_id_.load();
-    json["begin_ts"] = index_def_entry->begin_ts_;
-    json["commit_ts"] = index_def_entry->commit_ts_.load();
-    json["index_dir"] = *index_def_entry->index_dir_;
+    json["txn_id"] = this->txn_id_.load();
+    json["begin_ts"] = this->begin_ts_;
+    json["commit_ts"] = this->commit_ts_.load();
+    json["index_dir"] = *this->index_dir_;
 
     return json;
 }

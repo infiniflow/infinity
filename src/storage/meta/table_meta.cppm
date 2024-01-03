@@ -40,9 +40,9 @@ public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, SharedPtr<String> name, DBEntry *db_entry)
         : db_entry_dir_(db_entry_dir), table_name_(Move(name)), db_entry_(db_entry) {}
 
-    static SharedPtr<String> ToString(TableMeta *table_meta);
+    SharedPtr<String> ToString();
 
-    static Json Serialize(TableMeta *table_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableMeta> Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 

@@ -241,11 +241,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
     }
 }
 
-Json BlockColumnEntry::Serialize(BlockColumnEntry *block_column_entry) {
+Json BlockColumnEntry::Serialize() {
     Json json_res;
-    json_res["column_id"] = block_column_entry->column_id_;
-    if (block_column_entry->outline_info_) {
-        auto &outline_info = block_column_entry->outline_info_;
+    json_res["column_id"] = this->column_id_;
+    if (this->outline_info_) {
+        auto &outline_info = this->outline_info_;
         json_res["next_outline_idx"] = outline_info->next_file_idx;
     }
     return json_res;

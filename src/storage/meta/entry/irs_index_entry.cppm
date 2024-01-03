@@ -41,7 +41,7 @@ public:
 
     void AddColumn(SharedPtr<IndexBase> index_base, u64 column_id);
 
-    static Json Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<IrsIndexEntry> Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 

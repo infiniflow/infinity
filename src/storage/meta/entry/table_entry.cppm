@@ -114,13 +114,10 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(u64 txn_id, TxnTimeStamp begin_ts);
 
-    void GetFullTextAnalyzers(u64 txn_id,
-                              TxnTimeStamp begin_ts,
-                              SharedPtr<IrsIndexEntry> &irs_index_entry,
-                              Map<String, String> &column2analyzer);
+    void GetFullTextAnalyzers(u64 txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
 
 public:
-    static Json Serialize(TableEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableEntry> Deserialize(const Json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 

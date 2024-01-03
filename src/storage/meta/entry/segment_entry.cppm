@@ -49,7 +49,7 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const IndexBase *index_base, const ColumnDef *column_def);
 
-    static Json Serialize(SegmentEntry *segment_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
@@ -90,20 +90,19 @@ public:
     }
 
 protected:
-    static u64 AppendData(SegmentEntry *segment_entry, u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    u64 AppendData(u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr);
 
-    static void DeleteData(SegmentEntry *segment_entry, u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
-    static SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(SegmentEntry *segment_entry,
-                                                              ColumnIndexEntry *column_index_entry,
-                                                              SharedPtr<ColumnDef> column_def,
-                                                              TxnTimeStamp create_ts,
-                                                              BufferManager *buffer_mgr,
-                                                              TxnTableStore *txn_store);
+    SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
+                                                       SharedPtr<ColumnDef> column_def,
+                                                       TxnTimeStamp create_ts,
+                                                       BufferManager *buffer_mgr,
+                                                       TxnTableStore *txn_store);
 
-    static void CommitAppend(SegmentEntry *segment_entry, u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16 start_pos, u16 row_count);
+    void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16 start_pos, u16 row_count);
 
-    static void CommitDelete(SegmentEntry *segment_entry, u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);

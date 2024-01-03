@@ -52,7 +52,7 @@ public:
                                                            SharedPtr<String> index_dir,
                                                            TxnTimeStamp begin_ts);
 
-    static Json Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<ColumnIndexEntry>
     Deserialize(const Json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);

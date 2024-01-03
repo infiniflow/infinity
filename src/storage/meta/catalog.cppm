@@ -208,17 +208,17 @@ public:
 
 public:
     // Serialization and Deserialization
-    static Json Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+    String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+    void MergeFrom(NewCatalog &other);
 
     static void Deserialize(const Json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
     static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
     static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
-
-    static String SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
-    void MergeFrom(NewCatalog &other);
 
 public:
     // Profile related methods

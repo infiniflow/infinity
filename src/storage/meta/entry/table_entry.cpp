@@ -198,7 +198,7 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        u64 actual_appended = SegmentEntry::AppendData(this->unsealed_segment_, txn_id, append_state_ptr, buffer_mgr);
+        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr);
         LOG_TRACE(Format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
     }
 }
@@ -222,7 +222,7 @@ void TableEntry::CreateIndexFile(void *txn_store, TableIndexEntry *table_index_e
             SharedPtr<ColumnDef> column_def = this->columns_[column_id];
             for (const auto &[segment_id, segment_entry] : this->segment_map_) {
                 SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
-                    SegmentEntry::CreateIndexFile(segment_entry.get(), column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
+                    segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr);
                 column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
             }
         } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
@@ -257,7 +257,7 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
             return Status(ErrorCode::kNotFound, Move(err_msg));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
-        SegmentEntry::DeleteData(segment_entry, txn_id, commit_ts, block_row_hashmap);
+        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
     }
     return Status::OK();
 }
@@ -271,7 +271,7 @@ void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendSt
                          range.start_offset_,
                          range.row_count_));
         SegmentEntry *segment_ptr = this->segment_map_[range.segment_id_].get();
-        SegmentEntry::CommitAppend(segment_ptr, txn_id, commit_ts, range.block_id_, range.start_offset_, range.row_count_);
+        segment_ptr->CommitAppend(txn_id, commit_ts, range.block_id_, range.start_offset_, range.row_count_);
         row_count += range.row_count_;
     }
     this->row_count_ += row_count;
@@ -292,7 +292,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
             Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
-        SegmentEntry::CommitDelete(segment, txn_id, commit_ts, block_row_hashmap);
+        segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
         row_count += block_row_hashmap.size();
     }
     this->row_count_ += row_count;
@@ -381,23 +381,23 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
     return result;
 }
 
-Json TableEntry::Serialize(TableEntry *table_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+Json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
 
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
     {
-        SharedLock<RWMutex> lck(table_entry->rw_locker_);
-        json_res["table_entry_dir"] = *table_entry->table_entry_dir_;
-        json_res["table_name"] = *table_entry->GetTableName();
-        json_res["table_entry_type"] = table_entry->table_entry_type_;
-        json_res["row_count"] = table_entry->row_count_.load();
-        json_res["begin_ts"] = table_entry->begin_ts_;
-        json_res["commit_ts"] = table_entry->commit_ts_.load();
-        json_res["txn_id"] = table_entry->txn_id_.load();
-        json_res["deleted"] = table_entry->deleted_;
-        for (const auto &column_def : table_entry->columns_) {
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["table_entry_dir"] = *this->table_entry_dir_;
+        json_res["table_name"] = *this->GetTableName();
+        json_res["table_entry_type"] = this->table_entry_type_;
+        json_res["row_count"] = this->row_count_.load();
+        json_res["begin_ts"] = this->begin_ts_;
+        json_res["commit_ts"] = this->commit_ts_.load();
+        json_res["txn_id"] = this->txn_id_.load();
+        json_res["deleted"] = this->deleted_;
+        for (const auto &column_def : this->columns_) {
             Json column_def_json;
             column_def_json["column_type"] = column_def->type()->Serialize();
             column_def_json["column_id"] = column_def->id();
@@ -409,19 +409,19 @@ Json TableEntry::Serialize(TableEntry *table_entry, TxnTimeStamp max_commit_ts, 
 
             json_res["column_definition"].emplace_back(column_def_json);
         }
-        u32 next_segment_id = table_entry->next_segment_id_;
+        u32 next_segment_id = this->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
 
-        segment_candidates.reserve(table_entry->segment_map_.size());
-        for (const auto &[segment_id, segment_entry] : table_entry->segment_map_) {
+        segment_candidates.reserve(this->segment_map_.size());
+        for (const auto &[segment_id, segment_entry] : this->segment_map_) {
             //            if(segment_entry->commit_ts_ <= max_commit_ts) {
             segment_candidates.emplace_back(segment_entry.get());
             //            }
         }
 
-        table_index_meta_candidates.reserve(table_entry->index_meta_map_.size());
-        table_index_name_candidates.reserve(table_entry->index_meta_map_.size());
-        for (const auto &[index_name, table_index_meta] : table_entry->index_meta_map_) {
+        table_index_meta_candidates.reserve(this->index_meta_map_.size());
+        table_index_name_candidates.reserve(this->index_meta_map_.size());
+        for (const auto &[index_name, table_index_meta] : this->index_meta_map_) {
             table_index_meta_candidates.emplace_back(table_index_meta.get());
             table_index_name_candidates.emplace_back(index_name);
         }
@@ -429,14 +429,14 @@ Json TableEntry::Serialize(TableEntry *table_entry, TxnTimeStamp max_commit_ts, 
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        json_res["segments"].emplace_back(SegmentEntry::Serialize(segment_entry, max_commit_ts, is_full_checkpoint));
+        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts, is_full_checkpoint));
     }
 
     // Serialize indexes
     SizeT table_index_count = table_index_meta_candidates.size();
     for (SizeT idx = 0; idx < table_index_count; ++idx) {
         TableIndexMeta *table_index_meta = table_index_meta_candidates[idx];
-        Json index_def_meta_json = TableIndexMeta::Serialize(table_index_meta, max_commit_ts);
+        Json index_def_meta_json = table_index_meta->Serialize(max_commit_ts);
         index_def_meta_json["index_name"] = table_index_name_candidates[idx];
         json_res["table_indexes"].emplace_back(index_def_meta_json);
     }

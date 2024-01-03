@@ -30,7 +30,6 @@ import serialize;
 import infinity_exception;
 import parser;
 
-
 namespace infinity {
 
 bool BlockVersion::operator==(const BlockVersion &rhs) const {
@@ -159,16 +158,11 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
     return {block_offset_begin, row_idx};
 }
 
-u16 BlockEntry::AppendData(u64 txn_id,
-                           DataBlock *input_data_block,
-                           u16 input_block_offset,
-                           u16 append_rows,
-                           BufferManager *) {
+u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                       this->segment_entry_->segment_id(),
-                                       this->block_id_));
+        Error<StorageException>(
+            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     this->using_txn_id_ = txn_id;
@@ -199,9 +193,8 @@ u16 BlockEntry::AppendData(u64 txn_id,
 void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                       this->segment_entry_->segment_id(),
-                                       this->block_id_));
+        Error<StorageException>(
+            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     this->using_txn_id_ = txn_id;
@@ -222,9 +215,8 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
 void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != txn_id) {
-        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                       this->segment_entry_->segment_id(),
-                                       this->block_id_));
+        Error<StorageException>(
+            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
     this->using_txn_id_ = 0;
     if (this->min_row_ts_ == 0) {
@@ -239,9 +231,8 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
 void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(Format("Multiple transactions are changing data of Segment: {}, Block: {}",
-                                       this->segment_entry_->segment_id(),
-                                       this->block_id_));
+        Error<StorageException>(
+            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     if (this->using_txn_id_ == 0) {
@@ -267,9 +258,7 @@ void BlockEntry::FlushData(int64_t checkpoint_row_count) {
     }
 }
 
-void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) {
-    checkpoint_version.SaveToFile(this->VersionFilePath());
-}
+void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_version.SaveToFile(this->VersionFilePath()); }
 
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     LOG_TRACE(Format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
@@ -322,20 +311,20 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 }
 
 // TODO: introduce BlockColumnMeta
-Json BlockEntry::Serialize(BlockEntry *block_entry, TxnTimeStamp) {
+Json BlockEntry::Serialize(TxnTimeStamp) {
     Json json_res;
-    SharedLock<RWMutex> lck(block_entry->rw_locker_);
+    SharedLock<RWMutex> lck(this->rw_locker_);
 
-    json_res["block_id"] = block_entry->block_id_;
-    json_res["checkpoint_ts"] = block_entry->checkpoint_ts_;
-    json_res["row_count"] = block_entry->checkpoint_row_count_;
-    json_res["row_capacity"] = block_entry->row_capacity_;
-    json_res["block_dir"] = *block_entry->base_dir_;
-    for (const auto &block_column_entry : block_entry->columns_) {
-        json_res["columns"].emplace_back(BlockColumnEntry::Serialize(block_column_entry.get()));
+    json_res["block_id"] = this->block_id_;
+    json_res["checkpoint_ts"] = this->checkpoint_ts_;
+    json_res["row_count"] = this->checkpoint_row_count_;
+    json_res["row_capacity"] = this->row_capacity_;
+    json_res["block_dir"] = *this->base_dir_;
+    for (const auto &block_column_entry : this->columns_) {
+        json_res["columns"].emplace_back(block_column_entry->Serialize());
     }
-    json_res["min_row_ts"] = block_entry->min_row_ts_;
-    json_res["max_row_ts"] = block_entry->checkpoint_ts_;
+    json_res["min_row_ts"] = this->min_row_ts_;
+    json_res["max_row_ts"] = this->checkpoint_ts_;
     return json_res;
 }
 

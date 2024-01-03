@@ -33,9 +33,9 @@ friend struct NewCatalog;
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(Move(name)), data_dir_(data_dir) {}
 
-    static SharedPtr<String> ToString(DBMeta *db_meta);
+    SharedPtr<String> ToString();
 
-    static Json Serialize(DBMeta *db_meta, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBMeta> Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr);
 

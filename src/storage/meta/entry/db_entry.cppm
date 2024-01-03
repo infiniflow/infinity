@@ -42,9 +42,9 @@ public:
 
 public:
 
-    static SharedPtr<String> ToString(DBEntry *db_entry);
+    SharedPtr<String> ToString();
 
-    static Json Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const Json &db_entry_json, BufferManager *buffer_mgr);
 

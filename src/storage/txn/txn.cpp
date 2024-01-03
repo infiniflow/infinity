@@ -484,7 +484,7 @@ void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds.push_back(c
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
-    String catalog_path = NewCatalog::SaveAsFile(catalog_, dir_name, max_commit_ts, is_full_checkpoint);
+    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, is_full_checkpoint);
     wal_entry_->cmds.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path));
 }
 } // namespace infinity

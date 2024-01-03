@@ -396,22 +396,22 @@ void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) 
     catalog->table_functions_.erase(function_name);
 }
 
-Json NewCatalog::Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+Json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
     Vector<DBMeta *> databases;
     {
-        SharedLock<RWMutex> lck(catalog->rw_locker_);
-        json_res["current_dir"] = *catalog->current_dir_;
-        json_res["next_txn_id"] = catalog->next_txn_id_;
-        json_res["catalog_version"] = catalog->catalog_version_;
-        databases.reserve(catalog->databases_.size());
-        for (auto &db_meta : catalog->databases_) {
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["current_dir"] = *this->current_dir_;
+        json_res["next_txn_id"] = this->next_txn_id_;
+        json_res["catalog_version"] = this->catalog_version_;
+        databases.reserve(this->databases_.size());
+        for (auto &db_meta : this->databases_) {
             databases.push_back(db_meta.second.get());
         }
     }
 
     for (auto &db_meta : databases) {
-        json_res["databases"].emplace_back(DBMeta::Serialize(db_meta, max_commit_ts, is_full_checkpoint));
+        json_res["databases"].emplace_back(db_meta->DBMeta::Serialize(max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -500,8 +500,8 @@ void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr
     }
 }
 
-String NewCatalog::SaveAsFile(NewCatalog *catalog_ptr, const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json catalog_json = Serialize(catalog_ptr, max_commit_ts, is_full_checkpoint);
+String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    Json catalog_json = Serialize(max_commit_ts, is_full_checkpoint);
     String catalog_str = catalog_json.dump();
 
     // FIXME: Temp implementation, will be replaced by async task.

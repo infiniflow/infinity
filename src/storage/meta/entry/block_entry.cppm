@@ -89,7 +89,7 @@ public:
     // Used in block iterator
     inline BlockColumnEntry *GetColumnDataByID(u64 column_id) const { return this->columns_[column_id].get(); }
 
-    static Json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const Json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 

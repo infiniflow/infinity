@@ -50,7 +50,7 @@ public:
 
     static UniquePtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static Json Serialize(TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexEntry>
     Deserialize(const Json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableEntry *table_entry);

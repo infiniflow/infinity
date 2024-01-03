@@ -171,33 +171,33 @@ Status DBEntry::GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableD
     return Status::OK();
 }
 
-SharedPtr<String> DBEntry::ToString(DBEntry *db_entry) {
-    SharedLock<RWMutex> r_locker(db_entry->rw_locker_);
-    SharedPtr<String> res = MakeShared<String>(
-        Format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry->db_entry_dir_, db_entry->txn_id_, db_entry->tables_.size()));
+SharedPtr<String> DBEntry::ToString() {
+    SharedLock<RWMutex> r_locker(rw_locker_);
+    SharedPtr<String> res =
+        MakeShared<String>(Format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, tables_.size()));
     return res;
 }
 
-Json DBEntry::Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+Json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
 
     Vector<TableMeta *> table_metas;
     {
-        SharedLock<RWMutex> lck(db_entry->rw_locker_);
-        json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
-        json_res["db_name"] = *db_entry->db_name_;
-        json_res["txn_id"] = db_entry->txn_id_.load();
-        json_res["begin_ts"] = db_entry->begin_ts_;
-        json_res["commit_ts"] = db_entry->commit_ts_.load();
-        json_res["deleted"] = db_entry->deleted_;
-        json_res["entry_type"] = db_entry->entry_type_;
-        table_metas.reserve(db_entry->tables_.size());
-        for (auto &table_meta_pair : db_entry->tables_) {
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json_res["db_entry_dir"] = *this->db_entry_dir_;
+        json_res["db_name"] = *this->db_name_;
+        json_res["txn_id"] = this->txn_id_.load();
+        json_res["begin_ts"] = this->begin_ts_;
+        json_res["commit_ts"] = this->commit_ts_.load();
+        json_res["deleted"] = this->deleted_;
+        json_res["entry_type"] = this->entry_type_;
+        table_metas.reserve(this->tables_.size());
+        for (auto &table_meta_pair : this->tables_) {
             table_metas.push_back(table_meta_pair.second.get());
         }
     }
     for (TableMeta *table_meta : table_metas) {
-        json_res["tables"].emplace_back(TableMeta::Serialize(table_meta, max_commit_ts, is_full_checkpoint));
+        json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }

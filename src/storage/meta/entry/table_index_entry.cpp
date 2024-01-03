@@ -94,37 +94,37 @@ void TableIndexEntry::CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr
 
 void TableIndexEntry::CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry) { this->irs_index_entry_ = irs_index_entry; }
 
-Json TableIndexEntry::Serialize(TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts) {
+Json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     Json json;
 
     Vector<ColumnIndexEntry *> column_index_entry_candidates;
     IrsIndexEntry *irs_index_entry_candidate_{};
     {
-        SharedLock<RWMutex> lck(table_index_entry->rw_locker_);
-        json["txn_id"] = table_index_entry->txn_id_.load();
-        json["begin_ts"] = table_index_entry->begin_ts_;
-        json["commit_ts"] = table_index_entry->commit_ts_.load();
-        json["deleted"] = table_index_entry->deleted_;
-        if (table_index_entry->deleted_) {
+        SharedLock<RWMutex> lck(this->rw_locker_);
+        json["txn_id"] = this->txn_id_.load();
+        json["begin_ts"] = this->begin_ts_;
+        json["commit_ts"] = this->commit_ts_.load();
+        json["deleted"] = this->deleted_;
+        if (this->deleted_) {
             return json;
         }
 
-        json["index_dir"] = *table_index_entry->index_dir_;
-        json["index_def"] = table_index_entry->index_def_->Serialize();
+        json["index_dir"] = *this->index_dir_;
+        json["index_def"] = this->index_def_->Serialize();
 
-        for (const auto &[index_name, column_index_entry] : table_index_entry->column_index_map_) {
+        for (const auto &[index_name, column_index_entry] : this->column_index_map_) {
             column_index_entry_candidates.emplace_back((ColumnIndexEntry *)column_index_entry.get());
         }
 
-        irs_index_entry_candidate_ = table_index_entry->irs_index_entry_.get();
+        irs_index_entry_candidate_ = this->irs_index_entry_.get();
     }
 
     for (const auto &column_index_entry : column_index_entry_candidates) {
-        json["column_indexes"].emplace_back(ColumnIndexEntry::Serialize(column_index_entry, max_commit_ts));
+        json["column_indexes"].emplace_back(column_index_entry->Serialize(max_commit_ts));
     }
 
     if (irs_index_entry_candidate_ != nullptr) {
-        json["irs_index_entry"] = IrsIndexEntry::Serialize(irs_index_entry_candidate_, max_commit_ts);
+        json["irs_index_entry"] = irs_index_entry_candidate_->Serialize(max_commit_ts);
     }
 
     return json;

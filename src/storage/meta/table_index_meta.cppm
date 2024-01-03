@@ -50,9 +50,9 @@ private:
 
     Tuple<TableIndexEntry *, Status> DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static SharedPtr<String> ToString(TableIndexMeta *table_index_meta);
+    SharedPtr<String> ToString();
 
-    static Json Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexMeta> Deserialize(const Json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
