@@ -10,6 +10,8 @@ import index_config;
 import index_segment_reader;
 import posting_writer;
 import data_block;
+import parser;
+import column_vector;
 module column_indexer;
 
 namespace infinity {
@@ -32,6 +34,8 @@ ColumnIndexer::~ColumnIndexer() {
         posting_table_->clear();
     }
 }
+
+void ColumnIndexer::Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
 
 void ColumnIndexer::DoAddPosting(const String &term) {
     PostingTable::iterator it = posting_table_->find(term);

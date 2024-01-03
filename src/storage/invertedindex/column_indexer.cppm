@@ -10,6 +10,8 @@ import index_config;
 import index_segment_reader;
 import posting_writer;
 import data_block;
+import parser;
+import column_vector;
 export module column_indexer;
 
 namespace infinity {
@@ -19,6 +21,8 @@ export class ColumnIndexer {
 public:
     ColumnIndexer(u64 column_id, const InvertedIndexConfig &index_config, SharedPtr<MemoryPool> byte_slice_pool, SharedPtr<RecyclePool> buffer_pool);
     ~ColumnIndexer();
+
+    void Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
 private:
     void DoAddPosting(const String &term);

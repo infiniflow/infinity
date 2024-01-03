@@ -43,7 +43,7 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
 void Indexer::Add(DataBlock *data_block) {
     Vector<RowID> row_ids;
     Vector<SharedPtr<ColumnVector>> column_vectors;
-    for (SizeT i = 0; i < data_block->column_count(); i++) {
+    for (SizeT i = 0; i < data_block->column_count(); ++i) {
         SharedPtr<ColumnVector> column_vector = data_block->column_vectors[i];
         if (column_vector->data_type()->type() == LogicalType::kRowID) {
             row_ids.resize(column_vector->Size());
@@ -52,6 +52,11 @@ void Indexer::Add(DataBlock *data_block) {
         } else {
             column_vectors.push_back(column_vector);
         }
+    }
+    /// TODO column_id ?
+    for (SizeT i = 0; i < column_vectors.size(); ++i) {
+        u64 column_id = i;
+        column_indexers_[column_id]->Add(column_vectors[i], row_ids);
     }
 }
 
