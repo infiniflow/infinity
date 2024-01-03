@@ -26,6 +26,7 @@ import parser;
 import merge_knn_data;
 import create_index_data;
 import blocking_queue;
+import expression_state;
 
 export module operator_state;
 
@@ -169,11 +170,17 @@ export struct MergeLimitOperatorState : public OperatorState {
 // Merge Top
 export struct MergeTopOperatorState : public OperatorState {
     inline explicit MergeTopOperatorState() : OperatorState(PhysicalOperatorType::kMergeTop) {}
+    Vector<SharedPtr<ExpressionState>> expr_states_;         // expression states
+    Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
+    u32 middle_result_count_{};
+    Vector<UniquePtr<DataBlock>> input_data_blocks_;
+    bool input_complete_{false};
 };
 
 // Top
 export struct TopOperatorState : public OperatorState {
     inline explicit TopOperatorState() : OperatorState(PhysicalOperatorType::kTop) {}
+    Vector<SharedPtr<ExpressionState>> expr_states_; // expression states
 };
 
 // Projection

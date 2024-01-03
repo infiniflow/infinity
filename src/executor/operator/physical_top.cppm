@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_top;
+
 import stl;
 import parser;
 import query_context;
@@ -21,18 +23,27 @@ import operator_state;
 import physical_operator;
 import physical_operator_type;
 import base_expression;
+import expression_state;
 import data_table;
+import data_block;
+import column_vector;
 import load_meta;
 import infinity_exception;
-
-export module physical_top;
+import physical_limit;
 
 namespace infinity {
 
 export class PhysicalTop : public PhysicalOperator {
 public:
-    explicit PhysicalTop(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kTop, nullptr, nullptr, id, load_metas) {}
+    explicit PhysicalTop(u64 id,
+                         UniquePtr<PhysicalOperator> left,
+                         u32 limit,
+                         u32 offset,
+                         Vector<SharedPtr<BaseExpression>> sort_expressions,
+                         Vector<OrderType> order_by_types,
+                         SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kTop, std::move(left), nullptr, id, load_metas), limit_(limit), offset_(offset),
+          order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)) {}
 
     ~PhysicalTop() override = default;
 
@@ -44,10 +55,30 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
-        return 0;
-    }
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
+
+    // for OperatorState
+    inline auto const &GetSortExpressions() const { return sort_expressions_; }
+
+    // for MergeTop
+    inline auto const &GetInnerSortFunctions() const { return sort_functions_; }
+
+    // for Top and MergeTop
+    static void HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<UniquePtr<DataBlock>> &output_data_block_array);
+
+    // for Top and MergeTop
+    static Vector<Vector<SharedPtr<ColumnVector>>> GetEvalColumns(const Vector<SharedPtr<BaseExpression>> &expressions,
+                                                                  Vector<SharedPtr<ExpressionState>> &expr_states,
+                                                                  const Vector<UniquePtr<DataBlock>> &data_block_array);
+
+private:
+    u32 limit_{};                                                      // limit value
+    u32 offset_{};                                                     // offset value
+    u32 sort_expr_count_{};                                            // number of expressions to sort
+    Vector<OrderType> order_by_types_;                                 // ASC or DESC
+    Vector<SharedPtr<BaseExpression>> sort_expressions_;               // expressions to sort
+    Vector<StdFunction<i8(void *, u32, void *, u32)>> sort_functions_; // sort functions
+    // TODO: save a common threshold value for all tasks
 };
 
 } // namespace infinity

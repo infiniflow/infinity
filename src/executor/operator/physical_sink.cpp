@@ -112,6 +112,22 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kTop: {
+            auto top_output_state = static_cast<TopOperatorState *>(task_op_state);
+            if (top_output_state->data_block_array_.empty()) {
+                if (materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    Error<ExecutorException>("Empty sort output");
+                }
+            } else {
+                for (auto &data_block : top_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                top_output_state->data_block_array_.clear();
+            }
+            break;
+        }
         case PhysicalOperatorType::kSort: {
             SortOperatorState *sort_output_state = static_cast<SortOperatorState *>(task_op_state);
             if (sort_output_state->data_block_array_.empty()) {

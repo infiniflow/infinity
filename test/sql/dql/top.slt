@@ -1,0 +1,40 @@
+statement ok
+DROP TABLE IF EXISTS t1;
+
+statement ok
+CREATE TABLE t1 (c1 int, c2 boolean, c3 datetime);
+
+statement ok
+INSERT INTO t1 VALUES(0, true, DATETIME '2000-1-1 0:0:0'), (0, false, DATETIME '2000-1-1 0:0:0'),
+(0, true, DATETIME '2000-1-1 0:0:1'), (-1, true, DATETIME '2000-1-1 0:0:0');
+
+query I
+select * from t1 order by c1, c2, c3 limit 6;
+----
+-1 true 2000-01-01 00:00:00
+0 false 2000-01-01 00:00:00
+0 true 2000-01-01 00:00:00
+0 true 2000-01-01 00:00:01
+
+query II
+select * from t1 order by c1, c2, c3 limit 6 offset 2;
+----
+0 true 2000-01-01 00:00:00
+0 true 2000-01-01 00:00:01
+
+query III
+select * from t1 order by c3 desc, c2 desc, c1 asc limit 33;
+----
+0 true 2000-01-01 00:00:01
+-1 true 2000-01-01 00:00:00
+0 true 2000-01-01 00:00:00
+0 false 2000-01-01 00:00:00
+
+query IV
+select * from t1 order by c3 desc, c2 desc, c1 asc limit 33 offset 2;
+----
+0 true 2000-01-01 00:00:00
+0 false 2000-01-01 00:00:00
+
+statement ok
+DROP TABLE t1;
