@@ -51,10 +51,6 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
         return;
     }
 
-    if (expr->type_ == ParsedExprType::kFunction) {
-        return;
-    }
-
     bind_context_ptr->select_expr_name2index_[expr_name] = bind_context_ptr->select_expression_.size();
     bind_context_ptr->select_expression_.emplace_back(expr);
 }
