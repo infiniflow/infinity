@@ -275,7 +275,15 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
                 if (col_expr->star_) {
                     delete (*expr.arguments_)[0];
-                    (*expr.arguments_)[0] = new ConstantExpr(LiteralType::kBoolean);
+                    auto constant_exp = new ConstantExpr(LiteralType::kInteger);
+                    // catulate row count
+                    String &table_name = bind_context_ptr->table_names_[0];
+                    TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+                    constant_exp->integer_value_ = table_entry->row_count_;
+                    (*expr.arguments_)[0] = constant_exp;
+                    auto &expr_rewrite = (FunctionExpr &)expr;
+                    expr_rewrite.func_name_ = "COUNT_STAR";
+                    return ExpressionBinder::BuildFuncExpr(expr_rewrite, bind_context_ptr, depth, true);
                 }
             }
         }

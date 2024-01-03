@@ -322,7 +322,7 @@ void TableCollectionEntry::CommitDelete(TableCollectionEntry *table_entry, Txn *
         SegmentEntry::CommitDelete(segment, txn_ptr, block_row_hashmap);
         row_count += block_row_hashmap.size();
     }
-    table_entry->row_count_ += row_count;
+    table_entry->row_count_ -= row_count;
 }
 
 UniquePtr<String> TableCollectionEntry::RollbackDelete(TableCollectionEntry *, Txn *, DeleteState &, BufferManager *) {
@@ -348,7 +348,7 @@ UniquePtr<String> TableCollectionEntry::ImportSegment(TableCollectionEntry *tabl
     }
 
     UniqueLock<RWMutex> rw_locker(table_entry->rw_locker_);
-    table_entry->row_count_ += row_count;
+    table_entry->row_count_ = row_count;
     table_entry->segment_map_.emplace(segment->segment_id_, Move(segment));
     return nullptr;
 }

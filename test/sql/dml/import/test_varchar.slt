@@ -23,6 +23,12 @@ SELECT c1, c2 FROM test_varchar_type;
 3 hello world
 4 hello hello hello hello hello
 
+
+query III
+SELECT count(*) FROM test_varchar_type;
+----
+4
+
 # Clean up
 statement ok
 DROP TABLE test_varchar_type;

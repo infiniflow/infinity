@@ -99,6 +99,11 @@ SELECT MAX(c1)*AVG(c2) FROM simple_agg;
 ----
 6.000000
 
+query IIII
+SELECT COUNT(*) FROM simple_agg;
+----
+3
+
 
 statement ok
 DROP TABLE simple_agg;
