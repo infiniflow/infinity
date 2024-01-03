@@ -51,11 +51,18 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
         return;
     }
 
+    if (expr->type_ == ParsedExprType::kFunction) {
+        return;
+    }
+
     bind_context_ptr->select_expr_name2index_[expr_name] = bind_context_ptr->select_expression_.size();
     bind_context_ptr->select_expression_.emplace_back(expr);
 }
 
 SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    if (expr.type_ == ParsedExprType::kFunction) {
+        return ExpressionBinder::BuildFuncExpr((FunctionExpr &)expr, bind_context_ptr, depth, root);
+    }
     if (expr.type_ == ParsedExprType::kKnn) {
         return ExpressionBinder::BuildKnnExpr((KnnExpr &)expr, bind_context_ptr, depth, root);
     }
