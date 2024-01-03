@@ -49,12 +49,14 @@ export {
     typedef u32 tf_t;
     typedef i64 ttf_t;
     typedef u32 field_len_t;
+    typedef i32 segmentid_t;
 
     constexpr optionflag_t OPTION_FLAG_ALL = of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
     constexpr optionflag_t NO_TERM_FREQUENCY = of_doc_payload | of_term_payload;
     constexpr optionflag_t OPTION_FLAG_NONE = of_none;
     constexpr docid_t INVALID_DOCID = -1;
     constexpr pos_t INVALID_POSITION = u32_max;
+    constexpr segmentid_t INVALID_SEGMENTID = -1;
     constexpr u32 MAX_DOC_PER_RECORD = 128;
     constexpr u32 MAX_DOC_PER_RECORD_BIT_NUM = 7;
     constexpr u32 MAX_DOC_PER_BITMAP_BLOCK = 256;

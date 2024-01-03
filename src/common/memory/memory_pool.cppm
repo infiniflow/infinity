@@ -103,7 +103,7 @@ protected:
 
 export class RecyclePool : public MemoryPool {
 public:
-    RecyclePool(SizeT chunkSize, SizeT alignSize = 1);
+    RecyclePool(SizeT chunk_size = DEFAULT_CHUNK_SIZE, SizeT align_size = DEFAULT_ALIGN_SIZE);
 
     ~RecyclePool() {}
 

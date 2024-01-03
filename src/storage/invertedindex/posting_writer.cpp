@@ -60,6 +60,8 @@ void PostingWriter::Write(const SharedPtr<FileWriter> &file_writer) {
     }
 }
 
+void PostingWriter::AddPosition(pos_t pos) {}
+
 InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder(MemoryPool *session_pool) const {
     InMemPostingDecoder *posting_decoder =
         session_pool ? (new ((session_pool)->Allocate(sizeof(InMemPostingDecoder))) InMemPostingDecoder()) : new InMemPostingDecoder();
